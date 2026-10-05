@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151320">
+  <meta name="description" content="좋아하는 스트리머의 공식 팬페이지를 만나보세요.">
+  <title>스트리머 팬페이지</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
+    <div class="startup-card">
+      <div class="startup-mark" aria-hidden="true">✳</div>
+      <p class="eyebrow">STREAMER SERIES</p>
+      <h1 id="startupTitle">페이지를 준비하고 있어요</h1>
+      <p id="startupMessage">로그인 상태와 인증된 스트리머 정보를 확인하고 있습니다.</p>
+      <div class="startup-progress" aria-hidden="true"><span></span></div>
+      <button class="button button-primary hidden" id="retryButton" type="button">다시 불러오기</button>
+    </div>
+  </div>
+
+  <div class="site-shell" id="siteShell" aria-hidden="true">
+    <header class="topbar">
+      <a class="brand" href="#/" aria-label="스트리머 팬페이지 홈">
+        <span class="brand-symbol">✳</span><span><small>STREAMER SERIES</small><strong>스트리머 팬페이지</strong></span>
+      </a>
+      <span class="topbar-caption"><i></i>인증 스트리머 페이지</span>
+    </header>
+
+    <main id="mainContent" class="main-content">
+      <section id="homeView" class="home-view hidden">
+        <div class="hero-copy">
+          <p class="eyebrow">YOUR STREAMER, YOUR PLACE</p>
+          <h1>좋아하는 스트리머의<br><span>팬페이지를 찾아보세요.</span></h1>
+          <p class="hero-subtitle">인증 스트리머마다 하나씩, 팬들을 위한 페이지가 열려 있어요.</p>
+        </div>
+        <section class="search-panel" aria-labelledby="searchTitle">
+          <label id="searchTitle" for="searchInput">스트리머 검색</label>
+          <div class="search-field"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" maxlength="40" placeholder="닉네임 또는 SOOP 아이디" autocomplete="off"><button id="clearSearch" class="clear-search hidden" type="button" aria-label="검색어 지우기">×</button></div>
+          <p class="search-hint" id="searchHint">인증 스트리머의 닉네임이나 방송국 아이디를 입력해 주세요.</p>
+          <div id="searchResults" class="streamer-grid" aria-live="polite"></div>
+        </section>
+        <section class="recent-section" aria-labelledby="recentTitle">
+          <div class="section-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2 id="recentTitle">최근 방문한 팬페이지</h2></div><span class="section-note">최근 8개</span></div>
+          <div id="recentPages" class="recent-grid"><p class="empty-state">아직 방문한 팬페이지가 없어요.</p></div>
+        </section>
+      </section>
+
+      <section id="fanPageView" class="fanpage-view hidden" aria-live="polite"></section>
+    </main>
+    <footer class="footer"><span>STREAMER SERIES</span><span>좋아하는 마음이 머무는 곳</span></footer>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
