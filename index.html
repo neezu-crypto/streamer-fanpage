@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
+  <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -28,7 +29,15 @@
       <a class="brand" href="#/" aria-label="스트리머 팬페이지 홈">
         <span class="brand-symbol">✳</span><span><small>STREAMER SERIES</small><strong>스트리머 팬페이지</strong></span>
       </a>
-      <span class="topbar-caption"><i></i>인증 스트리머 페이지</span>
+      <div class="topbar-right">
+        <span class="topbar-caption"><i></i>인증 스트리머 페이지</span>
+        <div class="auth-actions" id="authActions">
+          <span class="account-status" id="accountStatus">로그인 확인 중</span>
+          <button class="auth-button google-button" id="googleLoginButton" type="button">Google 로그인</button>
+          <button class="auth-button kakao-button" id="kakaoLoginButton" type="button">카카오 로그인</button>
+          <button class="auth-button logout-button hidden" id="logoutButton" type="button">로그아웃</button>
+        </div>
+      </div>
     </header>
 
     <main id="mainContent" class="main-content">
@@ -54,6 +63,17 @@
     </main>
     <footer class="footer"><span>STREAMER SERIES</span><span>좋아하는 마음이 머무는 곳</span></footer>
   </div>
+  <dialog id="accountSwitchDialog" class="account-dialog">
+    <div class="account-dialog-card">
+      <p class="eyebrow">ACCOUNT SWITCH</p>
+      <h2>이미 연결된 계정이 있어요</h2>
+      <p>기존 계정으로 전환하면 현재 세션에 저장된 최근 방문 기록은 기존 계정과 합쳐지지 않습니다.</p>
+      <div class="account-dialog-actions">
+        <button class="button" id="cancelAccountSwitch" type="button">취소</button>
+        <button class="button button-primary" id="confirmAccountSwitch" type="button">기존 계정으로 전환</button>
+      </div>
+    </div>
+  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="app.js"></script>
 </body>

@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signInWithCustomToken, linkWithPopup, signOut, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 
 const firebaseConfig = {
@@ -19,10 +19,134 @@ const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
 const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
 const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
+// 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
+const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
+const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
 const $ = (id) => document.getElementById(id);
 let currentPage = null;
 let searchTimer = 0;
 let toastTimer = 0;
+
+if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
+
+function renderAuthControls() {
+  const user = auth.currentUser;
+  const googleLinked = !!(user && user.providerData.some((provider) => provider.providerId === 'google.com'));
+  const kakaoLinked = !!(user && localStorage.getItem(KAKAO_LINKED_UID_KEY) === user.uid);
+  $('accountStatus').textContent = !user
+    ? '로그인 확인 중'
+    : user.isAnonymous && !kakaoLinked
+      ? '게스트 이용 중'
+      : googleLinked
+        ? 'Google 계정 연결됨'
+        : '카카오 계정 연결됨';
+  $('googleLoginButton').classList.toggle('hidden', googleLinked);
+  $('googleLoginButton').textContent = user && !user.isAnonymous ? 'Google 연결' : 'Google 로그인';
+  $('kakaoLoginButton').textContent = user && !user.isAnonymous ? '카카오 연결' : '카카오 로그인';
+  $('logoutButton').classList.toggle('hidden', !user || (user.isAnonymous && !kakaoLinked));
+}
+
+onAuthStateChanged(auth, renderAuthControls);
+
+function confirmAccountSwitch() {
+  const dialog = $('accountSwitchDialog');
+  return new Promise((resolve) => {
+    const cancelEscape = (event) => { event.preventDefault(); finish(false); };
+    const finish = (confirmed) => {
+      dialog.close();
+      dialog.removeEventListener('cancel', cancelEscape);
+      $('cancelAccountSwitch').onclick = null;
+      $('confirmAccountSwitch').onclick = null;
+      resolve(confirmed);
+    };
+    dialog.addEventListener('cancel', cancelEscape);
+    $('cancelAccountSwitch').onclick = () => finish(false);
+    $('confirmAccountSwitch').onclick = () => finish(true);
+    dialog.showModal();
+  });
+}
+
+function isPopupCancelled(error) {
+  return error && ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(error.code);
+}
+
+async function loginWithGoogle() {
+  const button = $('googleLoginButton');
+  button.disabled = true;
+  try {
+    if (!auth.currentUser) await waitForAuthRestore();
+    await linkWithPopup(auth.currentUser, googleProvider);
+    await callLinkGoogle();
+    showToast('Google 계정을 연결했어요.');
+  } catch (error) {
+    if (error && error.code === 'auth/credential-already-in-use') {
+      if (!(await confirmAccountSwitch())) return;
+      try {
+        await signInWithPopup(auth, googleProvider);
+        await callLinkGoogle();
+        location.reload();
+      } catch (switchError) {
+        if (!isPopupCancelled(switchError)) showToast(switchError.message || 'Google 계정 전환에 실패했어요.');
+      }
+    } else if (error && error.code === 'auth/provider-already-linked') {
+      showToast('이미 Google 계정이 연결되어 있어요.');
+    } else if (!isPopupCancelled(error)) {
+      console.error('Google login failed:', error);
+      showToast(error.message || 'Google 로그인에 실패했어요.');
+    }
+  } finally { button.disabled = false; }
+}
+
+async function loginWithKakao() {
+  if (!window.Kakao || !window.Kakao.isInitialized()) {
+    showToast('카카오 로그인을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+    return;
+  }
+  const button = $('kakaoLoginButton');
+  button.disabled = true;
+  window.Kakao.Auth.login({
+    success: async (authObj) => {
+      try {
+        const result = await callLinkKakao({ kakaoAccessToken: authObj.access_token });
+        const action = result.data && result.data.action;
+        if (action === 'switch') {
+          if (!(await confirmAccountSwitch())) return;
+          const signedIn = await signInWithCustomToken(auth, result.data.customToken);
+          localStorage.setItem(KAKAO_LINKED_UID_KEY, signedIn.user.uid);
+          location.reload();
+          return;
+        }
+        if (auth.currentUser && (action === 'linked' || action === 'already-linked')) {
+          localStorage.setItem(KAKAO_LINKED_UID_KEY, auth.currentUser.uid);
+        }
+        renderAuthControls();
+        showToast(action === 'already-linked' ? '이미 카카오 계정이 연결되어 있어요.' : '카카오 계정을 연결했어요.');
+      } catch (error) {
+        console.error('Kakao login failed:', error);
+        showToast(error.message || '카카오 로그인에 실패했어요.');
+      } finally { button.disabled = false; }
+    },
+    fail: (error) => {
+      button.disabled = false;
+      if (!error || error.error !== 'access_denied') showToast('카카오 로그인이 취소되었거나 실패했어요.');
+    }
+  });
+}
+
+async function logout() {
+  $('logoutButton').disabled = true;
+  try {
+    await signOut(auth);
+    localStorage.removeItem(KAKAO_LINKED_UID_KEY);
+    location.reload();
+  } catch (error) {
+    showToast(error.message || '로그아웃하지 못했어요.');
+    $('logoutButton').disabled = false;
+  }
+}
 
 function routeId() {
   const match = location.hash.match(/^#\/p\/([a-z0-9_]{2,20})$/i);
@@ -240,5 +364,8 @@ async function loadApp() {
   } catch (error) { showStartupError(error); }
 }
 $('retryButton').addEventListener('click', loadApp);
+$('googleLoginButton').addEventListener('click', loginWithGoogle);
+$('kakaoLoginButton').addEventListener('click', loginWithKakao);
+$('logoutButton').addEventListener('click', logout);
 window.addEventListener('hashchange', loadApp);
 loadApp();
