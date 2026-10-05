@@ -11,7 +11,8 @@ const firebaseConfig = {
   messagingSenderId: '997788925900',
   appId: '1:997788925900:web:b58db2970489bf18a3a769'
 };
-const app = initializeApp(firebaseConfig, 'streamer-fanpage');
+// 다른 시리즈 앱과 같은 origin·apiKey·기본 Firebase 앱 세션을 공유해 기존 UID를 이어받는다.
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const functions = getFunctions(app, 'us-central1');
 const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
