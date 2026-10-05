@@ -33,8 +33,9 @@
         <span class="topbar-caption"><i></i>인증 스트리머 페이지</span>
         <div class="auth-actions" id="authActions">
           <span class="account-status" id="accountStatus">로그인 확인 중</span>
-          <button class="auth-button google-button" id="googleLoginButton" type="button">Google 로그인</button>
-          <button class="auth-button kakao-button" id="kakaoLoginButton" type="button">카카오 로그인</button>
+          <button class="auth-button login-options-button" id="openLoginOptions" type="button">로그인 / 인증</button>
+          <button class="auth-button google-button hidden" id="googleLoginButton" type="button">Google 로그인</button>
+          <button class="auth-button kakao-button hidden" id="kakaoLoginButton" type="button">카카오 로그인</button>
           <button class="auth-button logout-button hidden" id="logoutButton" type="button">로그아웃</button>
         </div>
       </div>
@@ -63,6 +64,36 @@
     </main>
     <footer class="footer"><span>STREAMER SERIES</span><span>좋아하는 마음이 머무는 곳</span></footer>
   </div>
+  <dialog id="loginChoiceDialog" class="account-dialog">
+    <div class="account-dialog-card">
+      <p class="eyebrow">WELCOME TO STREAMER SERIES</p>
+      <h2>로그인 방법을 선택해 주세요</h2>
+      <p>로그인하면 최근 방문한 팬페이지가 계정에 저장됩니다. 인증 스트리머는 인증 후 본인 팬페이지로 연결돼요.</p>
+      <div class="login-choice-actions">
+        <button class="auth-button google-button" id="choiceGoogleLogin" type="button">Google로 로그인</button>
+        <button class="auth-button kakao-button" id="choiceKakaoLogin" type="button">카카오로 로그인</button>
+        <button class="button streamer-verify-choice" id="openStreamerVerification" type="button">스트리머 인증 신청 / 확인</button>
+      </div>
+      <div class="account-dialog-actions"><button class="button" id="closeLoginChoices" type="button">닫기</button></div>
+    </div>
+  </dialog>
+  <dialog id="streamerVerifyDialog" class="account-dialog">
+    <form class="account-dialog-card verification-form" id="streamerVerificationForm">
+      <p class="eyebrow">STREAMER VERIFICATION</p>
+      <h2>스트리머 인증</h2>
+      <p>닉네임과 SOOP 아이디를 입력해 인증을 신청하세요. 신청은 서버에서 확인하며, 승인 후 본인 팬페이지로 자동 연결됩니다.</p>
+      <label for="verificationNickname">스트리머 닉네임</label>
+      <input id="verificationNickname" name="nickname" maxlength="20" autocomplete="nickname" required>
+      <label for="verificationSoopId">SOOP 아이디</label>
+      <input id="verificationSoopId" name="soopId" minlength="2" maxlength="20" pattern="[A-Za-z0-9]{2,20}" autocomplete="off" required>
+      <p class="verification-status" id="verificationStatus" role="status" aria-live="polite">관리자 승인 후 인증이 완료됩니다.</p>
+      <div class="account-dialog-actions verification-actions">
+        <button class="button" id="checkStreamerVerification" type="button">승인 여부 확인</button>
+        <button class="button" id="closeStreamerVerification" type="button">닫기</button>
+        <button class="button button-primary" id="submitStreamerVerification" type="submit">인증 신청</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="accountSwitchDialog" class="account-dialog">
     <div class="account-dialog-card">
       <p class="eyebrow">ACCOUNT SWITCH</p>

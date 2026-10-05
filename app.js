@@ -22,6 +22,7 @@ const callSave = httpsCallable(functions, 'streamerFanPageSave');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
+const callStreamerVerification = httpsCallable(functions, 'requestStreamerVerification');
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
@@ -46,6 +47,10 @@ function renderAuthControls() {
   $('googleLoginButton').classList.toggle('hidden', googleLinked);
   $('googleLoginButton').textContent = user && !user.isAnonymous ? 'Google 연결' : 'Google 로그인';
   $('kakaoLoginButton').textContent = user && !user.isAnonymous ? '카카오 연결' : '카카오 로그인';
+  $('choiceGoogleLogin').classList.toggle('hidden', googleLinked);
+  $('choiceGoogleLogin').textContent = user && !user.isAnonymous ? 'Google 계정 연결' : 'Google로 로그인';
+  $('choiceKakaoLogin').classList.toggle('hidden', kakaoLinked);
+  $('choiceKakaoLogin').textContent = user && !user.isAnonymous ? '카카오 계정 연결' : '카카오로 로그인';
   $('logoutButton').classList.toggle('hidden', !user || (user.isAnonymous && !kakaoLinked));
 }
 
@@ -366,6 +371,65 @@ async function loadApp() {
 $('retryButton').addEventListener('click', loadApp);
 $('googleLoginButton').addEventListener('click', loginWithGoogle);
 $('kakaoLoginButton').addEventListener('click', loginWithKakao);
+$('openLoginOptions').addEventListener('click', () => $('loginChoiceDialog').showModal());
+$('closeLoginChoices').addEventListener('click', () => $('loginChoiceDialog').close());
+$('choiceGoogleLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithGoogle(); });
+$('choiceKakaoLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithKakao(); });
+$('openStreamerVerification').addEventListener('click', () => {
+  $('loginChoiceDialog').close();
+  $('streamerVerifyDialog').showModal();
+});
+$('closeStreamerVerification').addEventListener('click', () => $('streamerVerifyDialog').close());
+$('checkStreamerVerification').addEventListener('click', () => submitOrCheckStreamerVerification(true));
+$('streamerVerificationForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  submitOrCheckStreamerVerification(false);
+});
 $('logoutButton').addEventListener('click', logout);
 window.addEventListener('hashchange', loadApp);
 loadApp();
+
+async function submitOrCheckStreamerVerification(checkOnly) {
+  const submitButton = $('submitStreamerVerification');
+  const checkButton = $('checkStreamerVerification');
+  const status = $('verificationStatus');
+  const nickname = $('verificationNickname').value.trim();
+  const soopId = $('verificationSoopId').value.trim().toLowerCase();
+  if (!checkOnly && !$('streamerVerificationForm').reportValidity()) return;
+  submitButton.disabled = true;
+  checkButton.disabled = true;
+  status.textContent = checkOnly ? '인증 상태를 확인하고 있어요.' : '인증 신청을 접수하고 있어요.';
+  try {
+    if (!auth.currentUser) await waitForAuthRestore();
+    if (!auth.currentUser) await signInAnonymously(auth);
+    const payload = { source: 'streamer-fanpage' };
+    if (!checkOnly) Object.assign(payload, { nickname, soopId });
+    const result = (await callStreamerVerification(payload)).data || {};
+    if (result.action === 'already-verified' || result.action === 'auto-approved') {
+      status.textContent = '인증이 확인됐어요. 본인 팬페이지로 이동합니다.';
+      setTimeout(() => location.reload(), 500);
+      return;
+    }
+    if (result.action === 'switch') {
+      status.textContent = '이미 인증된 계정이 확인됐어요.';
+      if (await confirmAccountSwitch()) {
+        await signInWithCustomToken(auth, result.customToken);
+        location.reload();
+      }
+      return;
+    }
+    if (result.action === 'pending') {
+      status.textContent = checkOnly
+        ? `${result.nickname || '스트리머'} 인증은 아직 검토 중이에요. 승인 후 다시 확인해 주세요.`
+        : '인증 신청을 접수했어요. 관리자 승인 후 “승인 여부 확인”을 눌러 주세요.';
+      return;
+    }
+    throw new Error('인증 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  } catch (error) {
+    console.error('Streamer verification failed:', error);
+    status.textContent = error.message || '인증 요청에 실패했어요. 잠시 후 다시 시도해 주세요.';
+  } finally {
+    submitButton.disabled = false;
+    checkButton.disabled = false;
+  }
+}
