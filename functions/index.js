@@ -53,7 +53,9 @@ async function findVerifiedBySoopId(soopId) {
 async function recordRecentVisit(uid, streamerId) {
   const ref = db.ref(`streamerFanPageRecentVisits/${uid}`);
   await ref.child(streamerId).set({ visitedAt: Date.now() });
-  const snap = await ref.orderByChild('visitedAt').get();
+  // 방문 이력은 최대 8개만 유지하므로 규칙 변경이 필요한 RTDB 정렬 쿼리 대신
+  // Admin SDK로 작은 목록을 읽고 서버에서 정렬한다.
+  const snap = await ref.get();
   const visits = Object.entries(snap.val() || {})
     .sort((a, b) => (Number(a[1] && a[1].visitedAt) || 0) - (Number(b[1] && b[1].visitedAt) || 0));
   if (visits.length > RECENT_PAGE_LIMIT) {
@@ -119,11 +121,11 @@ exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => 
 
 exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
-  const snap = await db.ref(`streamerFanPageRecentVisits/${uid}`)
-    .orderByChild('visitedAt').limitToLast(RECENT_PAGE_LIMIT).get();
+  const snap = await db.ref(`streamerFanPageRecentVisits/${uid}`).get();
   const visits = Object.entries(snap.val() || {})
     .map(([streamerId, value]) => ({ streamerId, visitedAt: Number(value && value.visitedAt) || 0 }))
-    .sort((a, b) => b.visitedAt - a.visitedAt);
+    .sort((a, b) => b.visitedAt - a.visitedAt)
+    .slice(0, RECENT_PAGE_LIMIT);
   const streamers = await Promise.all(visits.map(async (visit) => {
     const record = await findVerifiedBySoopId(visit.streamerId);
     return record ? { ...record.streamer, visitedAt: visit.visitedAt } : null;
