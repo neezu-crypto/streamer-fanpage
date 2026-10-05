@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
-import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 
 const firebaseConfig = {
@@ -27,6 +27,18 @@ let toastTimer = 0;
 function routeId() {
   const match = location.hash.match(/^#\/p\/([a-z0-9_]{2,20})$/i);
   return match ? decodeURIComponent(match[1]).toLowerCase() : '';
+}
+function waitForAuthRestore() {
+  return new Promise((resolve, reject) => {
+    let unsubscribe = () => {};
+    unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    }, (error) => {
+      unsubscribe();
+      reject(error);
+    });
+  });
 }
 function goHome() { location.hash = '#/'; }
 function goPage(id) { location.hash = `#/p/${encodeURIComponent(id)}`; }
@@ -193,11 +205,11 @@ async function loadApp() {
   $('startupTitle').textContent = '페이지를 준비하고 있어요';
   $('startupMessage').textContent = '로그인 상태와 인증된 스트리머 정보를 확인하고 있습니다.';
   try {
-    if (!auth.currentUser) await signInAnonymously(auth);
+    if (!await waitForAuthRestore()) await signInAnonymously(auth);
     let requestedId = routeId();
     let result = (await callBootstrap({ streamerId: requestedId })).data;
     if (result.redirectTo && result.redirectTo !== requestedId) {
-      location.hash = `#/p/${encodeURIComponent(result.redirectTo)}`;
+      history.replaceState(null, '', `#/p/${encodeURIComponent(result.redirectTo)}`);
       requestedId = result.redirectTo;
       result = (await callBootstrap({ streamerId: requestedId })).data;
     }
