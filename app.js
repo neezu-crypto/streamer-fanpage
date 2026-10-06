@@ -1,6 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signInWithCustomToken, linkWithPopup, signOut, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
+import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -14,6 +15,7 @@ const firebaseConfig = {
 // 다른 시리즈 앱과 같은 origin·apiKey·기본 Firebase 앱 세션을 공유해 기존 UID를 이어받는다.
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getDatabase(app);
 const functions = getFunctions(app, 'us-central1');
 const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
 const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
@@ -33,6 +35,39 @@ let toastTimer = 0;
 let verifiedStreamerUid = '';
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
+
+// admin-center가 관리하는 공개 devbarLinks를 표시한다. 읽기 실패나 빈 노드에는
+// HTML에 둔 기본 링크를 유지하고, 이 페이지 자신은 항상 제외한다.
+async function loadDevbarLinks() {
+  const selfGameId = 'streamerFanPage';
+  try {
+    const snapshot = await get(ref(db, 'devbarLinks'));
+    const data = snapshot.val();
+    if (!data) return;
+    const links = Object.keys(data)
+      .filter((id) => id !== selfGameId && data[id] && data[id].url)
+      .map((id) => ({ id, ...data[id] }))
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+    if (!links.length) return;
+    const nav = $('devbarLinks');
+    if (!nav) return;
+    nav.querySelectorAll('a[data-game-id]').forEach((link) => link.remove());
+    for (const item of links) {
+      const url = new URL(item.url, location.href);
+      if (url.protocol !== 'https:') continue;
+      const link = document.createElement('a');
+      link.dataset.gameId = item.id;
+      link.href = url.href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = item.label || item.name || item.id;
+      nav.appendChild(link);
+    }
+  } catch (error) {
+    console.error('자매 서비스 링크를 불러오지 못했습니다. 기본 링크를 유지합니다.', error);
+  }
+}
+loadDevbarLinks();
 
 function renderAuthControls() {
   const user = auth.currentUser;
