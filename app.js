@@ -310,10 +310,13 @@ function renderFanPage(page) {
     row.append(term, description); facts.append(row);
   });
 
-  const about = document.createElement('div'); about.className = 'profile-about';
-  const aboutLabel = document.createElement('strong'); aboutLabel.textContent = 'ABOUT';
-  const aboutText = document.createElement('span'); aboutText.textContent = page.intro || '당신이 여기 온 이유';
-  about.append(aboutLabel, aboutText);
+  let about = null;
+  if (page.intro) {
+    about = document.createElement('div'); about.className = 'profile-about';
+    const aboutLabel = document.createElement('strong'); aboutLabel.textContent = 'ABOUT';
+    const aboutText = document.createElement('span'); aboutText.textContent = page.intro;
+    about.append(aboutLabel, aboutText);
+  }
 
   const details = document.createElement('div'); details.className = 'profile-details';
   const detailRows = [
@@ -339,7 +342,9 @@ function renderFanPage(page) {
     const edit = document.createElement('a'); edit.className = 'button'; edit.href = '#editProfile'; edit.textContent = '프로필 수정';
     actions.append(edit);
   }
-  section.append(label, identity, facts, about, details, actions);
+  section.append(label, identity, facts);
+  if (about) section.append(about);
+  section.append(details, actions);
   view.append(back, section);
 
   if (page.isOwner) {
