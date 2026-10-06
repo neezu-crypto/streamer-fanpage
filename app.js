@@ -529,6 +529,7 @@ function renderFanPage(page) {
 function renderMessengerSection(page) {
   const soopId = String(page.streamer && page.streamer.soopId || '').trim();
   if (!/^[a-z0-9]{2,20}$/i.test(soopId)) return null;
+  const isStreamerOwner = page.isStreamerOwner === true;
 
   const section = document.createElement('section');
   section.className = 'messenger-link-section';
@@ -548,13 +549,17 @@ function renderMessengerSection(page) {
   eyebrow.textContent = 'STREAMER MESSENGER';
   const title = document.createElement('h2');
   title.id = 'messengerLinkTitle';
-  title.textContent = '팬들과 대화하기';
+  title.textContent = isStreamerOwner ? '내 메신저 채팅방' : '팬들과 대화하기';
   const description = document.createElement('p');
   description.className = 'messenger-link-description';
-  description.textContent = '팬들과 대화를 이어가 보세요.';
+  description.textContent = isStreamerOwner
+    ? '채팅방에서 팬들과 대화를 이어가 보세요.'
+    : '팬들과 대화를 이어가 보세요.';
   const note = document.createElement('p');
   note.className = 'messenger-link-note';
-  note.textContent = '참여 가능 여부와 권한은 메신저에서 확인합니다.';
+  note.textContent = isStreamerOwner
+    ? '채팅방이 없다면 메신저에서 먼저 만들어 주세요.'
+    : '참여 가능 여부와 권한은 메신저에서 확인합니다.';
   text.append(eyebrow, title, description, note);
   copy.append(icon, text);
 
@@ -565,7 +570,7 @@ function renderMessengerSection(page) {
   link.href = messengerUrl.href;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
-  link.textContent = '메신저 입장 ↗';
+  link.textContent = isStreamerOwner ? '메신저 관리 ↗' : '메신저 입장 ↗';
 
   section.append(copy, link);
   return section;
@@ -1436,9 +1441,9 @@ async function loadApp() {
       $('clearSearch').onclick = () => { $('searchInput').value = ''; runSearch(); $('searchInput').focus(); };
     } else {
       const page = result.page;
-      // 관리자는 서버가 권한을 확인한 경우에만 소유자 화면과 같은 설정 UI를 본다.
-      page.isOwner = (!!result.verifiedStreamer && result.verifiedStreamer.id === page.streamer.id)
-        || result.isAdmin === true;
+      page.isStreamerOwner = !!(result.verifiedStreamer && result.verifiedStreamer.id === page.streamer.id);
+      // 관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
+      page.isOwner = page.isStreamerOwner || result.isAdmin === true;
       setVisibleView(page);
       const recent = await recentPromise;
       renderList($('recentPages'), recent, true, '최근 방문한 팬페이지가 여기에 표시돼요.');
