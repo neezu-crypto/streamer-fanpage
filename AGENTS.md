@@ -5,6 +5,7 @@
 - 공개 프로필 응답에는 `id`, `nickname`, `soopId`, `avatarUrl`, `soopUrl`만 포함하고 인증 UID는 반환하지 않는다. 팬페이지 내용은 `streamerFanPages/{soopId}`, 최근 방문은 `streamerFanPageRecentVisits/{uid}/{soopId}`에 저장하며, 두 데이터는 Admin SDK를 거치는 callable로만 접근한다.
 - 인증된 스트리머가 접속하면 서버가 확인한 본인 SOOP ID 페이지로 이동한다. 안내 모달은 인증과 화면 데이터·폰트·프로필 이미지 로드가 끝난 뒤에 닫는다.
 - 인증 계정 연결은 공유 `DEFAULT` Firebase Auth 세션을 사용한다. Google은 클라이언트 `linkWithPopup` 후 공유 `linkGoogleAccount` callable을, Kakao는 공식 SDK와 공유 `linkKakaoAccount` callable을 사용한다. 기존 보호 계정 전환 전에는 방문 기록이 자동 병합되지 않는다는 점을 확인받는다.
+- 스트리머 인증 상태는 `users/{현재 UID}/streamerVerified`를 본인 전용으로 실시간 구독한다. 관리자 승인 결과는 페이지가 열려 있고 연결된 동안 화면에 자동 반영된다. `streamerVerificationSwitchApproval`이 도착하면 공유 `requestStreamerVerification` callable에서 신청·승인 상태를 다시 검증하고 기존 인증 UID의 custom token으로 세션을 전환한다. 토큰을 DB에 기록하지 않으며 처리 후 신호를 삭제한다. 페이지가 닫힌 상태의 푸시는 없다.
 - SOOP 다시보기 캐시는 `streamerFanPageVods/{soopId}/generations/{generation}` 아래 순번 키로 저장한다. bootstrap은 첫 24개만 반환하고 나머지는 인증된 callable 페이지로 읽는다. 갱신은 임시 세대에 응답을 묶음 저장·검증한 뒤 활성 세대 포인터를 교체하며 실패 시 기존 활성 세대를 유지한다. 예전 flat `items` 캐시도 다음 갱신 전까지 읽기를 지원한다.
 - 다시보기 카드는 SOOP 임베드 모달로 열고, 플레이어가 동작하지 않을 때 원본 링크를 제공한다. 갱신 UI 잠금은 스트리머 ID별로 관리한다.
 - 스트리머 캘린더는 `api-channel.sooplive.com` 응답을 서버에서 조회해 월간/주간으로 보여준다. 응답은 `streamerFanPageCalendarCache/{soopId}` 아래 기간별로 캐시하며 10분 TTL, 최근 24개 기간 제한을 적용한다. 브라우저는 캘린더를 직접 읽거나 쓰지 않고 `streamerFanPageCalendar` callable만 사용한다.
