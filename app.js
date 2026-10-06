@@ -44,9 +44,6 @@ function renderAuthControls() {
       : googleLinked
         ? 'Google 계정 연결됨'
         : '카카오 계정 연결됨';
-  $('googleLoginButton').classList.toggle('hidden', googleLinked);
-  $('googleLoginButton').textContent = user && !user.isAnonymous ? 'Google 연결' : 'Google 로그인';
-  $('kakaoLoginButton').textContent = user && !user.isAnonymous ? '카카오 연결' : '카카오 로그인';
   $('choiceGoogleLogin').classList.toggle('hidden', googleLinked);
   $('choiceGoogleLogin').textContent = user && !user.isAnonymous ? 'Google 계정 연결' : 'Google로 로그인';
   $('choiceKakaoLogin').classList.toggle('hidden', kakaoLinked);
@@ -79,7 +76,7 @@ function isPopupCancelled(error) {
 }
 
 async function loginWithGoogle() {
-  const button = $('googleLoginButton');
+  const button = $('choiceGoogleLogin');
   button.disabled = true;
   try {
     if (!auth.currentUser) await waitForAuthRestore();
@@ -110,7 +107,7 @@ async function loginWithKakao() {
     showToast('카카오 로그인을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return;
   }
-  const button = $('kakaoLoginButton');
+  const button = $('choiceKakaoLogin');
   button.disabled = true;
   window.Kakao.Auth.login({
     success: async (authObj) => {
@@ -369,8 +366,6 @@ async function loadApp() {
   } catch (error) { showStartupError(error); }
 }
 $('retryButton').addEventListener('click', loadApp);
-$('googleLoginButton').addEventListener('click', loginWithGoogle);
-$('kakaoLoginButton').addEventListener('click', loginWithKakao);
 $('openLoginOptions').addEventListener('click', () => $('loginChoiceDialog').showModal());
 $('closeLoginChoices').addEventListener('click', () => $('loginChoiceDialog').close());
 $('choiceGoogleLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithGoogle(); });
