@@ -354,7 +354,8 @@ function renderFanPage(page) {
   section.append(label, identity, facts);
   if (about) section.append(about);
   section.append(details, actions);
-  view.append(back, section);
+  if (!page.isOwner) view.append(back);
+  view.append(section);
 
   if (page.isOwner) {
     const editorDialog = document.createElement('dialog');
