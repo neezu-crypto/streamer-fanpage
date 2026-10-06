@@ -39,6 +39,11 @@ async function findVerifiedByUid(uid) {
   return streamer ? { key, streamer, record } : null;
 }
 
+async function isAdminUid(uid) {
+  const snap = await db.ref(`adminCenter/adminUids/${uid}`).get();
+  return snap.val() === true;
+}
+
 async function findVerifiedBySoopId(soopId) {
   const normalized = String(soopId || '').trim().toLowerCase();
   if (!SOOP_ID_PATTERN.test(normalized)) return null;
@@ -105,12 +110,12 @@ function normalizePage(streamer, value) {
 
 exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
-  const verified = await findVerifiedByUid(uid);
+  const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   const requestedId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
-  if (verified && requestedId !== verified.streamer.id) {
-    return { verifiedStreamer: verified.streamer, redirectTo: verified.streamer.id };
+  if (verified && !isAdmin && requestedId !== verified.streamer.id) {
+    return { verifiedStreamer: verified.streamer, isAdmin, redirectTo: verified.streamer.id };
   }
-  if (!requestedId) return { verifiedStreamer: verified ? verified.streamer : null, page: null };
+  if (!requestedId) return { verifiedStreamer: verified ? verified.streamer : null, isAdmin, page: null };
 
   const target = await findVerifiedBySoopId(requestedId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
@@ -120,6 +125,7 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
   ]);
   return {
     verifiedStreamer: verified ? verified.streamer : null,
+    isAdmin,
     page: normalizePage(target.streamer, pageSnap.val()),
   };
 });
@@ -160,9 +166,18 @@ exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => 
 
 exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
-  const verified = await findVerifiedByUid(uid);
-  if (!verified) throw new HttpsError('permission-denied', '인증 스트리머만 팬페이지를 수정할 수 있습니다.');
+  const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   const data = request.data || {};
+  let targetStreamer;
+  if (isAdmin) {
+    const targetId = String(data.streamerId || '').trim().toLowerCase();
+    if (!targetId) throw new HttpsError('invalid-argument', '수정할 팬페이지를 지정해 주세요.');
+    targetStreamer = await findVerifiedBySoopId(targetId);
+    if (!targetStreamer) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  } else {
+    if (!verified) throw new HttpsError('permission-denied', '인증 스트리머 또는 관리자만 팬페이지를 수정할 수 있습니다.');
+    targetStreamer = verified;
+  }
   const updates = { updatedAt: Date.now() };
   if (Object.prototype.hasOwnProperty.call(data, 'intro')) {
     if (typeof data.intro !== 'string' || data.intro.length > MAX_INTRO_LENGTH) {
@@ -206,7 +221,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   if (!Object.prototype.hasOwnProperty.call(data, 'intro') && !Object.prototype.hasOwnProperty.call(data, 'profile')) {
     throw new HttpsError('invalid-argument', '저장할 내용을 입력해 주세요.');
   }
-  await pageRef(verified.streamer.id).update(updates);
-  const saved = await pageRef(verified.streamer.id).get();
-  return { page: normalizePage(verified.streamer, saved.val()) };
+  await pageRef(targetStreamer.streamer.id).update(updates);
+  const saved = await pageRef(targetStreamer.streamer.id).get();
+  return { page: normalizePage(targetStreamer.streamer, saved.val()) };
 });
