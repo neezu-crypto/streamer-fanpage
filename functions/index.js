@@ -22,6 +22,18 @@ const CALENDAR_CACHE_MAX_RANGES = 24;
 const CALENDAR_MAX_EVENTS_PER_DAY = 30;
 const FANPAGE_SCHEDULE_MAX_ITEMS = 500;
 const FANPAGE_SCHEDULE_TYPES = new Set(['방송', '방송예정', '합방', '휴방', '기타']);
+const FANPAGE_GALLERY_PREVIEW_SIZE = 8;
+const FANPAGE_GALLERY_CACHE_TTL_MS = 3 * 60 * 1000;
+const FANPAGE_GALLERY_CACHE_MAX_ITEMS = 100;
+const GALLERY_PUBLIC_IMAGE_HOST = 'pub-aa5574dbd45e4404b18ab8efaae54e67.r2.dev';
+const GALLERY_CATEGORY_LABELS = Object.freeze({
+  screenshot: '방송 캡처',
+  'ai-art': 'AI 일러스트',
+  'fan-art': '팬아트',
+  meme: '밈',
+  etc: '기타',
+});
+const fanpageGalleryMemoryCache = new Map();
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -85,6 +97,100 @@ async function recordRecentVisit(uid, streamerId) {
 
 function pageRef(streamerId) {
   return db.ref(`streamerFanPages/${streamerId}`);
+}
+
+function normalizeStreamerName(value) {
+  return String(value || '').normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ko-KR');
+}
+
+function isSafeGalleryStreamerId(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
+function isGalleryPublicUrl(value) {
+  if (typeof value !== 'string' || !value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === GALLERY_PUBLIC_IMAGE_HOST;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function findGalleryStreamerIds(target) {
+  const verifiedUid = target.record && typeof target.record.uid === 'string' ? target.record.uid : '';
+  if (verifiedUid) {
+    const linkedSnap = await db.ref(`gallery/streamerAccountLinks/${verifiedUid}`).get();
+    const linkedId = linkedSnap.val() && linkedSnap.val().streamerId;
+    if (isSafeGalleryStreamerId(linkedId)) return [linkedId];
+  }
+
+  // 갤러리 계정 연결이 아직 없는 스트리머는 갤러리 업로드가 사용하는
+  // streamerNames의 실제 이름을 기준으로 찾아 표기명 차이로 인한 오탐을 줄인다.
+  const namesSnap = await db.ref('streamerNames').get();
+  const expectedName = normalizeStreamerName(target.streamer.nickname);
+  if (!expectedName) return [];
+  const names = namesSnap.val() || {};
+  const matches = [...new Set(Object.entries(names)
+    .filter(([id, name]) => isSafeGalleryStreamerId(id) && normalizeStreamerName(name) === expectedName)
+    .map(([id]) => id))];
+  // 이름만으로 둘 이상의 방송국이 매칭되면 잘못된 갤러리를 섞지 않도록 노출하지 않는다.
+  return matches.length === 1 ? matches : [];
+}
+
+async function readStreamerGallery(target) {
+  const cacheKey = target.streamer.id;
+  const cached = fanpageGalleryMemoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.fetchedAt < FANPAGE_GALLERY_CACHE_TTL_MS) return cached.result;
+
+  const galleryStreamerIds = await findGalleryStreamerIds(target);
+  if (!galleryStreamerIds.length) {
+    const result = { linked: false, totalCount: 0, items: [], fetchedAt: Date.now() };
+    fanpageGalleryMemoryCache.set(cacheKey, { fetchedAt: Date.now(), result });
+    return result;
+  }
+
+  // Gallery는 streamerId 인덱스로 이미 관련 이미지들을 조회한다. 팬페이지도 같은
+  // 공개 미러(imagesPublic)를 사용하고, UID가 포함된 내부 images 노드는 읽지 않는다.
+  const snapshots = await Promise.all(galleryStreamerIds.map((galleryStreamerId) => db.ref('gallery/imagesPublic')
+    .orderByChild('streamerId').equalTo(galleryStreamerId).get()));
+  const uniqueImages = new Map();
+  snapshots.forEach((snapshot) => {
+    Object.entries(snapshot.val() || {}).forEach(([id, value]) => {
+      if (!value) return;
+      uniqueImages.set(id, {
+        id,
+        category: Object.hasOwn(GALLERY_CATEGORY_LABELS, value.category) ? value.category : 'etc',
+        createdAt: Number(value.createdAt) || 0,
+        thumbUrl: isGalleryPublicUrl(value.thumbUrl) ? value.thumbUrl : '',
+      });
+    });
+  });
+
+  const ordered = [...uniqueImages.values()].sort((a, b) => b.createdAt - a.createdAt);
+  const previewById = new Map(ordered.filter((item) => item.thumbUrl).slice(0, FANPAGE_GALLERY_PREVIEW_SIZE).map((item) => [item.id, item]));
+  ['fan-art', 'screenshot'].forEach((category) => {
+    ordered.filter((item) => item.thumbUrl && item.category === category)
+      .slice(0, FANPAGE_GALLERY_PREVIEW_SIZE)
+      .forEach((item) => previewById.set(item.id, item));
+  });
+  const previewItems = [...previewById.values()].sort((a, b) => b.createdAt - a.createdAt);
+  const stats = await Promise.all(previewItems.map((item) => db.ref(`gallery/imageStats/${item.id}`).get()));
+  const items = previewItems.map((item, index) => {
+    const value = stats[index].val() || {};
+    return {
+      ...item,
+      categoryLabel: GALLERY_CATEGORY_LABELS[item.category],
+      likeCount: Math.max(0, Number(value.likeCount) || 0),
+      commentCount: Math.max(0, Number(value.commentCount) || 0),
+    };
+  });
+  const result = { linked: true, totalCount: uniqueImages.size, previewSize: FANPAGE_GALLERY_PREVIEW_SIZE, items, fetchedAt: Date.now() };
+  fanpageGalleryMemoryCache.set(cacheKey, { fetchedAt: Date.now(), result });
+  while (fanpageGalleryMemoryCache.size > FANPAGE_GALLERY_CACHE_MAX_ITEMS) {
+    fanpageGalleryMemoryCache.delete(fanpageGalleryMemoryCache.keys().next().value);
+  }
+  return result;
 }
 
 function vodListRef(streamerId) {
@@ -671,6 +777,14 @@ exports.streamerFanPageLiveStatus = onCall({ maxInstances: 20 }, async (request)
   const target = await findVerifiedBySoopId(streamerId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
   return await fetchSoopLiveStatus(target.streamer.soopId);
+});
+
+exports.streamerFanPageGallery = onCall({ maxInstances: 20 }, async (request) => {
+  requireAuth(request);
+  const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  return await readStreamerGallery(target);
 });
 
 exports.streamerFanPageCalendar = onCall({ maxInstances: 20 }, async (request) => {

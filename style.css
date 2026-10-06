@@ -48,6 +48,37 @@
 .profile-editor-footer-actions{display:flex;align-items:center;gap:8px}
 @media(max-width:720px){.profile-settings-dialog{width:calc(100% - 20px);max-height:calc(100dvh - 20px)}.profile-settings-dialog .account-dialog-card{padding:20px}.profile-editor-footer{align-items:flex-start;flex-direction:column}.profile-editor-footer-actions{width:100%;justify-content:flex-end}}
 
+/* Streamer Gallery preview */
+.fan-gallery-section{margin-top:18px}
+.fan-gallery-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px}
+.fan-gallery-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.fan-gallery-heading h2{margin:0;font:23px var(--display)}
+.fan-gallery-subtitle{margin:5px 0 0;color:#b6adbc;font-size:12px}
+.fan-gallery-heading-actions{display:flex;align-items:center;gap:13px}
+.fan-gallery-count{color:#bcb3c2;font-size:11px;white-space:nowrap}
+.fan-gallery-all-link{white-space:nowrap}
+.fan-gallery-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:21px 0 15px}
+.fan-gallery-tabs button{min-height:35px;padding:0 15px;border:1px solid #ffffff1c;border-radius:999px;background:#ffffff06;color:#bfb7c5;font:600 11px var(--font);transition:background .15s,border-color .15s,color .15s}
+.fan-gallery-tabs button:hover{border-color:#f58cac70;background:#f58cac12;color:var(--text)}
+.fan-gallery-tabs button.is-active{border-color:var(--pink);background:var(--pink);color:#24171e}
+.fan-gallery-status{min-height:0;margin:0;color:#9e96a5;font-size:12px;line-height:1.6}
+.fan-gallery-status:empty{display:none}
+.fan-gallery-status.is-error{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0}
+.fan-gallery-retry{flex:none}
+.fan-gallery-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-top:14px}
+.fan-gallery-card{min-width:0;overflow:hidden;border:1px solid #ffffff15;border-radius:12px;background:#111018;color:var(--text);text-decoration:none;transition:transform .18s,border-color .18s,background .18s}
+.fan-gallery-card:hover{transform:translateY(-2px);border-color:#f58cac70;background:#f58cac08}
+.fan-gallery-thumb-frame{position:relative;display:block;aspect-ratio:4/3;overflow:hidden;background:linear-gradient(135deg,#302533,#181720)}
+.fan-gallery-thumb-frame.is-missing:after{content:'STREAMER GALLERY';position:absolute;inset:0;display:grid;place-items:center;color:#ffffff55;font-size:9px;font-weight:700;letter-spacing:.13em}
+.fan-gallery-thumb{width:100%;height:100%;display:block;object-fit:cover;transition:transform .25s}
+.fan-gallery-card:hover .fan-gallery-thumb{transform:scale(1.035)}
+.fan-gallery-category{position:absolute;left:8px;bottom:8px;padding:4px 7px;border:1px solid #ffffff30;border-radius:99px;background:#111018c9;color:#f4eef5;font-size:9px;backdrop-filter:blur(8px)}
+.fan-gallery-card-details{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;color:#a9a1b0;font-size:9px}
+.fan-gallery-date{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fan-gallery-stats{flex:none;color:#d2c8d6;white-space:nowrap}
+@media(max-width:720px){.fan-gallery-heading{align-items:flex-start;flex-direction:column;gap:12px}.fan-gallery-heading-actions{width:100%;justify-content:space-between}.fan-gallery-all-link{flex:1}.fan-gallery-tabs{margin:18px 0 13px}.fan-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fan-gallery-card-details{align-items:flex-start;flex-direction:column;gap:4px;padding:8px}.fan-gallery-status.is-error{align-items:flex-start;flex-direction:column}}
+@media(max-width:380px){.fan-gallery-grid{grid-template-columns:1fr}}
+
 /* Cached SOOP replay list */
 .vod-section{margin-top:18px}
 .vod-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
