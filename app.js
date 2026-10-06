@@ -402,6 +402,7 @@ function renderFanPage(page) {
       try {
         const value = (key) => inputMap[key].value.trim();
         const result = await callSave({
+          streamerId: currentPage.streamer.id,
           intro: introInput.value,
           profile: {
             birthday: value('birthday'), mbti: value('mbti'), major: value('major'), debutDate: value('debutDate'),
@@ -477,7 +478,9 @@ async function loadApp() {
       $('clearSearch').onclick = () => { $('searchInput').value = ''; runSearch(); $('searchInput').focus(); };
     } else {
       const page = result.page;
-      page.isOwner = !!result.verifiedStreamer && result.verifiedStreamer.id === page.streamer.id;
+      // 관리자는 서버가 권한을 확인한 경우에만 소유자 화면과 같은 설정 UI를 본다.
+      page.isOwner = (!!result.verifiedStreamer && result.verifiedStreamer.id === page.streamer.id)
+        || result.isAdmin === true;
       setVisibleView(page);
       const recent = await recentPromise;
       renderList($('recentPages'), recent, true, '최근 방문한 팬페이지가 여기에 표시돼요.');
