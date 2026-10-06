@@ -381,6 +381,7 @@ $('openStreamerVerification').addEventListener('click', () => {
 });
 $('closeStreamerVerification').addEventListener('click', () => $('streamerVerifyDialog').close());
 $('checkStreamerVerification').addEventListener('click', () => submitOrCheckStreamerVerification(true));
+$('renewVerificationCode').addEventListener('click', () => submitOrCheckStreamerVerification(false, true));
 $('streamerVerificationForm').addEventListener('submit', (event) => {
   event.preventDefault();
   submitOrCheckStreamerVerification(false);
@@ -389,21 +390,23 @@ $('logoutButton').addEventListener('click', logout);
 window.addEventListener('hashchange', loadApp);
 loadApp();
 
-async function submitOrCheckStreamerVerification(checkOnly) {
+async function submitOrCheckStreamerVerification(checkOnly, renewOnly = false) {
   const submitButton = $('submitStreamerVerification');
   const checkButton = $('checkStreamerVerification');
   const status = $('verificationStatus');
   const nickname = $('verificationNickname').value.trim();
   const soopId = $('verificationSoopId').value.trim().toLowerCase();
-  if (!checkOnly && !$('streamerVerificationForm').reportValidity()) return;
+  if (!checkOnly && !renewOnly && !$('streamerVerificationForm').reportValidity()) return;
   submitButton.disabled = true;
   checkButton.disabled = true;
-  status.textContent = checkOnly ? '인증 상태를 확인하고 있어요.' : '인증 신청을 접수하고 있어요.';
+  status.textContent = checkOnly ? '인증 상태를 확인하고 있어요.' : renewOnly ? '새 코드를 발급하고 있어요.' : '인증 신청을 접수하고 있어요.';
   try {
+    const previousText = $('verificationNoteCode').textContent.trim();
+    const previousCode = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(previousText) ? previousText : '';
     if (!auth.currentUser) await waitForAuthRestore();
     if (!auth.currentUser) await signInAnonymously(auth);
-    const payload = { source: 'streamer-fanpage' };
-    if (!checkOnly) Object.assign(payload, { nickname, soopId });
+    const payload = { source: 'streamer-fanpage', checkOnly };
+    if (!checkOnly && !renewOnly) Object.assign(payload, { nickname, soopId });
     const result = (await callStreamerVerification(payload)).data || {};
     if (result.action === 'already-verified' || result.action === 'auto-approved') {
       status.textContent = '인증이 확인됐어요. 본인 팬페이지로 이동합니다.';
@@ -419,9 +422,23 @@ async function submitOrCheckStreamerVerification(checkOnly) {
       return;
     }
     if (result.action === 'pending') {
+      const note = $('verificationNote');
+      note.hidden = !!result.isSwitch;
+      if (!result.isSwitch) {
+        const code = Number(result.verificationCodeExpiresAt) > Date.now()
+          ? result.verificationCode || (checkOnly ? previousCode : '') : '';
+        const codeButton = $('verificationNoteCode');
+        codeButton.textContent = code || '코드 없음';
+        codeButton.disabled = !code;
+        $('verificationNoteStatus').textContent = code ? '' : '코드가 없거나 만료됐어요. 새 코드를 발급해주세요.';
+        codeButton.onclick = async () => {
+          try { await navigator.clipboard.writeText(code); $('verificationNoteStatus').textContent = '복사했어요. 쪽지 본문에 붙여넣어 보내주세요.'; }
+          catch (_) { $('verificationNoteStatus').textContent = '코드를 선택해 직접 복사해주세요.'; }
+        };
+      }
       status.textContent = checkOnly
         ? `${result.nickname || '스트리머'} 인증은 아직 검토 중이에요. 승인 후 다시 확인해 주세요.`
-        : '인증 신청을 접수했어요. 관리자 승인 후 “승인 여부 확인”을 눌러 주세요.';
+        : '인증 신청을 접수했어요. SOOP 쪽지의 발신자 아이디와 코드를 대조해 자동 승인합니다.';
       return;
     }
     throw new Error('인증 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
