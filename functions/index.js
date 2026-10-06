@@ -3,6 +3,7 @@
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
+const { randomUUID } = require('node:crypto');
 
 initializeApp();
 const db = getDatabase();
@@ -10,7 +11,8 @@ const MAX_INTRO_LENGTH = 700;
 const RECENT_PAGE_LIMIT = 8;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const SOOP_VOD_PAGE_SIZE = 60;
-const MAX_SOOP_VOD_PAGES = 100;
+const FANPAGE_VOD_PAGE_SIZE = 24;
+const VOD_REFRESH_LOCK_TTL_MS = 10 * 60 * 1000;
 const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
 
 function requireAuth(request) {
@@ -81,6 +83,14 @@ function vodListRef(streamerId) {
   return db.ref(`streamerFanPageVods/${streamerId}`);
 }
 
+function vodRefreshLockRef(streamerId) {
+  return db.ref(`streamerFanPageVodRefreshLocks/${streamerId}`);
+}
+
+function vodItemKey(index) {
+  return String(index).padStart(16, '0');
+}
+
 function normalizeSoopVod(row) {
   if (!row || typeof row !== 'object') return null;
   const id = String(row.title_no || row.id || '').trim();
@@ -127,6 +137,59 @@ function normalizeVodCache(value) {
   };
 }
 
+async function readVodPage(streamerId, offset = 0, requestedGeneration = '') {
+  const listRef = vodListRef(streamerId);
+  const [activeSnap, previousSnap] = await Promise.all([
+    listRef.child('activeGeneration').get(),
+    listRef.child('previousGeneration').get(),
+  ]);
+  const activeGeneration = activeSnap.val();
+  const previousGeneration = previousSnap.val();
+
+  if (typeof activeGeneration === 'string' && activeGeneration) {
+    const generation = requestedGeneration || activeGeneration;
+    if (generation !== activeGeneration && generation !== previousGeneration) {
+      throw new HttpsError('aborted', '다시보기 목록이 갱신됐습니다. 페이지를 새로 불러와 주세요.');
+    }
+    const generationRef = listRef.child('generations').child(generation);
+    const [metadataSnap, itemsSnap] = await Promise.all([
+      generationRef.child('metadata').get(),
+      generationRef.child('items').orderByKey().startAt(vodItemKey(offset)).limitToFirst(FANPAGE_VOD_PAGE_SIZE).get(),
+    ]);
+    const metadata = metadataSnap.val() || {};
+    const items = [];
+    itemsSnap.forEach((child) => {
+      const vod = normalizeSoopVod(child.val());
+      if (vod) items.push(vod);
+    });
+    const total = Math.max(0, Math.floor(Number(metadata.total) || 0));
+    return {
+      items,
+      total,
+      refreshedAt: Number.isFinite(metadata.refreshedAt) ? metadata.refreshedAt : null,
+      generation,
+      offset,
+      nextOffset: offset + items.length,
+      hasMore: offset + items.length < total,
+    };
+  }
+
+  if (requestedGeneration && requestedGeneration !== 'legacy') {
+    throw new HttpsError('aborted', '다시보기 목록이 갱신됐습니다. 페이지를 새로 불러와 주세요.');
+  }
+  // 최초 세대 전환 전까지 기존 캐시 형식도 읽어 점진적으로 호환한다.
+  const cache = normalizeVodCache((await listRef.get()).val());
+  const items = cache.items.slice(offset, offset + FANPAGE_VOD_PAGE_SIZE);
+  return {
+    ...cache,
+    items,
+    generation: 'legacy',
+    offset,
+    nextOffset: offset + items.length,
+    hasMore: offset + items.length < cache.total,
+  };
+}
+
 async function fetchSoopVodPage(soopId, page) {
   const url = new URL(`${SOOP_VOD_API}/${encodeURIComponent(soopId)}/vods/review`);
   url.search = new URLSearchParams({
@@ -164,32 +227,136 @@ async function fetchSoopVodPage(soopId, page) {
   return { rows: payload.data, total: Math.max(0, Math.floor(Number(payload.meta.total))) };
 }
 
-async function fetchAllSoopVods(soopId) {
-  const first = await fetchSoopVodPage(soopId, 1);
-  const pageCount = Math.ceil(first.total / SOOP_VOD_PAGE_SIZE);
-  if (pageCount > MAX_SOOP_VOD_PAGES) {
-    throw new HttpsError('resource-exhausted', '다시보기 목록이 너무 커서 한 번에 갱신할 수 없습니다.');
-  }
-  const rows = first.rows.slice();
-  for (let page = 2; page <= pageCount; page += 1) {
-    const result = await fetchSoopVodPage(soopId, page);
-    if (result.total !== first.total) {
-      throw new HttpsError('aborted', '갱신 중 SOOP 목록이 변경됐습니다. 다시 시도해 주세요.');
-    }
-    rows.push(...result.rows);
-  }
-  if (rows.length !== first.total) {
+function normalizeFetchedVodPage(rows, total, page, seenIds) {
+  const expectedRows = Math.max(0, Math.min(SOOP_VOD_PAGE_SIZE, total - ((page - 1) * SOOP_VOD_PAGE_SIZE)));
+  if (rows.length !== expectedRows) {
     throw new HttpsError('unavailable', 'SOOP 다시보기 전체 목록을 가져오지 못해 기존 목록을 유지했습니다.');
   }
-  const byId = new Map();
-  rows.forEach((row) => {
-    const vod = normalizeSoopVod(row);
-    if (vod) byId.set(vod.id, vod);
-  });
-  if (byId.size !== first.total) {
+  const vods = rows.map((row) => normalizeSoopVod(row));
+  if (vods.some((vod) => !vod)) {
     throw new HttpsError('unavailable', 'SOOP 다시보기 항목 일부를 읽지 못해 기존 목록을 유지했습니다.');
   }
-  return [...byId.values()].sort((a, b) => String(b.regDate).localeCompare(String(a.regDate)) || Number(b.id) - Number(a.id));
+  for (const vod of vods) {
+    if (seenIds.has(vod.id)) {
+      throw new HttpsError('aborted', '갱신 중 SOOP 목록이 변경되어 중복 항목이 발견됐습니다. 다시 시도해 주세요.');
+    }
+    seenIds.add(vod.id);
+  }
+  return vods.sort((a, b) => String(b.regDate).localeCompare(String(a.regDate)) || Number(b.id) - Number(a.id));
+}
+
+async function acquireVodRefreshLock(streamerId) {
+  const token = randomUUID();
+  const lockRef = vodRefreshLockRef(streamerId);
+  const result = await lockRef.transaction((current) => {
+    if (current && Number(current.expiresAt) > Date.now()) return;
+    return { token, expiresAt: Date.now() + VOD_REFRESH_LOCK_TTL_MS };
+  });
+  if (!result.committed || !result.snapshot.val() || result.snapshot.val().token !== token) {
+    throw new HttpsError('aborted', '이 팬페이지의 다시보기 목록을 이미 갱신하고 있습니다. 잠시 후 다시 시도해 주세요.');
+  }
+  return { token, lockRef };
+}
+
+async function renewVodRefreshLock(lockRef, token) {
+  const result = await lockRef.transaction((current) => {
+    if (!current || current.token !== token) return;
+    return { ...current, expiresAt: Date.now() + VOD_REFRESH_LOCK_TTL_MS };
+  });
+  if (!result.committed || !result.snapshot.val() || result.snapshot.val().token !== token) {
+    throw new HttpsError('aborted', '다시보기 갱신 권한이 만료됐습니다. 다시 시도해 주세요.');
+  }
+}
+
+async function stageAndPublishSoopVods(soopId, streamerId, lockToken, lockRef) {
+  const listRef = vodListRef(streamerId);
+  const [activeSnap, previousSnap, pendingSnap] = await Promise.all([
+    listRef.child('activeGeneration').get(),
+    listRef.child('previousGeneration').get(),
+    listRef.child('pendingGeneration').get(),
+  ]);
+  const oldActive = activeSnap.val();
+  const oldPrevious = previousSnap.val();
+  const oldPending = pendingSnap.val();
+  if (oldPending && oldPending !== oldActive && oldPending !== oldPrevious) {
+    await listRef.child('generations').child(oldPending).remove();
+  }
+
+  const generation = randomUUID();
+  const generationRef = listRef.child('generations').child(generation);
+  await listRef.child('pendingGeneration').set(generation);
+  let published = false;
+  try {
+    const first = await fetchSoopVodPage(soopId, 1);
+    const pageCount = Math.ceil(first.total / SOOP_VOD_PAGE_SIZE);
+    const seenIds = new Set();
+    const firstVods = normalizeFetchedVodPage(first.rows, first.total, 1, seenIds);
+    if (firstVods.length) {
+      await generationRef.child('items').update(Object.fromEntries(
+        firstVods.map((vod, index) => [vodItemKey(index), vod]),
+      ));
+    }
+
+    const fetchBatchSize = 4;
+    for (let firstPage = 2; firstPage <= pageCount; firstPage += fetchBatchSize) {
+      await renewVodRefreshLock(lockRef, lockToken);
+      const pages = Array.from(
+        { length: Math.min(fetchBatchSize, pageCount - firstPage + 1) },
+        (_, index) => firstPage + index,
+      );
+      const results = await Promise.all(pages.map((page) => fetchSoopVodPage(soopId, page)));
+      for (let index = 0; index < pages.length; index += 1) {
+        const page = pages[index];
+        const result = results[index];
+        if (result.total !== first.total) {
+          throw new HttpsError('aborted', '갱신 중 SOOP 목록이 변경됐습니다. 다시 시도해 주세요.');
+        }
+        const vods = normalizeFetchedVodPage(result.rows, first.total, page, seenIds);
+        if (vods.length) {
+          const startIndex = (page - 1) * SOOP_VOD_PAGE_SIZE;
+          await generationRef.child('items').update(Object.fromEntries(
+            vods.map((vod, itemIndex) => [vodItemKey(startIndex + itemIndex), vod]),
+          ));
+        }
+      }
+    }
+
+    if (seenIds.size !== first.total) {
+      throw new HttpsError('unavailable', 'SOOP 다시보기 전체 목록을 가져오지 못해 기존 목록을 유지했습니다.');
+    }
+    const refreshedAt = Date.now();
+    await generationRef.child('metadata').set({ total: first.total, refreshedAt });
+    await renewVodRefreshLock(lockRef, lockToken);
+    await listRef.update({
+      activeGeneration: generation,
+      previousGeneration: oldActive || null,
+      pendingGeneration: null,
+      items: null,
+      total: null,
+      refreshedAt: null,
+    });
+    published = true;
+    if (oldPrevious && oldPrevious !== oldActive && oldPrevious !== generation) {
+      await listRef.child('generations').child(oldPrevious).remove().catch((error) => {
+        console.warn('Could not remove the retired SOOP VOD generation:', error);
+      });
+    }
+    return await readVodPage(streamerId, 0, generation);
+  } catch (error) {
+    if (!published) {
+      let generationRemoved = false;
+      await generationRef.remove().then(() => { generationRemoved = true; }).catch((cleanupError) => {
+        console.warn('Could not remove the incomplete SOOP VOD generation:', cleanupError);
+      });
+      const pending = generationRemoved
+        ? await listRef.child('pendingGeneration').get().catch(() => null)
+        : null;
+      if (pending && pending.val() === generation) {
+        await listRef.child('pendingGeneration').remove().catch(() => undefined);
+      }
+    }
+    throw error;
+  }
 }
 
 function cleanHttpsUrl(value) {
@@ -237,16 +404,32 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
 
   const target = await findVerifiedBySoopId(requestedId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
-  const [pageSnap, vodSnap] = await Promise.all([
+  const [pageSnap, vods] = await Promise.all([
     pageRef(target.streamer.id).get(),
-    vodListRef(target.streamer.id).get(),
+    readVodPage(target.streamer.id),
     recordRecentVisit(uid, target.streamer.id),
   ]);
   return {
     verifiedStreamer: verified ? verified.streamer : null,
     isAdmin,
-    page: { ...normalizePage(target.streamer, pageSnap.val()), vods: normalizeVodCache(vodSnap.val()) },
+    page: { ...normalizePage(target.streamer, pageSnap.val()), vods },
   };
+});
+
+exports.streamerFanPageVodPage = onCall({ maxInstances: 30 }, async (request) => {
+  requireAuth(request);
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  const offset = Number(data.offset);
+  const generation = typeof data.generation === 'string' ? data.generation : '';
+  const validGeneration = !generation || generation === 'legacy'
+    || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(generation);
+  if (!streamerId || !Number.isSafeInteger(offset) || offset < 0 || !validGeneration) {
+    throw new HttpsError('invalid-argument', '다시보기 페이지 요청을 확인해 주세요.');
+  }
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  return { vods: await readVodPage(target.streamer.id, offset, generation) };
 });
 
 exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {
@@ -345,7 +528,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   return { page: normalizePage(targetStreamer.streamer, saved.val()) };
 });
 
-exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 180, memory: '512MiB' }, async (request) => {
+exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3600, memory: '1GiB' }, async (request) => {
   const uid = requireAuth(request);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   let targetStreamer;
@@ -359,10 +542,18 @@ exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 1
     targetStreamer = verified;
   }
 
-  const vods = await fetchAllSoopVods(targetStreamer.streamer.soopId);
-  const refreshedAt = Date.now();
-  const items = Object.fromEntries(vods.map((vod) => [vod.id, vod]));
-  const cache = { items, total: vods.length, refreshedAt };
-  await vodListRef(targetStreamer.streamer.id).set(cache);
-  return { vods: normalizeVodCache(cache) };
+  const { token, lockRef } = await acquireVodRefreshLock(targetStreamer.streamer.id);
+  try {
+    const vods = await stageAndPublishSoopVods(
+      targetStreamer.streamer.soopId,
+      targetStreamer.streamer.id,
+      token,
+      lockRef,
+    );
+    return { vods };
+  } finally {
+    await lockRef.transaction((current) => (current && current.token === token ? null : undefined)).catch((error) => {
+      console.warn('Could not release the SOOP VOD refresh lock:', error);
+    });
+  }
 });
