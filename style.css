@@ -183,6 +183,18 @@
 @media(max-width:420px){.calendar-controls{display:grid;grid-template-columns:1fr auto;justify-items:stretch}.calendar-mode-switch{justify-self:start}.calendar-navigation{grid-column:1/-1;grid-row:2;justify-content:center}.calendar-today-button{grid-column:1;grid-row:3;width:max-content}.calendar-refresh-button{grid-column:2;grid-row:3;width:max-content;justify-self:end}.calendar-day{min-height:63px;padding:4px 2px}.calendar-day-number{width:18px;height:18px}.calendar-event-chip{font-size:6px;padding:2px}.calendar-event-row{gap:8px;padding:10px}.calendar-event-time{flex-basis:47px;font-size:10px}.calendar-event-body{align-items:flex-start;flex-direction:column;gap:6px}}
 @media(max-width:420px){.calendar-event-chip{height:4px;padding:0;border:0;border-radius:3px;background:#9eabbc;font-size:0}.calendar-event-chip.calendar-type-1{background:#89d8ae}.calendar-event-chip.calendar-type-2{background:#f58cac}.calendar-event-chip.calendar-type-3{background:#9eabbc}.calendar-event-chip.calendar-type-4{background:#b6a3ff}.calendar-event-chip.calendar-type-5{background:#f7d890}.calendar-more-count{font-size:7px}}
 
+.messenger-link-section{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:18px;padding:18px 22px;border:1px solid #f58cac35;border-radius:16px;background:linear-gradient(125deg,#211e28,#19171f)}
+.messenger-link-copy{display:flex;align-items:center;gap:15px;min-width:0}
+.messenger-link-icon{flex:none;display:grid;place-items:center;width:46px;height:46px;border:1px solid #f58cac55;border-radius:14px;background:#f58cac12;color:var(--pink)}
+.messenger-link-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.messenger-link-text{min-width:0}
+.messenger-link-text .eyebrow{margin:0 0 4px;font-size:9px}
+.messenger-link-text h2{margin:0;font:20px var(--display)}
+.messenger-link-description{margin:5px 0 0;color:#cfc8d4;font-size:12px;line-height:1.5}
+.messenger-link-note{margin:3px 0 0;color:#928a9a;font-size:10px;line-height:1.5}
+.messenger-link-button{flex:none;min-width:164px;min-height:42px;white-space:nowrap}
+@media(max-width:720px){.messenger-link-section{align-items:stretch;flex-direction:column;gap:14px;padding:17px}.messenger-link-copy{align-items:flex-start;gap:12px}.messenger-link-icon{width:40px;height:40px;border-radius:12px}.messenger-link-icon svg{width:21px;height:21px}.messenger-link-text h2{font-size:18px}.messenger-link-description{font-size:11px}.messenger-link-note{font-size:9px}.messenger-link-button{width:100%;min-height:43px}}
+
 .calendar-legend-item.calendar-source-soop i{background:#9eabbc}
 .calendar-legend-item.calendar-source-fanpage i{background:#f7d890}
 .calendar-event-chip.calendar-source-fanpage{border-left-color:#f7d890;background:#f7d89012}

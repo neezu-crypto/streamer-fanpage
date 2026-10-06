@@ -444,6 +444,8 @@ function renderFanPage(page) {
   section.append(details, actions);
   if (!page.isOwner) view.append(back);
   view.append(section);
+  const messengerSection = renderMessengerSection(page);
+  if (messengerSection) view.append(messengerSection);
   view.append(renderLiveSection(page));
   view.append(renderVodSection(page));
   view.append(renderCalendarSection(page));
@@ -522,6 +524,51 @@ function renderFanPage(page) {
     editorDialog.addEventListener('click', (event) => { if (event.target === editorDialog) editorDialog.close(); });
     view.append(editorDialog);
   }
+}
+
+function renderMessengerSection(page) {
+  const soopId = String(page.streamer && page.streamer.soopId || '').trim();
+  if (!/^[a-z0-9]{2,20}$/i.test(soopId)) return null;
+
+  const section = document.createElement('section');
+  section.className = 'messenger-link-section';
+  section.setAttribute('aria-labelledby', 'messengerLinkTitle');
+
+  const copy = document.createElement('div');
+  copy.className = 'messenger-link-copy';
+  const icon = document.createElement('span');
+  icon.className = 'messenger-link-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.8-3.2A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8.5 11.5h.01M12.5 11.5h.01M16.5 11.5h.01"/></svg>';
+
+  const text = document.createElement('div');
+  text.className = 'messenger-link-text';
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'eyebrow';
+  eyebrow.textContent = 'STREAMER MESSENGER';
+  const title = document.createElement('h2');
+  title.id = 'messengerLinkTitle';
+  title.textContent = '팬들과 대화하기';
+  const description = document.createElement('p');
+  description.className = 'messenger-link-description';
+  description.textContent = '팬들과 대화를 이어가 보세요.';
+  const note = document.createElement('p');
+  note.className = 'messenger-link-note';
+  note.textContent = '참여 가능 여부와 권한은 메신저에서 확인합니다.';
+  text.append(eyebrow, title, description, note);
+  copy.append(icon, text);
+
+  const messengerUrl = new URL('https://neezu-crypto.github.io/streamer-messenger/');
+  messengerUrl.searchParams.set('streamer', soopId.toLowerCase());
+  const link = document.createElement('a');
+  link.className = 'button button-primary messenger-link-button';
+  link.href = messengerUrl.href;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = '메신저 입장 ↗';
+
+  section.append(copy, link);
+  return section;
 }
 
 function formatVodDuration(durationMs) {
