@@ -263,6 +263,7 @@ async function waitForPageAssets() {
 function setVisibleView(page) {
   $('homeView').classList.toggle('hidden', !!page);
   $('fanPageView').classList.toggle('hidden', !page);
+  $('brandEyebrow').classList.toggle('hidden', !!page);
   const pageName = page ? `${page.streamer.nickname} 팬페이지` : '스트리머 팬페이지';
   $('brandTitle').textContent = pageName;
   document.title = pageName;
