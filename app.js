@@ -24,6 +24,7 @@ const callSave = httpsCallable(functions, 'streamerFanPageSave');
 const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
 const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh', { timeout: 3600000 });
 const callCalendar = httpsCallable(functions, 'streamerFanPageCalendar');
+const callLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
 const callScheduleAdd = httpsCallable(functions, 'streamerFanPageScheduleAdd');
 const callScheduleDelete = httpsCallable(functions, 'streamerFanPageScheduleDelete');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
@@ -37,10 +38,12 @@ const $ = (id) => document.getElementById(id);
 let currentPage = null;
 let searchTimer = 0;
 let toastTimer = 0;
+let liveStatusTimer = 0;
 let verifiedStreamerUid = '';
 const vodRefreshesInProgress = new Set();
 const vodPageLoadsInProgress = new Set();
 const calendarStates = new Map();
+const liveStatusStates = new Map();
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
 
@@ -278,6 +281,10 @@ async function waitForPageAssets() {
   window.clearTimeout(timeoutId);
 }
 function setVisibleView(page) {
+  if (!page && liveStatusTimer) {
+    window.clearInterval(liveStatusTimer);
+    liveStatusTimer = 0;
+  }
   $('homeView').classList.toggle('hidden', !!page);
   $('fanPageView').classList.toggle('hidden', !page);
   $('devbar').classList.toggle('hidden', !!page);
@@ -288,6 +295,8 @@ function setVisibleView(page) {
   if (page) renderFanPage(page);
 }
 function renderFanPage(page) {
+  if (liveStatusTimer) window.clearInterval(liveStatusTimer);
+  liveStatusTimer = 0;
   currentPage = page;
   const view = $('fanPageView');
   view.replaceChildren();
@@ -373,10 +382,13 @@ function renderFanPage(page) {
   section.append(details, actions);
   if (!page.isOwner) view.append(back);
   view.append(section);
+  view.append(renderLiveSection(page));
   view.append(renderVodSection(page));
   view.append(renderCalendarSection(page));
   if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
   view.append(renderVodPlayerDialog());
+  loadLiveStatus(page.streamer.id);
+  liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
   loadCalendar(page.streamer.id);
 
   if (page.isOwner) {
@@ -458,6 +470,132 @@ function formatVodDuration(durationMs) {
   return hours
     ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
     : `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
+function liveStatusStateFor(streamerId) {
+  if (!liveStatusStates.has(streamerId)) {
+    liveStatusStates.set(streamerId, {
+      hasLoaded: false, loading: false, error: '', isLive: false,
+      title: '', viewerCount: 0, broadcastId: '', streamUrl: '', thumbnailUrl: '',
+    });
+  }
+  return liveStatusStates.get(streamerId);
+}
+
+function renderLiveSection(page) {
+  const state = liveStatusStateFor(page.streamer.id);
+  const section = document.createElement('section'); section.id = 'liveSection'; section.className = 'live-section';
+  const heading = document.createElement('div'); heading.className = 'live-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'LIVE SHORTCUT';
+  const title = document.createElement('h2'); title.textContent = '라이브 바로가기';
+  const subtitle = document.createElement('p'); subtitle.className = 'live-subtitle'; subtitle.textContent = '방송 중이면 미리보기 썸네일에서 바로 입장할 수 있어요.';
+  copy.append(eyebrow, title, subtitle);
+  const refresh = document.createElement('button'); refresh.type = 'button';
+  refresh.className = 'button live-refresh-button'; refresh.disabled = state.loading;
+  refresh.textContent = state.loading ? '확인 중…' : '↻ 상태 새로고침';
+  refresh.setAttribute('aria-label', '라이브 상태 새로고침');
+  refresh.dataset.liveFocus = 'refresh';
+  refresh.addEventListener('click', () => loadLiveStatus(page.streamer.id));
+  heading.append(copy, refresh);
+
+  const content = document.createElement('div'); content.className = 'live-content';
+  if (!state.hasLoaded && !state.error) {
+    const message = document.createElement('p'); message.className = 'live-state-message';
+    message.textContent = '현재 방송 상태를 확인하고 있어요.'; content.append(message);
+  } else if (!state.hasLoaded) {
+    const message = document.createElement('p'); message.className = 'live-state-message is-error';
+    message.textContent = '방송 상태를 확인할 수 없어요. 잠시 후 다시 시도해 주세요.'; content.append(message);
+  } else if (state.isLive) {
+    const card = document.createElement('div'); card.className = 'live-preview-card';
+    const preview = document.createElement('a'); preview.className = 'live-preview-link';
+    preview.dataset.liveFocus = 'preview';
+    preview.href = state.streamUrl; preview.target = '_blank'; preview.rel = 'noopener noreferrer';
+    preview.setAttribute('aria-label', `${page.streamer.nickname} 라이브 방송 보기`);
+    const frame = document.createElement('span'); frame.className = 'live-thumbnail-frame';
+    const image = document.createElement('img'); image.className = 'live-thumbnail';
+    image.src = state.thumbnailUrl; image.alt = `${page.streamer.nickname} 방송 미리보기`; image.loading = 'lazy';
+    image.addEventListener('error', () => frame.classList.add('has-no-thumbnail'), { once: true });
+    const fallback = document.createElement('span'); fallback.className = 'live-thumbnail-fallback'; fallback.textContent = '미리보기 썸네일을 불러올 수 없어요.';
+    const badge = document.createElement('span'); badge.className = 'live-badge'; badge.innerHTML = '<i aria-hidden="true"></i> LIVE';
+    frame.append(image, fallback, badge); preview.append(frame);
+
+    const details = document.createElement('div'); details.className = 'live-preview-details';
+    const info = document.createElement('div'); info.className = 'live-preview-info';
+    const liveStatus = document.createElement('span'); liveStatus.className = 'live-status-label'; liveStatus.textContent = '현재 방송 중';
+    const broadcastTitle = document.createElement('strong'); broadcastTitle.className = 'live-broadcast-title';
+    broadcastTitle.textContent = state.title || '방송을 진행하고 있어요.';
+    const viewers = document.createElement('span'); viewers.className = 'live-viewer-count';
+    viewers.textContent = `시청자 ${Number(state.viewerCount || 0).toLocaleString('ko-KR')}명`;
+    info.append(liveStatus, broadcastTitle, viewers);
+    const watch = document.createElement('a'); watch.className = 'button button-primary live-watch-button';
+    watch.dataset.liveFocus = 'watch';
+    watch.href = state.streamUrl; watch.target = '_blank'; watch.rel = 'noopener noreferrer'; watch.textContent = '방송 보러가기 ↗';
+    details.append(info, watch); card.append(preview, details); content.append(card);
+    if (state.error) {
+      const warning = document.createElement('p'); warning.className = 'live-stale-note';
+      warning.textContent = '방송 상태를 새로 확인하지 못해 이전 정보를 표시하고 있어요.'; content.append(warning);
+    }
+  } else {
+    const offline = document.createElement('div'); offline.className = 'live-offline-card';
+    const mark = document.createElement('span'); mark.className = 'live-offline-mark'; mark.setAttribute('aria-hidden', 'true'); mark.textContent = '◷';
+    const info = document.createElement('div'); info.className = 'live-offline-copy';
+    const message = document.createElement('strong'); message.textContent = '방송이 종료되었어요.';
+    const note = document.createElement('span'); note.textContent = '지금은 방송 중이 아닙니다. 다음 방송을 기다려 주세요.';
+    info.append(message, note); offline.append(mark, info);
+    const station = document.createElement('a'); station.className = 'button live-station-link';
+    station.dataset.liveFocus = 'station';
+    station.href = page.streamer.soopUrl; station.target = '_blank'; station.rel = 'noopener noreferrer'; station.textContent = 'SOOP 방송국 보기 ↗';
+    offline.append(station); content.append(offline);
+    if (state.error) {
+      const warning = document.createElement('p'); warning.className = 'live-stale-note';
+      warning.textContent = '방송 상태를 새로 확인하지 못해 이전 정보를 표시하고 있어요.'; content.append(warning);
+    }
+  }
+  section.append(heading, content);
+  return section;
+}
+
+async function loadLiveStatus(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const state = liveStatusStateFor(streamerId);
+  if (state.loading) return;
+  state.loading = true; state.error = '';
+  const button = $('liveSection')?.querySelector('.live-refresh-button');
+  if (button) { button.disabled = true; button.textContent = '확인 중…'; }
+  try {
+    const result = (await callLiveStatus({ streamerId })).data;
+    if (!currentPage || currentPage.streamer.id !== streamerId) return;
+    state.hasLoaded = true;
+    state.isLive = result.isLive === true;
+    state.title = typeof result.title === 'string' ? result.title : '';
+    state.viewerCount = Number(result.viewerCount) || 0;
+    state.broadcastId = typeof result.broadcastId === 'string' ? result.broadcastId : '';
+    state.streamUrl = typeof result.streamUrl === 'string' ? result.streamUrl : '';
+    state.thumbnailUrl = typeof result.thumbnailUrl === 'string' ? result.thumbnailUrl : '';
+  } catch (_) {
+    if (currentPage && currentPage.streamer.id === streamerId) state.error = 'unavailable';
+  } finally {
+    state.loading = false;
+    if (currentPage && currentPage.streamer.id === streamerId) refreshLiveSection(streamerId);
+  }
+}
+
+function refreshLiveSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('liveSection');
+  if (section) {
+    const active = section.contains(document.activeElement) ? document.activeElement : null;
+    const focusKey = active && active.dataset.liveFocus;
+    const replacement = renderLiveSection(currentPage);
+    section.replaceWith(replacement);
+    if (focusKey) {
+      const focusTarget = [...replacement.querySelectorAll('[data-live-focus]')]
+        .find((element) => element.dataset.liveFocus === focusKey)
+        || replacement.querySelector('.live-refresh-button');
+      focusTarget?.focus({ preventScroll: true });
+    }
+  }
 }
 
 function renderVodSection(page) {
