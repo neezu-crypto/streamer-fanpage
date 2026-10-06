@@ -24,6 +24,7 @@ const callSave = httpsCallable(functions, 'streamerFanPageSave');
 const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
 const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh', { timeout: 3600000 });
 const callCalendar = httpsCallable(functions, 'streamerFanPageCalendar');
+const callScheduleAdd = httpsCallable(functions, 'streamerFanPageScheduleAdd');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
@@ -373,6 +374,7 @@ function renderFanPage(page) {
   view.append(section);
   view.append(renderVodSection(page));
   view.append(renderCalendarSection(page));
+  if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   loadCalendar(page.streamer.id);
 
@@ -650,15 +652,26 @@ function renderCalendarSection(page) {
     state.days = []; state.fetchedAt = null; state.stale = false;
     refreshCalendarSection(streamerId); loadCalendar(streamerId);
   });
+  if (page.isOwner) {
+    const addSchedule = document.createElement('button'); addSchedule.type = 'button';
+    addSchedule.className = 'button button-primary calendar-add-button'; addSchedule.textContent = '＋ 일정 추가';
+    addSchedule.addEventListener('click', () => openFanPageScheduleDialog(state.selectedDate));
+    controls.append(mode, navigation, today, addSchedule);
+  } else controls.append(mode, navigation, today);
   const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'calendar-refresh-button';
   refresh.disabled = state.loading; refresh.setAttribute('aria-label', '일정 새로고침'); refresh.textContent = state.loading ? '불러오는 중…' : '↻ 새로고침';
   refresh.addEventListener('click', () => loadCalendar(streamerId, true));
-  controls.append(mode, navigation, today, refresh);
+  controls.append(refresh);
   heading.append(copy, controls);
 
   const legend = document.createElement('div'); legend.className = 'calendar-legend';
   ['방송', '방송예정', '합방', '휴방', '기타'].forEach((label, index) => {
     const item = document.createElement('span'); item.className = `calendar-legend-item calendar-type-${index + 1}`;
+    const dot = document.createElement('i'); dot.setAttribute('aria-hidden', 'true');
+    item.append(dot, document.createTextNode(label)); legend.append(item);
+  });
+  [['SOOP 일정', 'soop'], ['팬페이지 일정', 'fanpage']].forEach(([label, source]) => {
+    const item = document.createElement('span'); item.className = `calendar-legend-item calendar-source-key calendar-source-${source}`;
     const dot = document.createElement('i'); dot.setAttribute('aria-hidden', 'true');
     item.append(dot, document.createTextNode(label)); legend.append(item);
   });
@@ -696,7 +709,10 @@ function renderCalendarSection(page) {
     const number = document.createElement('span'); number.className = 'calendar-day-number'; number.textContent = String(date.getDate()); cell.append(number);
     const eventList = document.createElement('span'); eventList.className = 'calendar-day-events';
     events.slice(0, state.view === 'week' ? 3 : 2).forEach((event) => {
-      const chip = document.createElement('span'); chip.className = `calendar-event-chip calendar-type-${Math.max(1, Math.min(5, Number(event.type) || 5))}`;
+      const chip = document.createElement('span');
+      chip.className = event.source === 'fanpage'
+        ? 'calendar-event-chip calendar-source-fanpage'
+        : `calendar-event-chip calendar-type-${Math.max(1, Math.min(5, Number(event.type) || 5))}`;
       chip.textContent = event.title || event.typeName || '방송 일정';
       eventList.append(chip);
     });
@@ -733,13 +749,99 @@ function renderCalendarSection(page) {
       const time = document.createElement('time'); time.className = 'calendar-event-time'; time.textContent = event.time || '시간 미정';
       const body = document.createElement('div'); body.className = 'calendar-event-body';
       const eventTitle = document.createElement('strong'); eventTitle.textContent = event.title || '방송 일정';
-      const category = document.createElement('span'); category.className = `calendar-event-category calendar-type-${Math.max(1, Math.min(5, Number(event.type) || 5))}`;
-      category.textContent = event.typeName || '일정'; body.append(eventTitle, category); row.append(time, body); list.append(row);
+      const badges = document.createElement('span'); badges.className = 'calendar-event-badges';
+      const source = document.createElement('span'); source.className = `calendar-source-badge calendar-source-${event.source === 'fanpage' ? 'fanpage' : 'soop'}`;
+      source.textContent = event.source === 'fanpage' ? '팬페이지' : 'SOOP';
+      const category = document.createElement('span');
+      category.className = event.source === 'fanpage'
+        ? 'calendar-event-category calendar-source-fanpage'
+        : `calendar-event-category calendar-type-${Math.max(1, Math.min(5, Number(event.type) || 5))}`;
+      category.textContent = event.typeName || '일정';
+      badges.append(source, category); body.append(eventTitle, badges); row.append(time, body); list.append(row);
     });
     detail.append(list);
   }
   section.append(heading, legend, grid, detail);
   return section;
+}
+
+function openFanPageScheduleDialog(selectedDate) {
+  const dialog = $('fanPageScheduleDialog');
+  if (!dialog) return;
+  const form = dialog.querySelector('form');
+  form.reset();
+  form.querySelector('[name="date"]').value = selectedDate || localDateKey(new Date());
+  dialog.showModal();
+}
+
+function renderFanPageScheduleDialog(page) {
+  const dialog = document.createElement('dialog'); dialog.id = 'fanPageScheduleDialog';
+  dialog.className = 'account-dialog calendar-editor-dialog';
+  dialog.setAttribute('aria-labelledby', 'calendarEditorTitle');
+  const form = document.createElement('form'); form.className = 'account-dialog-card calendar-editor-form';
+  const heading = document.createElement('div'); heading.className = 'profile-editor-heading';
+  const title = document.createElement('h2'); title.id = 'calendarEditorTitle'; title.textContent = '팬페이지 일정 추가';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
+  close.setAttribute('aria-label', '일정 창 닫기'); close.textContent = '×'; close.addEventListener('click', () => dialog.close());
+  heading.append(title, close);
+
+  const fields = document.createElement('div'); fields.className = 'calendar-editor-grid';
+  const dateLabel = document.createElement('label'); dateLabel.className = 'profile-editor-field'; dateLabel.textContent = '날짜';
+  const date = document.createElement('input'); date.type = 'date'; date.name = 'date'; date.required = true;
+  dateLabel.append(date);
+  const timeLabel = document.createElement('label'); timeLabel.className = 'profile-editor-field'; timeLabel.textContent = '시간';
+  const time = document.createElement('input'); time.type = 'time'; time.name = 'time';
+  timeLabel.append(time);
+  const typeLabel = document.createElement('label'); typeLabel.className = 'profile-editor-field'; typeLabel.textContent = '일정 종류';
+  const type = document.createElement('select'); type.name = 'typeName';
+  ['방송예정', '방송', '합방', '휴방', '기타'].forEach((value) => {
+    const option = document.createElement('option'); option.value = value; option.textContent = value; type.append(option);
+  });
+  typeLabel.append(type);
+  const titleLabel = document.createElement('label'); titleLabel.className = 'profile-editor-field calendar-editor-wide'; titleLabel.textContent = '일정 이름';
+  const eventTitle = document.createElement('input'); eventTitle.type = 'text'; eventTitle.name = 'title'; eventTitle.maxLength = 200;
+  eventTitle.placeholder = '예: 오늘 저녁 합방'; eventTitle.required = true;
+  titleLabel.append(eventTitle);
+  fields.append(dateLabel, timeLabel, typeLabel, titleLabel);
+
+  const note = document.createElement('p'); note.className = 'calendar-editor-note';
+  note.textContent = '추가한 일정은 SOOP 캘린더 일정과 함께 표시됩니다.';
+  const footer = document.createElement('div'); footer.className = 'profile-editor-footer calendar-editor-footer';
+  const hint = document.createElement('small'); hint.textContent = '일정은 팬페이지 서버에 저장됩니다.';
+  const actions = document.createElement('div'); actions.className = 'profile-editor-footer-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소'; cancel.addEventListener('click', () => dialog.close());
+  const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = '일정 추가';
+  actions.append(cancel, save); footer.append(hint, actions);
+  form.append(heading, fields, note, footer);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity() || save.disabled) return;
+    save.disabled = true; save.textContent = '저장 중…';
+    try {
+      await callScheduleAdd({
+        streamerId: page.streamer.id,
+        date: date.value,
+        time: time.value,
+        typeName: type.value,
+        title: eventTitle.value.trim(),
+      });
+      const state = calendarStateFor(page.streamer.id);
+      const addedDate = parseLocalDateKey(date.value);
+      state.selectedDate = date.value; state.year = addedDate.getFullYear(); state.month = addedDate.getMonth() + 1;
+      state.days = []; state.fetchedAt = null; state.stale = false; state.error = '';
+      dialog.close(); form.reset();
+      showToast('팬페이지 일정을 추가했어요.');
+      refreshCalendarSection(page.streamer.id);
+      loadCalendar(page.streamer.id);
+    } catch (error) {
+      showToast(error.message || '일정을 추가하지 못했어요.');
+    } finally {
+      save.disabled = false; save.textContent = '일정 추가';
+    }
+  });
+  dialog.append(form);
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  return dialog;
 }
 
 function refreshCalendarSection(streamerId) {
