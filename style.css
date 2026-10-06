@@ -159,6 +159,9 @@
 .calendar-source-badge{flex:none;padding:4px 7px;border:1px solid #ffffff1a;border-radius:99px;background:#ffffff0a;color:#c6bfcc;font-size:9px;line-height:1}
 .calendar-source-badge.calendar-source-fanpage{border-color:#f7d89055;background:#f7d89014;color:#f7d890}
 .calendar-event-badges{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.calendar-event-delete-button{flex:none;padding:5px 8px;border:1px solid #f58cac44;border-radius:8px;background:#f58cac0c;color:#f5b3c7;font-size:10px;cursor:pointer}
+.calendar-event-delete-button:hover:not(:disabled){border-color:#f58cac99;background:#f58cac1c}
+.calendar-event-delete-button:disabled{opacity:.55;cursor:wait}
 .calendar-add-button{min-height:34px;padding:0 10px;font-size:10px}
 .calendar-editor-dialog{width:min(520px,calc(100% - 28px));max-height:calc(100dvh - 28px);overflow-y:auto}
 .calendar-editor-form{display:grid;gap:14px}

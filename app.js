@@ -25,6 +25,7 @@ const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
 const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh', { timeout: 3600000 });
 const callCalendar = httpsCallable(functions, 'streamerFanPageCalendar');
 const callScheduleAdd = httpsCallable(functions, 'streamerFanPageScheduleAdd');
+const callScheduleDelete = httpsCallable(functions, 'streamerFanPageScheduleDelete');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
@@ -757,7 +758,15 @@ function renderCalendarSection(page) {
         ? 'calendar-event-category calendar-source-fanpage'
         : `calendar-event-category calendar-type-${Math.max(1, Math.min(5, Number(event.type) || 5))}`;
       category.textContent = event.typeName || '일정';
-      badges.append(source, category); body.append(eventTitle, badges); row.append(time, body); list.append(row);
+      badges.append(source, category); body.append(eventTitle, badges); row.append(time, body);
+      if (page.isOwner && event.source === 'fanpage') {
+        const remove = document.createElement('button'); remove.type = 'button';
+        remove.className = 'calendar-event-delete-button'; remove.textContent = '삭제';
+        remove.setAttribute('aria-label', `팬페이지 일정 삭제: ${event.title || '일정'}`);
+        remove.addEventListener('click', () => deleteFanPageSchedule(page, event, remove));
+        row.append(remove);
+      }
+      list.append(row);
     });
     detail.append(list);
   }
@@ -772,6 +781,31 @@ function openFanPageScheduleDialog(selectedDate) {
   form.reset();
   form.querySelector('[name="date"]').value = selectedDate || localDateKey(new Date());
   dialog.showModal();
+}
+
+async function deleteFanPageSchedule(page, event, button) {
+  if (!event || event.source !== 'fanpage' || !event.id || button.disabled) return;
+  if (!window.confirm(`“${event.title || '이 일정'}” 일정을 삭제할까요?`)) return;
+  button.disabled = true;
+  button.textContent = '삭제 중…';
+  try {
+    await callScheduleDelete({ streamerId: page.streamer.id, eventId: event.id });
+    const state = calendarStateFor(page.streamer.id);
+    state.requestId += 1;
+    state.days = (state.days || []).map((day) => ({
+      ...day,
+      events: (day.events || []).filter((item) => !(item.source === 'fanpage' && item.id === event.id)),
+    })).filter((day) => day.events.length);
+    state.fetchedAt = null; state.stale = false; state.error = ''; state.loading = false;
+    showToast('팬페이지 일정을 삭제했어요.');
+    refreshCalendarSection(page.streamer.id);
+    loadCalendar(page.streamer.id);
+  } catch (error) {
+    showToast(error.message || '일정을 삭제하지 못했어요.');
+  } finally {
+    button.disabled = false;
+    button.textContent = '삭제';
+  }
 }
 
 function renderFanPageScheduleDialog(page) {
