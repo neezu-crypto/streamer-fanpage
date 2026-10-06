@@ -71,9 +71,23 @@ function pageRef(streamerId) {
 
 function normalizePage(streamer, value) {
   const page = value && typeof value === 'object' ? value : {};
+  const sourceProfile = page.profile && typeof page.profile === 'object' ? page.profile : {};
+  const profile = {
+    birthday: typeof sourceProfile.birthday === 'string' ? sourceProfile.birthday.slice(0, 20) : '',
+    mbti: typeof sourceProfile.mbti === 'string' ? sourceProfile.mbti.slice(0, 8) : '',
+    major: typeof sourceProfile.major === 'string' ? sourceProfile.major.slice(0, 50) : '',
+    debutDate: typeof sourceProfile.debutDate === 'string' ? sourceProfile.debutDate.slice(0, 20) : '',
+    fanNickname: typeof sourceProfile.fanNickname === 'string' ? sourceProfile.fanNickname.slice(0, 30) : '',
+    fandomName: typeof sourceProfile.fandomName === 'string' ? sourceProfile.fandomName.slice(0, 30) : '',
+    contents: Array.isArray(sourceProfile.contents)
+      ? sourceProfile.contents.filter((item) => typeof item === 'string').slice(0, 8).map((item) => item.slice(0, 20))
+      : [],
+    scheduleText: typeof sourceProfile.scheduleText === 'string' ? sourceProfile.scheduleText.slice(0, 120) : '',
+  };
   return {
     streamer,
     intro: typeof page.intro === 'string' ? page.intro.slice(0, MAX_INTRO_LENGTH) : '',
+    profile,
     updatedAt: Number.isFinite(page.updatedAt) ? page.updatedAt : null,
   };
 }
@@ -137,11 +151,40 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const verified = await findVerifiedByUid(uid);
   if (!verified) throw new HttpsError('permission-denied', '인증 스트리머만 팬페이지를 수정할 수 있습니다.');
-  const intro = request.data && request.data.intro;
-  if (typeof intro !== 'string' || intro.length > MAX_INTRO_LENGTH) {
-    throw new HttpsError('invalid-argument', `소개는 ${MAX_INTRO_LENGTH}자 이내로 입력해 주세요.`);
+  const data = request.data || {};
+  const updates = { updatedAt: Date.now() };
+  if (Object.prototype.hasOwnProperty.call(data, 'intro')) {
+    if (typeof data.intro !== 'string' || data.intro.length > MAX_INTRO_LENGTH) {
+      throw new HttpsError('invalid-argument', `소개는 ${MAX_INTRO_LENGTH}자 이내로 입력해 주세요.`);
+    }
+    updates.intro = data.intro.trim();
   }
-  const cleaned = intro.trim();
-  await pageRef(verified.streamer.id).set({ intro: cleaned, updatedAt: Date.now() });
-  return { page: normalizePage(verified.streamer, { intro: cleaned, updatedAt: Date.now() }) };
+  if (Object.prototype.hasOwnProperty.call(data, 'profile')) {
+    const profile = data.profile;
+    const stringFields = ['birthday', 'mbti', 'major', 'debutDate', 'fanNickname', 'fandomName', 'scheduleText'];
+    if (!profile || typeof profile !== 'object' || Array.isArray(profile)
+      || stringFields.some((field) => typeof profile[field] !== 'string')
+      || !Array.isArray(profile.contents)
+      || profile.contents.length > 8
+      || stringFields.some((field) => profile[field].length > ({ birthday: 20, mbti: 8, major: 50, debutDate: 20, fanNickname: 30, fandomName: 30, scheduleText: 120 })[field])
+      || profile.contents.some((item) => typeof item !== 'string' || item.length > 20)) {
+      throw new HttpsError('invalid-argument', '프로필 항목을 확인해 주세요.');
+    }
+    updates.profile = {
+      birthday: profile.birthday.trim(),
+      mbti: profile.mbti.trim().toUpperCase(),
+      major: profile.major.trim(),
+      debutDate: profile.debutDate.trim(),
+      fanNickname: profile.fanNickname.trim(),
+      fandomName: profile.fandomName.trim(),
+      contents: profile.contents.map((item) => item.trim()).filter(Boolean),
+      scheduleText: profile.scheduleText.trim(),
+    };
+  }
+  if (!Object.prototype.hasOwnProperty.call(data, 'intro') && !Object.prototype.hasOwnProperty.call(data, 'profile')) {
+    throw new HttpsError('invalid-argument', '저장할 내용을 입력해 주세요.');
+  }
+  await pageRef(verified.streamer.id).update(updates);
+  const saved = await pageRef(verified.streamer.id).get();
+  return { page: normalizePage(verified.streamer, saved.val()) };
 });

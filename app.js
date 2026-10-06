@@ -273,74 +273,119 @@ function renderFanPage(page) {
   back.href = '#/';
   back.className = 'back-link';
   back.innerHTML = '<span aria-hidden="true">←</span> 스트리머 검색으로';
-  const hero = document.createElement('section');
-  hero.className = 'fan-hero';
+  const profile = page.profile || {};
+  const section = document.createElement('section');
+  section.className = 'profile-board';
+  const label = document.createElement('div');
+  label.className = 'profile-tab';
+  label.innerHTML = 'PROFILE <span aria-hidden="true">💗🖊</span>';
   const identity = document.createElement('div');
-  identity.className = 'fan-identity';
+  identity.className = 'profile-identity';
   const avatar = document.createElement('img');
-  avatar.className = 'avatar';
+  avatar.className = 'profile-avatar';
   setImage(avatar, page.streamer.avatarUrl, page.streamer.nickname);
-  const info = document.createElement('div');
+  const identityCopy = document.createElement('div');
   const name = document.createElement('h1');
-  name.className = 'fan-name';
+  name.className = 'profile-name';
   name.textContent = page.streamer.nickname;
-  const handle = document.createElement('div');
-  handle.className = 'fan-id';
-  handle.textContent = `SOOP · ${page.streamer.soopId}`;
+  const handle = document.createElement('p');
+  handle.className = 'profile-handle';
+  handle.textContent = `@${page.streamer.soopId}`;
   const verified = document.createElement('span');
   verified.className = 'verified-tag';
   verified.textContent = '✓ 인증 스트리머';
-  info.append(name, handle, verified);
-  identity.append(avatar, info);
-  const actions = document.createElement('div');
-  actions.className = 'fan-hero-actions';
+  identityCopy.append(name, handle, verified);
+  identity.append(avatar, identityCopy);
+
+  const facts = document.createElement('div');
+  facts.className = 'profile-facts';
+  const factRows = [
+    ['생일', profile.birthday], ['MBTI', profile.mbti],
+    ['전공', profile.major], ['데뷔', profile.debutDate],
+  ];
+  factRows.forEach(([key, value]) => {
+    const row = document.createElement('div'); row.className = 'profile-fact';
+    const term = document.createElement('span'); term.textContent = key;
+    const description = document.createElement('strong'); description.textContent = value || '미등록';
+    row.append(term, description); facts.append(row);
+  });
+
+  const about = document.createElement('div'); about.className = 'profile-about';
+  const aboutLabel = document.createElement('strong'); aboutLabel.textContent = 'ABOUT';
+  const aboutText = document.createElement('span'); aboutText.textContent = page.intro || '당신이 여기 온 이유';
+  about.append(aboutLabel, aboutText);
+
+  const details = document.createElement('div'); details.className = 'profile-details';
+  const detailRows = [
+    ['팬닉', profile.fanNickname], ['팬덤명', profile.fandomName],
+    ['콘텐츠', Array.isArray(profile.contents) ? profile.contents.join(' · ') : ''], ['방송 시간', profile.scheduleText],
+  ];
+  detailRows.forEach(([key, value]) => {
+    const item = document.createElement('div'); item.className = 'profile-detail';
+    const term = document.createElement('span'); term.className = 'profile-detail-label'; term.textContent = key;
+    const description = document.createElement('span'); description.className = 'profile-detail-value'; description.textContent = value || '미등록';
+    item.append(term, description); details.append(item);
+  });
+
+  const actions = document.createElement('div'); actions.className = 'profile-actions';
   const soop = document.createElement('a');
-  soop.className = 'button'; soop.href = page.streamer.soopUrl;
-  soop.target = '_blank'; soop.rel = 'noopener noreferrer'; soop.textContent = '방송국 방문 ↗';
-  actions.append(soop);
+  soop.className = 'button'; soop.href = page.streamer.soopUrl; soop.target = '_blank';
+  soop.rel = 'noopener noreferrer'; soop.textContent = 'SOOP 방송국 ↗';
+  const roulette = document.createElement('a');
+  roulette.className = 'button button-primary'; roulette.href = 'https://weflab.com/user/lOPU2suSlGJuYWk';
+  roulette.target = '_blank'; roulette.rel = 'noopener noreferrer'; roulette.textContent = '룰렛 확률 ↗';
+  actions.append(soop, roulette);
   if (page.isOwner) {
-    const edit = document.createElement('a');
-    edit.className = 'button button-primary'; edit.href = '#editIntro'; edit.textContent = '페이지 소개 수정';
+    const edit = document.createElement('a'); edit.className = 'button'; edit.href = '#editProfile'; edit.textContent = '프로필 수정';
     actions.append(edit);
   }
-  hero.append(identity, actions);
-
-  const body = document.createElement('div');
-  body.className = 'fan-body';
-  const introCard = document.createElement('section');
-  introCard.className = 'content-card';
-  const title = document.createElement('h2'); title.textContent = '팬페이지';
-  const intro = document.createElement('p'); intro.className = page.intro ? 'intro-copy' : 'intro-copy intro-empty';
-  intro.textContent = page.intro || (page.isOwner ? '팬들에게 전할 인사말을 적어보세요.' : '팬페이지 소개가 아직 등록되지 않았어요.');
-  introCard.append(title, intro);
-  const side = document.createElement('aside'); side.className = 'content-card side-card';
-  const sideTitle = document.createElement('h2'); sideTitle.textContent = '함께 응원해요';
-  const sideCopy = document.createElement('p'); sideCopy.textContent = '스트리머의 방송 일정과 소식은 공식 방송국에서 확인할 수 있어요.';
-  side.append(sideTitle, sideCopy);
-  const fanBody = document.createElement('p'); fanBody.textContent = '이 페이지는 인증된 스트리머가 직접 관리합니다.'; side.append(fanBody);
-  body.append(introCard, side);
-  view.append(back, hero, body);
+  section.append(label, identity, facts, about, details, actions);
+  view.append(back, section);
 
   if (page.isOwner) {
     const editor = document.createElement('section');
-    editor.id = 'editIntro'; editor.className = 'content-card edit-panel';
-    const label = document.createElement('label'); label.htmlFor = 'introInput'; label.textContent = '팬들에게 전하는 소개';
-    const textarea = document.createElement('textarea'); textarea.id = 'introInput'; textarea.maxLength = 700; textarea.placeholder = '팬들에게 전하고 싶은 인사말이나 페이지 소개를 적어주세요.'; textarea.value = page.intro || '';
+    editor.id = 'editProfile'; editor.className = 'content-card profile-editor';
+    const heading = document.createElement('h2'); heading.textContent = '프로필 정보 수정'; editor.append(heading);
+    const fields = [
+      ['birthday', '생일', 20], ['mbti', 'MBTI', 8], ['major', '전공', 50], ['debutDate', '데뷔일', 20],
+      ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160], ['scheduleText', '방송 시간', 120],
+    ];
+    const inputMap = {};
+    const grid = document.createElement('div'); grid.className = 'profile-editor-grid';
+    fields.forEach(([key, labelText, maxLength]) => {
+      const wrapper = document.createElement('label'); wrapper.className = 'profile-editor-field'; wrapper.textContent = labelText;
+      const input = key === 'scheduleText' ? document.createElement('textarea') : document.createElement('input');
+      input.name = key; input.maxLength = maxLength;
+      input.value = key === 'contents' ? (profile.contents || []).join(', ') : (profile[key] || '');
+      wrapper.append(input); grid.append(wrapper); inputMap[key] = input;
+    });
+    const introLabel = document.createElement('label'); introLabel.className = 'profile-editor-field profile-editor-wide'; introLabel.textContent = 'ABOUT 문구';
+    const introInput = document.createElement('textarea'); introInput.maxLength = 700; introInput.value = page.intro || '';
+    introLabel.append(introInput); grid.append(introLabel);
     const footer = document.createElement('div'); footer.className = 'edit-footer';
-    const count = document.createElement('small'); count.textContent = `${textarea.value.length} / 700`;
-    textarea.addEventListener('input', () => { count.textContent = `${textarea.value.length} / 700`; });
-    const save = document.createElement('button'); save.type = 'button'; save.className = 'button button-primary'; save.textContent = '소개 저장';
+    const note = document.createElement('small'); note.textContent = '수정 내용은 서버에 저장됩니다.';
+    const save = document.createElement('button'); save.type = 'button'; save.className = 'button button-primary'; save.textContent = '프로필 저장';
     save.addEventListener('click', async () => {
       save.disabled = true;
       try {
-        const result = await callSave({ intro: textarea.value });
+        const value = (key) => inputMap[key].value.trim();
+        const result = await callSave({
+          intro: introInput.value,
+          profile: {
+            birthday: value('birthday'), mbti: value('mbti'), major: value('major'), debutDate: value('debutDate'),
+            fanNickname: value('fanNickname'), fandomName: value('fandomName'),
+            contents: value('contents').split(',').map((item) => item.trim()).filter(Boolean),
+            scheduleText: value('scheduleText'),
+          },
+        });
         currentPage.intro = result.data.page.intro;
+        currentPage.profile = result.data.page.profile;
         renderFanPage(currentPage);
-        showToast('팬페이지 소개를 저장했어요.');
+        showToast('프로필을 저장했어요.');
       } catch (error) { showToast(error.message || '저장하지 못했어요.'); }
       finally { save.disabled = false; }
     });
-    footer.append(count, save); editor.append(label, textarea, footer); view.append(editor);
+    footer.append(note, save); editor.append(grid, footer); view.append(editor);
   }
 }
 async function runSearch() {
