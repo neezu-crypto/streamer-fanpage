@@ -8,6 +8,7 @@
 - SOOP 다시보기 캐시는 `streamerFanPageVods/{soopId}/generations/{generation}` 아래 순번 키로 저장한다. bootstrap은 첫 24개만 반환하고 나머지는 인증된 callable 페이지로 읽는다. 갱신은 임시 세대에 응답을 묶음 저장·검증한 뒤 활성 세대 포인터를 교체하며 실패 시 기존 활성 세대를 유지한다. 예전 flat `items` 캐시도 다음 갱신 전까지 읽기를 지원한다.
 - 다시보기 카드는 SOOP 임베드 모달로 열고, 플레이어가 동작하지 않을 때 원본 링크를 제공한다. 갱신 UI 잠금은 스트리머 ID별로 관리한다.
 - 스트리머 캘린더는 `api-channel.sooplive.com` 응답을 서버에서 조회해 월간/주간으로 보여준다. 응답은 `streamerFanPageCalendarCache/{soopId}` 아래 기간별로 캐시하며 10분 TTL, 최근 24개 기간 제한을 적용한다. 브라우저는 캘린더를 직접 읽거나 쓰지 않고 `streamerFanPageCalendar` callable만 사용한다.
+- 라이브 바로가기는 서버 `streamerFanPageLiveStatus` callable이 SOOP 방송국 상태를 조회해 방송 중 여부·제목·시청자 수·미리보기 썸네일 URL을 반환한다. 브라우저는 1분마다 상태를 새로 확인하고 SOOP 플레이어 링크를 연다.
 - 인증 스트리머와 관리자가 추가한 일정은 `streamerFanPageSchedules/{soopId}/{eventId}`에 저장한다. 캘린더 callable은 이를 SOOP 일정과 합쳐 반환하며 브라우저는 `streamerFanPageScheduleAdd`/`streamerFanPageScheduleDelete` callable을 통해서만 일정을 추가·삭제한다.
 - 새 함수는 프로젝트+리전에서 이름이 겹치지 않는지 `firebase functions:list --project soop-stock-market`으로 확인하고 함수명을 지정해 배포한다. 전체 Functions 배포는 금지한다.
 - 이 저장소에는 `database.rules.json`을 추가하지 않는다. 팬페이지 내용·최근 방문은 callable을 통하지만, 상단 devbar 링크는 기존 공개 읽기 경로인 `devbarLinks`를 브라우저에서 직접 읽는다. RTDB 규칙을 변경할 필요가 생기면 공통 지침에 따라 여섯 사본 모두를 동기화한다.

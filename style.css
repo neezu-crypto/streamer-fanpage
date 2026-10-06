@@ -175,3 +175,40 @@
 .calendar-editor-footer small{color:#928a9a;font-size:10px}
 @media(max-width:720px){.calendar-add-button{flex:1}}
 @media(max-width:420px){.calendar-add-button{grid-column:2;grid-row:1;justify-self:end;min-height:31px;padding:0 8px}.calendar-editor-grid{grid-template-columns:1fr}.calendar-editor-wide{grid-column:auto}.calendar-editor-dialog{width:calc(100% - 20px);max-height:calc(100dvh - 20px)}.calendar-editor-form{padding:20px}.calendar-editor-footer{align-items:flex-start;flex-direction:column}.calendar-editor-footer-actions{width:100%;justify-content:flex-end}}
+
+.live-section{margin-top:18px;padding:20px;border:1px solid #ffffff15;border-radius:16px;background:linear-gradient(130deg,#201c28,#17151e)}
+.live-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.live-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.live-heading h2{margin:0;font:22px var(--display)}
+.live-subtitle{margin:5px 0 0;color:#9f97a6;font-size:11px}
+.live-refresh-button{flex:none;min-height:34px;font-size:10px}
+.live-refresh-button:disabled{opacity:.55;cursor:wait}
+.live-refresh-button:focus-visible,.live-preview-link:focus-visible,.live-watch-button:focus-visible,.live-station-link:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
+.live-content{min-width:0}
+.live-state-message{margin:0;padding:24px 14px;border:1px dashed #ffffff1c;border-radius:12px;color:#a9a1b0;text-align:center;font-size:12px}
+.live-state-message.is-error{color:#e0b3c3}
+.live-preview-card{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(220px,.88fr);overflow:hidden;border:1px solid #f58cac35;border-radius:13px;background:#11101880}
+.live-preview-link{position:relative;display:block;min-width:0;color:inherit;text-decoration:none}
+.live-thumbnail-frame{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;background:radial-gradient(ellipse at 45% 20%,#54394b,#17141d 70%)}
+.live-thumbnail{display:block;width:100%;height:100%;object-fit:cover;transition:transform .25s}
+.live-preview-link:hover .live-thumbnail{transform:scale(1.025)}
+.live-thumbnail-fallback{position:absolute;inset:0;display:none;place-items:center;color:#b7aab9;font-size:11px}
+.live-thumbnail-frame.has-no-thumbnail .live-thumbnail{display:none}
+.live-thumbnail-frame.has-no-thumbnail .live-thumbnail-fallback{display:grid}
+.live-badge{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:7px;background:#e34f68;color:#fff;font-size:10px;font-weight:800;letter-spacing:.08em;box-shadow:0 4px 14px #0005}
+.live-badge i{width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 8px #fff9}
+.live-preview-details{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px}
+.live-preview-info{display:grid;gap:8px;min-width:0}
+.live-status-label{color:#ff91a6;font-size:10px;font-weight:700}
+.live-broadcast-title{display:-webkit-box;overflow:hidden;color:#f5eff5;font-size:14px;line-height:1.55;overflow-wrap:anywhere;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+.live-viewer-count{color:#98909f;font-size:10px}
+.live-watch-button{flex:none;white-space:nowrap}
+.live-offline-card{display:flex;align-items:center;gap:15px;padding:18px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff04}
+.live-offline-mark{flex:none;display:grid;place-items:center;width:42px;height:42px;border:1px solid #ffffff18;border-radius:50%;color:#aaa2b0;font-size:22px}
+.live-offline-copy{display:grid;gap:5px;min-width:0;flex:1}
+.live-offline-copy strong{color:#e9e2eb;font-size:13px}
+.live-offline-copy span{color:#9992a0;font-size:10px;line-height:1.5}
+.live-station-link{flex:none}
+.live-stale-note{margin:9px 0 0;color:#b3a5b0;font-size:10px}
+@media(max-width:720px){.live-section{padding:16px}.live-heading h2{font-size:20px}.live-preview-card{grid-template-columns:1fr}.live-preview-details{align-items:flex-start;flex-direction:column;gap:12px;padding:14px}.live-watch-button{width:100%}}
+@media(max-width:420px){.live-heading{align-items:flex-start;flex-direction:column;gap:10px}.live-refresh-button{width:100%}.live-offline-card{align-items:flex-start;flex-wrap:wrap;padding:14px;gap:11px}.live-offline-copy{min-width:calc(100% - 54px);flex-basis:calc(100% - 54px)}.live-station-link{width:100%}}

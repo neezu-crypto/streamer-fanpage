@@ -14,6 +14,7 @@ const SOOP_VOD_PAGE_SIZE = 60;
 const FANPAGE_VOD_PAGE_SIZE = 24;
 const VOD_REFRESH_LOCK_TTL_MS = 2 * 60 * 1000;
 const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
+const SOOP_STATION_API = 'https://chapi.sooplive.com/api';
 const SOOP_CALENDAR_API = 'https://api-channel.sooplive.com/v1.1/channel';
 const CALENDAR_CACHE_TTL_MS = 10 * 60 * 1000;
 const CALENDAR_CACHE_FORCE_REFRESH_COOLDOWN_MS = 60 * 1000;
@@ -357,6 +358,58 @@ async function fetchSoopCalendar(soopId, view, year, month, day) {
   return days;
 }
 
+async function fetchSoopLiveStatus(soopId) {
+  const url = `${SOOP_STATION_API}/${encodeURIComponent(soopId)}/station`;
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        accept: 'application/json',
+        origin: 'https://www.sooplive.com',
+        referer: `https://www.sooplive.com/station/${encodeURIComponent(soopId)}`,
+        'user-agent': 'Mozilla/5.0',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (error) {
+    console.error(`SOOP live status request failed for ${soopId}:`, error);
+    throw new HttpsError('unavailable', 'SOOP 방송 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!response.ok) {
+    console.error(`SOOP station API returned HTTP ${response.status} for ${soopId}`);
+    throw new HttpsError('unavailable', 'SOOP 방송 상태 서버가 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (_) {
+    throw new HttpsError('unavailable', 'SOOP 방송 상태 응답을 읽지 못했습니다.');
+  }
+  const stationId = payload && payload.station && payload.station.user_id;
+  if (typeof stationId !== 'string' || stationId.toLowerCase() !== soopId.toLowerCase()) {
+    throw new HttpsError('unavailable', 'SOOP 방송 상태 응답 형식을 확인하지 못했습니다.');
+  }
+
+  const broad = payload.broad && typeof payload.broad === 'object' ? payload.broad : null;
+  if (!broad) return { isLive: false, checkedAt: Date.now() };
+  const broadcastId = String(broad.broad_no || '').trim();
+  if (!/^\d{1,20}$/.test(broadcastId) || broadcastId === '0') {
+    throw new HttpsError('unavailable', 'SOOP 라이브 썸네일 정보를 확인하지 못했습니다.');
+  }
+
+  const checkedAt = Date.now();
+  return {
+    isLive: true,
+    title: typeof broad.broad_title === 'string' ? broad.broad_title.trim().slice(0, 200) : '',
+    viewerCount: Math.max(0, Math.floor(Number(broad.current_sum_viewer) || 0)),
+    broadcastId,
+    streamUrl: `https://play.sooplive.com/${encodeURIComponent(soopId)}/${encodeURIComponent(broadcastId)}`,
+    thumbnailUrl: `https://liveimg.sooplive.com/m/${encodeURIComponent(broadcastId)}?t=${checkedAt}`,
+    checkedAt,
+  };
+}
+
 async function fetchSoopVodPage(soopId, page) {
   const url = new URL(`${SOOP_VOD_API}/${encodeURIComponent(soopId)}/vods/review`);
   url.search = new URLSearchParams({
@@ -610,6 +663,14 @@ exports.streamerFanPageVodPage = onCall({ maxInstances: 30 }, async (request) =>
   const target = await findVerifiedBySoopId(streamerId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
   return { vods: await readVodPage(target.streamer.id, offset, generation) };
+});
+
+exports.streamerFanPageLiveStatus = onCall({ maxInstances: 20 }, async (request) => {
+  requireAuth(request);
+  const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  return await fetchSoopLiveStatus(target.streamer.soopId);
 });
 
 exports.streamerFanPageCalendar = onCall({ maxInstances: 20 }, async (request) => {
