@@ -1,7 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signInWithCustomToken, linkWithPopup, signOut, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
-import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
+import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -40,6 +40,9 @@ let searchTimer = 0;
 let toastTimer = 0;
 let liveStatusTimer = 0;
 let verifiedStreamerUid = '';
+let verifiedStatusUnsubscribe = null;
+let switchApprovalUnsubscribe = null;
+let switchHandoffInProgress = false;
 const vodRefreshesInProgress = new Set();
 const vodPageLoadsInProgress = new Set();
 const calendarStates = new Map();
@@ -102,7 +105,64 @@ function renderAuthControls() {
   $('logoutButton').classList.toggle('hidden', !user || (user.isAnonymous && !kakaoLinked && !streamerVerified));
 }
 
-onAuthStateChanged(auth, renderAuthControls);
+async function handleFanpageStreamerSwitchApproval(uid, requestId) {
+  if (!requestId || switchHandoffInProgress || auth.currentUser?.uid !== uid) return;
+  const lockKey = 'soop.streamerVerificationSwitch.' + requestId;
+  try {
+    const lastAttemptAt = Number(localStorage.getItem(lockKey) || 0);
+    if (lastAttemptAt && Date.now() - lastAttemptAt < 20000) return;
+    localStorage.setItem(lockKey, String(Date.now()));
+  } catch (_) { /* Private browsing may disable localStorage. */ }
+  switchHandoffInProgress = true;
+  try {
+    const response = await callStreamerVerification({ checkOnly: true, switchRequestId: requestId });
+    if (response.data?.action !== 'switch' || auth.currentUser?.uid !== uid) {
+      try { localStorage.removeItem(lockKey); } catch (_) {}
+      switchHandoffInProgress = false;
+      return;
+    }
+    await signInWithCustomToken(auth, response.data.customToken);
+    location.reload();
+  } catch (error) {
+    try { localStorage.removeItem(lockKey); } catch (_) {}
+    switchHandoffInProgress = false;
+    console.error('승인된 스트리머 계정 자동 전환 실패:', error);
+  }
+}
+
+onAuthStateChanged(auth, (user) => {
+  if (verifiedStatusUnsubscribe) { verifiedStatusUnsubscribe(); verifiedStatusUnsubscribe = null; }
+  if (switchApprovalUnsubscribe) { switchApprovalUnsubscribe(); switchApprovalUnsubscribe = null; }
+  verifiedStreamerUid = '';
+  switchHandoffInProgress = false;
+  renderAuthControls();
+  if (!user) return;
+
+  let hasInitialVerifiedValue = false;
+  let previousVerifiedValue = false;
+  verifiedStatusUnsubscribe = onValue(ref(db, `users/${user.uid}/streamerVerified`), (snapshot) => {
+    if (auth.currentUser?.uid !== user.uid) return;
+    const verified = snapshot.val() === true;
+    verifiedStreamerUid = verified ? user.uid : '';
+    renderAuthControls();
+    if (hasInitialVerifiedValue && previousVerifiedValue !== verified) {
+      if (verified) {
+        $('verificationStatus').textContent = '✅ 관리자가 승인했어요. 인증 상태가 새로고침 없이 반영됐습니다. 본인 팬페이지로 이동할게요.';
+        $('verificationNote').hidden = true;
+        if ($('streamerVerifyDialog').open) $('streamerVerifyDialog').close();
+        showToast('스트리머 인증이 승인됐어요.');
+      }
+      if ($('siteShell').classList.contains('is-ready')) loadApp();
+    }
+    previousVerifiedValue = verified;
+    hasInitialVerifiedValue = true;
+  }, (error) => console.error('스트리머 인증 상태 구독 실패:', error));
+
+  switchApprovalUnsubscribe = onValue(ref(db, `users/${user.uid}/streamerVerificationSwitchApproval`), (snapshot) => {
+    const requestId = snapshot.val() && snapshot.val().requestId;
+    if (requestId) handleFanpageStreamerSwitchApproval(user.uid, String(requestId));
+  }, (error) => console.error('계정 전환 승인 신호 구독 실패:', error));
+});
 
 function confirmAccountSwitch() {
   const dialog = $('accountSwitchDialog');
