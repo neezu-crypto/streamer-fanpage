@@ -357,7 +357,7 @@ function renderFanPage(page) {
     const fields = [
       ['birthday', '생일', 20], ['mbti', 'MBTI', 8], ['major', '전공', 50], ['debutDate', '데뷔일', 20],
       ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160],
-      ['scheduleText', '방송 시간', 120], ['rouletteUrl', '룰렛확률 링크 (선택)', 300],
+      ['scheduleText', '방송 시간', 120], ['rouletteUrl', '룰렛 확률 링크', 300],
     ];
     const inputMap = {};
     const grid = document.createElement('div'); grid.className = 'profile-editor-grid';
@@ -367,7 +367,14 @@ function renderFanPage(page) {
       input.name = key; input.maxLength = maxLength;
       if (key === 'rouletteUrl') { input.type = 'url'; input.placeholder = 'https://'; }
       input.value = key === 'contents' ? (profile.contents || []).join(', ') : (profile[key] || '');
-      wrapper.append(input); grid.append(wrapper); inputMap[key] = input;
+      wrapper.append(input);
+      if (key === 'rouletteUrl') {
+        const hint = document.createElement('small');
+        hint.className = 'profile-editor-hint';
+        hint.textContent = '주소를 입력하면 버튼이 표시되고, 비워두면 숨겨집니다.';
+        wrapper.append(hint);
+      }
+      grid.append(wrapper); inputMap[key] = input;
     });
     const introLabel = document.createElement('label'); introLabel.className = 'profile-editor-field profile-editor-wide'; introLabel.textContent = 'ABOUT 문구';
     const introInput = document.createElement('textarea'); introInput.maxLength = 700; introInput.value = page.intro || '';
