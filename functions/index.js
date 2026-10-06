@@ -19,6 +19,8 @@ const CALENDAR_CACHE_TTL_MS = 10 * 60 * 1000;
 const CALENDAR_CACHE_FORCE_REFRESH_COOLDOWN_MS = 60 * 1000;
 const CALENDAR_CACHE_MAX_RANGES = 24;
 const CALENDAR_MAX_EVENTS_PER_DAY = 30;
+const FANPAGE_SCHEDULE_MAX_ITEMS = 500;
+const FANPAGE_SCHEDULE_TYPES = new Set(['방송', '방송예정', '합방', '휴방', '기타']);
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -201,6 +203,75 @@ function calendarCacheRootRef(streamerId) {
 
 function calendarCacheRef(streamerId, cacheKey) {
   return calendarCacheRootRef(streamerId).child(cacheKey);
+}
+
+function fanPageSchedulesRef(streamerId) {
+  return db.ref(`streamerFanPageSchedules/${streamerId}`);
+}
+
+function isValidCalendarDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function calendarVisibleRange(view, year, month, day) {
+  let start;
+  if (view === 'month') {
+    start = new Date(Date.UTC(year, month - 1, 1));
+    start.setUTCDate(start.getUTCDate() - start.getUTCDay());
+  } else start = new Date(Date.UTC(year, month - 1, day));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + (view === 'month' ? 41 : 6));
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
+
+async function readFanPageSchedules(streamerId, startDate, endDate) {
+  const snap = await fanPageSchedulesRef(streamerId).get();
+  return Object.entries(snap.val() || {}).flatMap(([id, record]) => {
+    if (!record || typeof record !== 'object' || !isValidCalendarDate(record.date)
+      || record.date < startDate || record.date > endDate) return [];
+    const title = typeof record.title === 'string' ? record.title.trim().slice(0, 200) : '';
+    if (!title) return [];
+    const time = typeof record.time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(record.time)
+      ? record.time
+      : '';
+    const typeName = FANPAGE_SCHEDULE_TYPES.has(record.typeName) ? record.typeName : '기타';
+    return [{
+      id,
+      date: record.date,
+      source: 'fanpage',
+      type: 0,
+      typeName,
+      title,
+      time,
+    }];
+  });
+}
+
+function mergeCalendarDays(soopDays, fanPageEvents, startDate, endDate) {
+  const daysByDate = new Map();
+  for (const day of soopDays) {
+    if (day.date < startDate || day.date > endDate) continue;
+    const events = daysByDate.get(day.date) || [];
+    events.push(...(day.events || []).map((event) => ({ ...event, source: 'soop' })));
+    daysByDate.set(day.date, events);
+  }
+  for (const event of fanPageEvents) {
+    if (event.date < startDate || event.date > endDate) continue;
+    const events = daysByDate.get(event.date) || [];
+    events.push(event);
+    daysByDate.set(event.date, events);
+  }
+  return [...daysByDate.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, events]) => ({
+      date,
+      events: events.sort((a, b) => a.time.localeCompare(b.time) || a.title.localeCompare(b.title, 'ko')),
+    }));
 }
 
 async function saveCalendarCache(streamerId, cacheKey, days, fetchedAt) {
@@ -573,26 +644,85 @@ exports.streamerFanPageCalendar = onCall({ maxInstances: 20 }, async (request) =
   const hasCachedDays = cached && Array.isArray(cached.days) && Number.isFinite(Number(cached.fetchedAt));
   const cacheAge = hasCachedDays ? Math.max(0, now - Number(cached.fetchedAt)) : Infinity;
   const forceRefreshCoolingDown = data.forceRefresh && cacheAge < CALENDAR_CACHE_FORCE_REFRESH_COOLDOWN_MS;
+  let soopDays = null;
+  let fetchedAt = null;
+  let stale = false;
   if (hasCachedDays && cacheAge < CALENDAR_CACHE_TTL_MS && (!data.forceRefresh || forceRefreshCoolingDown)) {
-    return { view, year, month, day, days: cached.days, fetchedAt: Number(cached.fetchedAt), stale: false };
+    soopDays = cached.days;
+    fetchedAt = Number(cached.fetchedAt);
+  } else {
+    try {
+      soopDays = await fetchSoopCalendar(target.streamer.soopId, view, year, month, day);
+      fetchedAt = Date.now();
+      try {
+        await saveCalendarCache(target.streamer.id, cacheKey, soopDays, fetchedAt);
+      } catch (cacheError) {
+        console.warn(`Could not cache SOOP calendar for ${target.streamer.id}:`, cacheError);
+      }
+    } catch (error) {
+      if (!hasCachedDays) throw error;
+      console.warn(`Serving stale SOOP calendar cache for ${target.streamer.id}:`, error);
+      soopDays = cached.days;
+      fetchedAt = Number(cached.fetchedAt);
+      stale = true;
+    }
+  }
+  const visibleRange = calendarVisibleRange(view, year, month, day);
+  const fanPageEvents = await readFanPageSchedules(target.streamer.id, visibleRange.startDate, visibleRange.endDate);
+  return {
+    view,
+    year,
+    month,
+    day,
+    days: mergeCalendarDays(soopDays || [], fanPageEvents, visibleRange.startDate, visibleRange.endDate),
+    fetchedAt,
+    stale,
+  };
+});
+
+exports.streamerFanPageScheduleAdd = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+  const data = request.data || {};
+  let target;
+  if (isAdmin) {
+    const streamerId = String(data.streamerId || '').trim().toLowerCase();
+    if (!streamerId) throw new HttpsError('invalid-argument', '일정을 추가할 팬페이지를 지정해 주세요.');
+    target = await findVerifiedBySoopId(streamerId);
+  } else {
+    if (!verified) throw new HttpsError('permission-denied', '인증 스트리머만 팬페이지 일정을 추가할 수 있습니다.');
+    const requestedId = String(data.streamerId || '').trim().toLowerCase();
+    if (requestedId && requestedId !== verified.streamer.id) {
+      throw new HttpsError('permission-denied', '본인 팬페이지에만 일정을 추가할 수 있습니다.');
+    }
+    target = verified;
+  }
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+
+  const date = typeof data.date === 'string' ? data.date : '';
+  const title = typeof data.title === 'string' ? data.title.trim() : '';
+  const time = typeof data.time === 'string' ? data.time.trim() : '';
+  const typeName = typeof data.typeName === 'string' ? data.typeName.trim() : '';
+  const dateYear = Number(date.slice(0, 4));
+  const currentYear = new Date().getUTCFullYear();
+  if (!isValidCalendarDate(date) || dateYear < currentYear - 2 || dateYear > currentYear + 2
+    || (time && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time))
+    || !title || title.length > 200 || !FANPAGE_SCHEDULE_TYPES.has(typeName)) {
+    throw new HttpsError('invalid-argument', '날짜, 시간, 일정 이름을 확인해 주세요.');
   }
 
-  try {
-    const days = await fetchSoopCalendar(target.streamer.soopId, view, year, month, day);
-    const fetchedAt = Date.now();
-    try {
-      await saveCalendarCache(target.streamer.id, cacheKey, days, fetchedAt);
-    } catch (cacheError) {
-      console.warn(`Could not cache SOOP calendar for ${target.streamer.id}:`, cacheError);
-    }
-    return { view, year, month, day, days, fetchedAt, stale: false };
-  } catch (error) {
-    if (hasCachedDays) {
-      console.warn(`Serving stale SOOP calendar cache for ${target.streamer.id}:`, error);
-      return { view, year, month, day, days: cached.days, fetchedAt: Number(cached.fetchedAt), stale: true };
-    }
-    throw error;
+  const schedulesRef = fanPageSchedulesRef(target.streamer.id);
+  const id = randomUUID();
+  const event = { date, time, title, typeName, createdAt: Date.now() };
+  const result = await schedulesRef.transaction((current) => {
+    const schedules = current && typeof current === 'object' ? current : {};
+    if (Object.keys(schedules).length >= FANPAGE_SCHEDULE_MAX_ITEMS) return;
+    return { ...schedules, [id]: event };
+  });
+  if (!result.committed) {
+    throw new HttpsError('resource-exhausted', `팬페이지 일정은 최대 ${FANPAGE_SCHEDULE_MAX_ITEMS}개까지 등록할 수 있습니다.`);
   }
+  return { event: { id, ...event, source: 'fanpage', type: 0 } };
 });
 
 exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {
