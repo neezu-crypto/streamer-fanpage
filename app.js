@@ -30,6 +30,7 @@ const $ = (id) => document.getElementById(id);
 let currentPage = null;
 let searchTimer = 0;
 let toastTimer = 0;
+let verifiedStreamerUid = '';
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
 
@@ -37,18 +38,22 @@ function renderAuthControls() {
   const user = auth.currentUser;
   const googleLinked = !!(user && user.providerData.some((provider) => provider.providerId === 'google.com'));
   const kakaoLinked = !!(user && localStorage.getItem(KAKAO_LINKED_UID_KEY) === user.uid);
+  const streamerVerified = !!(user && verifiedStreamerUid === user.uid);
   $('accountStatus').textContent = !user
     ? '로그인 확인 중'
-    : user.isAnonymous && !kakaoLinked
+    : streamerVerified
+      ? '스트리머 인증됨'
+      : user.isAnonymous && !kakaoLinked
       ? '게스트 이용 중'
       : googleLinked
         ? 'Google 계정 연결됨'
         : '카카오 계정 연결됨';
+  $('openLoginOptions').classList.toggle('hidden', !!(user && (!user.isAnonymous || kakaoLinked || streamerVerified)));
   $('choiceGoogleLogin').classList.toggle('hidden', googleLinked);
   $('choiceGoogleLogin').textContent = user && !user.isAnonymous ? 'Google 계정 연결' : 'Google로 로그인';
   $('choiceKakaoLogin').classList.toggle('hidden', kakaoLinked);
   $('choiceKakaoLogin').textContent = user && !user.isAnonymous ? '카카오 계정 연결' : '카카오로 로그인';
-  $('logoutButton').classList.toggle('hidden', !user || (user.isAnonymous && !kakaoLinked));
+  $('logoutButton').classList.toggle('hidden', !user || (user.isAnonymous && !kakaoLinked && !streamerVerified));
 }
 
 onAuthStateChanged(auth, renderAuthControls);
@@ -339,6 +344,8 @@ async function loadApp() {
       requestedId = result.redirectTo;
       result = (await callBootstrap({ streamerId: requestedId })).data;
     }
+    verifiedStreamerUid = result.verifiedStreamer ? auth.currentUser.uid : '';
+    renderAuthControls();
     if (requestedId && !result.page) throw new Error('팬페이지를 찾을 수 없습니다.');
     const recentPromise = callRecent().then((value) => value.data.streamers);
     if (!requestedId) {
