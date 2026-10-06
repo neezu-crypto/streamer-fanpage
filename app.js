@@ -25,6 +25,7 @@ const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
 const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh', { timeout: 3600000 });
 const callCalendar = httpsCallable(functions, 'streamerFanPageCalendar');
 const callLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
+const callGallery = httpsCallable(functions, 'streamerFanPageGallery');
 const callScheduleAdd = httpsCallable(functions, 'streamerFanPageScheduleAdd');
 const callScheduleDelete = httpsCallable(functions, 'streamerFanPageScheduleDelete');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
@@ -445,6 +446,7 @@ function renderFanPage(page) {
   view.append(renderLiveSection(page));
   view.append(renderVodSection(page));
   view.append(renderCalendarSection(page));
+  view.append(renderGallerySection(page));
   if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   loadLiveStatus(page.streamer.id);
@@ -806,6 +808,129 @@ function calendarPeriodLabel(state) {
   const end = new Date(start); end.setDate(end.getDate() + 6);
   const formatter = new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' });
   return `${formatter.format(start)} – ${formatter.format(end)}`;
+}
+
+function galleryPageUrl(page, category = 'all') {
+  const url = new URL('https://neezu-crypto.github.io/streamer-gallery/');
+  url.searchParams.set('streamer', page.streamer.nickname);
+  if (category !== 'all') url.searchParams.set('category', category);
+  return url.href;
+}
+
+function renderGallerySection(page) {
+  const section = document.createElement('section');
+  section.className = 'fan-gallery-section content-card';
+  section.id = 'fanGallerySection';
+
+  const heading = document.createElement('div'); heading.className = 'fan-gallery-heading';
+  const headingCopy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'STREAMER GALLERY';
+  const title = document.createElement('h2'); title.textContent = '팬 갤러리';
+  const subtitle = document.createElement('p'); subtitle.className = 'fan-gallery-subtitle'; subtitle.textContent = '팬들이 남긴 순간';
+  headingCopy.append(eyebrow, title, subtitle);
+  const headingActions = document.createElement('div'); headingActions.className = 'fan-gallery-heading-actions';
+  const count = document.createElement('span'); count.className = 'fan-gallery-count'; count.textContent = '불러오는 중';
+  const allGalleryLink = document.createElement('a'); allGalleryLink.className = 'button button-primary fan-gallery-all-link';
+  allGalleryLink.href = galleryPageUrl(page); allGalleryLink.target = '_blank'; allGalleryLink.rel = 'noopener noreferrer';
+  allGalleryLink.textContent = '전체 갤러리 보기 ↗';
+  headingActions.append(count, allGalleryLink); heading.append(headingCopy, headingActions);
+
+  const tabs = document.createElement('div'); tabs.className = 'fan-gallery-tabs';
+  tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '갤러리 종류');
+  const categories = [
+    { id: 'all', label: '전체' },
+    { id: 'fan-art', label: '팬아트' },
+    { id: 'screenshot', label: '방송 캡처' },
+  ];
+  let activeCategory = 'all';
+  let galleryData = null;
+  let isLoading = true;
+  let errorMessage = '';
+  const status = document.createElement('p'); status.className = 'fan-gallery-status';
+  status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+  const grid = document.createElement('div'); grid.className = 'fan-gallery-grid';
+
+  function renderItems() {
+    count.textContent = galleryData
+      ? `전체 ${Number(galleryData.totalCount || 0).toLocaleString('ko-KR')}개`
+      : isLoading ? '불러오는 중' : '';
+    allGalleryLink.href = galleryPageUrl(page, activeCategory);
+    tabs.querySelectorAll('[role="tab"]').forEach((button) => {
+      const selected = button.dataset.category === activeCategory;
+      button.setAttribute('aria-selected', String(selected));
+      button.classList.toggle('is-active', selected);
+    });
+    grid.replaceChildren();
+    if (isLoading) {
+      status.textContent = '갤러리 이미지를 불러오고 있어요.';
+      status.classList.remove('is-error');
+      return;
+    }
+    if (errorMessage) {
+      status.replaceChildren();
+      const message = document.createElement('span'); message.textContent = errorMessage;
+      const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button fan-gallery-retry';
+      retry.textContent = '다시 불러오기'; retry.addEventListener('click', loadGallery);
+      status.append(message, retry); status.classList.add('is-error');
+      return;
+    }
+    status.classList.remove('is-error');
+    const matchingItems = (galleryData?.items || []).filter((item) => activeCategory === 'all' || item.category === activeCategory);
+    const items = activeCategory === 'all' ? matchingItems.slice(0, Number(galleryData?.previewSize) || 8) : matchingItems;
+    if (!items.length) {
+      status.textContent = galleryData?.linked === false
+        ? '연결된 스트리머 갤러리를 찾지 못했어요.'
+        : galleryData?.totalCount
+          ? '선택한 분류의 이미지가 아직 없어요.'
+          : '아직 이 스트리머의 갤러리 이미지가 없어요.';
+      return;
+    }
+    status.textContent = '';
+    items.forEach((item) => {
+      const card = document.createElement('a'); card.className = 'fan-gallery-card';
+      card.href = galleryPageUrl(page, item.category); card.target = '_blank'; card.rel = 'noopener noreferrer';
+      card.setAttribute('aria-label', `${page.streamer.nickname} ${item.categoryLabel} 갤러리 보기`);
+      const frame = document.createElement('span'); frame.className = 'fan-gallery-thumb-frame';
+      const image = document.createElement('img'); image.className = 'fan-gallery-thumb';
+      image.src = item.thumbUrl; image.alt = ''; image.loading = 'lazy';
+      image.addEventListener('error', () => { image.remove(); frame.classList.add('is-missing'); }, { once: true });
+      const category = document.createElement('span'); category.className = 'fan-gallery-category'; category.textContent = item.categoryLabel;
+      frame.append(image, category);
+      const details = document.createElement('span'); details.className = 'fan-gallery-card-details';
+      const date = document.createElement('span'); date.className = 'fan-gallery-date';
+      date.textContent = item.createdAt ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' }).format(new Date(item.createdAt)) : '날짜 정보 없음';
+      const stats = document.createElement('span'); stats.className = 'fan-gallery-stats';
+      stats.textContent = `♥ ${Number(item.likeCount || 0).toLocaleString('ko-KR')}　댓글 ${Number(item.commentCount || 0).toLocaleString('ko-KR')}`;
+      details.append(date, stats); card.append(frame, details); grid.append(card);
+    });
+  }
+
+  async function loadGallery() {
+    isLoading = true; errorMessage = ''; renderItems();
+    try {
+      const response = await callGallery({ streamerId: page.streamer.id });
+      if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+      galleryData = response.data || { totalCount: 0, items: [] };
+    } catch (error) {
+      if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+      errorMessage = error.message || '갤러리를 불러오지 못했어요.';
+    } finally {
+      if (currentPage && currentPage.streamer.id === page.streamer.id) {
+        isLoading = false;
+        renderItems();
+      }
+    }
+  }
+
+  categories.forEach(({ id, label }) => {
+    const button = document.createElement('button'); button.type = 'button'; button.setAttribute('role', 'tab');
+    button.dataset.category = id; button.textContent = label;
+    button.addEventListener('click', () => { activeCategory = id; renderItems(); });
+    tabs.append(button);
+  });
+  section.append(heading, tabs, status, grid);
+  loadGallery();
+  return section;
 }
 
 function renderCalendarSection(page) {
