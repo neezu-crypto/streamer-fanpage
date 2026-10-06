@@ -23,6 +23,7 @@ const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
 const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
 const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh', { timeout: 3600000 });
+const callCalendar = httpsCallable(functions, 'streamerFanPageCalendar');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
@@ -37,6 +38,7 @@ let toastTimer = 0;
 let verifiedStreamerUid = '';
 const vodRefreshesInProgress = new Set();
 const vodPageLoadsInProgress = new Set();
+const calendarStates = new Map();
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
 
@@ -370,7 +372,9 @@ function renderFanPage(page) {
   if (!page.isOwner) view.append(back);
   view.append(section);
   view.append(renderVodSection(page));
+  view.append(renderCalendarSection(page));
   view.append(renderVodPlayerDialog());
+  loadCalendar(page.streamer.id);
 
   if (page.isOwner) {
     const editorDialog = document.createElement('dialog');
@@ -524,6 +528,7 @@ function renderVodSection(page) {
     return section;
   }
 
+  const scrollbox = document.createElement('div'); scrollbox.className = 'vod-scrollbox';
   const grid = document.createElement('div'); grid.className = 'vod-grid';
   vods.items.forEach((vod) => {
     if (!vod || !/^\d{1,20}$/.test(String(vod.id || ''))) return;
@@ -550,7 +555,7 @@ function renderVodSection(page) {
     const views = document.createElement('span'); views.textContent = `조회 ${Math.max(0, Number(vod.readCount) || 0).toLocaleString('ko-KR')}`;
     metadata.append(date, views); copy.append(vodTitle, metadata); card.append(imageFrame, copy); grid.append(card);
   });
-  section.append(grid);
+  scrollbox.append(grid);
   if (vods.hasMore) {
     const moreRow = document.createElement('div'); moreRow.className = 'vod-more-row';
     const more = document.createElement('button'); more.type = 'button'; more.className = 'button vod-more-button';
@@ -559,9 +564,235 @@ function renderVodSection(page) {
     more.disabled = loading || refreshing;
     more.textContent = loading ? '목록을 불러오는 중…' : refreshing ? '전체 목록 갱신 중…' : `더 보기 (${Math.max(0, vods.total - vods.items.length).toLocaleString('ko-KR')}개 남음)`;
     more.addEventListener('click', () => loadMoreVods(streamerId, vods));
-    moreRow.append(more); section.append(moreRow);
+    moreRow.append(more); scrollbox.append(moreRow);
   }
+  section.append(scrollbox);
   return section;
+}
+
+function localDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function parseLocalDateKey(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  if (!match) return new Date();
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function calendarStateFor(streamerId) {
+  if (!calendarStates.has(streamerId)) {
+    const today = new Date();
+    calendarStates.set(streamerId, {
+      view: 'month', year: today.getFullYear(), month: today.getMonth() + 1,
+      selectedDate: localDateKey(today), days: [], fetchedAt: null,
+      loading: false, error: '', stale: false, requestId: 0,
+    });
+  }
+  return calendarStates.get(streamerId);
+}
+
+function calendarWeekStart(date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+}
+
+function calendarPeriodLabel(state) {
+  if (state.view === 'month') return `${state.year}년 ${state.month}월`;
+  const selected = parseLocalDateKey(state.selectedDate);
+  const start = calendarWeekStart(selected);
+  const end = new Date(start); end.setDate(end.getDate() + 6);
+  const formatter = new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' });
+  return `${formatter.format(start)} – ${formatter.format(end)}`;
+}
+
+function renderCalendarSection(page) {
+  const streamerId = page.streamer.id;
+  const state = calendarStateFor(streamerId);
+  const section = document.createElement('section');
+  section.className = 'calendar-section content-card';
+  section.id = 'calendarSection';
+
+  const heading = document.createElement('div'); heading.className = 'calendar-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'STREAMER SCHEDULE';
+  const title = document.createElement('h2'); title.textContent = '방송 일정';
+  copy.append(eyebrow, title);
+  const controls = document.createElement('div'); controls.className = 'calendar-controls';
+  const mode = document.createElement('div'); mode.className = 'calendar-mode-switch'; mode.setAttribute('role', 'group'); mode.setAttribute('aria-label', '캘린더 보기');
+  [['month', '월간'], ['week', '주간']].forEach(([value, label]) => {
+    const button = document.createElement('button'); button.type = 'button';
+    button.className = `calendar-mode-button${state.view === value ? ' is-active' : ''}`;
+    button.setAttribute('aria-pressed', String(state.view === value)); button.textContent = label;
+    button.addEventListener('click', () => {
+      if (state.view === value) return;
+      state.view = value;
+      state.error = '';
+      state.days = []; state.fetchedAt = null; state.stale = false;
+      refreshCalendarSection(streamerId);
+      loadCalendar(streamerId);
+    });
+    mode.append(button);
+  });
+  const navigation = document.createElement('div'); navigation.className = 'calendar-navigation';
+  const previous = document.createElement('button'); previous.type = 'button'; previous.className = 'calendar-nav-button';
+  previous.setAttribute('aria-label', '이전 기간'); previous.textContent = '‹';
+  previous.addEventListener('click', () => shiftCalendar(streamerId, -1));
+  const period = document.createElement('strong'); period.className = 'calendar-period'; period.textContent = calendarPeriodLabel(state);
+  const next = document.createElement('button'); next.type = 'button'; next.className = 'calendar-nav-button';
+  next.setAttribute('aria-label', '다음 기간'); next.textContent = '›';
+  next.addEventListener('click', () => shiftCalendar(streamerId, 1));
+  navigation.append(previous, period, next);
+  const today = document.createElement('button'); today.type = 'button'; today.className = 'calendar-today-button'; today.textContent = '오늘';
+  today.addEventListener('click', () => {
+    const now = new Date(); state.selectedDate = localDateKey(now); state.year = now.getFullYear(); state.month = now.getMonth() + 1; state.error = '';
+    state.days = []; state.fetchedAt = null; state.stale = false;
+    refreshCalendarSection(streamerId); loadCalendar(streamerId);
+  });
+  const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'calendar-refresh-button';
+  refresh.disabled = state.loading; refresh.setAttribute('aria-label', '일정 새로고침'); refresh.textContent = state.loading ? '불러오는 중…' : '↻ 새로고침';
+  refresh.addEventListener('click', () => loadCalendar(streamerId, true));
+  controls.append(mode, navigation, today, refresh);
+  heading.append(copy, controls);
+
+  const legend = document.createElement('div'); legend.className = 'calendar-legend';
+  ['방송', '방송예정', '합방', '휴방', '기타'].forEach((label, index) => {
+    const item = document.createElement('span'); item.className = `calendar-legend-item calendar-type-${index + 1}`;
+    const dot = document.createElement('i'); dot.setAttribute('aria-hidden', 'true');
+    item.append(dot, document.createTextNode(label)); legend.append(item);
+  });
+
+  const grid = document.createElement('div'); grid.className = `calendar-grid${state.view === 'week' ? ' is-week-view' : ''}`;
+  grid.setAttribute('role', 'grid'); grid.setAttribute('aria-label', `${calendarPeriodLabel(state)} 방송 일정`);
+  ['일', '월', '화', '수', '목', '금', '토'].forEach((label) => {
+    const dayName = document.createElement('div'); dayName.className = 'calendar-weekday'; dayName.setAttribute('role', 'columnheader'); dayName.textContent = label;
+    grid.append(dayName);
+  });
+  const selected = parseLocalDateKey(state.selectedDate);
+  const first = state.view === 'week'
+    ? calendarWeekStart(selected)
+    : calendarWeekStart(new Date(state.year, state.month - 1, 1));
+  const cellCount = state.view === 'week' ? 7 : 42;
+  const eventsByDate = new Map((state.days || []).map((item) => [item.date, item.events || []]));
+  for (let index = 0; index < cellCount; index += 1) {
+    const date = new Date(first); date.setDate(first.getDate() + index);
+    const dateKey = localDateKey(date);
+    const events = eventsByDate.get(dateKey) || [];
+    const cell = document.createElement('button'); cell.type = 'button'; cell.className = 'calendar-day';
+    if (state.view === 'month' && date.getMonth() + 1 !== state.month) cell.classList.add('is-outside-month');
+    if (dateKey === localDateKey(new Date())) cell.classList.add('is-today');
+    if (dateKey === state.selectedDate) cell.classList.add('is-selected');
+    cell.setAttribute('role', 'gridcell'); cell.setAttribute('aria-label', `${date.getMonth() + 1}월 ${date.getDate()}일, 일정 ${events.length}개`);
+    cell.addEventListener('click', () => {
+      const changesMonth = state.view === 'month' && (date.getFullYear() !== state.year || date.getMonth() + 1 !== state.month);
+      state.selectedDate = dateKey;
+      state.year = date.getFullYear(); state.month = date.getMonth() + 1;
+      if (changesMonth) {
+        state.error = ''; state.days = []; state.fetchedAt = null; state.stale = false;
+        refreshCalendarSection(streamerId); loadCalendar(streamerId);
+      } else refreshCalendarSection(streamerId);
+    });
+    const number = document.createElement('span'); number.className = 'calendar-day-number'; number.textContent = String(date.getDate()); cell.append(number);
+    const eventList = document.createElement('span'); eventList.className = 'calendar-day-events';
+    events.slice(0, state.view === 'week' ? 3 : 2).forEach((event) => {
+      const chip = document.createElement('span'); chip.className = `calendar-event-chip calendar-type-${Math.max(1, Math.min(5, Number(event.type) || 5))}`;
+      chip.textContent = event.title || event.typeName || '방송 일정';
+      eventList.append(chip);
+    });
+    if (events.length > (state.view === 'week' ? 3 : 2)) {
+      const more = document.createElement('span'); more.className = 'calendar-more-count'; more.textContent = `+${events.length - (state.view === 'week' ? 3 : 2)}개`;
+      eventList.append(more);
+    }
+    cell.append(eventList); grid.append(cell);
+  }
+
+  const selectedEvents = eventsByDate.get(state.selectedDate) || [];
+  const detail = document.createElement('div'); detail.className = 'calendar-day-detail';
+  const detailHeading = document.createElement('div'); detailHeading.className = 'calendar-detail-heading';
+  const detailTitle = document.createElement('h3');
+  detailTitle.textContent = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'full' }).format(selected);
+  const updateNote = document.createElement('span'); updateNote.className = `calendar-update-note${state.stale ? ' is-stale' : ''}`;
+  updateNote.textContent = state.stale
+    ? '저장된 일정 표시 중'
+    : state.fetchedAt ? `갱신 ${new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit' }).format(new Date(state.fetchedAt))}` : '';
+  detailHeading.append(detailTitle, updateNote); detail.append(detailHeading);
+
+  if (state.loading) {
+    const status = document.createElement('p'); status.className = 'calendar-state-message is-loading'; status.textContent = '방송 일정을 불러오고 있어요.'; detail.append(status);
+  } else if (state.error) {
+    const status = document.createElement('p'); status.className = 'calendar-state-message'; status.textContent = state.error;
+    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button calendar-retry-button'; retry.textContent = '다시 시도'; retry.addEventListener('click', () => loadCalendar(streamerId, true));
+    detail.append(status, retry);
+  } else if (!selectedEvents.length) {
+    const empty = document.createElement('p'); empty.className = 'calendar-empty-state'; empty.textContent = '이 날짜에 등록된 일정이 없어요.'; detail.append(empty);
+  } else {
+    const list = document.createElement('div'); list.className = 'calendar-event-list';
+    selectedEvents.forEach((event) => {
+      const row = document.createElement('article'); row.className = 'calendar-event-row';
+      const time = document.createElement('time'); time.className = 'calendar-event-time'; time.textContent = event.time || '시간 미정';
+      const body = document.createElement('div'); body.className = 'calendar-event-body';
+      const eventTitle = document.createElement('strong'); eventTitle.textContent = event.title || '방송 일정';
+      const category = document.createElement('span'); category.className = `calendar-event-category calendar-type-${Math.max(1, Math.min(5, Number(event.type) || 5))}`;
+      category.textContent = event.typeName || '일정'; body.append(eventTitle, category); row.append(time, body); list.append(row);
+    });
+    detail.append(list);
+  }
+  section.append(heading, legend, grid, detail);
+  return section;
+}
+
+function refreshCalendarSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('calendarSection');
+  if (section) section.replaceWith(renderCalendarSection(currentPage));
+}
+
+function shiftCalendar(streamerId, amount) {
+  const state = calendarStateFor(streamerId);
+  const selected = parseLocalDateKey(state.selectedDate);
+  if (state.view === 'month') {
+    const next = new Date(selected.getFullYear(), selected.getMonth() + amount, 1);
+    state.selectedDate = localDateKey(next); state.year = next.getFullYear(); state.month = next.getMonth() + 1;
+  } else {
+    selected.setDate(selected.getDate() + amount * 7);
+    state.selectedDate = localDateKey(selected); state.year = selected.getFullYear(); state.month = selected.getMonth() + 1;
+  }
+  state.error = ''; state.days = []; state.fetchedAt = null; state.stale = false;
+  refreshCalendarSection(streamerId);
+  loadCalendar(streamerId);
+}
+
+async function loadCalendar(streamerId, forceRefresh = false) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const state = calendarStateFor(streamerId);
+  const selected = parseLocalDateKey(state.selectedDate);
+  const requestDate = state.view === 'week' ? calendarWeekStart(selected) : new Date(state.year, state.month - 1, 1);
+  const requestId = ++state.requestId;
+  state.loading = true; state.error = '';
+  refreshCalendarSection(streamerId);
+  try {
+    const result = await callCalendar({
+      streamerId,
+      view: state.view,
+      year: requestDate.getFullYear(),
+      month: requestDate.getMonth() + 1,
+      day: requestDate.getDate(),
+      forceRefresh,
+    });
+    if (state.requestId !== requestId) return;
+    state.days = Array.isArray(result.data.days) ? result.data.days : [];
+    state.fetchedAt = Number(result.data.fetchedAt) || Date.now();
+    state.stale = !!result.data.stale;
+  } catch (error) {
+    if (state.requestId !== requestId) return;
+    state.error = error.message || '방송 일정을 불러오지 못했어요.';
+  } finally {
+    if (state.requestId === requestId) {
+      state.loading = false;
+      refreshCalendarSection(streamerId);
+    }
+  }
 }
 
 function renderVodPlayerDialog() {

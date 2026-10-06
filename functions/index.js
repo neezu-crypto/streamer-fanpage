@@ -14,6 +14,11 @@ const SOOP_VOD_PAGE_SIZE = 60;
 const FANPAGE_VOD_PAGE_SIZE = 24;
 const VOD_REFRESH_LOCK_TTL_MS = 2 * 60 * 1000;
 const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
+const SOOP_CALENDAR_API = 'https://api-channel.sooplive.com/v1.1/channel';
+const CALENDAR_CACHE_TTL_MS = 10 * 60 * 1000;
+const CALENDAR_CACHE_FORCE_REFRESH_COOLDOWN_MS = 60 * 1000;
+const CALENDAR_CACHE_MAX_RANGES = 24;
+const CALENDAR_MAX_EVENTS_PER_DAY = 30;
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -188,6 +193,97 @@ async function readVodPage(streamerId, offset = 0, requestedGeneration = '') {
     nextOffset: offset + items.length,
     hasMore: offset + items.length < cache.total,
   };
+}
+
+function calendarCacheRootRef(streamerId) {
+  return db.ref(`streamerFanPageCalendarCache/${streamerId}`);
+}
+
+function calendarCacheRef(streamerId, cacheKey) {
+  return calendarCacheRootRef(streamerId).child(cacheKey);
+}
+
+async function saveCalendarCache(streamerId, cacheKey, days, fetchedAt) {
+  const rootRef = calendarCacheRootRef(streamerId);
+  await rootRef.child(cacheKey).set({ days, fetchedAt });
+  const cached = (await rootRef.get()).val() || {};
+  const keepKeys = new Set(Object.entries(cached)
+    .filter(([, value]) => value && Array.isArray(value.days))
+    .sort((a, b) => (Number(b[1].fetchedAt) || 0) - (Number(a[1].fetchedAt) || 0))
+    .slice(0, CALENDAR_CACHE_MAX_RANGES)
+    .map(([key]) => key));
+  const updates = {};
+  Object.keys(cached).forEach((key) => {
+    if (!keepKeys.has(key)) updates[key] = null;
+  });
+  if (Object.keys(updates).length) await rootRef.update(updates);
+}
+
+function normalizeSoopCalendar(payload) {
+  if (!payload || !Array.isArray(payload.days)) return null;
+  const days = [];
+  for (const day of payload.days.slice(0, 45)) {
+    const date = typeof day?.date === 'string' ? day.date : '';
+    const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00Z`) : null;
+    if (!parsedDate || !Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) continue;
+    const events = Array.isArray(day.events) ? day.events.slice(0, CALENDAR_MAX_EVENTS_PER_DAY).map((event) => {
+      if (!event || typeof event !== 'object') return null;
+      const time = typeof event.eventTime === 'string' && /^\d{2}:\d{2}$/.test(event.eventTime)
+        ? event.eventTime
+        : '';
+      return {
+        type: Number.isSafeInteger(Number(event.calendarType)) && Number(event.calendarType) >= 1 && Number(event.calendarType) <= 5
+          ? Number(event.calendarType)
+          : 0,
+        typeName: typeof event.calendarTypeName === 'string' ? event.calendarTypeName.trim().slice(0, 20) : '',
+        title: typeof event.title === 'string' ? event.title.trim().slice(0, 200) : '',
+        time,
+      };
+    }).filter((event) => event && (event.title || event.typeName)) : [];
+    events.sort((a, b) => a.time.localeCompare(b.time) || a.title.localeCompare(b.title, 'ko'));
+    days.push({ date, events });
+  }
+  return days.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function fetchSoopCalendar(soopId, view, year, month, day) {
+  const url = new URL(`${SOOP_CALENDAR_API}/${encodeURIComponent(soopId)}/calendar`);
+  url.search = new URLSearchParams({
+    view,
+    year: String(year),
+    month: String(month),
+    day: String(day),
+    userId: soopId,
+  }).toString();
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        accept: 'application/json',
+        referer: `https://www.sooplive.com/station/${encodeURIComponent(soopId)}/calendar`,
+        'user-agent': 'Mozilla/5.0',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (error) {
+    console.error('SOOP calendar API request failed:', error);
+    throw new HttpsError('unavailable', 'SOOP 방송 일정을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!response.ok) {
+    console.error(`SOOP calendar API returned HTTP ${response.status} for ${soopId}`);
+    throw new HttpsError('unavailable', 'SOOP 방송 일정 서버가 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (_) {
+    throw new HttpsError('unavailable', 'SOOP 방송 일정 응답을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+  const days = normalizeSoopCalendar(payload);
+  if (!days) {
+    throw new HttpsError('unavailable', 'SOOP 방송 일정 응답 형식이 바뀌어 일정을 불러오지 못했습니다.');
+  }
+  return days;
 }
 
 async function fetchSoopVodPage(soopId, page) {
@@ -443,6 +539,60 @@ exports.streamerFanPageVodPage = onCall({ maxInstances: 30 }, async (request) =>
   const target = await findVerifiedBySoopId(streamerId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
   return { vods: await readVodPage(target.streamer.id, offset, generation) };
+});
+
+exports.streamerFanPageCalendar = onCall({ maxInstances: 20 }, async (request) => {
+  requireAuth(request);
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  const view = data.view === 'week' ? 'week' : data.view === 'month' ? 'month' : '';
+  const year = Number(data.year);
+  const month = Number(data.month);
+  const requestedDay = Number(data.day);
+  const currentYear = new Date().getUTCFullYear();
+  if (!streamerId || !view || !Number.isInteger(year) || year < currentYear - 2 || year > currentYear + 2
+    || !Number.isInteger(month) || month < 1 || month > 12
+    || !Number.isInteger(requestedDay) || requestedDay < 1 || requestedDay > 31) {
+    throw new HttpsError('invalid-argument', '캘린더 요청을 확인해 주세요.');
+  }
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+
+  const calendarDate = new Date(Date.UTC(year, month - 1, requestedDay));
+  if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() + 1 !== month
+    || calendarDate.getUTCDate() !== requestedDay || (view === 'week' && calendarDate.getUTCDay() !== 0)) {
+    throw new HttpsError('invalid-argument', '캘린더 날짜를 확인해 주세요.');
+  }
+  const day = view === 'month' ? 1 : requestedDay;
+  const cacheKey = view === 'month'
+    ? `month-${year}-${String(month).padStart(2, '0')}`
+    : `week-${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const cacheRef = calendarCacheRef(target.streamer.id, cacheKey);
+  const cached = (await cacheRef.get()).val();
+  const now = Date.now();
+  const hasCachedDays = cached && Array.isArray(cached.days) && Number.isFinite(Number(cached.fetchedAt));
+  const cacheAge = hasCachedDays ? Math.max(0, now - Number(cached.fetchedAt)) : Infinity;
+  const forceRefreshCoolingDown = data.forceRefresh && cacheAge < CALENDAR_CACHE_FORCE_REFRESH_COOLDOWN_MS;
+  if (hasCachedDays && cacheAge < CALENDAR_CACHE_TTL_MS && (!data.forceRefresh || forceRefreshCoolingDown)) {
+    return { view, year, month, day, days: cached.days, fetchedAt: Number(cached.fetchedAt), stale: false };
+  }
+
+  try {
+    const days = await fetchSoopCalendar(target.streamer.soopId, view, year, month, day);
+    const fetchedAt = Date.now();
+    try {
+      await saveCalendarCache(target.streamer.id, cacheKey, days, fetchedAt);
+    } catch (cacheError) {
+      console.warn(`Could not cache SOOP calendar for ${target.streamer.id}:`, cacheError);
+    }
+    return { view, year, month, day, days, fetchedAt, stale: false };
+  } catch (error) {
+    if (hasCachedDays) {
+      console.warn(`Serving stale SOOP calendar cache for ${target.streamer.id}:`, error);
+      return { view, year, month, day, days: cached.days, fetchedAt: Number(cached.fetchedAt), stale: true };
+    }
+    throw error;
+  }
 });
 
 exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {
