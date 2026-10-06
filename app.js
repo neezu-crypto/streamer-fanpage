@@ -334,10 +334,13 @@ function renderFanPage(page) {
   const soop = document.createElement('a');
   soop.className = 'button'; soop.href = page.streamer.soopUrl; soop.target = '_blank';
   soop.rel = 'noopener noreferrer'; soop.textContent = 'SOOP 방송국 ↗';
-  const roulette = document.createElement('a');
-  roulette.className = 'button button-primary'; roulette.href = 'https://weflab.com/user/lOPU2suSlGJuYWk';
-  roulette.target = '_blank'; roulette.rel = 'noopener noreferrer'; roulette.textContent = '룰렛 확률 ↗';
-  actions.append(soop, roulette);
+  actions.append(soop);
+  if (profile.rouletteUrl) {
+    const roulette = document.createElement('a');
+    roulette.className = 'button button-primary'; roulette.href = profile.rouletteUrl;
+    roulette.target = '_blank'; roulette.rel = 'noopener noreferrer'; roulette.textContent = '룰렛 확률 ↗';
+    actions.append(roulette);
+  }
   if (page.isOwner) {
     const edit = document.createElement('a'); edit.className = 'button'; edit.href = '#editProfile'; edit.textContent = '프로필 수정';
     actions.append(edit);
@@ -353,7 +356,8 @@ function renderFanPage(page) {
     const heading = document.createElement('h2'); heading.textContent = '프로필 정보 수정'; editor.append(heading);
     const fields = [
       ['birthday', '생일', 20], ['mbti', 'MBTI', 8], ['major', '전공', 50], ['debutDate', '데뷔일', 20],
-      ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160], ['scheduleText', '방송 시간', 120],
+      ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160],
+      ['scheduleText', '방송 시간', 120], ['rouletteUrl', '룰렛확률 링크 (선택)', 300],
     ];
     const inputMap = {};
     const grid = document.createElement('div'); grid.className = 'profile-editor-grid';
@@ -361,6 +365,7 @@ function renderFanPage(page) {
       const wrapper = document.createElement('label'); wrapper.className = 'profile-editor-field'; wrapper.textContent = labelText;
       const input = key === 'scheduleText' ? document.createElement('textarea') : document.createElement('input');
       input.name = key; input.maxLength = maxLength;
+      if (key === 'rouletteUrl') { input.type = 'url'; input.placeholder = 'https://'; }
       input.value = key === 'contents' ? (profile.contents || []).join(', ') : (profile[key] || '');
       wrapper.append(input); grid.append(wrapper); inputMap[key] = input;
     });
@@ -380,7 +385,7 @@ function renderFanPage(page) {
             birthday: value('birthday'), mbti: value('mbti'), major: value('major'), debutDate: value('debutDate'),
             fanNickname: value('fanNickname'), fandomName: value('fandomName'),
             contents: value('contents').split(',').map((item) => item.trim()).filter(Boolean),
-            scheduleText: value('scheduleText'),
+            scheduleText: value('scheduleText'), rouletteUrl: value('rouletteUrl'),
           },
         });
         currentPage.intro = result.data.page.intro;

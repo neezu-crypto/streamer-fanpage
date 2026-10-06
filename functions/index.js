@@ -69,6 +69,16 @@ function pageRef(streamerId) {
   return db.ref(`streamerFanPages/${streamerId}`);
 }
 
+function cleanHttpsUrl(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 300) return '';
+  try {
+    const parsed = new URL(value.trim());
+    return parsed.protocol === 'https:' && parsed.hostname && !parsed.username && !parsed.password ? parsed.href : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 function normalizePage(streamer, value) {
   const page = value && typeof value === 'object' ? value : {};
   const sourceProfile = page.profile && typeof page.profile === 'object' ? page.profile : {};
@@ -83,6 +93,7 @@ function normalizePage(streamer, value) {
       ? sourceProfile.contents.filter((item) => typeof item === 'string').slice(0, 8).map((item) => item.slice(0, 20))
       : [],
     scheduleText: typeof sourceProfile.scheduleText === 'string' ? sourceProfile.scheduleText.slice(0, 120) : '',
+    rouletteUrl: cleanHttpsUrl(sourceProfile.rouletteUrl),
   };
   return {
     streamer,
@@ -161,14 +172,24 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   }
   if (Object.prototype.hasOwnProperty.call(data, 'profile')) {
     const profile = data.profile;
-    const stringFields = ['birthday', 'mbti', 'major', 'debutDate', 'fanNickname', 'fandomName', 'scheduleText'];
+    const stringFields = ['birthday', 'mbti', 'major', 'debutDate', 'fanNickname', 'fandomName', 'scheduleText', 'rouletteUrl'];
     if (!profile || typeof profile !== 'object' || Array.isArray(profile)
       || stringFields.some((field) => typeof profile[field] !== 'string')
       || !Array.isArray(profile.contents)
       || profile.contents.length > 8
-      || stringFields.some((field) => profile[field].length > ({ birthday: 20, mbti: 8, major: 50, debutDate: 20, fanNickname: 30, fandomName: 30, scheduleText: 120 })[field])
+      || stringFields.some((field) => profile[field].length > ({ birthday: 20, mbti: 8, major: 50, debutDate: 20, fanNickname: 30, fandomName: 30, scheduleText: 120, rouletteUrl: 300 })[field])
       || profile.contents.some((item) => typeof item !== 'string' || item.length > 20)) {
       throw new HttpsError('invalid-argument', '프로필 항목을 확인해 주세요.');
+    }
+    let rouletteUrl = profile.rouletteUrl.trim();
+    if (rouletteUrl) {
+      try {
+        const parsed = new URL(rouletteUrl);
+        if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) throw new Error('invalid url');
+        rouletteUrl = parsed.href;
+      } catch (_) {
+        throw new HttpsError('invalid-argument', '룰렛 링크는 https 주소로 입력해 주세요.');
+      }
     }
     updates.profile = {
       birthday: profile.birthday.trim(),
@@ -179,6 +200,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       fandomName: profile.fandomName.trim(),
       contents: profile.contents.map((item) => item.trim()).filter(Boolean),
       scheduleText: profile.scheduleText.trim(),
+      rouletteUrl,
     };
   }
   if (!Object.prototype.hasOwnProperty.call(data, 'intro') && !Object.prototype.hasOwnProperty.call(data, 'profile')) {
