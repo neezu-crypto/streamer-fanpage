@@ -725,6 +725,35 @@ exports.streamerFanPageScheduleAdd = onCall({ maxInstances: 20 }, async (request
   return { event: { id, ...event, source: 'fanpage', type: 0 } };
 });
 
+exports.streamerFanPageScheduleDelete = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+  const data = request.data || {};
+  const requestedId = String(data.streamerId || '').trim().toLowerCase();
+  const eventId = typeof data.eventId === 'string' ? data.eventId.trim() : '';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)) {
+    throw new HttpsError('invalid-argument', '삭제할 일정을 확인해 주세요.');
+  }
+
+  let target;
+  if (isAdmin) {
+    if (!requestedId) throw new HttpsError('invalid-argument', '일정을 삭제할 팬페이지를 지정해 주세요.');
+    target = await findVerifiedBySoopId(requestedId);
+  } else {
+    if (!verified) throw new HttpsError('permission-denied', '인증 스트리머만 팬페이지 일정을 삭제할 수 있습니다.');
+    if (requestedId !== verified.streamer.id) {
+      throw new HttpsError('permission-denied', '본인 팬페이지의 일정만 삭제할 수 있습니다.');
+    }
+    target = verified;
+  }
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+
+  const result = await fanPageSchedulesRef(target.streamer.id).child(eventId)
+    .transaction((current) => current ? null : undefined);
+  if (!result.committed) throw new HttpsError('not-found', '팬페이지 일정을 찾을 수 없습니다.');
+  return { deleted: true, eventId };
+});
+
 exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {
   requireAuth(request);
   const query = String((request.data && request.data.query) || '').trim().toLocaleLowerCase();
