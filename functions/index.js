@@ -12,7 +12,7 @@ const RECENT_PAGE_LIMIT = 8;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const SOOP_VOD_PAGE_SIZE = 60;
 const FANPAGE_VOD_PAGE_SIZE = 24;
-const VOD_REFRESH_LOCK_TTL_MS = 10 * 60 * 1000;
+const VOD_REFRESH_LOCK_TTL_MS = 2 * 60 * 1000;
 const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
 
 function requireAuth(request) {
@@ -248,14 +248,19 @@ function normalizeFetchedVodPage(rows, total, page, seenIds) {
 async function acquireVodRefreshLock(streamerId) {
   const token = randomUUID();
   const lockRef = vodRefreshLockRef(streamerId);
+  const startedAt = Date.now();
   const result = await lockRef.transaction((current) => {
     if (current && Number(current.expiresAt) > Date.now()) return;
-    return { token, expiresAt: Date.now() + VOD_REFRESH_LOCK_TTL_MS };
+    return { token, startedAt, expiresAt: Date.now() + VOD_REFRESH_LOCK_TTL_MS };
   });
   if (!result.committed || !result.snapshot.val() || result.snapshot.val().token !== token) {
-    throw new HttpsError('aborted', '이 팬페이지의 다시보기 목록을 이미 갱신하고 있습니다. 잠시 후 다시 시도해 주세요.');
+    const current = result.snapshot.val();
+    return {
+      acquired: false,
+      retryAfterMs: Math.max(0, (Number(current && current.expiresAt) || Date.now()) - Date.now()),
+    };
   }
-  return { token, lockRef };
+  return { acquired: true, token, lockRef };
 }
 
 async function renewVodRefreshLock(lockRef, token) {
@@ -542,7 +547,11 @@ exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3
     targetStreamer = verified;
   }
 
-  const { token, lockRef } = await acquireVodRefreshLock(targetStreamer.streamer.id);
+  const lock = await acquireVodRefreshLock(targetStreamer.streamer.id);
+  if (!lock.acquired) {
+    return { inProgress: true, retryAfterMs: lock.retryAfterMs };
+  }
+  const { token, lockRef } = lock;
   try {
     const vods = await stageAndPublishSoopVods(
       targetStreamer.streamer.soopId,
