@@ -260,9 +260,18 @@ function renderList(container, items, recent = false, emptyText = '검색 결과
   items.forEach((item) => container.append(streamerCard(item, recent)));
 }
 async function waitForPageAssets() {
-  if (document.fonts && document.fonts.ready) await document.fonts.ready;
-  const images = [...document.querySelectorAll('#mainContent img')];
-  await Promise.all(images.map((image) => image.decode().catch(() => undefined)));
+  const images = [...document.querySelectorAll('#mainContent img')]
+    .filter((image) => image.loading !== 'lazy' && image.getBoundingClientRect().top < window.innerHeight);
+  const criticalAssets = [
+    ...(document.fonts && document.fonts.ready ? [document.fonts.ready.catch(() => undefined)] : []),
+    ...images.map((image) => image.decode().catch(() => undefined)),
+  ];
+  let timeoutId;
+  await Promise.race([
+    Promise.all(criticalAssets),
+    new Promise((resolve) => { timeoutId = window.setTimeout(resolve, 1800); }),
+  ]);
+  window.clearTimeout(timeoutId);
 }
 function setVisibleView(page) {
   $('homeView').classList.toggle('hidden', !!page);
