@@ -477,6 +477,16 @@ function renderVodSection(page) {
       replaceVodSectionIfCurrent(streamerId);
       try {
         const result = await callVodRefresh({ streamerId });
+        if (result.data && result.data.inProgress) {
+          const waitSeconds = Math.ceil((Number(result.data.retryAfterMs) || 0) / 1000);
+          const waitLabel = waitSeconds >= 60
+            ? `약 ${Math.ceil(waitSeconds / 60)}분`
+            : '잠시';
+          if (currentPage && currentPage.streamer.id === streamerId) {
+            showToast(`다시보기 목록을 갱신 중이에요. ${waitLabel} 후 다시 시도해 주세요.`);
+          }
+          return;
+        }
         page.vods = result.data.vods;
         if (currentPage && currentPage.streamer.id === streamerId) {
           currentPage.vods = result.data.vods;
@@ -562,7 +572,6 @@ function renderVodPlayerDialog() {
   const frame = document.createElement('div'); frame.className = 'vod-player-frame';
   const iframe = document.createElement('iframe'); iframe.id = 'vodPlayerFrame'; iframe.title = 'SOOP 다시보기 플레이어';
   iframe.src = 'about:blank'; iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
-  iframe.allowFullscreen = true;
   frame.append(iframe);
   const footer = document.createElement('div'); footer.className = 'vod-player-footer';
   const note = document.createElement('p'); note.textContent = '플레이어가 표시되지 않거나 재생되지 않으면 SOOP에서 열어 주세요.';
