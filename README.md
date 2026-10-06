@@ -5,6 +5,6 @@
 - 정적 사이트: `https://neezu-crypto.github.io/streamer-fanpage/`
 - Firebase 프로젝트: `soop-stock-market`
 - Functions codebase: `fanpage`
-- Functions 배포: `firebase deploy --only functions:fanpage:streamerFanPageBootstrap,functions:fanpage:streamerFanPageSearch,functions:fanpage:streamerFanPageRecent,functions:fanpage:streamerFanPageSave --project soop-stock-market`
+- Functions 배포: `firebase deploy --only functions:fanpage:streamerFanPageBootstrap,functions:fanpage:streamerFanPageSearch,functions:fanpage:streamerFanPageRecent,functions:fanpage:streamerFanPageSave,functions:fanpage:streamerFanPageVodRefresh --project soop-stock-market`
 
-팬페이지와 최근 방문 기록은 `streamerFanPages/` 및 `streamerFanPageRecentVisits/`에 저장되며, 브라우저에서 RTDB를 직접 읽거나 쓰지 않습니다.
+팬페이지, 최근 방문 기록, 수동 갱신한 SOOP 다시보기 목록은 `streamerFanPages/`, `streamerFanPageRecentVisits/`, `streamerFanPageVods/`에 저장되며, 브라우저에서 RTDB를 직접 읽거나 쓰지 않습니다. 다시보기 전체 갱신은 인증 스트리머 본인 또는 관리자만 실행할 수 있습니다.

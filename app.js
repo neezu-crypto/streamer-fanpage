@@ -21,6 +21,7 @@ const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
 const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
 const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
+const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
@@ -33,6 +34,7 @@ let currentPage = null;
 let searchTimer = 0;
 let toastTimer = 0;
 let verifiedStreamerUid = '';
+let vodRefreshInProgress = false;
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
 
@@ -356,6 +358,7 @@ function renderFanPage(page) {
   section.append(details, actions);
   if (!page.isOwner) view.append(back);
   view.append(section);
+  view.append(renderVodSection(page));
 
   if (page.isOwner) {
     const editorDialog = document.createElement('dialog');
@@ -425,6 +428,105 @@ function renderFanPage(page) {
     view.append(editorDialog);
   }
 }
+
+function formatVodDuration(durationMs) {
+  const duration = Number(durationMs);
+  if (!Number.isFinite(duration) || duration <= 0) return '';
+  const seconds = Math.floor(duration / 1000);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  return hours
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
+    : `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
+function renderVodSection(page) {
+  const vods = page.vods && Array.isArray(page.vods.items) ? page.vods : { items: [], total: 0, refreshedAt: null };
+  const section = document.createElement('section');
+  section.className = 'vod-section content-card';
+  section.id = 'vodSection';
+
+  const heading = document.createElement('div');
+  heading.className = 'vod-heading';
+  const headingCopy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'SOOP REPLAYS';
+  const title = document.createElement('h2'); title.textContent = '방송 다시보기';
+  const count = document.createElement('span'); count.className = 'vod-count'; count.textContent = `전체 ${vods.total.toLocaleString('ko-KR')}개`;
+  headingCopy.append(eyebrow, title, count);
+  heading.append(headingCopy);
+
+  if (page.isOwner) {
+    const refresh = document.createElement('button');
+    refresh.type = 'button'; refresh.className = 'button button-primary vod-refresh-button';
+    refresh.textContent = '↻ 전체 목록 갱신';
+    refresh.disabled = vodRefreshInProgress;
+    refresh.addEventListener('click', async () => {
+      if (vodRefreshInProgress) return;
+      vodRefreshInProgress = true;
+      refresh.disabled = true;
+      refresh.textContent = '전체 목록을 불러오는 중…';
+      try {
+        const result = await callVodRefresh({ streamerId: page.streamer.id });
+        page.vods = result.data.vods;
+        vodRefreshInProgress = false;
+        if (section.isConnected) section.replaceWith(renderVodSection(page));
+        showToast(`다시보기 ${page.vods.total.toLocaleString('ko-KR')}개를 갱신했어요.`);
+      } catch (error) {
+        refresh.disabled = false;
+        refresh.textContent = '↻ 전체 목록 갱신';
+        showToast(error.message || '다시보기 목록을 갱신하지 못했어요.');
+      } finally {
+        vodRefreshInProgress = false;
+      }
+    });
+    heading.append(refresh);
+  }
+
+  const status = document.createElement('p'); status.className = 'vod-refresh-status';
+  status.textContent = vods.refreshedAt
+    ? `마지막 갱신 ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(vods.refreshedAt))}`
+    : '아직 갱신된 다시보기 목록이 없어요.';
+  section.append(heading, status);
+
+  if (!vods.items.length) {
+    const empty = document.createElement('p'); empty.className = 'vod-empty-state';
+    empty.textContent = page.isOwner
+      ? '전체 목록 갱신을 눌러 SOOP 다시보기를 가져오세요.'
+      : '스트리머가 다시보기 목록을 갱신하면 여기에 표시돼요.';
+    section.append(empty);
+    return section;
+  }
+
+  const grid = document.createElement('div'); grid.className = 'vod-grid';
+  vods.items.forEach((vod) => {
+    if (!vod || !/^\d{1,20}$/.test(String(vod.id || ''))) return;
+    const card = document.createElement('a');
+    card.className = 'vod-card'; card.href = `https://vod.sooplive.com/player/${encodeURIComponent(vod.id)}`;
+    card.target = '_blank'; card.rel = 'noopener noreferrer';
+    const imageFrame = document.createElement('span'); imageFrame.className = 'vod-thumbnail-frame';
+    if (vod.thumbnailUrl) {
+      const image = document.createElement('img'); image.className = 'vod-thumbnail';
+      image.src = vod.thumbnailUrl; image.alt = ''; image.loading = 'lazy';
+      image.addEventListener('error', () => { image.remove(); imageFrame.classList.add('vod-thumbnail-missing'); }, { once: true });
+      imageFrame.append(image);
+    } else imageFrame.classList.add('vod-thumbnail-missing');
+    const duration = formatVodDuration(vod.durationMs);
+    if (duration) {
+      const badge = document.createElement('span'); badge.className = 'vod-duration'; badge.textContent = duration;
+      imageFrame.append(badge);
+    }
+    const copy = document.createElement('span'); copy.className = 'vod-copy';
+    const vodTitle = document.createElement('strong'); vodTitle.className = 'vod-title'; vodTitle.textContent = vod.title || '제목 없음';
+    const metadata = document.createElement('span'); metadata.className = 'vod-metadata';
+    const date = document.createElement('span'); date.textContent = vod.regDate || '';
+    const views = document.createElement('span'); views.textContent = `조회 ${Math.max(0, Number(vod.readCount) || 0).toLocaleString('ko-KR')}`;
+    metadata.append(date, views); copy.append(vodTitle, metadata); card.append(imageFrame, copy); grid.append(card);
+  });
+  section.append(grid);
+  return section;
+}
+
 async function runSearch() {
   const query = $('searchInput').value.trim();
   $('clearSearch').classList.toggle('hidden', !query);
