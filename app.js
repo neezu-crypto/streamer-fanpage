@@ -347,7 +347,8 @@ function renderFanPage(page) {
     actions.append(roulette);
   }
   if (page.isOwner) {
-    const edit = document.createElement('a'); edit.className = 'button'; edit.href = '#editProfile'; edit.textContent = '프로필 수정';
+    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'button'; edit.textContent = '⚙ 설정';
+    edit.addEventListener('click', () => $('profileSettingsDialog').showModal());
     actions.append(edit);
   }
   section.append(label, identity, facts);
@@ -356,9 +357,14 @@ function renderFanPage(page) {
   view.append(back, section);
 
   if (page.isOwner) {
-    const editor = document.createElement('section');
-    editor.id = 'editProfile'; editor.className = 'content-card profile-editor';
-    const heading = document.createElement('h2'); heading.textContent = '프로필 정보 수정'; editor.append(heading);
+    const editorDialog = document.createElement('dialog');
+    editorDialog.id = 'profileSettingsDialog'; editorDialog.className = 'account-dialog profile-settings-dialog';
+    const editor = document.createElement('div'); editor.className = 'account-dialog-card profile-editor';
+    const headingRow = document.createElement('div'); headingRow.className = 'profile-editor-heading';
+    const heading = document.createElement('h2'); heading.textContent = '팬페이지 설정';
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close'; close.setAttribute('aria-label', '설정 닫기'); close.textContent = '×';
+    close.addEventListener('click', () => editorDialog.close());
+    headingRow.append(heading, close); editor.append(headingRow);
     const fields = [
       ['birthday', '생일', 20], ['mbti', 'MBTI', 8], ['major', '전공', 50], ['debutDate', '데뷔일', 20],
       ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160],
@@ -384,8 +390,11 @@ function renderFanPage(page) {
     const introLabel = document.createElement('label'); introLabel.className = 'profile-editor-field profile-editor-wide'; introLabel.textContent = 'ABOUT 문구';
     const introInput = document.createElement('textarea'); introInput.maxLength = 700; introInput.value = page.intro || '';
     introLabel.append(introInput); grid.append(introLabel);
-    const footer = document.createElement('div'); footer.className = 'edit-footer';
+    const footer = document.createElement('div'); footer.className = 'edit-footer profile-editor-footer';
     const note = document.createElement('small'); note.textContent = '수정 내용은 서버에 저장됩니다.';
+    const footerActions = document.createElement('div'); footerActions.className = 'profile-editor-footer-actions';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
+    cancel.addEventListener('click', () => editorDialog.close());
     const save = document.createElement('button'); save.type = 'button'; save.className = 'button button-primary'; save.textContent = '프로필 저장';
     save.addEventListener('click', async () => {
       save.disabled = true;
@@ -402,12 +411,16 @@ function renderFanPage(page) {
         });
         currentPage.intro = result.data.page.intro;
         currentPage.profile = result.data.page.profile;
+        editorDialog.close();
         renderFanPage(currentPage);
         showToast('프로필을 저장했어요.');
       } catch (error) { showToast(error.message || '저장하지 못했어요.'); }
       finally { save.disabled = false; }
     });
-    footer.append(note, save); editor.append(grid, footer); view.append(editor);
+    footerActions.append(cancel, save);
+    footer.append(note, footerActions); editor.append(grid, footer); editorDialog.append(editor);
+    editorDialog.addEventListener('click', (event) => { if (event.target === editorDialog) editorDialog.close(); });
+    view.append(editorDialog);
   }
 }
 async function runSearch() {

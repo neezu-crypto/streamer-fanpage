@@ -39,3 +39,11 @@
 .profile-editor .edit-footer{margin-top:15px}
 @media(max-width:720px){.profile-board{grid-template-columns:1fr;gap:20px;padding:68px 19px 21px;border-radius:23px}.profile-tab{font-size:17px;padding:10px 16px 11px}.profile-identity{gap:16px}.profile-avatar{width:100px;height:100px}.profile-name{font-size:35px}.profile-handle{font-size:12px}.profile-facts{gap:8px}.profile-fact{min-height:47px;grid-template-columns:105px minmax(0,1fr)}.profile-fact span{font-size:14px}.profile-fact strong{font-size:16px;padding:7px 12px}.profile-about{gap:12px;margin-top:2px}.profile-about strong{font-size:16px}.profile-about span{font-size:14px}.profile-details{gap:13px 16px;padding-top:19px}.profile-detail{grid-template-columns:1fr;gap:2px;font-size:13px;line-height:1.5}.profile-actions{justify-content:stretch}.profile-actions .button{flex:1}.profile-editor-grid{grid-template-columns:1fr}.profile-editor-wide{grid-column:auto}}
 .profile-editor-hint{color:#928a9a;font-size:10px;line-height:1.45}
+.profile-settings-dialog{width:min(640px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow-y:auto}
+.profile-settings-dialog .profile-editor{margin:0}
+.profile-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.profile-editor-heading h2{margin:0}
+.profile-settings-close{width:36px;height:36px;padding:0;font-size:22px}
+.profile-editor-footer{gap:12px}
+.profile-editor-footer-actions{display:flex;align-items:center;gap:8px}
+@media(max-width:720px){.profile-settings-dialog{width:calc(100% - 20px);max-height:calc(100dvh - 20px)}.profile-settings-dialog .account-dialog-card{padding:20px}.profile-editor-footer{align-items:flex-start;flex-direction:column}.profile-editor-footer-actions{width:100%;justify-content:flex-end}}
