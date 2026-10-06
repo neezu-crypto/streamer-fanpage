@@ -21,7 +21,8 @@ const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
 const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
 const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
-const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh');
+const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
+const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh', { timeout: 3600000 });
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
@@ -34,7 +35,8 @@ let currentPage = null;
 let searchTimer = 0;
 let toastTimer = 0;
 let verifiedStreamerUid = '';
-let vodRefreshInProgress = false;
+const vodRefreshesInProgress = new Set();
+const vodPageLoadsInProgress = new Set();
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
 
@@ -359,6 +361,7 @@ function renderFanPage(page) {
   if (!page.isOwner) view.append(back);
   view.append(section);
   view.append(renderVodSection(page));
+  view.append(renderVodPlayerDialog());
 
   if (page.isOwner) {
     const editorDialog = document.createElement('dialog');
@@ -442,7 +445,12 @@ function formatVodDuration(durationMs) {
 }
 
 function renderVodSection(page) {
-  const vods = page.vods && Array.isArray(page.vods.items) ? page.vods : { items: [], total: 0, refreshedAt: null };
+  const vods = page.vods && Array.isArray(page.vods.items)
+    ? page.vods
+    : { items: [], total: 0, refreshedAt: null, generation: '', nextOffset: 0, hasMore: false };
+  const streamerId = page.streamer.id;
+  const isRefreshing = vodRefreshesInProgress.has(streamerId);
+  const isLoadingMore = vodPageLoadsInProgress.has(streamerId);
   const section = document.createElement('section');
   section.className = 'vod-section content-card';
   section.id = 'vodSection';
@@ -459,25 +467,28 @@ function renderVodSection(page) {
   if (page.isOwner) {
     const refresh = document.createElement('button');
     refresh.type = 'button'; refresh.className = 'button button-primary vod-refresh-button';
-    refresh.textContent = '↻ 전체 목록 갱신';
-    refresh.disabled = vodRefreshInProgress;
+    refresh.textContent = isRefreshing ? '전체 목록을 불러오는 중…' : isLoadingMore ? '목록을 불러오는 중…' : '↻ 전체 목록 갱신';
+    refresh.disabled = isRefreshing || isLoadingMore;
     refresh.addEventListener('click', async () => {
-      if (vodRefreshInProgress) return;
-      vodRefreshInProgress = true;
+      if (vodRefreshesInProgress.has(streamerId) || vodPageLoadsInProgress.has(streamerId)) return;
+      vodRefreshesInProgress.add(streamerId);
       refresh.disabled = true;
       refresh.textContent = '전체 목록을 불러오는 중…';
+      replaceVodSectionIfCurrent(streamerId);
       try {
-        const result = await callVodRefresh({ streamerId: page.streamer.id });
+        const result = await callVodRefresh({ streamerId });
         page.vods = result.data.vods;
-        vodRefreshInProgress = false;
-        if (section.isConnected) section.replaceWith(renderVodSection(page));
-        showToast(`다시보기 ${page.vods.total.toLocaleString('ko-KR')}개를 갱신했어요.`);
+        if (currentPage && currentPage.streamer.id === streamerId) {
+          currentPage.vods = result.data.vods;
+          showToast(`다시보기 ${page.vods.total.toLocaleString('ko-KR')}개를 갱신했어요.`);
+        }
       } catch (error) {
-        refresh.disabled = false;
-        refresh.textContent = '↻ 전체 목록 갱신';
-        showToast(error.message || '다시보기 목록을 갱신하지 못했어요.');
+        if (currentPage && currentPage.streamer.id === streamerId) {
+          showToast(error.message || '다시보기 목록을 갱신하지 못했어요.');
+        }
       } finally {
-        vodRefreshInProgress = false;
+        vodRefreshesInProgress.delete(streamerId);
+        replaceVodSectionIfCurrent(streamerId);
       }
     });
     heading.append(refresh);
@@ -501,9 +512,10 @@ function renderVodSection(page) {
   const grid = document.createElement('div'); grid.className = 'vod-grid';
   vods.items.forEach((vod) => {
     if (!vod || !/^\d{1,20}$/.test(String(vod.id || ''))) return;
-    const card = document.createElement('a');
-    card.className = 'vod-card'; card.href = `https://vod.sooplive.com/player/${encodeURIComponent(vod.id)}`;
-    card.target = '_blank'; card.rel = 'noopener noreferrer';
+    const card = document.createElement('button');
+    card.type = 'button'; card.className = 'vod-card';
+    card.setAttribute('aria-label', `${vod.title || '제목 없음'} 재생`);
+    card.addEventListener('click', () => openVodPlayer(vod));
     const imageFrame = document.createElement('span'); imageFrame.className = 'vod-thumbnail-frame';
     if (vod.thumbnailUrl) {
       const image = document.createElement('img'); image.className = 'vod-thumbnail';
@@ -524,7 +536,97 @@ function renderVodSection(page) {
     metadata.append(date, views); copy.append(vodTitle, metadata); card.append(imageFrame, copy); grid.append(card);
   });
   section.append(grid);
+  if (vods.hasMore) {
+    const moreRow = document.createElement('div'); moreRow.className = 'vod-more-row';
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'button vod-more-button';
+    const loading = vodPageLoadsInProgress.has(streamerId);
+    const refreshing = vodRefreshesInProgress.has(streamerId);
+    more.disabled = loading || refreshing;
+    more.textContent = loading ? '목록을 불러오는 중…' : refreshing ? '전체 목록 갱신 중…' : `더 보기 (${Math.max(0, vods.total - vods.items.length).toLocaleString('ko-KR')}개 남음)`;
+    more.addEventListener('click', () => loadMoreVods(streamerId, vods));
+    moreRow.append(more); section.append(moreRow);
+  }
   return section;
+}
+
+function renderVodPlayerDialog() {
+  const dialog = document.createElement('dialog');
+  dialog.id = 'vodPlayerDialog'; dialog.className = 'account-dialog vod-player-dialog';
+  const card = document.createElement('div'); card.className = 'account-dialog-card vod-player-card';
+  const heading = document.createElement('div'); heading.className = 'vod-player-heading';
+  const title = document.createElement('h2'); title.id = 'vodPlayerTitle'; title.textContent = '방송 다시보기';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
+  close.setAttribute('aria-label', '플레이어 닫기'); close.textContent = '×';
+  close.addEventListener('click', () => dialog.close());
+  heading.append(title, close);
+  const frame = document.createElement('div'); frame.className = 'vod-player-frame';
+  const iframe = document.createElement('iframe'); iframe.id = 'vodPlayerFrame'; iframe.title = 'SOOP 다시보기 플레이어';
+  iframe.src = 'about:blank'; iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+  iframe.allowFullscreen = true;
+  frame.append(iframe);
+  const footer = document.createElement('div'); footer.className = 'vod-player-footer';
+  const note = document.createElement('p'); note.textContent = '플레이어가 표시되지 않거나 재생되지 않으면 SOOP에서 열어 주세요.';
+  const link = document.createElement('a'); link.id = 'vodPlayerExternalLink'; link.className = 'button button-primary';
+  link.href = 'https://vod.sooplive.com/'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'SOOP에서 열기 ↗';
+  footer.append(note, link); card.append(heading, frame, footer); dialog.append(card);
+  dialog.addEventListener('close', () => { iframe.src = 'about:blank'; });
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  return dialog;
+}
+
+function openVodPlayer(vod) {
+  if (!/^\d{1,20}$/.test(String(vod && vod.id || ''))) return;
+  const id = encodeURIComponent(vod.id);
+  $('vodPlayerTitle').textContent = vod.title || '방송 다시보기';
+  $('vodPlayerExternalLink').href = `https://vod.sooplive.com/player/${id}`;
+  $('vodPlayerFrame').src = `https://vod.sooplive.com/player/${id}/embed?autoPlay=false&mutePlay=true&showChat=false`;
+  $('vodPlayerDialog').showModal();
+}
+
+function replaceVodSectionIfCurrent(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('vodSection');
+  if (section) section.replaceWith(renderVodSection(currentPage));
+}
+
+async function loadMoreVods(streamerId, currentVods) {
+  if (vodPageLoadsInProgress.has(streamerId) || vodRefreshesInProgress.has(streamerId)) return;
+  vodPageLoadsInProgress.add(streamerId);
+  replaceVodSectionIfCurrent(streamerId);
+  try {
+    const result = await callVodPage({
+      streamerId,
+      offset: Number(currentVods.nextOffset) || currentVods.items.length,
+      generation: currentVods.generation || '',
+    });
+    if (!currentPage || currentPage.streamer.id !== streamerId) return;
+    const nextPage = result.data.vods;
+    const knownIds = new Set(currentPage.vods.items.map((vod) => vod.id));
+    const addedItems = nextPage.items.filter((vod) => !knownIds.has(vod.id));
+    currentPage.vods = {
+      ...nextPage,
+      items: [...currentPage.vods.items, ...addedItems],
+      nextOffset: nextPage.nextOffset,
+      hasMore: nextPage.hasMore,
+    };
+  } catch (error) {
+    if (currentPage && currentPage.streamer.id === streamerId) {
+      if (error.code === 'functions/aborted') {
+        try {
+          const latest = (await callBootstrap({ streamerId })).data;
+          if (latest.page && currentPage && currentPage.streamer.id === streamerId) {
+            currentPage.vods = latest.page.vods;
+            showToast('목록이 갱신되어 최신 상태로 불러왔어요.');
+          } else showToast(error.message || '다시보기 목록을 불러오지 못했어요.');
+        } catch (reloadError) {
+          showToast(reloadError.message || error.message || '다시보기 목록을 불러오지 못했어요.');
+        }
+      } else showToast(error.message || '다시보기 목록을 불러오지 못했어요.');
+    }
+  } finally {
+    vodPageLoadsInProgress.delete(streamerId);
+    replaceVodSectionIfCurrent(streamerId);
+  }
 }
 
 async function runSearch() {
