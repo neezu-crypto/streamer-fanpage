@@ -265,11 +265,19 @@ async function acquireVodRefreshLock(streamerId) {
 
 async function renewVodRefreshLock(lockRef, token) {
   const result = await lockRef.transaction((current) => {
-    if (!current || current.token !== token) return;
-    return { ...current, expiresAt: Date.now() + VOD_REFRESH_LOCK_TTL_MS };
+    const now = Date.now();
+    if (current && current.token !== token && Number(current.expiresAt) > now) return;
+    const startedAt = current && current.token === token && Number(current.startedAt)
+      ? Number(current.startedAt)
+      : now;
+    return { token, startedAt, expiresAt: now + VOD_REFRESH_LOCK_TTL_MS };
   });
   if (!result.committed || !result.snapshot.val() || result.snapshot.val().token !== token) {
-    throw new HttpsError('aborted', '다시보기 갱신 권한이 만료됐습니다. 다시 시도해 주세요.');
+    const current = result.snapshot.val();
+    throw new HttpsError('aborted', '다른 갱신 작업이 진행 중입니다.', {
+      reason: 'vod-refresh-in-progress',
+      retryAfterMs: Math.max(0, (Number(current && current.expiresAt) || Date.now()) - Date.now()),
+    });
   }
 }
 
@@ -553,13 +561,20 @@ exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3
   }
   const { token, lockRef } = lock;
   try {
-    const vods = await stageAndPublishSoopVods(
-      targetStreamer.streamer.soopId,
-      targetStreamer.streamer.id,
-      token,
-      lockRef,
-    );
-    return { vods };
+    try {
+      const vods = await stageAndPublishSoopVods(
+        targetStreamer.streamer.soopId,
+        targetStreamer.streamer.id,
+        token,
+        lockRef,
+      );
+      return { vods };
+    } catch (error) {
+      if (error instanceof HttpsError && error.details && error.details.reason === 'vod-refresh-in-progress') {
+        return { inProgress: true, retryAfterMs: error.details.retryAfterMs };
+      }
+      throw error;
+    }
   } finally {
     await lockRef.transaction((current) => (current && current.token === token ? null : undefined)).catch((error) => {
       console.warn('Could not release the SOOP VOD refresh lock:', error);

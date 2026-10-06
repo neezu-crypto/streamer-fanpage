@@ -478,12 +478,8 @@ function renderVodSection(page) {
       try {
         const result = await callVodRefresh({ streamerId });
         if (result.data && result.data.inProgress) {
-          const waitSeconds = Math.ceil((Number(result.data.retryAfterMs) || 0) / 1000);
-          const waitLabel = waitSeconds >= 60
-            ? `약 ${Math.ceil(waitSeconds / 60)}분`
-            : '잠시';
           if (currentPage && currentPage.streamer.id === streamerId) {
-            showToast(`다시보기 목록을 갱신 중이에요. ${waitLabel} 후 다시 시도해 주세요.`);
+            showToast('다시보기 목록을 갱신 중이에요. 완료 후 다시 시도해 주세요.');
           }
           return;
         }
