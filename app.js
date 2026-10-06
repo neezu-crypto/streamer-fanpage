@@ -48,6 +48,7 @@ const vodRefreshesInProgress = new Set();
 const vodPageLoadsInProgress = new Set();
 const calendarStates = new Map();
 const liveStatusStates = new Map();
+let galleryLoadPromise = Promise.resolve();
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
 
@@ -446,7 +447,8 @@ function renderFanPage(page) {
   view.append(renderLiveSection(page));
   view.append(renderVodSection(page));
   view.append(renderCalendarSection(page));
-  view.append(renderGallerySection(page));
+  const gallerySection = renderGallerySection(page);
+  view.append(gallerySection);
   if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   loadLiveStatus(page.streamer.id);
@@ -929,7 +931,7 @@ function renderGallerySection(page) {
     tabs.append(button);
   });
   section.append(heading, tabs, status, grid);
-  loadGallery();
+  galleryLoadPromise = loadGallery();
   return section;
 }
 
@@ -1356,6 +1358,7 @@ function showStartupError(error) {
   $('retryButton').classList.remove('hidden');
 }
 async function loadApp() {
+  galleryLoadPromise = Promise.resolve();
   $('startupCover').classList.remove('is-error');
   $('retryButton').classList.add('hidden');
   $('startupTitle').textContent = '페이지를 준비하고 있어요';
@@ -1393,7 +1396,7 @@ async function loadApp() {
       const recent = await recentPromise;
       renderList($('recentPages'), recent, true, '최근 방문한 팬페이지가 여기에 표시돼요.');
     }
-    await waitForPageAssets();
+    await Promise.all([waitForPageAssets(), galleryLoadPromise]);
     $('startupCover').classList.add('hidden');
     $('siteShell').setAttribute('aria-hidden', 'false');
     $('siteShell').classList.add('is-ready');
