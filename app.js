@@ -549,7 +549,7 @@ function renderMessengerSection(page) {
   eyebrow.textContent = 'STREAMER MESSENGER';
   const title = document.createElement('h2');
   title.id = 'messengerLinkTitle';
-  title.textContent = isStreamerOwner ? '내 메신저 채팅방' : '팬들과 대화하기';
+  title.textContent = isStreamerOwner ? '내 메신저 채팅방' : '스트리머와 채팅하기';
   const description = document.createElement('p');
   description.className = 'messenger-link-description';
   description.textContent = isStreamerOwner
