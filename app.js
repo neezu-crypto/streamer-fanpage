@@ -700,6 +700,8 @@ function renderFanPage(page) {
 
 function renderStreamerStockPrice(page) {
   const stock = page.stock && typeof page.stock.id === 'string' ? page.stock : null;
+  const module = document.createElement('div');
+  module.className = 'profile-stock-module';
   const link = document.createElement('a');
   link.className = 'profile-stock-card';
   link.href = stock
@@ -829,7 +831,15 @@ function renderStreamerStockPrice(page) {
     chart.hidden = true;
     change.hidden = true;
   }
-  return link;
+  const attendance = document.createElement('a');
+  attendance.className = 'button profile-stock-attendance';
+  attendance.href = 'https://neezu-crypto.github.io/soop-stock-market/';
+  attendance.target = '_blank';
+  attendance.rel = 'noopener noreferrer';
+  attendance.textContent = '🎁 출석체크하고 게임머니 받기 ↗';
+  attendance.setAttribute('aria-label', '스트리머 주식시장에서 출석체크하고 게임머니 받기');
+  module.append(link, attendance);
+  return module;
 }
 
 function renderMessengerSection(page) {
