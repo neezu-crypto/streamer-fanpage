@@ -3,6 +3,7 @@
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const { randomUUID } = require('node:crypto');
 
 initializeApp();
@@ -25,6 +26,11 @@ const FANPAGE_SCHEDULE_TYPES = new Set(['방송', '방송예정', '합방', '휴
 const FANPAGE_GALLERY_PREVIEW_SIZE = 8;
 const FANPAGE_GALLERY_CACHE_TTL_MS = 3 * 60 * 1000;
 const FANPAGE_GALLERY_CACHE_MAX_ITEMS = 100;
+const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
+const YOUTUBE_VIDEO_PAGE_SIZE = 24;
+const YOUTUBE_CACHE_TTL_MS = 30 * 60 * 1000;
+const YOUTUBE_REFRESH_COOLDOWN_MS = 60 * 1000;
+const YOUTUBE_DATA_API_KEY = defineSecret('YOUTUBE_DATA_API_KEY');
 const GALLERY_PUBLIC_IMAGE_HOST = 'pub-aa5574dbd45e4404b18ab8efaae54e67.r2.dev';
 const GALLERY_CATEGORY_LABELS = Object.freeze({
   screenshot: '방송 캡처',
@@ -34,6 +40,7 @@ const GALLERY_CATEGORY_LABELS = Object.freeze({
   etc: '기타',
 });
 const fanpageGalleryMemoryCache = new Map();
+const youtubeFetchInProgress = new Map();
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -708,6 +715,150 @@ function cleanHttpsUrl(value) {
   }
 }
 
+function parseYouTubeChannelUrl(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 300) return null;
+  try {
+    const parsed = new URL(value.trim());
+    if (parsed.protocol !== 'https:' || !['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(parsed.hostname)
+      || parsed.username || parsed.password) return null;
+    const pathname = decodeURIComponent(parsed.pathname).replace(/\/+$/, '');
+    const handleMatch = /^\/@([^/]+)(?:\/(?:videos|featured|playlists|streams|shorts))?$/u.exec(pathname);
+    if (handleMatch && /^[\p{L}\p{N}][\p{L}\p{N}._-]{2,29}$/u.test(handleMatch[1])) {
+      const handle = handleMatch[1];
+      return { type: 'handle', value: handle, url: `https://www.youtube.com/@${handle}` };
+    }
+    const channelMatch = /^\/channel\/(UC[A-Za-z0-9_-]{20,30})(?:\/(?:videos|featured|playlists|streams|shorts))?$/i.exec(pathname);
+    if (channelMatch) {
+      const channelId = channelMatch[1];
+      return { type: 'channel', value: channelId, url: `https://www.youtube.com/channel/${channelId}` };
+    }
+    const userMatch = /^\/user\/([A-Za-z0-9._-]{1,100})(?:\/(?:videos|featured|playlists|streams|shorts))?$/i.exec(pathname);
+    if (userMatch) {
+      const username = userMatch[1];
+      return { type: 'username', value: username, url: `https://www.youtube.com/user/${encodeURIComponent(username)}` };
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function youtubeCacheRef(streamerId) {
+  return db.ref(`streamerFanPageYouTubeCache/${streamerId}`);
+}
+
+async function fetchYouTubeJson(resource, parameters, apiKey) {
+  const url = new URL(`${YOUTUBE_API_BASE}/${resource}`);
+  Object.entries({ ...parameters, key: apiKey }).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
+  });
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(12000),
+    });
+  } catch (_) {
+    throw new HttpsError('unavailable', 'YouTube 영상 목록에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!response.ok) {
+    console.warn(`YouTube Data API ${resource} returned HTTP ${response.status}`);
+    throw new HttpsError('unavailable', 'YouTube 영상 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (_) {
+    throw new HttpsError('unavailable', 'YouTube 영상 목록 응답을 읽지 못했어요.');
+  }
+  if (payload && payload.error) {
+    const errorCode = String(payload.error.errors?.[0]?.reason || payload.error.status || 'apiError');
+    console.warn(`YouTube Data API ${resource} returned ${errorCode}`);
+    throw new HttpsError('unavailable', 'YouTube 영상 목록을 불러오지 못했어요. 채널 주소와 API 설정을 확인해 주세요.');
+  }
+  return payload;
+}
+
+function normalizeYouTubeVideo(item) {
+  if (!item || typeof item !== 'object') return null;
+  const snippet = item && item.snippet && typeof item.snippet === 'object' ? item.snippet : {};
+  const contentDetails = item && item.contentDetails && typeof item.contentDetails === 'object' ? item.contentDetails : {};
+  const videoId = String(contentDetails.videoId || (snippet.resourceId && snippet.resourceId.videoId) || item.id || '');
+  if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) return null;
+  const thumbnails = snippet.thumbnails && typeof snippet.thumbnails === 'object' ? snippet.thumbnails : {};
+  const thumbnail = thumbnails.maxres || thumbnails.standard || thumbnails.high || thumbnails.medium || thumbnails.default;
+  let thumbnailUrl = '';
+  const rawThumbnailUrl = thumbnail && typeof thumbnail.url === 'string'
+    ? thumbnail.url
+    : typeof item.thumbnailUrl === 'string' ? item.thumbnailUrl : '';
+  if (rawThumbnailUrl) {
+    try {
+      const parsed = new URL(rawThumbnailUrl);
+      if (parsed.protocol === 'https:' && parsed.hostname === 'i.ytimg.com') thumbnailUrl = parsed.href;
+    } catch (_) {
+      // 썸네일 주소가 예상과 다르면 이미지만 생략한다.
+    }
+  }
+  return {
+    id: videoId,
+    title: typeof snippet.title === 'string' ? snippet.title.trim().slice(0, 300)
+      : typeof item.title === 'string' ? item.title.trim().slice(0, 300) : '제목 없음',
+    publishedAt: typeof snippet.publishedAt === 'string' ? snippet.publishedAt.slice(0, 32)
+      : typeof item.publishedAt === 'string' ? item.publishedAt.slice(0, 32) : '',
+    thumbnailUrl,
+  };
+}
+
+function normalizeYouTubeCache(value, channelUrl) {
+  const cache = value && typeof value === 'object' ? value : {};
+  if (cache.sourceUrl && cache.sourceUrl !== channelUrl) {
+    return { linked: true, channelTitle: '', channelUrl, totalCount: 0, items: [], fetchedAt: null };
+  }
+  const items = Array.isArray(cache.items) ? cache.items.map(normalizeYouTubeVideo).filter(Boolean).slice(0, YOUTUBE_VIDEO_PAGE_SIZE) : [];
+  return {
+    linked: true,
+    channelTitle: typeof cache.channelTitle === 'string' ? cache.channelTitle.slice(0, 100) : '',
+    channelUrl,
+    totalCount: Math.max(items.length, Math.floor(Number(cache.totalCount) || 0)),
+    items,
+    fetchedAt: Number.isFinite(Number(cache.fetchedAt)) ? Number(cache.fetchedAt) : null,
+  };
+}
+
+async function fetchYouTubeUploads(channelUrl, apiKey) {
+  const channel = parseYouTubeChannelUrl(channelUrl);
+  if (!channel) throw new HttpsError('failed-precondition', 'YouTube 채널 주소 형식을 확인해 주세요.');
+  const channelFilter = channel.type === 'handle'
+    ? { forHandle: channel.value }
+    : channel.type === 'username' ? { forUsername: channel.value } : { id: channel.value };
+  const channelPayload = await fetchYouTubeJson('channels', {
+    part: 'snippet,contentDetails',
+    ...channelFilter,
+  }, apiKey);
+  const channelItem = Array.isArray(channelPayload.items) ? channelPayload.items[0] : null;
+  const channelId = String(channelItem && channelItem.id || '');
+  const uploadsPlaylistId = String(channelItem && channelItem.contentDetails
+    && channelItem.contentDetails.relatedPlaylists && channelItem.contentDetails.relatedPlaylists.uploads || '');
+  if (!/^UC[A-Za-z0-9_-]{20,30}$/i.test(channelId) || !uploadsPlaylistId) {
+    throw new HttpsError('not-found', 'YouTube 채널을 찾을 수 없어요. 링크를 확인해 주세요.');
+  }
+  const uploads = await fetchYouTubeJson('playlistItems', {
+    part: 'snippet,contentDetails',
+    playlistId: uploadsPlaylistId,
+    maxResults: YOUTUBE_VIDEO_PAGE_SIZE,
+  }, apiKey);
+  const items = Array.isArray(uploads.items) ? uploads.items.map(normalizeYouTubeVideo).filter(Boolean) : [];
+  return {
+    linked: true,
+    channelTitle: typeof channelItem.snippet?.title === 'string' ? channelItem.snippet.title.slice(0, 100) : '',
+    channelUrl: `https://www.youtube.com/channel/${channelId}`,
+    sourceUrl: channel.url,
+    totalCount: Math.max(items.length, Math.floor(Number(uploads.pageInfo?.totalResults) || 0)),
+    items,
+    fetchedAt: Date.now(),
+  };
+}
+
 function normalizePage(streamer, value) {
   const page = value && typeof value === 'object' ? value : {};
   const sourceProfile = page.profile && typeof page.profile === 'object' ? page.profile : {};
@@ -723,6 +874,7 @@ function normalizePage(streamer, value) {
       : [],
     scheduleText: typeof sourceProfile.scheduleText === 'string' ? sourceProfile.scheduleText.slice(0, 120) : '',
     rouletteUrl: cleanHttpsUrl(sourceProfile.rouletteUrl),
+    youtubeChannelUrl: parseYouTubeChannelUrl(sourceProfile.youtubeChannelUrl)?.url || '',
   };
   return {
     streamer,
@@ -753,6 +905,62 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
     isAdmin,
     page: { ...normalizePage(target.streamer, pageSnap.val()), vods },
   };
+});
+
+exports.streamerFanPageYouTubeVideos = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  const forceRefresh = data.forceRefresh === true;
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+
+  if (forceRefresh) {
+    const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+    if (!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)) {
+      throw new HttpsError('permission-denied', '인증 스트리머 또는 관리자만 YouTube 목록을 갱신할 수 있습니다.');
+    }
+  }
+
+  const pageSnap = await pageRef(target.streamer.id).child('profile/youtubeChannelUrl').get();
+  const channel = parseYouTubeChannelUrl(pageSnap.val());
+  if (!channel) {
+    return { youtube: { linked: false, channelTitle: '', channelUrl: '', totalCount: 0, items: [], fetchedAt: null } };
+  }
+
+  const cacheRef = youtubeCacheRef(target.streamer.id);
+  const cached = normalizeYouTubeCache((await cacheRef.get()).val(), channel.url);
+  const cacheAge = cached.fetchedAt ? Math.max(0, Date.now() - cached.fetchedAt) : Infinity;
+  if (cached.fetchedAt && !forceRefresh && cacheAge < YOUTUBE_CACHE_TTL_MS) {
+    return { youtube: cached, stale: false };
+  }
+  if (cached.fetchedAt && forceRefresh && cacheAge < YOUTUBE_REFRESH_COOLDOWN_MS) {
+    return { youtube: cached, stale: false, refreshCoolingDown: true };
+  }
+
+  const inProgress = youtubeFetchInProgress.get(target.streamer.id);
+  if (inProgress) return { youtube: await inProgress, stale: false };
+
+  const task = (async () => {
+    try {
+      const fresh = await fetchYouTubeUploads(channel.url, YOUTUBE_DATA_API_KEY.value());
+      await cacheRef.set(fresh);
+      return fresh;
+    } catch (error) {
+      if (cached.fetchedAt) {
+        console.warn(`Serving stale YouTube upload cache for ${target.streamer.id}.`);
+        return { ...cached, stale: true };
+      }
+      throw error;
+    }
+  })();
+  youtubeFetchInProgress.set(target.streamer.id, task);
+  try {
+    const youtube = await task;
+    return { youtube, stale: youtube.stale === true, refreshCoolingDown: false };
+  } finally {
+    if (youtubeFetchInProgress.get(target.streamer.id) === task) youtubeFetchInProgress.delete(target.streamer.id);
+  }
 });
 
 exports.streamerFanPageVodPage = onCall({ maxInstances: 30 }, async (request) => {
@@ -978,6 +1186,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
     targetStreamer = verified;
   }
   const updates = { updatedAt: Date.now() };
+  let clearYouTubeCache = false;
   if (Object.prototype.hasOwnProperty.call(data, 'intro')) {
     if (typeof data.intro !== 'string' || data.intro.length > MAX_INTRO_LENGTH) {
       throw new HttpsError('invalid-argument', `소개는 ${MAX_INTRO_LENGTH}자 이내로 입력해 주세요.`);
@@ -989,12 +1198,16 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
     const stringFields = ['birthday', 'mbti', 'major', 'debutDate', 'fanNickname', 'fandomName', 'scheduleText', 'rouletteUrl'];
     if (!profile || typeof profile !== 'object' || Array.isArray(profile)
       || stringFields.some((field) => typeof profile[field] !== 'string')
+      || (Object.prototype.hasOwnProperty.call(profile, 'youtubeChannelUrl') && typeof profile.youtubeChannelUrl !== 'string')
       || !Array.isArray(profile.contents)
       || profile.contents.length > 8
       || stringFields.some((field) => profile[field].length > ({ birthday: 20, mbti: 8, major: 50, debutDate: 20, fanNickname: 30, fandomName: 30, scheduleText: 120, rouletteUrl: 300 })[field])
+      || (typeof profile.youtubeChannelUrl === 'string' && profile.youtubeChannelUrl.length > 300)
       || profile.contents.some((item) => typeof item !== 'string' || item.length > 20)) {
       throw new HttpsError('invalid-argument', '프로필 항목을 확인해 주세요.');
     }
+    const hasYouTubeUrl = Object.prototype.hasOwnProperty.call(profile, 'youtubeChannelUrl');
+    const previousProfile = (await pageRef(targetStreamer.streamer.id).child('profile').get()).val() || {};
     let rouletteUrl = profile.rouletteUrl.trim();
     if (rouletteUrl) {
       try {
@@ -1004,6 +1217,13 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       } catch (_) {
         throw new HttpsError('invalid-argument', '룰렛 링크는 https 주소로 입력해 주세요.');
       }
+    }
+    const youtubeChannelUrlInput = hasYouTubeUrl
+      ? profile.youtubeChannelUrl.trim()
+      : String(previousProfile.youtubeChannelUrl || '').trim();
+    const youtubeChannel = youtubeChannelUrlInput ? parseYouTubeChannelUrl(youtubeChannelUrlInput) : null;
+    if (youtubeChannelUrlInput && !youtubeChannel) {
+      throw new HttpsError('invalid-argument', 'YouTube 채널 링크는 @핸들이나 채널 ID 주소로 입력해 주세요.');
     }
     updates.profile = {
       birthday: profile.birthday.trim(),
@@ -1015,12 +1235,17 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       contents: profile.contents.map((item) => item.trim()).filter(Boolean),
       scheduleText: profile.scheduleText.trim(),
       rouletteUrl,
+      youtubeChannelUrl: youtubeChannel ? youtubeChannel.url : '',
     };
+    clearYouTubeCache = hasYouTubeUrl;
   }
   if (!Object.prototype.hasOwnProperty.call(data, 'intro') && !Object.prototype.hasOwnProperty.call(data, 'profile')) {
     throw new HttpsError('invalid-argument', '저장할 내용을 입력해 주세요.');
   }
   await pageRef(targetStreamer.streamer.id).update(updates);
+  if (clearYouTubeCache) {
+    await youtubeCacheRef(targetStreamer.streamer.id).remove();
+  }
   const saved = await pageRef(targetStreamer.streamer.id).get();
   return { page: normalizePage(targetStreamer.streamer, saved.val()) };
 });
