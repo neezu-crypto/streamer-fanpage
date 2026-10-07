@@ -125,6 +125,14 @@ function renderAuthControls() {
   $('logoutButton').classList.toggle('hidden', !user || (user.isAnonymous && !kakaoLinked && !streamerVerified));
 }
 
+function canSaveCommentProfile(user = auth.currentUser) {
+  if (!user) return false;
+  return !user.isAnonymous
+    || localStorage.getItem(KAKAO_LINKED_UID_KEY) === user.uid
+    || verifiedStreamerUid === user.uid
+    || isAdminUser;
+}
+
 async function handleFanpageStreamerSwitchApproval(uid, requestId) {
   if (!requestId || switchHandoffInProgress || auth.currentUser?.uid !== uid) return;
   const lockKey = 'soop.streamerVerificationSwitch.' + requestId;
@@ -165,6 +173,7 @@ onAuthStateChanged(auth, (user) => {
     const verified = snapshot.val() === true;
     verifiedStreamerUid = verified ? user.uid : '';
     renderAuthControls();
+    if (vodCommentState) renderVodCommentsContents();
     if (hasInitialVerifiedValue && previousVerifiedValue !== verified) {
       if (verified) {
         $('verificationStatus').textContent = '✅ 관리자가 승인했어요. 인증 상태가 새로고침 없이 반영됐습니다. 본인 팬페이지로 이동할게요.';
@@ -182,6 +191,7 @@ onAuthStateChanged(auth, (user) => {
     const requestId = snapshot.val() && snapshot.val().requestId;
     if (requestId) handleFanpageStreamerSwitchApproval(user.uid, String(requestId));
   }, (error) => console.error('계정 전환 승인 신호 구독 실패:', error));
+  if (vodCommentState) renderVodCommentsContents();
 });
 
 function confirmAccountSwitch() {
@@ -256,6 +266,7 @@ async function loginWithKakao() {
           localStorage.setItem(KAKAO_LINKED_UID_KEY, auth.currentUser.uid);
         }
         renderAuthControls();
+        if (vodCommentState) renderVodCommentsContents();
         showToast(action === 'already-linked' ? '이미 카카오 계정이 연결되어 있어요.' : '카카오 계정을 연결했어요.');
       } catch (error) {
         console.error('Kakao login failed:', error);
@@ -1987,6 +1998,16 @@ function renderVodCommentItem(comment, source) {
 function renderCommentProfileEditor() {
   const state = vodCommentState;
   const wrap = document.createElement('div'); wrap.className = 'vod-comment-profile-editor';
+  if (!canSaveCommentProfile()) {
+    const title = document.createElement('strong'); title.textContent = '로그인 후 댓글 프로필 설정';
+    const note = document.createElement('p');
+    note.textContent = '게스트 세션에서는 프로필을 저장할 수 없어요. Google·카카오 로그인 또는 스트리머 인증을 완료해 주세요.';
+    const login = document.createElement('button'); login.type = 'button'; login.className = 'button button-primary';
+    login.textContent = '로그인 / 인증';
+    login.addEventListener('click', () => $('loginChoiceDialog').showModal());
+    wrap.append(title, note, login);
+    return wrap;
+  }
   const title = document.createElement('strong'); title.textContent = state.profile ? '댓글 프로필 수정' : '댓글 프로필 설정';
   const note = document.createElement('p');
   note.textContent = '배팅시장 또는 갤러리에 저장된 프로필을 불러옵니다. 저장하면 팬페이지 댓글에 이 프로필이 표시돼요.';
@@ -2012,6 +2033,10 @@ function renderCommentProfileEditor() {
   save.addEventListener('click', async () => {
     save.disabled = true;
     try {
+      if (!canSaveCommentProfile()) {
+        $('loginChoiceDialog').showModal();
+        return;
+      }
       const result = await callCommentProfileSave({ nickname: nickname.value.trim(), soopId: soopId.value.trim() });
       state.profile = { ...result.data.profile, source: 'streamerFanPageCommentProfiles' };
       state.profileEditorOpen = false;
@@ -2028,7 +2053,8 @@ function renderCommentProfileEditor() {
 function renderFanpageCommentComposer() {
   const state = vodCommentState;
   const composer = document.createElement('div'); composer.className = 'vod-comment-composer';
-  if (state.profile) {
+  const canComment = canSaveCommentProfile();
+  if (canComment && state.profile) {
     const identity = document.createElement('div'); identity.className = 'vod-comment-composer-identity';
     identity.append(createVodCommentAvatar(state.profile));
     const name = document.createElement('strong'); name.textContent = state.profile.nickname;
@@ -2037,11 +2063,13 @@ function renderFanpageCommentComposer() {
     identity.append(name, edit); composer.append(identity);
   } else {
     const prompt = document.createElement('p'); prompt.className = 'vod-comment-profile-required';
-    prompt.textContent = '댓글을 등록하려면 먼저 프로필을 설정해 주세요.';
+    prompt.textContent = canComment
+      ? '댓글을 등록하려면 먼저 프로필을 설정해 주세요.'
+      : '댓글을 등록하려면 로그인 후 댓글 프로필을 설정해 주세요.';
     composer.append(prompt);
   }
-  if (state.profileEditorOpen || !state.profile) composer.append(renderCommentProfileEditor());
-  if (state.profile && !state.profileEditorOpen) {
+  if (state.profileEditorOpen || !state.profile || !canComment) composer.append(renderCommentProfileEditor());
+  if (canComment && state.profile && !state.profileEditorOpen) {
     const textarea = document.createElement('textarea'); textarea.className = 'vod-comment-input';
     textarea.maxLength = 500; textarea.rows = 3; textarea.placeholder = '팬페이지에 댓글을 남겨보세요.';
     const footer = document.createElement('div'); footer.className = 'vod-comment-compose-footer';

@@ -57,6 +57,27 @@ function requireAuth(request) {
   return request.auth.uid;
 }
 
+async function hasProtectedAccount(request, uid = requireAuth(request)) {
+  const signInProvider = request.auth && request.auth.token
+    && request.auth.token.firebase && request.auth.token.firebase.sign_in_provider;
+  if (signInProvider && signInProvider !== 'anonymous') return true;
+
+  const [kakaoLinked, verified, admin] = await Promise.all([
+    db.ref(`users/${uid}/kakaoLinked`).get(),
+    findVerifiedByUid(uid),
+    isAdminUid(uid),
+  ]);
+  return kakaoLinked.val() === true || !!verified || admin;
+}
+
+async function requireProtectedCommentProfileAuth(request) {
+  const uid = requireAuth(request);
+  if (!await hasProtectedAccount(request, uid)) {
+    throw new HttpsError('failed-precondition', '댓글 프로필을 저장하고 댓글을 쓰려면 Google·카카오 로그인 또는 스트리머 인증을 완료해 주세요.');
+  }
+  return uid;
+}
+
 function publicStreamer(key, record) {
   if (!record || typeof record.nickname !== 'string' || typeof record.soopId !== 'string') return null;
   const soopId = record.soopId.trim();
@@ -1443,7 +1464,7 @@ exports.streamerFanPageVodPage = onCall({ maxInstances: 30 }, async (request) =>
 });
 
 exports.streamerFanPageCommentProfileSave = onCall({ maxInstances: 20 }, async (request) => {
-  const uid = requireAuth(request);
+  const uid = await requireProtectedCommentProfileAuth(request);
   const data = request.data || {};
   const nickname = typeof data.nickname === 'string' ? data.nickname.trim() : '';
   const soopId = typeof data.soopId === 'string' ? data.soopId.trim().toLowerCase() : '';
@@ -1473,14 +1494,15 @@ exports.streamerFanPageVodComments = onCall({ maxInstances: 20 }, async (request
   const target = await findVerifiedBySoopId(streamerId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
 
-  const [vodInfo, profile, fanpageSnapshot, verified, isAdmin] = await Promise.all([
+  const [vodInfo, canUseCommentProfile, fanpageSnapshot, verified, isAdmin] = await Promise.all([
     fetchSoopVodInfoForComments(vodId),
-    resolveFanpageCommentProfile(uid),
+    hasProtectedAccount(request, uid),
     fanPageVodCommentsRef(target.streamer.id, vodId).orderByKey()
       .limitToLast(FANPAGE_VOD_COMMENT_PAGE_SIZE + 1).get(),
     findVerifiedByUid(uid),
     isAdminUid(uid),
   ]);
+  const profile = canUseCommentProfile ? await resolveFanpageCommentProfile(uid) : null;
 
   const relatedVod = !!(vodInfo && typeof vodInfo.bj_id === 'string'
     && vodInfo.bj_id.toLowerCase() === target.streamer.soopId.toLowerCase());
@@ -1538,7 +1560,7 @@ exports.streamerFanPageVodComments = onCall({ maxInstances: 20 }, async (request
 });
 
 exports.streamerFanPageVodCommentAdd = onCall({ maxInstances: 20 }, async (request) => {
-  const uid = requireAuth(request);
+  const uid = await requireProtectedCommentProfileAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
   const vodId = String(data.vodId || '').trim();
