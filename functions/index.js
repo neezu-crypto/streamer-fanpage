@@ -14,9 +14,9 @@ const FANPAGE_STATS_DAYS = 30;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const SOOP_VOD_PAGE_SIZE = 60;
 const FANPAGE_VOD_PAGE_SIZE = 24;
+const MAX_LOADED_VIDEO_ITEMS = 500;
 const FANPAGE_VOD_COMMENT_PAGE_SIZE = 50;
 const FANPAGE_VOD_COMMENT_MAX_LENGTH = 500;
-const FANPAGE_VOD_CACHE_VALIDATION_MAX_ITEMS = 2400;
 const VOD_REFRESH_LOCK_TTL_MS = 2 * 60 * 1000;
 const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
 const SOOP_STATION_API = 'https://chapi.sooplive.com/api';
@@ -338,6 +338,7 @@ function normalizeVodCache(value) {
 }
 
 async function readVodPage(streamerId, offset = 0, requestedGeneration = '') {
+  const safeOffset = Math.min(MAX_LOADED_VIDEO_ITEMS, Math.max(0, Math.floor(Number(offset) || 0)));
   const listRef = vodListRef(streamerId);
   const [activeSnap, previousSnap] = await Promise.all([
     listRef.child('activeGeneration').get(),
@@ -352,25 +353,33 @@ async function readVodPage(streamerId, offset = 0, requestedGeneration = '') {
       throw new HttpsError('aborted', '다시보기 목록이 갱신됐습니다. 페이지를 새로 불러와 주세요.');
     }
     const generationRef = listRef.child('generations').child(generation);
+    const pageSize = Math.min(FANPAGE_VOD_PAGE_SIZE, MAX_LOADED_VIDEO_ITEMS - safeOffset);
     const [metadataSnap, itemsSnap] = await Promise.all([
       generationRef.child('metadata').get(),
-      generationRef.child('items').orderByKey().startAt(vodItemKey(offset)).limitToFirst(FANPAGE_VOD_PAGE_SIZE).get(),
+      pageSize
+        ? generationRef.child('items').orderByKey().startAt(vodItemKey(safeOffset)).limitToFirst(pageSize).get()
+        : Promise.resolve(null),
     ]);
     const metadata = metadataSnap.val() || {};
-    const items = [];
-    itemsSnap.forEach((child) => {
-      const vod = normalizeSoopVod(child.val());
-      if (vod) items.push(vod);
-    });
     const total = Math.max(0, Math.floor(Number(metadata.total) || 0));
+    const storedTotal = Math.max(0, Math.floor(Number(metadata.loadedTotal ?? metadata.total) || 0));
+    const available = Math.min(total, storedTotal, MAX_LOADED_VIDEO_ITEMS);
+    const items = [];
+    if (itemsSnap) {
+      itemsSnap.forEach((child) => {
+        const vod = normalizeSoopVod(child.val());
+        if (vod) items.push(vod);
+      });
+    }
     return {
       items,
       total,
+      available,
       refreshedAt: Number.isFinite(metadata.refreshedAt) ? metadata.refreshedAt : null,
       generation,
-      offset,
-      nextOffset: offset + items.length,
-      hasMore: offset + items.length < total,
+      offset: safeOffset,
+      nextOffset: safeOffset + items.length,
+      hasMore: safeOffset + items.length < available,
     };
   }
 
@@ -379,14 +388,16 @@ async function readVodPage(streamerId, offset = 0, requestedGeneration = '') {
   }
   // 최초 세대 전환 전까지 기존 캐시 형식도 읽어 점진적으로 호환한다.
   const cache = normalizeVodCache((await listRef.get()).val());
-  const items = cache.items.slice(offset, offset + FANPAGE_VOD_PAGE_SIZE);
+  const available = Math.min(cache.total, MAX_LOADED_VIDEO_ITEMS);
+  const items = cache.items.slice(safeOffset, Math.min(safeOffset + FANPAGE_VOD_PAGE_SIZE, available));
   return {
     ...cache,
     items,
+    available,
     generation: 'legacy',
-    offset,
-    nextOffset: offset + items.length,
-    hasMore: offset + items.length < cache.total,
+    offset: safeOffset,
+    nextOffset: safeOffset + items.length,
+    hasMore: safeOffset + items.length < available,
   };
 }
 
@@ -399,13 +410,14 @@ async function isFanpageVodInCache(streamerId, vodId) {
   const generations = [...new Set([activeSnap.val(), previousSnap.val()].filter((value) => typeof value === 'string' && value))];
   if (!generations.length) {
     const cache = normalizeVodCache((await listRef.get()).val());
-    return cache.items.some((vod) => vod.id === vodId);
+    return cache.items.slice(0, MAX_LOADED_VIDEO_ITEMS).some((vod) => vod.id === vodId);
   }
 
   for (const generation of generations) {
     const metadata = (await listRef.child('generations').child(generation).child('metadata').get()).val() || {};
-    const total = Math.max(0, Math.floor(Number(metadata.total) || 0));
-    if (!total || total > FANPAGE_VOD_CACHE_VALIDATION_MAX_ITEMS) continue;
+    const total = Math.min(MAX_LOADED_VIDEO_ITEMS,
+      Math.max(0, Math.floor(Number(metadata.loadedTotal ?? metadata.total) || 0)));
+    if (!total) continue;
     const items = await listRef.child('generations').child(generation).child('items')
       .orderByKey().limitToFirst(total).get();
     let found = false;
@@ -668,10 +680,10 @@ async function fetchSoopVodPage(soopId, page) {
 
 function normalizeFetchedVodPage(rows, total, page, seenIds) {
   const expectedRows = Math.max(0, Math.min(SOOP_VOD_PAGE_SIZE, total - ((page - 1) * SOOP_VOD_PAGE_SIZE)));
-  if (rows.length !== expectedRows) {
+  if (rows.length < expectedRows) {
     throw new HttpsError('unavailable', 'SOOP 다시보기 전체 목록을 가져오지 못해 기존 목록을 유지했습니다.');
   }
-  const vods = rows.map((row) => normalizeSoopVod(row));
+  const vods = rows.slice(0, expectedRows).map((row) => normalizeSoopVod(row));
   if (vods.some((vod) => !vod)) {
     throw new HttpsError('unavailable', 'SOOP 다시보기 항목 일부를 읽지 못해 기존 목록을 유지했습니다.');
   }
@@ -740,9 +752,10 @@ async function stageAndPublishSoopVods(soopId, streamerId, lockToken, lockRef) {
   let published = false;
   try {
     const first = await fetchSoopVodPage(soopId, 1);
-    const pageCount = Math.ceil(first.total / SOOP_VOD_PAGE_SIZE);
+    const loadedTotal = Math.min(first.total, MAX_LOADED_VIDEO_ITEMS);
+    const pageCount = Math.ceil(loadedTotal / SOOP_VOD_PAGE_SIZE);
     const seenIds = new Set();
-    const firstVods = normalizeFetchedVodPage(first.rows, first.total, 1, seenIds);
+    const firstVods = normalizeFetchedVodPage(first.rows, loadedTotal, 1, seenIds);
     if (firstVods.length) {
       await generationRef.child('items').update(Object.fromEntries(
         firstVods.map((vod, index) => [vodItemKey(index), vod]),
@@ -763,7 +776,7 @@ async function stageAndPublishSoopVods(soopId, streamerId, lockToken, lockRef) {
         if (result.total !== first.total) {
           throw new HttpsError('aborted', '갱신 중 SOOP 목록이 변경됐습니다. 다시 시도해 주세요.');
         }
-        const vods = normalizeFetchedVodPage(result.rows, first.total, page, seenIds);
+        const vods = normalizeFetchedVodPage(result.rows, loadedTotal, page, seenIds);
         if (vods.length) {
           const startIndex = (page - 1) * SOOP_VOD_PAGE_SIZE;
           await generationRef.child('items').update(Object.fromEntries(
@@ -773,11 +786,11 @@ async function stageAndPublishSoopVods(soopId, streamerId, lockToken, lockRef) {
       }
     }
 
-    if (seenIds.size !== first.total) {
+    if (seenIds.size !== loadedTotal) {
       throw new HttpsError('unavailable', 'SOOP 다시보기 전체 목록을 가져오지 못해 기존 목록을 유지했습니다.');
     }
     const refreshedAt = Date.now();
-    await generationRef.child('metadata').set({ total: first.total, refreshedAt });
+    await generationRef.child('metadata').set({ total: first.total, loadedTotal, refreshedAt });
     await renewVodRefreshLock(lockRef, lockToken);
     await listRef.update({
       activeGeneration: generation,
@@ -1059,7 +1072,9 @@ function normalizeYouTubeCache(value, channelUrl) {
   if (cache.sourceUrl && cache.sourceUrl !== channelUrl) {
     return { linked: true, channelTitle: '', channelUrl, totalCount: 0, items: [], fetchedAt: null };
   }
-  const items = Array.isArray(cache.items) ? cache.items.map(normalizeYouTubeVideo).filter(Boolean).slice(0, YOUTUBE_VIDEO_PAGE_SIZE) : [];
+  const items = Array.isArray(cache.items)
+    ? cache.items.map(normalizeYouTubeVideo).filter(Boolean).slice(0, MAX_LOADED_VIDEO_ITEMS)
+    : [];
   return {
     linked: true,
     channelTitle: typeof cache.channelTitle === 'string' ? cache.channelTitle.slice(0, 100) : '',
@@ -1090,9 +1105,11 @@ async function fetchYouTubeUploads(channelUrl, apiKey) {
   const uploads = await fetchYouTubeJson('playlistItems', {
     part: 'snippet,contentDetails',
     playlistId: uploadsPlaylistId,
-    maxResults: YOUTUBE_VIDEO_PAGE_SIZE,
+    maxResults: Math.min(YOUTUBE_VIDEO_PAGE_SIZE, MAX_LOADED_VIDEO_ITEMS),
   }, apiKey);
-  const items = Array.isArray(uploads.items) ? uploads.items.map(normalizeYouTubeVideo).filter(Boolean) : [];
+  const items = Array.isArray(uploads.items)
+    ? uploads.items.map(normalizeYouTubeVideo).filter(Boolean).slice(0, MAX_LOADED_VIDEO_ITEMS)
+    : [];
   return {
     linked: true,
     channelTitle: typeof channelItem.snippet?.title === 'string' ? channelItem.snippet.title.slice(0, 100) : '',

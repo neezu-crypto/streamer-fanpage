@@ -42,6 +42,7 @@ const callStreamerVerification = httpsCallable(functions, 'requestStreamerVerifi
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
+const MAX_LOADED_VIDEO_ITEMS = 500;
 const $ = (id) => document.getElementById(id);
 let currentPage = null;
 let searchTimer = 0;
@@ -1010,8 +1011,12 @@ function refreshLiveSection(streamerId) {
 
 function renderVodSection(page) {
   const vods = page.vods && Array.isArray(page.vods.items)
-    ? page.vods
-    : { items: [], total: 0, refreshedAt: null, generation: '', nextOffset: 0, hasMore: false };
+    ? {
+      ...page.vods,
+      items: page.vods.items.slice(0, MAX_LOADED_VIDEO_ITEMS),
+      available: Math.min(MAX_LOADED_VIDEO_ITEMS, Number(page.vods.available ?? page.vods.total) || 0),
+    }
+    : { items: [], total: 0, available: 0, refreshedAt: null, generation: '', nextOffset: 0, hasMore: false };
   const streamerId = page.streamer.id;
   const isRefreshing = vodRefreshesInProgress.has(streamerId);
   const isLoadingMore = vodPageLoadsInProgress.has(streamerId);
@@ -1031,13 +1036,13 @@ function renderVodSection(page) {
   if (page.isOwner) {
     const refresh = document.createElement('button');
     refresh.type = 'button'; refresh.className = 'button button-primary vod-refresh-button';
-    refresh.textContent = isRefreshing ? '전체 목록을 불러오는 중…' : isLoadingMore ? '목록을 불러오는 중…' : '↻ 전체 목록 갱신';
+    refresh.textContent = isRefreshing ? '다시보기를 불러오는 중…' : isLoadingMore ? '목록을 불러오는 중…' : '↻ 목록 갱신';
     refresh.disabled = isRefreshing || isLoadingMore;
     refresh.addEventListener('click', async () => {
       if (vodRefreshesInProgress.has(streamerId) || vodPageLoadsInProgress.has(streamerId)) return;
       vodRefreshesInProgress.add(streamerId);
       refresh.disabled = true;
-      refresh.textContent = '전체 목록을 불러오는 중…';
+      refresh.textContent = '다시보기를 불러오는 중…';
       replaceVodSectionIfCurrent(streamerId);
       try {
         const result = await callVodRefresh({ streamerId });
@@ -1050,7 +1055,10 @@ function renderVodSection(page) {
         page.vods = result.data.vods;
         if (currentPage && currentPage.streamer.id === streamerId) {
           currentPage.vods = result.data.vods;
-          showToast(`다시보기 ${page.vods.total.toLocaleString('ko-KR')}개를 갱신했어요.`);
+          const loadedCount = Number(page.vods.available) || page.vods.items.length;
+          showToast(page.vods.total > loadedCount
+            ? `최근 다시보기 ${loadedCount.toLocaleString('ko-KR')}개를 불러왔어요. 전체 ${page.vods.total.toLocaleString('ko-KR')}개 중이에요.`
+            : `다시보기 ${loadedCount.toLocaleString('ko-KR')}개를 갱신했어요.`);
         }
       } catch (error) {
         if (currentPage && currentPage.streamer.id === streamerId) {
@@ -1069,11 +1077,16 @@ function renderVodSection(page) {
     ? `마지막 갱신 ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(vods.refreshedAt))}`
     : '아직 갱신된 다시보기 목록이 없어요.';
   section.append(heading, status);
+  if (vods.total > vods.available) {
+    const limitNote = document.createElement('p'); limitNote.className = 'vod-refresh-status';
+    limitNote.textContent = `최근 영상 ${vods.available}개까지만 표시해요.`;
+    section.append(limitNote);
+  }
 
   if (!vods.items.length) {
     const empty = document.createElement('p'); empty.className = 'vod-empty-state';
     empty.textContent = page.isOwner
-      ? '전체 목록 갱신을 눌러 SOOP 다시보기를 가져오세요.'
+      ? '목록 갱신을 눌러 SOOP 다시보기를 가져오세요.'
       : '스트리머가 다시보기 목록을 갱신하면 여기에 표시돼요.';
     section.append(empty);
     return section;
@@ -1113,7 +1126,7 @@ function renderVodSection(page) {
     const loading = vodPageLoadsInProgress.has(streamerId);
     const refreshing = vodRefreshesInProgress.has(streamerId);
     more.disabled = loading || refreshing;
-    more.textContent = loading ? '목록을 불러오는 중…' : refreshing ? '전체 목록 갱신 중…' : `더 보기 (${Math.max(0, vods.total - vods.items.length).toLocaleString('ko-KR')}개 남음)`;
+    more.textContent = loading ? '목록을 불러오는 중…' : refreshing ? '다시보기 갱신 중…' : `더 보기 (${Math.max(0, vods.available - vods.items.length).toLocaleString('ko-KR')}개 남음)`;
     more.addEventListener('click', () => loadMoreVods(streamerId, vods));
     moreRow.append(more); scrollbox.append(moreRow);
   }
@@ -1180,7 +1193,9 @@ function renderYouTubeSection(page) {
     status.classList.add('is-stale'); status.textContent = 'YouTube에 연결하지 못해 이전 목록을 표시하고 있어요.';
     section.append(status);
   }
-  const videos = state.data && Array.isArray(state.data.items) ? state.data.items : [];
+  const videos = state.data && Array.isArray(state.data.items)
+    ? state.data.items.slice(0, MAX_LOADED_VIDEO_ITEMS)
+    : [];
   if (!videos.length) {
     const empty = document.createElement('p'); empty.className = 'youtube-empty-state';
     empty.textContent = state.hasLoaded ? '아직 공개된 YouTube 영상이 없어요.' : '최신 영상을 불러오고 있어요.';
@@ -1237,7 +1252,11 @@ async function loadYouTubeVideos(streamerId, forceRefresh = false) {
   try {
     const response = await callYouTubeVideos({ streamerId, forceRefresh });
     if (!currentPage || currentPage.streamer.id !== streamerId) return;
-    state.data = response.data && response.data.youtube ? response.data.youtube : { items: [], totalCount: 0 };
+    const youtube = response.data && response.data.youtube ? response.data.youtube : { items: [], totalCount: 0 };
+    state.data = {
+      ...youtube,
+      items: Array.isArray(youtube.items) ? youtube.items.slice(0, MAX_LOADED_VIDEO_ITEMS) : [],
+    };
     state.stale = response.data && response.data.stale === true;
     state.hasLoaded = true;
     if (forceRefresh && state.stale) showToast('YouTube 연결이 원활하지 않아 이전 목록을 유지했어요.');
@@ -2230,7 +2249,8 @@ function replaceVodSectionIfCurrent(streamerId) {
 }
 
 async function loadMoreVods(streamerId, currentVods) {
-  if (vodPageLoadsInProgress.has(streamerId) || vodRefreshesInProgress.has(streamerId)) return;
+  if (vodPageLoadsInProgress.has(streamerId) || vodRefreshesInProgress.has(streamerId)
+    || currentVods.items.length >= MAX_LOADED_VIDEO_ITEMS) return;
   vodPageLoadsInProgress.add(streamerId);
   replaceVodSectionIfCurrent(streamerId);
   try {
@@ -2243,11 +2263,14 @@ async function loadMoreVods(streamerId, currentVods) {
     const nextPage = result.data.vods;
     const knownIds = new Set(currentPage.vods.items.map((vod) => vod.id));
     const addedItems = nextPage.items.filter((vod) => !knownIds.has(vod.id));
+    const available = Math.min(MAX_LOADED_VIDEO_ITEMS, Number(nextPage.available ?? nextPage.total) || 0);
+    const items = [...currentPage.vods.items, ...addedItems].slice(0, MAX_LOADED_VIDEO_ITEMS);
     currentPage.vods = {
       ...nextPage,
-      items: [...currentPage.vods.items, ...addedItems],
-      nextOffset: nextPage.nextOffset,
-      hasMore: nextPage.hasMore,
+      items,
+      available,
+      nextOffset: Math.min(MAX_LOADED_VIDEO_ITEMS, nextPage.nextOffset),
+      hasMore: items.length < available && nextPage.hasMore,
     };
   } catch (error) {
     if (currentPage && currentPage.streamer.id === streamerId) {
