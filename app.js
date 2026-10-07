@@ -1740,8 +1740,8 @@ function renderVodPlayerDialog() {
   close.setAttribute('aria-label', '플레이어 닫기'); close.textContent = '×';
   close.addEventListener('click', () => dialog.close());
   heading.append(title, close);
-  const frame = document.createElement('div'); frame.className = 'vod-player-frame';
-  const iframe = document.createElement('iframe'); iframe.id = 'vodPlayerFrame'; iframe.title = 'SOOP 다시보기 플레이어';
+  const frame = document.createElement('div'); frame.className = 'vod-player-frame vod-player-frame-soop';
+  const iframe = document.createElement('iframe'); iframe.id = 'vodPlayerFrame'; iframe.title = 'SOOP 다시보기 및 채팅 플레이어';
   iframe.src = 'about:blank'; iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
   frame.append(iframe);
   const footer = document.createElement('div'); footer.className = 'vod-player-footer';
@@ -1759,7 +1759,7 @@ function openVodPlayer(vod) {
   const id = encodeURIComponent(vod.id);
   $('vodPlayerTitle').textContent = vod.title || '방송 다시보기';
   $('vodPlayerExternalLink').href = `https://vod.sooplive.com/player/${id}`;
-  $('vodPlayerFrame').src = `https://vod.sooplive.com/player/${id}/embed?autoPlay=false&mutePlay=true&showChat=false`;
+  $('vodPlayerFrame').src = `https://vod.sooplive.com/player/${id}/embed?autoPlay=false&mutePlay=true&showChat=true`;
   $('vodPlayerDialog').showModal();
 }
 
