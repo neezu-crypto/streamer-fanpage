@@ -14,6 +14,9 @@ const FANPAGE_STATS_DAYS = 30;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const SOOP_VOD_PAGE_SIZE = 60;
 const FANPAGE_VOD_PAGE_SIZE = 24;
+const FANPAGE_VOD_COMMENT_PAGE_SIZE = 50;
+const FANPAGE_VOD_COMMENT_MAX_LENGTH = 500;
+const FANPAGE_VOD_CACHE_VALIDATION_MAX_ITEMS = 2400;
 const VOD_REFRESH_LOCK_TTL_MS = 2 * 60 * 1000;
 const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
 const SOOP_STATION_API = 'https://chapi.sooplive.com/api';
@@ -385,6 +388,33 @@ async function readVodPage(streamerId, offset = 0, requestedGeneration = '') {
     nextOffset: offset + items.length,
     hasMore: offset + items.length < cache.total,
   };
+}
+
+async function isFanpageVodInCache(streamerId, vodId) {
+  const listRef = vodListRef(streamerId);
+  const [activeSnap, previousSnap] = await Promise.all([
+    listRef.child('activeGeneration').get(),
+    listRef.child('previousGeneration').get(),
+  ]);
+  const generations = [...new Set([activeSnap.val(), previousSnap.val()].filter((value) => typeof value === 'string' && value))];
+  if (!generations.length) {
+    const cache = normalizeVodCache((await listRef.get()).val());
+    return cache.items.some((vod) => vod.id === vodId);
+  }
+
+  for (const generation of generations) {
+    const metadata = (await listRef.child('generations').child(generation).child('metadata').get()).val() || {};
+    const total = Math.max(0, Math.floor(Number(metadata.total) || 0));
+    if (!total || total > FANPAGE_VOD_CACHE_VALIDATION_MAX_ITEMS) continue;
+    const items = await listRef.child('generations').child(generation).child('items')
+      .orderByKey().limitToFirst(total).get();
+    let found = false;
+    items.forEach((child) => {
+      if (normalizeSoopVod(child.val())?.id === vodId) found = true;
+    });
+    if (found) return true;
+  }
+  return false;
 }
 
 function calendarCacheRootRef(streamerId) {
@@ -1100,6 +1130,158 @@ function normalizePage(streamer, value) {
   };
 }
 
+function fanPageVodCommentsRef(streamerId, vodId) {
+  return db.ref(`streamerFanPageVodComments/${streamerId}/${vodId}`);
+}
+
+function avatarUrlForSoopId(soopId) {
+  if (!soopId) return '';
+  return `https://stimg.sooplive.com/LOGO/${soopId.slice(0, 2)}/${soopId}/${soopId}.jpg`;
+}
+
+function normalizeFanpageCommentProfile(value) {
+  if (!value || typeof value !== 'object') return null;
+  const nickname = typeof value.nickname === 'string' ? value.nickname.trim().slice(0, 12) : '';
+  if (!nickname || /[<>\x00-\x1F\x7F]/.test(nickname)) return null;
+  const rawSoopId = typeof value.soopId === 'string' ? value.soopId.trim().toLowerCase() : '';
+  const soopId = SOOP_ID_PATTERN.test(rawSoopId) ? rawSoopId : '';
+  let avatarUrl = soopId ? avatarUrlForSoopId(soopId) : '';
+  if (!avatarUrl && typeof value.avatarUrl === 'string') {
+    try {
+      const parsed = new URL(value.avatarUrl);
+      if (parsed.protocol === 'https:' && parsed.hostname === 'stimg.sooplive.com') avatarUrl = parsed.href;
+    } catch (_) { /* Ignore malformed or untrusted profile image URLs. */ }
+  }
+  return { nickname, soopId, avatarUrl };
+}
+
+async function resolveFanpageCommentProfile(uid) {
+  const paths = [
+    ['streamerFanPageCommentProfiles', `streamerFanPageCommentProfiles/${uid}`],
+    ['bettingMarket', `bettingMarket/profiles/${uid}`],
+    ['gallery', `gallery/profiles/${uid}`],
+  ];
+  for (const [source, path] of paths) {
+    const snapshot = await db.ref(path).get();
+    const profile = normalizeFanpageCommentProfile(snapshot.val());
+    if (profile) return { ...profile, source };
+  }
+  return null;
+}
+
+async function fetchSoopVodInfoForComments(vodId) {
+  let response;
+  try {
+    response = await fetch('https://api.m.sooplive.com/station/video/a/view', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/plain, */*',
+        'content-type': 'application/x-www-form-urlencoded',
+        referer: `https://vod.sooplive.com/player/${vodId}`,
+        'user-agent': 'Mozilla/5.0',
+      },
+      body: new URLSearchParams({ nTitleNo: vodId, nApiLevel: '11', nPlaylistIdx: '0' }).toString(),
+      signal: AbortSignal.timeout(12000),
+    });
+  } catch (error) {
+    console.warn(`SOOP VOD metadata request failed for ${vodId}:`, error);
+    return null;
+  }
+  if (!response.ok) return null;
+  try {
+    const payload = await response.json();
+    return payload && payload.result === 1 && payload.data && typeof payload.data === 'object'
+      ? payload.data
+      : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function normalizeSoopVodComment(row) {
+  if (!row || typeof row !== 'object' || !/^\d{1,20}$/.test(String(row.p_comment_no || ''))) return null;
+  const rawProfileUrl = typeof row.user_profile === 'string' ? row.user_profile.trim() : '';
+  let avatarUrl = '';
+  if (rawProfileUrl) {
+    try {
+      const parsed = new URL(rawProfileUrl.startsWith('//') ? `https:${rawProfileUrl}` : rawProfileUrl);
+      if (parsed.protocol === 'https:' && parsed.hostname === 'stimg.sooplive.com') avatarUrl = parsed.href;
+    } catch (_) { /* Optional avatar. */ }
+  }
+  return {
+    id: String(row.p_comment_no),
+    nickname: typeof row.user_nick === 'string' ? row.user_nick.trim().slice(0, 50) : '',
+    soopId: typeof row.user_id === 'string' ? row.user_id.trim().slice(0, 30) : '',
+    avatarUrl,
+    content: typeof row.comment === 'string' ? row.comment.slice(0, 2000) : '',
+    createdAt: typeof row.reg_date === 'string' ? row.reg_date.slice(0, 30) : '',
+    replyCount: Math.max(0, Math.floor(Number(row.c_comment_cnt) || 0)),
+  };
+}
+
+async function fetchSoopVodCommentPage(vodId, vodInfo, pageNo, lastNo) {
+  const body = new URLSearchParams({
+    nStationNo: String(vodInfo.station_no),
+    nBbsNo: String(vodInfo.bbs_no),
+    nTitleNo: vodId,
+    bj_id: String(vodInfo.bj_id),
+    nPageNo: String(pageNo),
+    nOrderNo: '1',
+    nBoardType: String(vodInfo.board_type ?? 105),
+    szAction: 'get',
+    nVod: '1',
+    nLastNo: String(lastNo),
+  });
+  let response;
+  try {
+    response = await fetch('https://stbbs.sooplive.com/api/bbs_memo_action.php', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/plain, */*',
+        'accept-language': 'ko',
+        'content-type': 'application/x-www-form-urlencoded',
+        referer: `https://vod.sooplive.com/player/${vodId}`,
+        'user-agent': 'Mozilla/5.0',
+      },
+      body: body.toString(),
+      signal: AbortSignal.timeout(12000),
+    });
+  } catch (error) {
+    console.warn(`SOOP VOD comments request failed for ${vodId}:`, error);
+    return null;
+  }
+  if (!response.ok) return null;
+  try {
+    const payload = await response.json();
+    const channel = payload && payload.CHANNEL;
+    const success = channel && [channel.RESULT, channel.result].some((value) => value === 1 || String(value) === '1');
+    if (!success) return null;
+    const data = channel.DATA && typeof channel.DATA === 'object' ? channel.DATA : {};
+    return {
+      items: Array.isArray(data.list_data) ? data.list_data.map(normalizeSoopVodComment).filter(Boolean) : [],
+      totalCount: Math.max(0, Math.floor(Number(data.total_cnt ?? payload.TOTAL_CNT) || 0)),
+      hasMore: data.has_more === true,
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function normalizeFanpageVodComment(value, id) {
+  if (!value || typeof value !== 'object') return null;
+  const profile = normalizeFanpageCommentProfile(value);
+  const content = typeof value.content === 'string' ? value.content.trim().slice(0, FANPAGE_VOD_COMMENT_MAX_LENGTH) : '';
+  const createdAt = Number(value.createdAt);
+  if (!profile || !content || !Number.isFinite(createdAt)) return null;
+  return {
+    id,
+    uid: typeof value.uid === 'string' ? value.uid : '',
+    ...profile,
+    content,
+    createdAt,
+  };
+}
+
 exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
@@ -1241,6 +1423,166 @@ exports.streamerFanPageVodPage = onCall({ maxInstances: 30 }, async (request) =>
   const target = await findVerifiedBySoopId(streamerId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
   return { vods: await readVodPage(target.streamer.id, offset, generation) };
+});
+
+exports.streamerFanPageCommentProfileSave = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const nickname = typeof data.nickname === 'string' ? data.nickname.trim() : '';
+  const soopId = typeof data.soopId === 'string' ? data.soopId.trim().toLowerCase() : '';
+  if (!nickname || nickname.length > 12 || /[<>\x00-\x1F\x7F]/.test(nickname)) {
+    throw new HttpsError('invalid-argument', '닉네임은 사용할 수 없는 문자 없이 1~12자로 입력해 주세요.');
+  }
+  if (soopId && !SOOP_ID_PATTERN.test(soopId)) {
+    throw new HttpsError('invalid-argument', 'SOOP 아이디는 영문 소문자/숫자 2~20자로 입력해 주세요.');
+  }
+  const profile = { nickname, soopId, avatarUrl: avatarUrlForSoopId(soopId), updatedAt: Date.now() };
+  await db.ref(`streamerFanPageCommentProfiles/${uid}`).set(profile);
+  return { profile: { nickname, soopId, avatarUrl: profile.avatarUrl } };
+});
+
+exports.streamerFanPageVodComments = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  const vodId = String(data.vodId || '').trim();
+  const pageNo = Number(data.soopPageNo || 1);
+  const lastNo = Number(data.soopLastNo || 0);
+  if (!streamerId || !/^\d{1,20}$/.test(vodId)
+    || !Number.isSafeInteger(pageNo) || pageNo < 1 || pageNo > 1000
+    || !Number.isSafeInteger(lastNo) || lastNo < 0) {
+    throw new HttpsError('invalid-argument', 'VOD 댓글 요청을 확인해 주세요.');
+  }
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+
+  const [vodInfo, profile, fanpageSnapshot, verified, isAdmin] = await Promise.all([
+    fetchSoopVodInfoForComments(vodId),
+    resolveFanpageCommentProfile(uid),
+    fanPageVodCommentsRef(target.streamer.id, vodId).orderByKey()
+      .limitToLast(FANPAGE_VOD_COMMENT_PAGE_SIZE + 1).get(),
+    findVerifiedByUid(uid),
+    isAdminUid(uid),
+  ]);
+
+  const relatedVod = !!(vodInfo && typeof vodInfo.bj_id === 'string'
+    && vodInfo.bj_id.toLowerCase() === target.streamer.soopId.toLowerCase());
+  const cachedVod = !vodInfo && await isFanpageVodInCache(target.streamer.id, vodId);
+  if ((vodInfo && !relatedVod) || (!vodInfo && !cachedVod)) {
+    throw new HttpsError('not-found', '이 VOD는 해당 스트리머의 다시보기가 아닙니다.');
+  }
+
+  let soop = {
+    available: !!(vodInfo && vodInfo.comment_yn !== 0 && String(vodInfo.comment_yn) !== '0'),
+    totalCount: Math.max(0, Math.floor(Number(vodInfo && vodInfo.memo_cnt) || 0)),
+    items: [],
+    hasMore: false,
+    nextPageNo: pageNo,
+    nextLastNo: lastNo,
+    error: vodInfo ? '' : 'SOOP 댓글 서버에 연결할 수 없어 팬페이지 댓글만 표시하고 있어요.',
+  };
+  if (soop.available) {
+    const page = await fetchSoopVodCommentPage(vodId, vodInfo, pageNo, lastNo);
+    if (!page) {
+      soop = { ...soop, available: false, error: 'SOOP 댓글을 불러오지 못했어요.' };
+    } else {
+      const lastCommentNo = page.items.length ? Number(page.items[page.items.length - 1].id) : lastNo;
+      soop = {
+        ...soop,
+        totalCount: Math.max(soop.totalCount, page.totalCount),
+        items: page.items,
+        hasMore: page.hasMore && page.items.length > 0,
+        nextPageNo: pageNo + 1,
+        nextLastNo: Number.isSafeInteger(lastCommentNo) ? lastCommentNo : lastNo,
+      };
+    }
+  }
+
+  const fanpageEntries = Object.entries(fanpageSnapshot.val() || {})
+    .map(([id, value]) => normalizeFanpageVodComment(value, id))
+    .filter(Boolean)
+    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+  const fanpageHasMore = fanpageEntries.length > FANPAGE_VOD_COMMENT_PAGE_SIZE;
+  const fanpageComments = fanpageEntries.slice(-FANPAGE_VOD_COMMENT_PAGE_SIZE);
+  const canDelete = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
+
+  return {
+    streamerId: target.streamer.id,
+    vodId,
+    profile,
+    canDelete,
+    soop,
+    fanpage: {
+      items: fanpageComments,
+      hasMore: fanpageHasMore,
+      countLabel: `${fanpageComments.length}${fanpageHasMore ? '+' : ''}`,
+    },
+  };
+});
+
+exports.streamerFanPageVodCommentAdd = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  const vodId = String(data.vodId || '').trim();
+  const content = typeof data.content === 'string' ? data.content.trim() : '';
+  if (!streamerId || !/^\d{1,20}$/.test(vodId) || !content || content.length > FANPAGE_VOD_COMMENT_MAX_LENGTH
+    || /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(content)) {
+    throw new HttpsError('invalid-argument', `댓글은 비어 있지 않게 ${FANPAGE_VOD_COMMENT_MAX_LENGTH}자 이하로 입력해 주세요.`);
+  }
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  const [vodInfo, profile] = await Promise.all([
+    fetchSoopVodInfoForComments(vodId),
+    resolveFanpageCommentProfile(uid),
+  ]);
+  const relatedVod = !!(vodInfo && typeof vodInfo.bj_id === 'string'
+    && vodInfo.bj_id.toLowerCase() === target.streamer.soopId.toLowerCase());
+  const cachedVod = !vodInfo && await isFanpageVodInCache(target.streamer.id, vodId);
+  if ((vodInfo && !relatedVod) || (!vodInfo && !cachedVod)) {
+    throw new HttpsError('not-found', '이 VOD는 해당 스트리머의 다시보기가 아닙니다.');
+  }
+  if (!profile) {
+    throw new HttpsError('failed-precondition', '댓글을 쓰려면 먼저 댓글 프로필을 저장해 주세요.');
+  }
+
+  const createdAt = Date.now();
+  const id = `${String(createdAt).padStart(13, '0')}_${randomUUID()}`;
+  const comment = {
+    uid,
+    nickname: profile.nickname,
+    soopId: profile.soopId,
+    avatarUrl: profile.avatarUrl,
+    content,
+    createdAt,
+  };
+  await fanPageVodCommentsRef(target.streamer.id, vodId).child(id).set(comment);
+  return { comment: { id, ...comment } };
+});
+
+exports.streamerFanPageVodCommentDelete = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  const vodId = String(data.vodId || '').trim();
+  const commentId = typeof data.commentId === 'string' ? data.commentId.trim() : '';
+  if (!streamerId || !/^\d{1,20}$/.test(vodId)
+    || !/^(?:\d{13}_)?[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(commentId)) {
+    throw new HttpsError('invalid-argument', '삭제할 댓글 정보를 확인해 주세요.');
+  }
+  const [target, verified, isAdmin] = await Promise.all([
+    findVerifiedBySoopId(streamerId),
+    findVerifiedByUid(uid),
+    isAdminUid(uid),
+  ]);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  if (!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)) {
+    throw new HttpsError('permission-denied', '관리자와 해당 팬페이지의 인증 스트리머만 댓글을 삭제할 수 있습니다.');
+  }
+  const result = await fanPageVodCommentsRef(target.streamer.id, vodId).child(commentId)
+    .transaction((current) => current ? null : undefined);
+  if (!result.committed) throw new HttpsError('not-found', '팬페이지 댓글을 찾을 수 없습니다.');
+  return { deleted: true, commentId };
 });
 
 exports.streamerFanPageLiveStatus = onCall({ maxInstances: 20 }, async (request) => {

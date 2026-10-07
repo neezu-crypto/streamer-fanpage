@@ -23,6 +23,10 @@ const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
 const callAdminStats = httpsCallable(functions, 'streamerFanPageAdminStats');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
 const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
+const callVodComments = httpsCallable(functions, 'streamerFanPageVodComments');
+const callVodCommentAdd = httpsCallable(functions, 'streamerFanPageVodCommentAdd');
+const callVodCommentDelete = httpsCallable(functions, 'streamerFanPageVodCommentDelete');
+const callCommentProfileSave = httpsCallable(functions, 'streamerFanPageCommentProfileSave');
 const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh', { timeout: 3600000 });
 const callCalendar = httpsCallable(functions, 'streamerFanPageCalendar');
 const callLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
@@ -54,6 +58,8 @@ let switchApprovalUnsubscribe = null;
 let switchHandoffInProgress = false;
 const vodRefreshesInProgress = new Set();
 const vodPageLoadsInProgress = new Set();
+let vodCommentState = null;
+let vodCommentRequestId = 0;
 const calendarStates = new Map();
 const liveStatusStates = new Map();
 const youtubeStates = new Map();
@@ -1861,8 +1867,16 @@ function renderVodPlayerDialog() {
   const note = document.createElement('p'); note.textContent = '플레이어가 표시되지 않거나 재생되지 않으면 SOOP에서 열어 주세요.';
   const link = document.createElement('a'); link.id = 'vodPlayerExternalLink'; link.className = 'button button-primary';
   link.href = 'https://vod.sooplive.com/'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'SOOP에서 열기 ↗';
-  footer.append(note, link); card.append(heading, frame, footer); dialog.append(card);
-  dialog.addEventListener('close', () => { iframe.src = 'about:blank'; });
+  footer.append(note, link);
+  const comments = document.createElement('section'); comments.id = 'vodCommentsPanel'; comments.className = 'vod-comments-panel';
+  comments.setAttribute('aria-live', 'polite');
+  comments.textContent = '댓글을 불러오고 있어요.';
+  card.append(heading, frame, footer, comments); dialog.append(card);
+  dialog.addEventListener('close', () => {
+    iframe.src = 'about:blank';
+    vodCommentRequestId += 1;
+    vodCommentState = null;
+  });
   dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   return dialog;
 }
@@ -1874,6 +1888,304 @@ function openVodPlayer(vod) {
   $('vodPlayerExternalLink').href = `https://vod.sooplive.com/player/${id}`;
   $('vodPlayerFrame').src = `https://vod.sooplive.com/player/${id}/embed?autoPlay=false&mutePlay=true&showChat=true`;
   $('vodPlayerDialog').showModal();
+  vodCommentState = {
+    streamerId: currentPage.streamer.id,
+    vodId: String(vod.id),
+    activeTab: 'soop',
+    profileEditorOpen: false,
+    loading: true,
+    loadingMore: false,
+    error: '',
+    profile: null,
+    canDelete: false,
+    soop: { available: true, totalCount: 0, items: [], hasMore: false, nextPageNo: 1, nextLastNo: 0, error: '' },
+    fanpage: { items: [], hasMore: false, countLabel: '0' },
+  };
+  const requestId = ++vodCommentRequestId;
+  renderVodCommentsContents();
+  loadVodComments(requestId);
+}
+
+function createVodCommentAvatar(profile) {
+  const avatar = document.createElement('span');
+  avatar.className = 'vod-comment-avatar';
+  const nickname = String(profile && profile.nickname || '?');
+  const url = String(profile && profile.avatarUrl || '');
+  if (url) {
+    const image = document.createElement('img');
+    image.src = url;
+    image.alt = '';
+    image.loading = 'lazy';
+    image.addEventListener('error', () => {
+      avatar.replaceChildren();
+      avatar.textContent = nickname.charAt(0) || '?';
+      avatar.classList.add('is-fallback');
+    }, { once: true });
+    avatar.append(image);
+  } else {
+    avatar.textContent = nickname.charAt(0) || '?';
+    avatar.classList.add('is-fallback');
+  }
+  return avatar;
+}
+
+function formatCommentDate(value, soopFormat = false) {
+  if (soopFormat) {
+    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})/.exec(String(value || ''));
+    return match ? `${match[1]}.${match[2]}.${match[3]} ${match[4]}` : String(value || '');
+  }
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp)) return '';
+  return new Intl.DateTimeFormat('ko-KR', {
+    dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Seoul',
+  }).format(new Date(timestamp));
+}
+
+function renderVodCommentItem(comment, source) {
+  const article = document.createElement('article');
+  article.className = 'vod-comment-item';
+  const identity = document.createElement('div'); identity.className = 'vod-comment-identity';
+  identity.append(createVodCommentAvatar(comment));
+  const copy = document.createElement('div'); copy.className = 'vod-comment-author-copy';
+  const nickname = document.createElement('strong'); nickname.className = 'vod-comment-nickname'; nickname.textContent = comment.nickname || 'SOOP 유저';
+  const meta = document.createElement('span'); meta.className = 'vod-comment-meta';
+  const handle = comment.soopId ? `@${comment.soopId}` : '';
+  const created = formatCommentDate(comment.createdAt, source === 'soop');
+  meta.textContent = [handle, created].filter(Boolean).join(' · ');
+  copy.append(nickname, meta); identity.append(copy);
+  if (source === 'fanpage' && vodCommentState && vodCommentState.canDelete) {
+    const remove = document.createElement('button'); remove.type = 'button';
+    remove.className = 'vod-comment-delete'; remove.textContent = '삭제';
+    remove.setAttribute('aria-label', `${comment.nickname || '사용자'} 댓글 삭제`);
+    remove.addEventListener('click', () => deleteVodComment(comment.id));
+    identity.append(remove);
+  }
+  const content = document.createElement('p'); content.className = 'vod-comment-content'; content.textContent = comment.content || '';
+  article.append(identity, content);
+  return article;
+}
+
+function renderCommentProfileEditor() {
+  const state = vodCommentState;
+  const wrap = document.createElement('div'); wrap.className = 'vod-comment-profile-editor';
+  const title = document.createElement('strong'); title.textContent = state.profile ? '댓글 프로필 수정' : '댓글 프로필 설정';
+  const note = document.createElement('p');
+  note.textContent = '배팅시장 또는 갤러리에 저장된 프로필을 불러옵니다. 저장하면 팬페이지 댓글에 이 프로필이 표시돼요.';
+  const grid = document.createElement('div'); grid.className = 'vod-comment-profile-fields';
+  const nicknameLabel = document.createElement('label'); nicknameLabel.textContent = '닉네임';
+  const nickname = document.createElement('input'); nickname.type = 'text'; nickname.maxLength = 12;
+  nickname.autocomplete = 'nickname'; nickname.placeholder = '1~12자';
+  nickname.value = state.profile && state.profile.nickname || '';
+  nicknameLabel.append(nickname);
+  const soopLabel = document.createElement('label'); soopLabel.textContent = 'SOOP 아이디 (선택)';
+  const soopId = document.createElement('input'); soopId.type = 'text'; soopId.maxLength = 20;
+  soopId.autocomplete = 'off'; soopId.placeholder = '영문 소문자/숫자';
+  soopId.value = state.profile && state.profile.soopId || '';
+  soopLabel.append(soopId); grid.append(nicknameLabel, soopLabel);
+  const actions = document.createElement('div'); actions.className = 'vod-comment-profile-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
+  cancel.addEventListener('click', () => {
+    if (!state.profile) return;
+    state.profileEditorOpen = false;
+    renderVodCommentsContents();
+  });
+  const save = document.createElement('button'); save.type = 'button'; save.className = 'button button-primary'; save.textContent = '프로필 저장';
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    try {
+      const result = await callCommentProfileSave({ nickname: nickname.value.trim(), soopId: soopId.value.trim() });
+      state.profile = { ...result.data.profile, source: 'streamerFanPageCommentProfiles' };
+      state.profileEditorOpen = false;
+      renderVodCommentsContents();
+      showToast('댓글 프로필을 저장했어요.');
+    } catch (error) {
+      showToast(error.message || '댓글 프로필을 저장하지 못했어요.');
+    } finally { save.disabled = false; }
+  });
+  actions.append(cancel, save); wrap.append(title, note, grid, actions);
+  return wrap;
+}
+
+function renderFanpageCommentComposer() {
+  const state = vodCommentState;
+  const composer = document.createElement('div'); composer.className = 'vod-comment-composer';
+  if (state.profile) {
+    const identity = document.createElement('div'); identity.className = 'vod-comment-composer-identity';
+    identity.append(createVodCommentAvatar(state.profile));
+    const name = document.createElement('strong'); name.textContent = state.profile.nickname;
+    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'vod-comment-profile-edit'; edit.textContent = '프로필 수정';
+    edit.addEventListener('click', () => { state.profileEditorOpen = true; renderVodCommentsContents(); });
+    identity.append(name, edit); composer.append(identity);
+  } else {
+    const prompt = document.createElement('p'); prompt.className = 'vod-comment-profile-required';
+    prompt.textContent = '댓글을 등록하려면 먼저 프로필을 설정해 주세요.';
+    composer.append(prompt);
+  }
+  if (state.profileEditorOpen || !state.profile) composer.append(renderCommentProfileEditor());
+  if (state.profile && !state.profileEditorOpen) {
+    const textarea = document.createElement('textarea'); textarea.className = 'vod-comment-input';
+    textarea.maxLength = 500; textarea.rows = 3; textarea.placeholder = '팬페이지에 댓글을 남겨보세요.';
+    const footer = document.createElement('div'); footer.className = 'vod-comment-compose-footer';
+    const count = document.createElement('span'); count.className = 'vod-comment-input-count'; count.textContent = '0 / 500';
+    const submit = document.createElement('button'); submit.type = 'button'; submit.className = 'button button-primary';
+    submit.textContent = '댓글 등록'; submit.disabled = true;
+    textarea.addEventListener('input', () => {
+      count.textContent = `${textarea.value.length} / 500`;
+      submit.disabled = !textarea.value.trim() || state.loading;
+    });
+    submit.addEventListener('click', async () => {
+      const content = textarea.value.trim();
+      if (!content) return;
+      submit.disabled = true;
+      try {
+        const result = await callVodCommentAdd({ streamerId: state.streamerId, vodId: state.vodId, content });
+        state.fanpage.items = [...state.fanpage.items, result.data.comment].slice(-50);
+        state.fanpage.hasMore = state.fanpage.hasMore || state.fanpage.items.length === 50;
+        state.fanpage.countLabel = `${state.fanpage.items.length}${state.fanpage.hasMore ? '+' : ''}`;
+        renderVodCommentsContents();
+        showToast('팬페이지 댓글을 등록했어요.');
+      } catch (error) {
+        showToast(error.message || '댓글을 등록하지 못했어요.');
+        submit.disabled = false;
+      }
+    });
+    footer.append(count, submit); composer.append(textarea, footer);
+  }
+  return composer;
+}
+
+function renderVodCommentsContents() {
+  const root = $('vodCommentsPanel');
+  const state = vodCommentState;
+  if (!root || !state) return;
+  root.replaceChildren();
+  const heading = document.createElement('div'); heading.className = 'vod-comments-heading';
+  const headingCopy = document.createElement('div');
+  const title = document.createElement('h3'); title.textContent = '다시보기 댓글';
+  const hint = document.createElement('p'); hint.textContent = 'SOOP 댓글은 읽기 전용이며, 팬페이지 댓글은 이곳에서 등록할 수 있어요.';
+  headingCopy.append(title, hint); heading.append(headingCopy);
+  const tabs = document.createElement('div'); tabs.className = 'vod-comments-tabs'; tabs.setAttribute('role', 'tablist');
+  const soopTab = document.createElement('button'); soopTab.type = 'button'; soopTab.setAttribute('role', 'tab');
+  soopTab.setAttribute('aria-selected', String(state.activeTab === 'soop'));
+  soopTab.className = state.activeTab === 'soop' ? 'is-active' : '';
+  soopTab.textContent = `SOOP 댓글 ${state.soop.totalCount.toLocaleString('ko-KR')}`;
+  soopTab.addEventListener('click', () => { state.activeTab = 'soop'; renderVodCommentsContents(); });
+  const fanTab = document.createElement('button'); fanTab.type = 'button'; fanTab.setAttribute('role', 'tab');
+  fanTab.setAttribute('aria-selected', String(state.activeTab === 'fanpage'));
+  fanTab.className = state.activeTab === 'fanpage' ? 'is-active' : '';
+  fanTab.textContent = `팬페이지 댓글 ${state.fanpage.countLabel || state.fanpage.items.length}`;
+  fanTab.addEventListener('click', () => { state.activeTab = 'fanpage'; renderVodCommentsContents(); });
+  tabs.append(soopTab, fanTab); root.append(heading, tabs);
+  const body = document.createElement('div'); body.className = 'vod-comments-body';
+  if (state.loading && !state.soop.items.length && !state.fanpage.items.length) {
+    const loading = document.createElement('p'); loading.className = 'vod-comments-status';
+    loading.textContent = '댓글을 불러오고 있어요.'; body.append(loading); root.append(body); return;
+  }
+  if (state.error) {
+    const error = document.createElement('p'); error.className = 'vod-comments-status is-error'; error.textContent = state.error;
+    body.append(error);
+  } else if (state.activeTab === 'soop') {
+    if (state.soop.error) {
+      const error = document.createElement('p'); error.className = 'vod-comments-status is-error'; error.textContent = state.soop.error;
+      body.append(error);
+    } else if (!state.soop.available) {
+      const unavailable = document.createElement('p'); unavailable.className = 'vod-comments-status';
+      unavailable.textContent = '이 다시보기에서는 SOOP 댓글을 사용할 수 없어요.'; body.append(unavailable);
+    } else if (!state.soop.items.length) {
+      const empty = document.createElement('p'); empty.className = 'vod-comments-status'; empty.textContent = '등록된 SOOP 댓글이 없어요.';
+      body.append(empty);
+    } else {
+      const list = document.createElement('div'); list.className = 'vod-comments-list';
+      state.soop.items.forEach((comment) => list.append(renderVodCommentItem(comment, 'soop')));
+      body.append(list);
+    }
+    if (state.soop.hasMore) {
+      const more = document.createElement('button'); more.type = 'button'; more.className = 'button vod-comments-more';
+      more.textContent = state.loadingMore ? '불러오는 중…' : 'SOOP 댓글 더 보기'; more.disabled = state.loadingMore;
+      more.addEventListener('click', loadMoreSoopVodComments); body.append(more);
+    }
+  } else {
+    body.append(renderFanpageCommentComposer());
+    if (!state.fanpage.items.length) {
+      const empty = document.createElement('p'); empty.className = 'vod-comments-status'; empty.textContent = '아직 팬페이지 댓글이 없어요. 첫 댓글을 남겨보세요.';
+      body.append(empty);
+    } else {
+      const list = document.createElement('div'); list.className = 'vod-comments-list';
+      state.fanpage.items.forEach((comment) => list.append(renderVodCommentItem(comment, 'fanpage')));
+      body.append(list);
+      if (state.fanpage.hasMore) {
+        const limit = document.createElement('p'); limit.className = 'vod-comments-status'; limit.textContent = '최근 댓글 50개를 표시하고 있어요.';
+        body.append(limit);
+      }
+    }
+  }
+  root.append(body);
+}
+
+async function loadVodComments(requestId) {
+  const state = vodCommentState;
+  if (!state || requestId !== vodCommentRequestId) return;
+  state.loading = true; state.error = '';
+  renderVodCommentsContents();
+  try {
+    const result = await callVodComments({ streamerId: state.streamerId, vodId: state.vodId });
+    if (!vodCommentState || requestId !== vodCommentRequestId) return;
+    state.profile = result.data.profile || null;
+    state.canDelete = result.data.canDelete === true;
+    state.soop = result.data.soop;
+    state.fanpage = result.data.fanpage;
+    if (!state.profile) state.profileEditorOpen = true;
+  } catch (error) {
+    if (!vodCommentState || requestId !== vodCommentRequestId) return;
+    state.error = error.message || '댓글을 불러오지 못했어요.';
+  } finally {
+    if (vodCommentState && requestId === vodCommentRequestId) {
+      state.loading = false;
+      renderVodCommentsContents();
+    }
+  }
+}
+
+async function loadMoreSoopVodComments() {
+  const state = vodCommentState;
+  if (!state || state.loadingMore || !state.soop.hasMore) return;
+  const requestId = vodCommentRequestId;
+  state.loadingMore = true; renderVodCommentsContents();
+  try {
+    const result = await callVodComments({
+      streamerId: state.streamerId,
+      vodId: state.vodId,
+      soopPageNo: state.soop.nextPageNo,
+      soopLastNo: state.soop.nextLastNo,
+    });
+    if (!vodCommentState || requestId !== vodCommentRequestId) return;
+    const prior = state.soop;
+    state.soop = {
+      ...result.data.soop,
+      items: [...prior.items, ...result.data.soop.items],
+    };
+    state.fanpage = result.data.fanpage;
+  } catch (error) {
+    showToast(error.message || 'SOOP 댓글을 더 불러오지 못했어요.');
+  } finally {
+    if (vodCommentState && requestId === vodCommentRequestId) {
+      state.loadingMore = false; renderVodCommentsContents();
+    }
+  }
+}
+
+async function deleteVodComment(commentId) {
+  const state = vodCommentState;
+  if (!state || !state.canDelete || !confirm('이 팬페이지 댓글을 삭제할까요?')) return;
+  try {
+    await callVodCommentDelete({ streamerId: state.streamerId, vodId: state.vodId, commentId });
+    state.fanpage.items = state.fanpage.items.filter((comment) => comment.id !== commentId);
+    state.fanpage.countLabel = `${state.fanpage.items.length}${state.fanpage.hasMore ? '+' : ''}`;
+    renderVodCommentsContents();
+    showToast('팬페이지 댓글을 삭제했어요.');
+  } catch (error) {
+    showToast(error.message || '댓글을 삭제하지 못했어요.');
+  }
 }
 
 function renderYouTubePlayerDialog() {

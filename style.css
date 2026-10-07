@@ -126,7 +126,48 @@
 .vod-player-footer{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:14px}
 .vod-player-footer p{margin:0;color:#aaa3b1;font-size:11px;line-height:1.6}
 .vod-player-footer .button{flex:none}
+.vod-comments-panel{margin-top:22px;padding-top:19px;border-top:1px solid var(--line)}
+.vod-comments-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.vod-comments-heading h3{margin:0;font:20px var(--display)}
+.vod-comments-heading p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+.vod-comments-tabs{display:flex;gap:8px;margin:16px 0 12px;border-bottom:1px solid var(--line)}
+.vod-comments-tabs button{padding:9px 12px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:12px;font-weight:700}
+.vod-comments-tabs button.is-active{border-color:var(--pink);color:var(--text)}
+.vod-comments-body{min-height:80px}
+.vod-comments-status{margin:12px 0;padding:16px;border:1px dashed #ffffff20;border-radius:11px;color:var(--muted);text-align:center;font-size:12px;line-height:1.6}
+.vod-comments-status.is-error{color:#ffb7c9;border-color:#f58cac55}
+.vod-comments-list{display:grid;gap:0}
+.vod-comment-item{padding:14px 2px;border-bottom:1px solid #ffffff10}
+.vod-comment-identity{display:flex;align-items:center;gap:10px;min-width:0}
+.vod-comment-avatar{display:grid;width:36px;height:36px;flex:0 0 36px;place-items:center;overflow:hidden;border:1px solid #ffffff20;border-radius:50%;background:linear-gradient(135deg,#69485d,#35304a);color:#fff;font-size:13px;font-weight:700}
+.vod-comment-avatar img{width:100%;height:100%;object-fit:cover}
+.vod-comment-author-copy{display:grid;min-width:0;flex:1;gap:3px}
+.vod-comment-nickname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.vod-comment-meta{overflow:hidden;color:#928a9a;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+.vod-comment-content{margin:9px 0 0 46px;color:#e9e4ed;font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.vod-comment-delete,.vod-comment-profile-edit{flex:none;padding:5px 8px;border:1px solid #ffffff1c;border-radius:7px;background:#ffffff08;color:#bdb5c4;font-size:10px}
+.vod-comment-delete:hover,.vod-comment-profile-edit:hover{border-color:#f58cac70;color:var(--text)}
+.vod-comments-more{display:block;margin:14px auto 2px}
+.vod-comment-composer{margin:6px 0 12px;padding:14px;border:1px solid #ffffff18;border-radius:12px;background:#ffffff05}
+.vod-comment-composer-identity{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.vod-comment-composer-identity strong{flex:1;font-size:12px}
+.vod-comment-profile-required{margin:0 0 12px;color:#f3c0d0;font-size:12px}
+.vod-comment-input{display:block;width:100%;min-height:76px;resize:vertical;padding:11px 12px;border:1px solid #ffffff20;border-radius:9px;outline:0;background:#100f16;color:var(--text);font:12px/1.6 var(--font)}
+.vod-comment-input:focus,.vod-comment-profile-fields input:focus{border-color:#f58cac99;box-shadow:0 0 0 3px #f58cac16}
+.vod-comment-input::placeholder{color:#77717f}
+.vod-comment-compose-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:9px}
+.vod-comment-input-count{color:#928a9a;font-size:10px}
+.vod-comment-compose-footer button:disabled{opacity:.5;cursor:not-allowed}
+.vod-comment-profile-editor{margin-top:10px;padding:13px;border:1px solid #f58cac35;border-radius:10px;background:#f58cac08}
+.vod-comment-profile-editor>strong{font:15px var(--display)}
+.vod-comment-profile-editor>p{margin:5px 0 11px;color:var(--muted);font-size:10px;line-height:1.55}
+.vod-comment-profile-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.vod-comment-profile-fields label{display:grid;gap:5px;color:#d7cfdd;font-size:10px}
+.vod-comment-profile-fields input{width:100%;height:38px;padding:0 10px;border:1px solid #ffffff20;border-radius:8px;outline:0;background:#100f16;color:var(--text);font:12px var(--font)}
+.vod-comment-profile-fields input::placeholder{color:#77717f}
+.vod-comment-profile-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 @media(max-width:560px){.vod-player-card{padding:13px}.vod-player-heading h2{font-size:15px}.vod-player-footer{align-items:stretch;flex-direction:column}.vod-player-footer .button{width:100%}}
+@media(max-width:560px){.vod-comments-heading h3{font-size:18px}.vod-comments-tabs button{flex:1;padding:9px 5px;font-size:11px}.vod-comment-content{margin-left:0}.vod-comment-profile-fields{grid-template-columns:1fr}.vod-comment-compose-footer button{min-width:100px}.vod-comment-composer{padding:11px}}
 
 /* Administrator-only fanpage statistics */
 .admin-stats-dialog{width:min(980px,calc(100% - 24px));max-width:none;max-height:calc(100dvh - 24px);overflow:hidden}
