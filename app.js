@@ -592,6 +592,8 @@ function renderFanPage(page) {
   section.append(details, stockCard, actions);
   if (!page.isOwner) view.append(back);
   view.append(section);
+  const rouletteSection = renderRouletteSection(page);
+  if (rouletteSection) view.append(rouletteSection);
   const messengerSection = renderMessengerSection(page);
   if (messengerSection) view.append(messengerSection);
   view.append(renderLiveSection(page));
@@ -640,7 +642,7 @@ function renderFanPage(page) {
       if (key === 'rouletteUrl') {
         const hint = document.createElement('small');
         hint.className = 'profile-editor-hint';
-        hint.textContent = '주소를 입력하면 버튼이 표시되고, 비워두면 숨겨집니다.';
+        hint.textContent = '위플랩 룰렛 확률 페이지 주소를 입력하면 고정 높이 영역에 표시됩니다.';
         wrapper.append(hint);
       }
       if (key === 'youtubeChannelUrl') {
@@ -696,6 +698,60 @@ function renderFanPage(page) {
     editorDialog.addEventListener('click', (event) => { if (event.target === editorDialog) editorDialog.close(); });
     view.append(editorDialog);
   }
+}
+
+function renderRouletteSection(page) {
+  const profile = page.profile || {};
+  let rouletteUrl;
+  try {
+    const parsed = new URL(profile.rouletteUrl || '');
+    if (parsed.protocol !== 'https:'
+      || !['weflab.com', 'www.weflab.com'].includes(parsed.hostname)
+      || !parsed.pathname.startsWith('/user/')) return null;
+    rouletteUrl = parsed.href;
+  } catch (_) {
+    return null;
+  }
+
+  const section = document.createElement('section');
+  section.className = 'content-card roulette-section';
+  const heading = document.createElement('div');
+  heading.className = 'roulette-heading';
+  const copy = document.createElement('div');
+  copy.className = 'roulette-heading-copy';
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'eyebrow';
+  eyebrow.textContent = 'WEFLAB ROULETTE';
+  const title = document.createElement('h2');
+  title.textContent = '룰렛 확률';
+  const description = document.createElement('p');
+  description.className = 'roulette-description';
+  description.textContent = `${page.streamer.nickname}님이 위플랩에서 공유한 룰렛 확률입니다.`;
+  copy.append(eyebrow, title, description);
+
+  const openLink = document.createElement('a');
+  openLink.className = 'button roulette-open-link';
+  openLink.href = rouletteUrl;
+  openLink.target = '_blank';
+  openLink.rel = 'noopener noreferrer';
+  openLink.textContent = '위플랩에서 열기 ↗';
+  heading.append(copy, openLink);
+
+  const viewport = document.createElement('div');
+  viewport.className = 'roulette-frame-scrollbox';
+  const frame = document.createElement('iframe');
+  frame.className = 'roulette-frame';
+  frame.src = rouletteUrl;
+  frame.title = `${page.streamer.nickname} 위플랩 룰렛 확률`;
+  frame.loading = 'lazy';
+  frame.referrerPolicy = 'strict-origin-when-cross-origin';
+  viewport.append(frame);
+
+  const note = document.createElement('p');
+  note.className = 'roulette-scroll-note';
+  note.textContent = '확률 목록이 길면 프레임 안에서 스크롤해 확인할 수 있어요.';
+  section.append(heading, viewport, note);
+  return section;
 }
 
 function renderStreamerStockPrice(page) {
