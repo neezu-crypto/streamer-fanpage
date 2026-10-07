@@ -1618,9 +1618,10 @@ exports.streamerFanPageVodCommentDelete = onCall({ maxInstances: 20 }, async (re
   if (!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)) {
     throw new HttpsError('permission-denied', '관리자와 해당 팬페이지의 인증 스트리머만 댓글을 삭제할 수 있습니다.');
   }
-  const result = await fanPageVodCommentsRef(target.streamer.id, vodId).child(commentId)
-    .transaction((current) => current ? null : undefined);
-  if (!result.committed) throw new HttpsError('not-found', '팬페이지 댓글을 찾을 수 없습니다.');
+  const commentRef = fanPageVodCommentsRef(target.streamer.id, vodId).child(commentId);
+  const commentSnapshot = await commentRef.get();
+  if (!commentSnapshot.exists()) throw new HttpsError('not-found', '팬페이지 댓글을 찾을 수 없습니다.');
+  await commentRef.remove();
   return { deleted: true, commentId };
 });
 
