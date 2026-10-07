@@ -35,6 +35,7 @@ const callScheduleAdd = httpsCallable(functions, 'streamerFanPageScheduleAdd');
 const callScheduleDelete = httpsCallable(functions, 'streamerFanPageScheduleDelete');
 const callYouTubeVideos = httpsCallable(functions, 'streamerFanPageYouTubeVideos');
 const callCafePosts = httpsCallable(functions, 'streamerFanPageCafePosts');
+const callRoulette = httpsCallable(functions, 'streamerFanPageRoulette');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
@@ -65,6 +66,7 @@ const calendarStates = new Map();
 const liveStatusStates = new Map();
 const youtubeStates = new Map();
 const cafeStates = new Map();
+const rouletteStates = new Map();
 let galleryLoadPromise = Promise.resolve();
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
@@ -642,7 +644,7 @@ function renderFanPage(page) {
       if (key === 'rouletteUrl') {
         const hint = document.createElement('small');
         hint.className = 'profile-editor-hint';
-        hint.textContent = '위플랩 룰렛 확률 페이지 주소를 입력하면 고정 높이 영역에 표시됩니다.';
+        hint.textContent = '위플랩 공개 룰렛 설정을 팬페이지 디자인으로 표시하고, 페이지 방문 시 최신 데이터를 불러옵니다.';
         wrapper.append(hint);
       }
       if (key === 'youtubeChannelUrl') {
@@ -687,6 +689,7 @@ function renderFanPage(page) {
         currentPage.profile = result.data.page.profile;
         youtubeStates.delete(currentPage.streamer.id);
         cafeStates.delete(currentPage.streamer.id);
+        rouletteStates.delete(currentPage.streamer.id);
         editorDialog.close();
         renderFanPage(currentPage);
         showToast('프로필을 저장했어요.');
@@ -707,14 +710,16 @@ function renderRouletteSection(page) {
     const parsed = new URL(profile.rouletteUrl || '');
     if (parsed.protocol !== 'https:'
       || !['weflab.com', 'www.weflab.com'].includes(parsed.hostname)
-      || !parsed.pathname.startsWith('/user/')) return null;
-    rouletteUrl = parsed.href;
+      || !/^\/user\/[A-Za-z0-9_-]{4,128}\/?$/.test(parsed.pathname)
+      || parsed.username || parsed.password || parsed.port) return null;
+    rouletteUrl = `https://weflab.com${parsed.pathname.replace(/\/$/, '')}`;
   } catch (_) {
     return null;
   }
 
   const section = document.createElement('section');
   section.className = 'content-card roulette-section';
+  section.dataset.streamerId = page.streamer.id;
   const heading = document.createElement('div');
   heading.className = 'roulette-heading';
   const copy = document.createElement('div');
@@ -735,23 +740,160 @@ function renderRouletteSection(page) {
   openLink.target = '_blank';
   openLink.rel = 'noopener noreferrer';
   openLink.textContent = '위플랩에서 열기 ↗';
-  heading.append(copy, openLink);
+  const controls = document.createElement('div');
+  controls.className = 'roulette-controls';
+  const refreshButton = document.createElement('button');
+  refreshButton.type = 'button';
+  refreshButton.className = 'button roulette-refresh-button';
+  refreshButton.textContent = '↻ 목록 새로고침';
+  refreshButton.addEventListener('click', () => loadRouletteData(section, page.streamer.id, true));
+  controls.append(openLink, refreshButton);
+  heading.append(copy, controls);
 
+  const status = document.createElement('p');
+  status.className = 'roulette-status';
+  status.setAttribute('aria-live', 'polite');
   const viewport = document.createElement('div');
-  viewport.className = 'roulette-frame-scrollbox';
-  const frame = document.createElement('iframe');
-  frame.className = 'roulette-frame';
-  frame.src = rouletteUrl;
-  frame.title = `${page.streamer.nickname} 위플랩 룰렛 확률`;
-  frame.loading = 'lazy';
-  frame.referrerPolicy = 'strict-origin-when-cross-origin';
-  viewport.append(frame);
+  viewport.className = 'roulette-list-viewport';
+  const list = document.createElement('div');
+  list.className = 'roulette-groups';
+  viewport.append(list);
 
   const note = document.createElement('p');
   note.className = 'roulette-scroll-note';
-  note.textContent = '확률 목록이 길면 프레임 안에서 스크롤해 확인할 수 있어요.';
-  section.append(heading, viewport, note);
+  note.textContent = '위플랩에서 공개한 항목과 확률을 팬페이지에 맞춰 표시합니다.';
+  section.append(heading, status, viewport, note);
+  renderRouletteData(section, rouletteStates.get(page.streamer.id) || { loading: true });
+  loadRouletteData(section, page.streamer.id, false);
   return section;
+}
+
+function formatRouletteDateTime(timestamp) {
+  if (timestamp === null || timestamp === undefined || timestamp === '') return '';
+  const date = new Date(Number(timestamp));
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function rouletteCountLabel(count) {
+  const min = Number(count.min);
+  const max = Number(count.max);
+  const range = min === max ? min.toLocaleString('ko-KR') : `${min.toLocaleString('ko-KR')}~${max.toLocaleString('ko-KR')}`;
+  const platformNames = {
+    afreeca: 'SOOP', soopg: 'SOOP G', naver: '치지직', youtube: 'YouTube',
+    twitch: 'Twitch', cime: '씨미', flextv: '플렉스TV', extdona: '외부후원',
+  };
+  const platform = platformNames[count.platform] || '';
+  return `${platform ? `${platform} ` : ''}${range}개`;
+}
+
+function renderRouletteData(section, state) {
+  const status = section.querySelector('.roulette-status');
+  const list = section.querySelector('.roulette-groups');
+  const refreshButton = section.querySelector('.roulette-refresh-button');
+  if (!status || !list || !refreshButton) return;
+
+  refreshButton.disabled = !!state.loading;
+  refreshButton.textContent = state.loading ? '↻ 불러오는 중…' : '↻ 목록 새로고침';
+  list.replaceChildren();
+
+  const roulette = state.data;
+  if (roulette && roulette.linked && Array.isArray(roulette.groups) && roulette.groups.length) {
+    const sourceDate = roulette.sourceUpdatedAt ? `위플랩 설정 수정 ${roulette.sourceUpdatedAt}` : '';
+    const fetchedDate = formatRouletteDateTime(roulette.fetchedAt);
+    const freshness = fetchedDate ? `팬페이지 확인 ${fetchedDate}` : '';
+    const staleCopy = state.stale ? '위플랩 연결이 원활하지 않아 최근 저장된 데이터를 표시 중 · ' : '';
+    const cooldownCopy = state.refreshCoolingDown ? '최근에 새로 확인했어요 · ' : '';
+    status.textContent = `${staleCopy}${cooldownCopy}${[sourceDate, freshness].filter(Boolean).join('　·　')}`;
+
+    roulette.groups.forEach((group, index) => {
+      const groupElement = document.createElement('section');
+      groupElement.className = 'roulette-group';
+      const groupHeading = document.createElement('div');
+      groupHeading.className = 'roulette-group-heading';
+      const countLabels = (Array.isArray(group.counts) ? group.counts : []).map(rouletteCountLabel);
+      const count = document.createElement('strong');
+      count.className = 'roulette-donation-count';
+      count.textContent = countLabels.length ? countLabels.join(' · ') : `룰렛 설정 ${index + 1}`;
+      const itemCount = document.createElement('span');
+      itemCount.className = 'roulette-item-count';
+      itemCount.textContent = `${group.items.length.toLocaleString('ko-KR')}개 항목`;
+      groupHeading.append(count, itemCount);
+
+      const items = document.createElement('div');
+      items.className = 'roulette-items';
+      group.items.forEach((item) => {
+        const row = document.createElement('article');
+        row.className = 'roulette-item';
+        const itemCopy = document.createElement('div');
+        itemCopy.className = 'roulette-item-copy';
+        const type = document.createElement('span');
+        type.className = 'roulette-item-type';
+        type.textContent = item.type || '룰렛';
+        const value = document.createElement('strong');
+        value.className = 'roulette-item-value';
+        value.textContent = item.value || '이름 없음';
+        itemCopy.append(type, value);
+
+        const odds = document.createElement('div');
+        odds.className = 'roulette-item-odds';
+        const probability = document.createElement('strong');
+        probability.className = 'roulette-item-probability';
+        const percent = item.probability === null || item.probability === undefined ? NaN : Number(item.probability);
+        probability.textContent = Number.isFinite(percent) ? `${percent.toLocaleString('ko-KR')}%` : '미등록';
+        const meter = document.createElement('span');
+        meter.className = 'roulette-item-meter';
+        const meterFill = document.createElement('span');
+        meterFill.className = 'roulette-item-meter-fill';
+        meterFill.style.width = `${Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0}%`;
+        meter.append(meterFill);
+        odds.append(probability, meter);
+        row.append(itemCopy, odds);
+        items.append(row);
+      });
+      groupElement.append(groupHeading, items);
+      list.append(groupElement);
+    });
+    return;
+  }
+
+  if (state.loading) {
+    status.textContent = '위플랩에서 최신 룰렛 데이터를 확인하고 있어요.';
+    const loading = document.createElement('p');
+    loading.className = 'roulette-empty';
+    loading.textContent = '룰렛 항목을 불러오는 중…';
+    list.append(loading);
+    return;
+  }
+  status.textContent = '';
+  const empty = document.createElement('p');
+  empty.className = 'roulette-empty';
+  empty.textContent = state.error || '공개된 룰렛 설정을 불러오지 못했어요. 위플랩에서 원본을 확인해 주세요.';
+  list.append(empty);
+}
+
+async function loadRouletteData(section, streamerId, forceRefresh) {
+  const previous = rouletteStates.get(streamerId) || {};
+  const state = { ...previous, loading: true, error: '', refreshCoolingDown: false };
+  rouletteStates.set(streamerId, state);
+  renderRouletteData(section, state);
+  try {
+    const response = await callRoulette({ streamerId, forceRefresh });
+    state.data = response.data.roulette || null;
+    state.stale = response.data.stale === true;
+    state.refreshCoolingDown = response.data.refreshCoolingDown === true;
+  } catch (error) {
+    state.stale = !!state.data;
+    state.error = error && error.code === 'functions/unauthenticated'
+      ? '로그인 정보를 확인한 후 다시 시도해 주세요.'
+      : (error && typeof error.message === 'string' && error.message !== 'internal'
+        ? error.message
+        : '위플랩 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  } finally {
+    state.loading = false;
+    rouletteStates.set(streamerId, state);
+    if (section.isConnected) renderRouletteData(section, state);
+  }
 }
 
 function renderStreamerStockPrice(page) {
