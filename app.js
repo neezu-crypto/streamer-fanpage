@@ -29,6 +29,7 @@ const callGallery = httpsCallable(functions, 'streamerFanPageGallery');
 const callScheduleAdd = httpsCallable(functions, 'streamerFanPageScheduleAdd');
 const callScheduleDelete = httpsCallable(functions, 'streamerFanPageScheduleDelete');
 const callYouTubeVideos = httpsCallable(functions, 'streamerFanPageYouTubeVideos');
+const callCafePosts = httpsCallable(functions, 'streamerFanPageCafePosts');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
@@ -51,6 +52,7 @@ const vodPageLoadsInProgress = new Set();
 const calendarStates = new Map();
 const liveStatusStates = new Map();
 const youtubeStates = new Map();
+const cafeStates = new Map();
 let galleryLoadPromise = Promise.resolve();
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
@@ -462,6 +464,8 @@ function renderFanPage(page) {
   view.append(renderVodSection(page));
   const youtubeSection = renderYouTubeSection(page);
   if (youtubeSection) view.append(youtubeSection);
+  const cafeSection = renderCafeSection(page);
+  if (cafeSection) view.append(cafeSection);
   view.append(renderCalendarSection(page));
   const gallerySection = renderGallerySection(page);
   view.append(gallerySection);
@@ -471,6 +475,7 @@ function renderFanPage(page) {
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
   if (youtubeSection) loadYouTubeVideos(page.streamer.id);
+  if (cafeSection) loadCafePosts(page.streamer.id);
   loadCalendar(page.streamer.id);
 
   if (page.isOwner) {
@@ -487,6 +492,7 @@ function renderFanPage(page) {
       ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160],
       ['scheduleText', '방송 시간', 120], ['rouletteUrl', '룰렛 확률 링크', 300],
       ['youtubeChannelUrl', 'YouTube 채널 링크', 300],
+      ['cafeUrl', '네이버 카페 주소', 300],
     ];
     const inputMap = {};
     const grid = document.createElement('div'); grid.className = 'profile-editor-grid';
@@ -494,7 +500,7 @@ function renderFanPage(page) {
       const wrapper = document.createElement('label'); wrapper.className = 'profile-editor-field'; wrapper.textContent = labelText;
       const input = key === 'scheduleText' ? document.createElement('textarea') : document.createElement('input');
       input.name = key; input.maxLength = maxLength;
-      if (key === 'rouletteUrl' || key === 'youtubeChannelUrl') { input.type = 'url'; input.placeholder = 'https://'; }
+      if (key === 'rouletteUrl' || key === 'youtubeChannelUrl' || key === 'cafeUrl') { input.type = 'url'; input.placeholder = 'https://'; }
       input.value = key === 'contents' ? (profile.contents || []).join(', ') : (profile[key] || '');
       wrapper.append(input);
       if (key === 'rouletteUrl') {
@@ -507,6 +513,12 @@ function renderFanPage(page) {
         const hint = document.createElement('small');
         hint.className = 'profile-editor-hint';
         hint.textContent = 'https://www.youtube.com/@핸들 또는 /channel/채널ID 링크를 입력하면 최신 영상 영역이 표시됩니다.';
+        wrapper.append(hint);
+      }
+      if (key === 'cafeUrl') {
+        const hint = document.createElement('small');
+        hint.className = 'profile-editor-hint';
+        hint.textContent = '공개 글 6개의 제목·작성자·날짜·댓글 수만 표시하고, 글을 누르면 네이버 카페에서 열립니다.';
         wrapper.append(hint);
       }
       grid.append(wrapper); inputMap[key] = input;
@@ -532,12 +544,13 @@ function renderFanPage(page) {
             fanNickname: value('fanNickname'), fandomName: value('fandomName'),
             contents: value('contents').split(',').map((item) => item.trim()).filter(Boolean),
             scheduleText: value('scheduleText'), rouletteUrl: value('rouletteUrl'),
-            youtubeChannelUrl: value('youtubeChannelUrl'),
+            youtubeChannelUrl: value('youtubeChannelUrl'), cafeUrl: value('cafeUrl'),
           },
         });
         currentPage.intro = result.data.page.intro;
         currentPage.profile = result.data.page.profile;
         youtubeStates.delete(currentPage.streamer.id);
+        cafeStates.delete(currentPage.streamer.id);
         editorDialog.close();
         renderFanPage(currentPage);
         showToast('프로필을 저장했어요.');
@@ -1025,6 +1038,121 @@ async function loadYouTubeVideos(streamerId, forceRefresh = false) {
   } finally {
     state.loading = false;
     refreshYouTubeSection(streamerId);
+  }
+}
+
+function cafeStateFor(streamerId) {
+  if (!cafeStates.has(streamerId)) {
+    cafeStates.set(streamerId, { loading: false, hasLoaded: false, error: '', stale: false, data: null });
+  }
+  return cafeStates.get(streamerId);
+}
+
+function renderCafeSection(page) {
+  const cafeUrl = String(page.profile && page.profile.cafeUrl || '').trim();
+  if (!cafeUrl) return null;
+  const streamerId = page.streamer.id;
+  const state = cafeStateFor(streamerId);
+  const section = document.createElement('section');
+  section.className = 'cafe-section content-card';
+  section.id = 'cafeSection';
+
+  const heading = document.createElement('div'); heading.className = 'cafe-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'NAVER CAFE';
+  const title = document.createElement('h2'); title.textContent = '전체글보기';
+  copy.append(eyebrow, title);
+  const more = document.createElement('a'); more.className = 'cafe-more-link';
+  more.href = (state.data && state.data.cafeListUrl) || cafeUrl;
+  more.target = '_blank'; more.rel = 'noopener noreferrer'; more.textContent = '더보기 ↗';
+  heading.append(copy, more); section.append(heading);
+
+  if (state.loading && !state.hasLoaded) {
+    const status = document.createElement('p'); status.className = 'cafe-status';
+    status.setAttribute('role', 'status'); status.textContent = '카페 글 목록을 불러오고 있어요.';
+    section.append(status);
+    return section;
+  }
+  if (state.error && !state.hasLoaded) {
+    const status = document.createElement('div'); status.className = 'cafe-status is-error';
+    const message = document.createElement('span'); message.textContent = state.error;
+    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button cafe-retry-button';
+    retry.textContent = '다시 불러오기'; retry.addEventListener('click', () => loadCafePosts(streamerId));
+    status.append(message, retry); section.append(status);
+    return section;
+  }
+  if (state.stale) {
+    const stale = document.createElement('p'); stale.className = 'cafe-stale-note';
+    stale.textContent = '네이버 카페 연결이 원활하지 않아 이전 목록을 표시하고 있어요.';
+    section.append(stale);
+  }
+  const items = state.data && Array.isArray(state.data.items) ? state.data.items : [];
+  if (!items.length) {
+    const empty = document.createElement('p'); empty.className = 'cafe-status';
+    empty.textContent = state.hasLoaded ? '표시할 공개 게시글이 없어요.' : '카페 글 목록을 불러오고 있어요.';
+    section.append(empty);
+    return section;
+  }
+
+  const list = document.createElement('div'); list.className = 'cafe-post-list';
+  items.forEach((post) => {
+    if (!post || !Number.isSafeInteger(Number(post.articleId)) || !/^\d+$/.test(String(post.cafeId || state.data.cafeId || ''))) return;
+    const cafeId = String(post.cafeId || state.data.cafeId);
+    const articleId = String(post.articleId);
+    const row = document.createElement('a'); row.className = 'cafe-post-row';
+    row.href = `https://cafe.naver.com/ca-fe/cafes/${encodeURIComponent(cafeId)}/articles/${encodeURIComponent(articleId)}`;
+    row.target = '_blank'; row.rel = 'noopener noreferrer';
+    const postTitle = document.createElement('span'); postTitle.className = 'cafe-post-title';
+    postTitle.textContent = String(post.title || '제목 없음');
+    const metadata = document.createElement('span'); metadata.className = 'cafe-post-meta';
+    const author = document.createElement('span'); author.className = 'cafe-post-author'; author.textContent = String(post.writer || '');
+    const date = document.createElement('time'); date.className = 'cafe-post-date';
+    const timestamp = Number(post.writeDate);
+    if (Number.isFinite(timestamp)) {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).formatToParts(new Date(timestamp));
+      const dateParts = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      date.dateTime = new Date(timestamp).toISOString();
+      date.textContent = `${dateParts.year}.${dateParts.month}.${dateParts.day}.`;
+    } else date.textContent = '';
+    const comments = document.createElement('span'); comments.className = 'cafe-post-comments';
+    comments.textContent = String(Math.max(0, Math.floor(Number(post.commentCount) || 0)));
+    comments.setAttribute('aria-label', `댓글 ${comments.textContent}개`);
+    metadata.append(author, date, comments); row.append(postTitle, metadata); list.append(row);
+  });
+  if (!list.childElementCount) {
+    const empty = document.createElement('p'); empty.className = 'cafe-status'; empty.textContent = '표시할 공개 게시글이 없어요.';
+    section.append(empty);
+  } else section.append(list);
+  return section;
+}
+
+function refreshCafeSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('cafeSection');
+  if (!section) return;
+  section.replaceWith(renderCafeSection(currentPage));
+}
+
+async function loadCafePosts(streamerId) {
+  const state = cafeStateFor(streamerId);
+  if (state.loading || state.hasLoaded) return;
+  state.loading = true;
+  state.error = '';
+  refreshCafeSection(streamerId);
+  try {
+    const response = await callCafePosts({ streamerId });
+    if (!currentPage || currentPage.streamer.id !== streamerId) return;
+    state.data = response.data && response.data.cafe ? response.data.cafe : { items: [] };
+    state.stale = response.data && response.data.stale === true;
+    state.hasLoaded = true;
+  } catch (error) {
+    if (!currentPage || currentPage.streamer.id !== streamerId) return;
+    state.error = error.message || '카페 글 목록을 불러오지 못했어요.';
+  } finally {
+    state.loading = false;
+    refreshCafeSection(streamerId);
   }
 }
 

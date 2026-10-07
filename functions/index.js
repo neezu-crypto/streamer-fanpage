@@ -30,6 +30,9 @@ const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const YOUTUBE_VIDEO_PAGE_SIZE = 24;
 const YOUTUBE_CACHE_TTL_MS = 30 * 60 * 1000;
 const YOUTUBE_REFRESH_COOLDOWN_MS = 60 * 1000;
+const CAFE_POST_PREVIEW_SIZE = 6;
+const CAFE_POST_CACHE_TTL_MS = 5 * 60 * 1000;
+const NAVER_CAFE_API_BASE = 'https://apis.naver.com/cafe-web/cafe-boardlist-api/v1';
 const YOUTUBE_DATA_API_KEY = defineSecret('YOUTUBE_DATA_API_KEY');
 const GALLERY_PUBLIC_IMAGE_HOST = 'pub-aa5574dbd45e4404b18ab8efaae54e67.r2.dev';
 const GALLERY_CATEGORY_LABELS = Object.freeze({
@@ -41,6 +44,7 @@ const GALLERY_CATEGORY_LABELS = Object.freeze({
 });
 const fanpageGalleryMemoryCache = new Map();
 const youtubeFetchInProgress = new Map();
+const cafeFetchInProgress = new Map();
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -762,6 +766,145 @@ function parseYouTubeChannelUrl(value) {
   }
 }
 
+function parseNaverCafeUrl(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 300) return null;
+  try {
+    const parsed = new URL(value.trim());
+    if (parsed.protocol !== 'https:' || !['cafe.naver.com', 'm.cafe.naver.com', 'www.cafe.naver.com'].includes(parsed.hostname)
+      || parsed.username || parsed.password) return null;
+    const path = decodeURIComponent(parsed.pathname).replace(/\/+$/, '');
+    const cafeIdMatch = /^\/ca-fe\/cafes\/(\d+)$/i.exec(path);
+    if (cafeIdMatch) {
+      return { type: 'id', value: cafeIdMatch[1], url: `https://cafe.naver.com/ca-fe/cafes/${cafeIdMatch[1]}` };
+    }
+    const slugMatch = /^\/([a-z0-9_-]{2,40})$/i.exec(path);
+    if (!slugMatch) return null;
+    const slug = slugMatch[1];
+    return { type: 'slug', value: slug, url: `https://cafe.naver.com/${slug}` };
+  } catch (_) {
+    return null;
+  }
+}
+
+function cafeCacheRef(streamerId) {
+  return db.ref(`streamerFanPageCafeCache/${streamerId}`);
+}
+
+function normalizeCafePost(item, cafeId) {
+  if (!item || typeof item !== 'object') return null;
+  const articleId = Math.floor(Number(item.articleId));
+  const title = typeof item.subject === 'string' ? item.subject.trim().slice(0, 200) : '';
+  const writer = item.writerInfo && typeof item.writerInfo.nickName === 'string'
+    ? item.writerInfo.nickName.trim().slice(0, 50) : '';
+  const writeDate = Number(item.writeDateTimestamp);
+  if (!Number.isSafeInteger(articleId) || articleId < 1 || !title || !writer || !Number.isFinite(writeDate)
+    || item.openArticle !== true || item.blindArticle === true) return null;
+  return {
+    articleId,
+    title,
+    writer,
+    writeDate: writeDate < 1e12 ? writeDate * 1000 : writeDate,
+    commentCount: Math.max(0, Math.floor(Number(item.commentCount) || 0)),
+    url: `https://cafe.naver.com/ca-fe/cafes/${cafeId}/articles/${articleId}`,
+  };
+}
+
+function normalizeCafeCache(value, cafeUrl) {
+  const cache = value && typeof value === 'object' ? value : {};
+  if (cache.sourceUrl && cache.sourceUrl !== cafeUrl) {
+    return { linked: true, cafeUrl, cafeId: '', cafeListUrl: cafeUrl, items: [], totalCount: 0, fetchedAt: null };
+  }
+  const cafeId = /^\d{4,16}$/.test(String(cache.cafeId || '')) ? String(cache.cafeId) : '';
+  const items = cafeId && Array.isArray(cache.items)
+    ? cache.items.map((item) => normalizeCafePost({
+      articleId: item && item.articleId,
+      subject: item && item.title,
+      writerInfo: { nickName: item && item.writer },
+      writeDateTimestamp: item && item.writeDate,
+      commentCount: item && item.commentCount,
+      openArticle: true,
+    }, cafeId)).filter(Boolean).slice(0, CAFE_POST_PREVIEW_SIZE)
+    : [];
+  return {
+    linked: true,
+    cafeUrl,
+    cafeId,
+    cafeListUrl: cafeId ? `https://cafe.naver.com/f-e/cafes/${cafeId}/menus/0?viewType=L` : cafeUrl,
+    items,
+    totalCount: Math.max(items.length, Math.floor(Number(cache.totalCount) || 0)),
+    fetchedAt: Number.isFinite(Number(cache.fetchedAt)) ? Number(cache.fetchedAt) : null,
+  };
+}
+
+async function resolveNaverCafeId(cafe) {
+  if (cafe.type === 'id') return cafe.value;
+  let response;
+  try {
+    response = await fetch(cafe.url, {
+      headers: { accept: 'text/html,application/xhtml+xml', 'user-agent': 'Mozilla/5.0 (compatible; StreamerFanPage/1.0)' },
+      signal: AbortSignal.timeout(12000),
+    });
+  } catch (_) {
+    throw new HttpsError('unavailable', '네이버 카페에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!response.ok || !['cafe.naver.com', 'm.cafe.naver.com', 'www.cafe.naver.com'].includes(new URL(response.url).hostname)) {
+    throw new HttpsError('unavailable', '네이버 카페 주소를 확인할 수 없어요.');
+  }
+  const html = await response.text();
+  const match = /g_sClubId\s*=\s*["'](\d{4,16})["']/.exec(html)
+    || /["'](?:cafeId|clubid)["']\s*:\s*["']?(\d{4,16})/i.exec(html);
+  if (!match) throw new HttpsError('not-found', '네이버 카페를 찾을 수 없어요. 공개 카페 주소인지 확인해 주세요.');
+  return match[1];
+}
+
+async function fetchNaverCafePosts(cafe) {
+  const cafeId = await resolveNaverCafeId(cafe);
+  const url = new URL(`${NAVER_CAFE_API_BASE}/cafes/${cafeId}/menus/0/articles`);
+  url.searchParams.set('page', '1');
+  url.searchParams.set('pageSize', String(CAFE_POST_PREVIEW_SIZE));
+  url.searchParams.set('viewType', 'L');
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        accept: 'application/json',
+        origin: 'https://cafe.naver.com',
+        referer: cafe.url,
+        'user-agent': 'Mozilla/5.0 (compatible; StreamerFanPage/1.0)',
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+  } catch (_) {
+    throw new HttpsError('unavailable', '네이버 카페 글 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!response.ok) {
+    console.warn(`Naver Cafe board list returned HTTP ${response.status}`);
+    throw new HttpsError('unavailable', '네이버 카페 글 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (_) {
+    throw new HttpsError('unavailable', '네이버 카페 글 목록 응답을 읽지 못했어요.');
+  }
+  if (!payload || !payload.result || !Array.isArray(payload.result.articleList)) {
+    throw new HttpsError('unavailable', '네이버 카페 글 목록 형식이 바뀌었어요. 잠시 후 다시 시도해 주세요.');
+  }
+  const result = payload && payload.result && typeof payload.result === 'object' ? payload.result : {};
+  const rows = Array.isArray(result.articleList) ? result.articleList : [];
+  const items = rows.map((row) => normalizeCafePost(row && row.item, cafeId)).filter(Boolean).slice(0, CAFE_POST_PREVIEW_SIZE);
+  const totalCount = Math.max(items.length, Math.floor(Number(result.pageInfo && result.pageInfo.totalArticleCount) || 0));
+  return {
+    linked: true,
+    cafeUrl: cafe.url,
+    cafeId,
+    cafeListUrl: `https://cafe.naver.com/f-e/cafes/${cafeId}/menus/0?viewType=L`,
+    items,
+    totalCount,
+    fetchedAt: Date.now(),
+  };
+}
+
 function youtubeCacheRef(streamerId) {
   return db.ref(`streamerFanPageYouTubeCache/${streamerId}`);
 }
@@ -894,6 +1037,7 @@ function normalizePage(streamer, value) {
     scheduleText: typeof sourceProfile.scheduleText === 'string' ? sourceProfile.scheduleText.slice(0, 120) : '',
     rouletteUrl: cleanHttpsUrl(sourceProfile.rouletteUrl),
     youtubeChannelUrl: parseYouTubeChannelUrl(sourceProfile.youtubeChannelUrl)?.url || '',
+    cafeUrl: parseNaverCafeUrl(sourceProfile.cafeUrl)?.url || '',
   };
   return {
     streamer,
@@ -981,6 +1125,47 @@ exports.streamerFanPageYouTubeVideos = onCall({ secrets: [YOUTUBE_DATA_API_KEY],
     return { youtube, stale: youtube.stale === true, refreshCoolingDown: false };
   } finally {
     if (youtubeFetchInProgress.get(target.streamer.id) === task) youtubeFetchInProgress.delete(target.streamer.id);
+  }
+});
+
+exports.streamerFanPageCafePosts = onCall({ maxInstances: 20 }, async (request) => {
+  requireAuth(request);
+  const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  const cafeUrl = parseNaverCafeUrl((await pageRef(target.streamer.id).child('profile/cafeUrl').get()).val());
+  if (!cafeUrl) {
+    return { cafe: { linked: false, cafeUrl: '', cafeListUrl: '', cafeId: '', items: [], totalCount: 0, fetchedAt: null }, stale: false };
+  }
+
+  const cacheRef = cafeCacheRef(target.streamer.id);
+  const cached = normalizeCafeCache((await cacheRef.get()).val(), cafeUrl.url);
+  const cacheAge = cached.fetchedAt ? Math.max(0, Date.now() - cached.fetchedAt) : Infinity;
+  if (cached.fetchedAt && cacheAge < CAFE_POST_CACHE_TTL_MS) return { cafe: cached, stale: false };
+
+  const inProgress = cafeFetchInProgress.get(target.streamer.id);
+  if (inProgress) return await inProgress;
+
+  const task = (async () => {
+    try {
+      const fresh = await fetchNaverCafePosts(cafeUrl);
+      await cacheRef.set({ ...fresh, sourceUrl: cafeUrl.url });
+      return { cafe: fresh, stale: false };
+    } catch (error) {
+      if (cached.fetchedAt && cached.items.length) {
+        console.warn(`Serving stale Naver Cafe post cache for ${target.streamer.id}.`);
+        return { cafe: cached, stale: true };
+      }
+      if (error instanceof HttpsError) throw error;
+      console.error(`Naver Cafe post preview failed for ${target.streamer.id}:`, error);
+      throw new HttpsError('unavailable', '네이버 카페 글 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+    }
+  })();
+  cafeFetchInProgress.set(target.streamer.id, task);
+  try {
+    return await task;
+  } finally {
+    if (cafeFetchInProgress.get(target.streamer.id) === task) cafeFetchInProgress.delete(target.streamer.id);
   }
 });
 
@@ -1208,6 +1393,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   }
   const updates = { updatedAt: Date.now() };
   let clearYouTubeCache = false;
+  let clearCafeCache = false;
   if (Object.prototype.hasOwnProperty.call(data, 'intro')) {
     if (typeof data.intro !== 'string' || data.intro.length > MAX_INTRO_LENGTH) {
       throw new HttpsError('invalid-argument', `소개는 ${MAX_INTRO_LENGTH}자 이내로 입력해 주세요.`);
@@ -1220,10 +1406,12 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
     if (!profile || typeof profile !== 'object' || Array.isArray(profile)
       || stringFields.some((field) => typeof profile[field] !== 'string')
       || (Object.prototype.hasOwnProperty.call(profile, 'youtubeChannelUrl') && typeof profile.youtubeChannelUrl !== 'string')
+      || (Object.prototype.hasOwnProperty.call(profile, 'cafeUrl') && typeof profile.cafeUrl !== 'string')
       || !Array.isArray(profile.contents)
       || profile.contents.length > 8
       || stringFields.some((field) => profile[field].length > ({ birthday: 20, mbti: 8, major: 50, debutDate: 20, fanNickname: 30, fandomName: 30, scheduleText: 120, rouletteUrl: 300 })[field])
       || (typeof profile.youtubeChannelUrl === 'string' && profile.youtubeChannelUrl.length > 300)
+      || (typeof profile.cafeUrl === 'string' && profile.cafeUrl.length > 300)
       || profile.contents.some((item) => typeof item !== 'string' || item.length > 20)) {
       throw new HttpsError('invalid-argument', '프로필 항목을 확인해 주세요.');
     }
@@ -1246,6 +1434,14 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
     if (youtubeChannelUrlInput && !youtubeChannel) {
       throw new HttpsError('invalid-argument', 'YouTube 채널 링크는 @핸들이나 채널 ID 주소로 입력해 주세요.');
     }
+    const cafeUrlInput = Object.prototype.hasOwnProperty.call(profile, 'cafeUrl')
+      ? profile.cafeUrl.trim()
+      : String(previousProfile.cafeUrl || '').trim();
+    const cafe = cafeUrlInput ? parseNaverCafeUrl(cafeUrlInput) : null;
+    if (cafeUrlInput && !cafe) {
+      throw new HttpsError('invalid-argument', '네이버 카페 링크는 카페 홈 또는 전체글보기 주소로 입력해 주세요.');
+    }
+    const previousCafeUrl = parseNaverCafeUrl(previousProfile.cafeUrl)?.url || '';
     updates.profile = {
       birthday: profile.birthday.trim(),
       mbti: profile.mbti.trim().toUpperCase(),
@@ -1257,8 +1453,10 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       scheduleText: profile.scheduleText.trim(),
       rouletteUrl,
       youtubeChannelUrl: youtubeChannel ? youtubeChannel.url : '',
+      cafeUrl: cafe ? cafe.url : '',
     };
     clearYouTubeCache = hasYouTubeUrl;
+    clearCafeCache = Object.prototype.hasOwnProperty.call(profile, 'cafeUrl') && previousCafeUrl !== (cafe ? cafe.url : '');
   }
   if (!Object.prototype.hasOwnProperty.call(data, 'intro') && !Object.prototype.hasOwnProperty.call(data, 'profile')) {
     throw new HttpsError('invalid-argument', '저장할 내용을 입력해 주세요.');
@@ -1266,6 +1464,9 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   await pageRef(targetStreamer.streamer.id).update(updates);
   if (clearYouTubeCache) {
     await youtubeCacheRef(targetStreamer.streamer.id).remove();
+  }
+  if (clearCafeCache) {
+    await cafeCacheRef(targetStreamer.streamer.id).remove();
   }
   const saved = await pageRef(targetStreamer.streamer.id).get();
   return { page: normalizePage(targetStreamer.streamer, saved.val()) };

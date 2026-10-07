@@ -282,3 +282,24 @@
 .live-stale-note{margin:9px 0 0;color:#b3a5b0;font-size:10px}
 @media(max-width:720px){.live-section{padding:16px}.live-heading h2{font-size:20px}.live-preview-card{grid-template-columns:1fr}.live-preview-details{align-items:flex-start;flex-direction:column;gap:12px;padding:14px}.live-watch-button{width:100%}}
 @media(max-width:420px){.live-heading{align-items:flex-start;flex-direction:column;gap:10px}.live-refresh-button{width:100%}.live-offline-card{align-items:flex-start;flex-wrap:wrap;padding:14px;gap:11px}.live-offline-copy{min-width:calc(100% - 54px);flex-basis:calc(100% - 54px)}.live-station-link{width:100%}}
+
+/* Simple Naver Cafe post preview; article content stays on Naver Cafe. */
+.cafe-section{margin-top:18px}
+.cafe-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:4px}
+.cafe-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.cafe-heading h2{margin:0;font:23px var(--display)}
+.cafe-more-link{flex:none;color:#aaa3b0;font-size:11px;text-decoration:none}
+.cafe-more-link:hover{color:var(--pink)}
+.cafe-post-list{margin-top:8px;border-top:1px solid #ffffff30}
+.cafe-post-row{display:grid;grid-template-columns:minmax(0,1fr) 120px 110px 42px;align-items:center;gap:14px;min-height:43px;padding:9px 5px;border-bottom:1px solid #ffffff12;color:#e6e1e8;text-decoration:none;font-size:12px}
+.cafe-post-row:hover{background:#ffffff07;color:#fff}
+.cafe-post-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cafe-post-title:before{content:'▪';display:inline-block;margin-right:9px;color:#bdb5c1}
+.cafe-post-meta{display:contents}
+.cafe-post-author,.cafe-post-date,.cafe-post-comments{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#aaa3b0;font-size:11px}
+.cafe-post-comments{text-align:center}
+.cafe-status{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin:12px 0 0;padding:17px 12px;color:#aaa3b0;text-align:center;font-size:11px;line-height:1.6}
+.cafe-status.is-error{color:#f2b2c6}
+.cafe-retry-button{min-height:31px;padding:6px 10px;font-size:10px}
+.cafe-stale-note{margin:10px 0 0;color:#f7d890;font-size:10px}
+@media(max-width:600px){.cafe-heading h2{font-size:21px}.cafe-post-row{grid-template-columns:minmax(0,1fr);gap:5px;padding:10px 4px}.cafe-post-meta{display:flex;align-items:center;gap:12px;min-width:0}.cafe-post-author{flex:1}.cafe-post-date,.cafe-post-comments{flex:none}.cafe-post-comments{min-width:24px;text-align:right}}
