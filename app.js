@@ -28,6 +28,7 @@ const callLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
 const callGallery = httpsCallable(functions, 'streamerFanPageGallery');
 const callScheduleAdd = httpsCallable(functions, 'streamerFanPageScheduleAdd');
 const callScheduleDelete = httpsCallable(functions, 'streamerFanPageScheduleDelete');
+const callYouTubeVideos = httpsCallable(functions, 'streamerFanPageYouTubeVideos');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
@@ -48,6 +49,7 @@ const vodRefreshesInProgress = new Set();
 const vodPageLoadsInProgress = new Set();
 const calendarStates = new Map();
 const liveStatusStates = new Map();
+const youtubeStates = new Map();
 let galleryLoadPromise = Promise.resolve();
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
@@ -448,13 +450,17 @@ function renderFanPage(page) {
   if (messengerSection) view.append(messengerSection);
   view.append(renderLiveSection(page));
   view.append(renderVodSection(page));
+  const youtubeSection = renderYouTubeSection(page);
+  if (youtubeSection) view.append(youtubeSection);
   view.append(renderCalendarSection(page));
   const gallerySection = renderGallerySection(page);
   view.append(gallerySection);
   if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
   view.append(renderVodPlayerDialog());
+  if (youtubeSection) view.append(renderYouTubePlayerDialog());
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
+  if (youtubeSection) loadYouTubeVideos(page.streamer.id);
   loadCalendar(page.streamer.id);
 
   if (page.isOwner) {
@@ -470,6 +476,7 @@ function renderFanPage(page) {
       ['birthday', '생일', 20], ['mbti', 'MBTI', 8], ['major', '전공', 50], ['debutDate', '데뷔일', 20],
       ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160],
       ['scheduleText', '방송 시간', 120], ['rouletteUrl', '룰렛 확률 링크', 300],
+      ['youtubeChannelUrl', 'YouTube 채널 링크', 300],
     ];
     const inputMap = {};
     const grid = document.createElement('div'); grid.className = 'profile-editor-grid';
@@ -477,13 +484,19 @@ function renderFanPage(page) {
       const wrapper = document.createElement('label'); wrapper.className = 'profile-editor-field'; wrapper.textContent = labelText;
       const input = key === 'scheduleText' ? document.createElement('textarea') : document.createElement('input');
       input.name = key; input.maxLength = maxLength;
-      if (key === 'rouletteUrl') { input.type = 'url'; input.placeholder = 'https://'; }
+      if (key === 'rouletteUrl' || key === 'youtubeChannelUrl') { input.type = 'url'; input.placeholder = 'https://'; }
       input.value = key === 'contents' ? (profile.contents || []).join(', ') : (profile[key] || '');
       wrapper.append(input);
       if (key === 'rouletteUrl') {
         const hint = document.createElement('small');
         hint.className = 'profile-editor-hint';
         hint.textContent = '주소를 입력하면 버튼이 표시되고, 비워두면 숨겨집니다.';
+        wrapper.append(hint);
+      }
+      if (key === 'youtubeChannelUrl') {
+        const hint = document.createElement('small');
+        hint.className = 'profile-editor-hint';
+        hint.textContent = 'https://www.youtube.com/@핸들 또는 /channel/채널ID 링크를 입력하면 최신 영상 영역이 표시됩니다.';
         wrapper.append(hint);
       }
       grid.append(wrapper); inputMap[key] = input;
@@ -509,10 +522,12 @@ function renderFanPage(page) {
             fanNickname: value('fanNickname'), fandomName: value('fandomName'),
             contents: value('contents').split(',').map((item) => item.trim()).filter(Boolean),
             scheduleText: value('scheduleText'), rouletteUrl: value('rouletteUrl'),
+            youtubeChannelUrl: value('youtubeChannelUrl'),
           },
         });
         currentPage.intro = result.data.page.intro;
         currentPage.profile = result.data.page.profile;
+        youtubeStates.delete(currentPage.streamer.id);
         editorDialog.close();
         renderFanPage(currentPage);
         showToast('프로필을 저장했어요.');
@@ -825,6 +840,138 @@ function renderVodSection(page) {
   }
   section.append(scrollbox);
   return section;
+}
+
+function youtubeStateFor(streamerId) {
+  if (!youtubeStates.has(streamerId)) {
+    youtubeStates.set(streamerId, { loading: false, hasLoaded: false, error: '', stale: false, data: null });
+  }
+  return youtubeStates.get(streamerId);
+}
+
+function renderYouTubeSection(page) {
+  const channelUrl = String(page.profile && page.profile.youtubeChannelUrl || '').trim();
+  if (!channelUrl) return null;
+  const streamerId = page.streamer.id;
+  const state = youtubeStateFor(streamerId);
+  const section = document.createElement('section');
+  section.className = 'youtube-section content-card';
+  section.id = 'youtubeSection';
+
+  const heading = document.createElement('div'); heading.className = 'youtube-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'YOUTUBE VIDEOS';
+  const title = document.createElement('h2'); title.textContent = 'YouTube 영상';
+  const count = document.createElement('span'); count.className = 'vod-count';
+  count.textContent = state.data ? `전체 ${Number(state.data.totalCount || 0).toLocaleString('ko-KR')}개` : '';
+  copy.append(eyebrow, title, count);
+
+  const actions = document.createElement('div'); actions.className = 'youtube-heading-actions';
+  const channel = document.createElement('a'); channel.className = 'button youtube-channel-link';
+  channel.href = channelUrl; channel.target = '_blank'; channel.rel = 'noopener noreferrer';
+  channel.textContent = '채널 보기 ↗';
+  actions.append(channel);
+  if (page.isOwner) {
+    const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'button youtube-refresh-button';
+    refresh.dataset.youtubeFocus = 'refresh';
+    refresh.disabled = state.loading;
+    refresh.textContent = state.loading ? '목록 확인 중…' : '↻ 영상 목록 갱신';
+    refresh.addEventListener('click', () => loadYouTubeVideos(streamerId, true));
+    actions.append(refresh);
+  }
+  heading.append(copy, actions);
+  section.append(heading);
+
+  const status = document.createElement('p'); status.className = 'youtube-status';
+  status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+  if (state.loading && !state.hasLoaded) {
+    status.textContent = '최신 영상을 불러오고 있어요.';
+    section.append(status);
+    return section;
+  }
+  if (state.error && !state.hasLoaded) {
+    status.classList.add('is-error');
+    const message = document.createElement('span'); message.textContent = state.error;
+    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button youtube-retry-button';
+    retry.textContent = '다시 불러오기'; retry.addEventListener('click', () => loadYouTubeVideos(streamerId));
+    status.append(message, retry); section.append(status);
+    return section;
+  }
+  if (state.stale) {
+    status.classList.add('is-stale'); status.textContent = 'YouTube에 연결하지 못해 이전 목록을 표시하고 있어요.';
+    section.append(status);
+  }
+  const videos = state.data && Array.isArray(state.data.items) ? state.data.items : [];
+  if (!videos.length) {
+    const empty = document.createElement('p'); empty.className = 'youtube-empty-state';
+    empty.textContent = state.hasLoaded ? '아직 공개된 YouTube 영상이 없어요.' : '최신 영상을 불러오고 있어요.';
+    section.append(empty);
+    return section;
+  }
+
+  const scrollbox = document.createElement('div'); scrollbox.className = 'youtube-scrollbox vod-scrollbox';
+  const grid = document.createElement('div'); grid.className = 'youtube-grid vod-grid';
+  videos.forEach((video) => {
+    if (!video || !/^[A-Za-z0-9_-]{11}$/.test(String(video.id || ''))) return;
+    const card = document.createElement('button'); card.type = 'button'; card.className = 'vod-card youtube-video-card';
+    card.setAttribute('aria-label', `${video.title || 'YouTube 영상'} 재생`);
+    card.addEventListener('click', () => openYouTubePlayer(video));
+    const frame = document.createElement('span'); frame.className = 'vod-thumbnail-frame youtube-thumbnail-frame';
+    const image = document.createElement('img'); image.className = 'vod-thumbnail';
+    image.src = video.thumbnailUrl || `https://i.ytimg.com/vi/${encodeURIComponent(video.id)}/hqdefault.jpg`;
+    image.alt = ''; image.loading = 'lazy';
+    image.addEventListener('error', () => { image.remove(); frame.classList.add('youtube-thumbnail-missing'); }, { once: true });
+    const play = document.createElement('span'); play.className = 'youtube-play-mark'; play.setAttribute('aria-hidden', 'true'); play.textContent = '▶';
+    frame.append(image, play);
+    const body = document.createElement('span'); body.className = 'vod-copy';
+    const videoTitle = document.createElement('strong'); videoTitle.className = 'vod-title'; videoTitle.textContent = video.title || '제목 없음';
+    const metadata = document.createElement('span'); metadata.className = 'vod-metadata';
+    const date = document.createElement('span');
+    const publishedAt = Date.parse(video.publishedAt || '');
+    date.textContent = Number.isFinite(publishedAt)
+      ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' }).format(new Date(publishedAt))
+      : '날짜 정보 없음';
+    const platform = document.createElement('span'); platform.textContent = 'YouTube';
+    metadata.append(date, platform); body.append(videoTitle, metadata); card.append(frame, body); grid.append(card);
+  });
+  scrollbox.append(grid); section.append(scrollbox);
+  return section;
+}
+
+function refreshYouTubeSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('youtubeSection');
+  if (!section) return;
+  const focused = section.contains(document.activeElement);
+  const replacement = renderYouTubeSection(currentPage);
+  if (!replacement) { section.remove(); return; }
+  section.replaceWith(replacement);
+  if (focused) replacement.querySelector('[data-youtube-focus="refresh"]')?.focus({ preventScroll: true });
+}
+
+async function loadYouTubeVideos(streamerId, forceRefresh = false) {
+  const state = youtubeStateFor(streamerId);
+  if (state.loading) return;
+  state.loading = true;
+  state.error = '';
+  refreshYouTubeSection(streamerId);
+  try {
+    const response = await callYouTubeVideos({ streamerId, forceRefresh });
+    if (!currentPage || currentPage.streamer.id !== streamerId) return;
+    state.data = response.data && response.data.youtube ? response.data.youtube : { items: [], totalCount: 0 };
+    state.stale = response.data && response.data.stale === true;
+    state.hasLoaded = true;
+    if (forceRefresh && state.stale) showToast('YouTube 연결이 원활하지 않아 이전 목록을 유지했어요.');
+    else if (forceRefresh && response.data && response.data.refreshCoolingDown) showToast('잠시 전에 갱신했어요.');
+    else if (forceRefresh) showToast('YouTube 영상 목록을 갱신했어요.');
+  } catch (error) {
+    if (!currentPage || currentPage.streamer.id !== streamerId) return;
+    state.error = error.message || 'YouTube 영상을 불러오지 못했어요.';
+    state.hasLoaded = false;
+  } finally {
+    state.loading = false;
+    refreshYouTubeSection(streamerId);
+  }
 }
 
 function localDateKey(date) {
@@ -1339,6 +1486,41 @@ function openVodPlayer(vod) {
   $('vodPlayerExternalLink').href = `https://vod.sooplive.com/player/${id}`;
   $('vodPlayerFrame').src = `https://vod.sooplive.com/player/${id}/embed?autoPlay=false&mutePlay=true&showChat=false`;
   $('vodPlayerDialog').showModal();
+}
+
+function renderYouTubePlayerDialog() {
+  const dialog = document.createElement('dialog');
+  dialog.id = 'youtubePlayerDialog'; dialog.className = 'account-dialog vod-player-dialog';
+  const card = document.createElement('div'); card.className = 'account-dialog-card vod-player-card';
+  const heading = document.createElement('div'); heading.className = 'vod-player-heading';
+  const title = document.createElement('h2'); title.id = 'youtubePlayerTitle'; title.textContent = 'YouTube 영상';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
+  close.setAttribute('aria-label', 'YouTube 플레이어 닫기'); close.textContent = '×';
+  close.addEventListener('click', () => dialog.close());
+  heading.append(title, close);
+  const frame = document.createElement('div'); frame.className = 'vod-player-frame';
+  const iframe = document.createElement('iframe'); iframe.id = 'youtubePlayerFrame'; iframe.title = 'YouTube 영상 플레이어';
+  iframe.src = 'about:blank';
+  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+  frame.append(iframe);
+  const footer = document.createElement('div'); footer.className = 'vod-player-footer';
+  const note = document.createElement('p'); note.textContent = '영상은 YouTube 공식 플레이어로 재생돼요. 외부 재생이 제한된 영상은 YouTube에서 열어 주세요.';
+  const link = document.createElement('a'); link.id = 'youtubePlayerExternalLink'; link.className = 'button button-primary';
+  link.href = 'https://www.youtube.com/'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'YouTube에서 열기 ↗';
+  footer.append(note, link); card.append(heading, frame, footer); dialog.append(card);
+  dialog.addEventListener('close', () => { iframe.src = 'about:blank'; });
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  return dialog;
+}
+
+function openYouTubePlayer(video) {
+  if (!video || !/^[A-Za-z0-9_-]{11}$/.test(String(video.id || ''))) return;
+  const id = encodeURIComponent(video.id);
+  $('youtubePlayerTitle').textContent = video.title || 'YouTube 영상';
+  $('youtubePlayerExternalLink').href = `https://www.youtube.com/watch?v=${id}`;
+  $('youtubePlayerFrame').src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
+  $('youtubePlayerDialog').showModal();
 }
 
 function replaceVodSectionIfCurrent(streamerId) {

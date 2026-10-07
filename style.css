@@ -124,6 +124,25 @@
 .vod-scrollbox::-webkit-scrollbar{width:8px}
 .vod-scrollbox::-webkit-scrollbar-track{border-radius:8px;background:#ffffff08}
 .vod-scrollbox::-webkit-scrollbar-thumb{border:2px solid #19171f;border-radius:8px;background:#66505f}
+.youtube-section{margin-top:18px}
+.youtube-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.youtube-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.youtube-heading h2{display:inline-block;margin:0;font:23px var(--display)}
+.youtube-heading-actions{display:flex;align-items:center;gap:8px}
+.youtube-channel-link,.youtube-refresh-button{flex:none;white-space:nowrap}
+.youtube-status,.youtube-empty-state{margin:14px 0 0;padding:14px;color:#aaa3b1;text-align:center;font-size:11px;line-height:1.6}
+.youtube-status.is-error{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;color:#f5b3c7}
+.youtube-status.is-stale{padding:0;text-align:left;color:#f7d890;font-size:10px}
+.youtube-retry-button{min-height:32px;padding:6px 10px;font-size:10px}
+.youtube-grid{padding-bottom:3px}
+.youtube-video-card{position:relative}
+.youtube-thumbnail-frame:after{content:none}
+.youtube-thumbnail-missing:after{content:'YOUTUBE';display:grid;position:absolute;inset:0;place-items:center;color:#ffffff55;font:700 11px var(--font);letter-spacing:.18em}
+.youtube-play-mark{position:absolute;left:50%;top:50%;display:grid;place-items:center;width:42px;height:30px;border-radius:9px;background:#e62117e8;color:#fff;font-size:14px;line-height:1;transform:translate(-50%,-50%);pointer-events:none}
+.youtube-video-card:hover .youtube-play-mark{background:#ff251a;transform:translate(-50%,-50%) scale(1.08)}
+.youtube-video-card .vod-metadata span:last-child{color:#f2a4a0}
+@media(max-width:720px){.youtube-heading{align-items:flex-start;flex-direction:column;gap:11px}.youtube-heading h2{font-size:21px}.youtube-heading-actions{width:100%}.youtube-heading-actions .button{flex:1;min-width:0;padding-inline:9px;font-size:11px}.youtube-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+@media(max-width:380px){.youtube-grid{grid-template-columns:1fr}}
 .calendar-section{margin-top:18px}
 .calendar-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
 .calendar-heading .eyebrow{margin:0 0 5px;font-size:9px}
