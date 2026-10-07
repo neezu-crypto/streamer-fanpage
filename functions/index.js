@@ -110,6 +110,25 @@ function normalizeStreamerName(value) {
   return String(value || '').normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ko-KR');
 }
 
+function findStockForStreamer(streamer, stockNames) {
+  const targetName = normalizeStreamerName(streamer && streamer.nickname);
+  if (!targetName || !stockNames || typeof stockNames !== 'object') return null;
+
+  const entries = Object.entries(stockNames)
+    .filter(([id, name]) => /^[A-Za-z0-9_-]{1,128}$/.test(id) && typeof name === 'string' && name.trim())
+    .map(([id, name]) => ({ id, name: name.trim() }));
+  const exactMatches = entries.filter((entry) => normalizeStreamerName(entry.name) === targetName);
+  if (exactMatches.length === 1) return exactMatches[0];
+  if (exactMatches.length > 1) return null;
+
+  // 주식시장에서는 크루 종목을 `[크루명] 닉네임`으로 표시하기도 한다.
+  const crewMatches = entries.filter((entry) => {
+    const withoutCrew = entry.name.replace(/^\[[^\]]{1,60}\]\s*/, '');
+    return withoutCrew !== entry.name && normalizeStreamerName(withoutCrew) === targetName;
+  });
+  return crewMatches.length === 1 ? crewMatches[0] : null;
+}
+
 function isSafeGalleryStreamerId(value) {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 }
@@ -895,15 +914,17 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
 
   const target = await findVerifiedBySoopId(requestedId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
-  const [pageSnap, vods] = await Promise.all([
+  const [pageSnap, vods, stockNamesSnap] = await Promise.all([
     pageRef(target.streamer.id).get(),
     readVodPage(target.streamer.id),
+    db.ref('streamerNames').get(),
     recordRecentVisit(uid, target.streamer.id),
   ]);
+  const stock = findStockForStreamer(target.streamer, stockNamesSnap.val());
   return {
     verifiedStreamer: verified ? verified.streamer : null,
     isAdmin,
-    page: { ...normalizePage(target.streamer, pageSnap.val()), vods },
+    page: { ...normalizePage(target.streamer, pageSnap.val()), vods, stock },
   };
 });
 
