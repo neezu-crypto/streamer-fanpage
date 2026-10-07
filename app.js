@@ -1060,7 +1060,7 @@ function renderCafeSection(page) {
   const heading = document.createElement('div'); heading.className = 'cafe-heading';
   const copy = document.createElement('div');
   const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'NAVER CAFE';
-  const title = document.createElement('h2'); title.textContent = '전체글보기';
+  const title = document.createElement('h2'); title.textContent = '네이버 카페 전체글보기';
   copy.append(eyebrow, title);
   const more = document.createElement('a'); more.className = 'cafe-more-link';
   more.href = (state.data && state.data.cafeListUrl) || cafeUrl;
