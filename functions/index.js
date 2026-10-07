@@ -5,6 +5,7 @@ const { getDatabase } = require('firebase-admin/database');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { createHash, randomUUID } = require('node:crypto');
+const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
 
 initializeApp();
 const db = getDatabase();
@@ -37,6 +38,9 @@ const YOUTUBE_REFRESH_COOLDOWN_MS = 60 * 1000;
 const CAFE_POST_PREVIEW_SIZE = 6;
 const CAFE_POST_CACHE_TTL_MS = 5 * 60 * 1000;
 const NAVER_CAFE_API_BASE = 'https://apis.naver.com/cafe-web/cafe-boardlist-api/v1';
+const WEFLAB_ROULETTE_CACHE_TTL_MS = 60 * 1000;
+const WEFLAB_ROULETTE_REFRESH_COOLDOWN_MS = 30 * 1000;
+const WEFLAB_ROULETTE_MAX_HTML_BYTES = 2 * 1024 * 1024;
 const YOUTUBE_DATA_API_KEY = defineSecret('YOUTUBE_DATA_API_KEY');
 const GALLERY_PUBLIC_IMAGE_HOST = 'pub-aa5574dbd45e4404b18ab8efaae54e67.r2.dev';
 const GALLERY_CATEGORY_LABELS = Object.freeze({
@@ -49,6 +53,7 @@ const GALLERY_CATEGORY_LABELS = Object.freeze({
 const fanpageGalleryMemoryCache = new Map();
 const youtubeFetchInProgress = new Map();
 const cafeFetchInProgress = new Map();
+const weflabRouletteFetchInProgress = new Map();
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -1022,6 +1027,130 @@ async function fetchNaverCafePosts(cafe) {
   };
 }
 
+function weflabRouletteCacheRef(streamerId) {
+  return db.ref(`streamerFanPageRouletteCache/${streamerId}`);
+}
+
+function normalizeWeFlabRouletteData(value, sourceUrl) {
+  if (!value || typeof value !== 'object' || (value.sourceUrl && value.sourceUrl !== sourceUrl)) return null;
+  let remainingItems = 500;
+  const groups = [];
+  for (const group of Array.isArray(value.groups) ? value.groups.slice(0, 50) : []) {
+    if (!group || typeof group !== 'object' || remainingItems <= 0) continue;
+    const items = (Array.isArray(group.items) ? group.items : []).slice(0, remainingItems).map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const type = typeof item.type === 'string' ? item.type.trim().slice(0, 40) : '';
+      const label = typeof item.value === 'string' ? item.value.trim().slice(0, 180) : '';
+      const probability = item.probability === null || item.probability === undefined ? NaN : Number(item.probability);
+      if (!type && !label) return null;
+      return {
+        type: type || '룰렛',
+        value: label || '이름 없음',
+        probability: Number.isFinite(probability) && probability >= 0 && probability <= 100 ? probability : null,
+      };
+    }).filter(Boolean);
+    if (!items.length) continue;
+    remainingItems -= items.length;
+    const counts = (Array.isArray(group.counts) ? group.counts : []).slice(0, 12).map((count) => {
+      if (!count || typeof count !== 'object') return null;
+      const min = Math.floor(Number(count.min));
+      const max = Math.floor(Number(count.max));
+      if (!Number.isSafeInteger(min) || min < 0 || !Number.isSafeInteger(max) || max < min) return null;
+      return {
+        platform: typeof count.platform === 'string' ? count.platform.slice(0, 30) : '',
+        min,
+        max,
+      };
+    }).filter(Boolean);
+    groups.push({ index: groups.length, counts, items });
+  }
+  if (!groups.length) return null;
+  return {
+    linked: true,
+    streamerName: typeof value.streamerName === 'string' ? value.streamerName.slice(0, 60) : '',
+    sourceUpdatedAt: typeof value.sourceUpdatedAt === 'string' ? value.sourceUpdatedAt.slice(0, 80) : '',
+    groups,
+    itemCount: groups.reduce((total, group) => total + group.items.length, 0),
+    fetchedAt: value.fetchedAt !== null && value.fetchedAt !== undefined && Number.isFinite(Number(value.fetchedAt))
+      ? Number(value.fetchedAt)
+      : null,
+  };
+}
+
+async function readLimitedResponseText(response, maxBytes) {
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new HttpsError('resource-exhausted', '위플랩 공개 페이지가 너무 커서 표시할 수 없어요.');
+  }
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let result = '';
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new HttpsError('resource-exhausted', '위플랩 공개 페이지가 너무 커서 표시할 수 없어요.');
+      }
+      result += decoder.decode(value, { stream: true });
+    }
+    return result + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function fetchWeFlabRoulette(sourceUrl) {
+  let response = null;
+  let requestUrl = sourceUrl;
+  const redirectStatuses = new Set([301, 302, 303, 307, 308]);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      response = await fetch(requestUrl, {
+        headers: {
+          accept: 'text/html,application/xhtml+xml',
+          'user-agent': 'Mozilla/5.0 (compatible; StreamerFanPage/1.0)',
+        },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(12000),
+      });
+    } catch (_) {
+      throw new HttpsError('unavailable', '위플랩 룰렛 페이지에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    }
+    if (!redirectStatuses.has(response.status)) break;
+    const location = response.headers.get('location');
+    let nextUrl;
+    try {
+      nextUrl = location ? parseWeFlabRouletteUrl(new URL(location, requestUrl).href) : null;
+    } catch (_) {
+      nextUrl = null;
+    }
+    if (!nextUrl) {
+      throw new HttpsError('unavailable', '위플랩 공유 페이지가 안전한 주소로 연결되지 않았어요.');
+    }
+    requestUrl = nextUrl;
+    response = null;
+  }
+  if (!response || !response.ok || parseWeFlabRouletteUrl(response.url) !== sourceUrl) {
+    console.warn(`WeFlab roulette page returned HTTP ${response ? response.status : 'no response'}.`);
+    throw new HttpsError('unavailable', '위플랩 공개 페이지에 연결할 수 없어요. 링크를 확인해 주세요.');
+  }
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  if (contentType && !contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
+    throw new HttpsError('unavailable', '위플랩 룰렛 페이지 응답 형식이 올바르지 않아요.');
+  }
+  const html = await readLimitedResponseText(response, WEFLAB_ROULETTE_MAX_HTML_BYTES);
+  const parsed = parseWeFlabRouletteHtml(html);
+  if (!parsed) {
+    throw new HttpsError('unavailable', '위플랩 룰렛 항목을 읽지 못했어요. 페이지 구조가 바뀌었을 수 있습니다.');
+  }
+  return normalizeWeFlabRouletteData({ ...parsed, fetchedAt: Date.now() }, sourceUrl);
+}
+
 function youtubeCacheRef(streamerId) {
   return db.ref(`streamerFanPageYouTubeCache/${streamerId}`);
 }
@@ -1348,6 +1477,63 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
     isAdmin,
     page: { ...normalizePage(target.streamer, pageSnap.val()), vods, stock },
   };
+});
+
+exports.streamerFanPageRoulette = onCall({ maxInstances: 20 }, async (request) => {
+  requireAuth(request);
+  const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+
+  const configuredUrl = (await pageRef(target.streamer.id).child('profile/rouletteUrl').get()).val();
+  const sourceUrl = parseWeFlabRouletteUrl(configuredUrl);
+  if (!sourceUrl) {
+    return {
+      roulette: { linked: false, streamerName: '', sourceUpdatedAt: '', groups: [], itemCount: 0, fetchedAt: null },
+      stale: false,
+    };
+  }
+
+  const cacheRef = weflabRouletteCacheRef(target.streamer.id);
+  const cached = normalizeWeFlabRouletteData((await cacheRef.get()).val(), sourceUrl);
+  const cacheAge = cached && cached.fetchedAt ? Math.max(0, Date.now() - cached.fetchedAt) : Infinity;
+  const forceRefresh = request.data && request.data.forceRefresh === true;
+  if (cached && !forceRefresh && cacheAge < WEFLAB_ROULETTE_CACHE_TTL_MS) {
+    return { roulette: cached, stale: false, refreshCoolingDown: false };
+  }
+  if (cached && forceRefresh && cacheAge < WEFLAB_ROULETTE_REFRESH_COOLDOWN_MS) {
+    return { roulette: cached, stale: false, refreshCoolingDown: true };
+  }
+
+  const requestKey = `${target.streamer.id}:${sourceUrl}`;
+  const inProgress = weflabRouletteFetchInProgress.get(requestKey);
+  if (inProgress) return await inProgress;
+
+  const task = (async () => {
+    try {
+      const fresh = await fetchWeFlabRoulette(sourceUrl);
+      try {
+        await cacheRef.set({ ...fresh, sourceUrl });
+      } catch (cacheError) {
+        console.warn(`Could not cache WeFlab roulette data for ${target.streamer.id}:`, cacheError);
+      }
+      return { roulette: fresh, stale: false, refreshCoolingDown: false };
+    } catch (error) {
+      if (cached && cached.itemCount > 0) {
+        console.warn(`Serving stale WeFlab roulette cache for ${target.streamer.id}:`, error);
+        return { roulette: cached, stale: true, refreshCoolingDown: false };
+      }
+      if (error instanceof HttpsError) throw error;
+      console.error(`WeFlab roulette fetch failed for ${target.streamer.id}:`, error);
+      throw new HttpsError('unavailable', '위플랩 룰렛 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+    }
+  })();
+  weflabRouletteFetchInProgress.set(requestKey, task);
+  try {
+    return await task;
+  } finally {
+    if (weflabRouletteFetchInProgress.get(requestKey) === task) weflabRouletteFetchInProgress.delete(requestKey);
+  }
 });
 
 exports.streamerFanPageYouTubeVideos = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
@@ -1892,6 +2078,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   const updates = { updatedAt: Date.now() };
   let clearYouTubeCache = false;
   let clearCafeCache = false;
+  let clearRouletteCache = false;
   if (Object.prototype.hasOwnProperty.call(data, 'intro')) {
     if (typeof data.intro !== 'string' || data.intro.length > MAX_INTRO_LENGTH) {
       throw new HttpsError('invalid-argument', `소개는 ${MAX_INTRO_LENGTH}자 이내로 입력해 주세요.`);
@@ -1915,6 +2102,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
     }
     const hasYouTubeUrl = Object.prototype.hasOwnProperty.call(profile, 'youtubeChannelUrl');
     const previousProfile = (await pageRef(targetStreamer.streamer.id).child('profile').get()).val() || {};
+    const previousRouletteUrl = parseWeFlabRouletteUrl(previousProfile.rouletteUrl) || '';
     let rouletteUrl = profile.rouletteUrl.trim();
     if (rouletteUrl) {
       try {
@@ -1940,6 +2128,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       throw new HttpsError('invalid-argument', '네이버 카페 링크는 카페 홈 또는 전체글보기 주소로 입력해 주세요.');
     }
     const previousCafeUrl = parseNaverCafeUrl(previousProfile.cafeUrl)?.url || '';
+    clearRouletteCache = previousRouletteUrl !== (parseWeFlabRouletteUrl(rouletteUrl) || '');
     updates.profile = {
       birthday: profile.birthday.trim(),
       mbti: profile.mbti.trim().toUpperCase(),
@@ -1965,6 +2154,9 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   }
   if (clearCafeCache) {
     await cafeCacheRef(targetStreamer.streamer.id).remove();
+  }
+  if (clearRouletteCache) {
+    await weflabRouletteCacheRef(targetStreamer.streamer.id).remove();
   }
   const saved = await pageRef(targetStreamer.streamer.id).get();
   return { page: normalizePage(targetStreamer.streamer, saved.val()) };
