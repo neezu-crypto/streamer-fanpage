@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261007-vod-chat">
+  <link rel="stylesheet" href="style.css?v=20261007-admin-stats">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -46,6 +46,7 @@
         <span class="topbar-caption"><i></i>인증 스트리머 페이지</span>
         <div class="auth-actions" id="authActions">
           <span class="account-status" id="accountStatus">로그인 확인 중</span>
+          <button class="auth-button hidden" id="openAdminStats" type="button">팬페이지 통계</button>
           <button class="auth-button login-options-button" id="openLoginOptions" type="button">로그인</button>
           <button class="auth-button logout-button hidden" id="logoutButton" type="button">로그아웃</button>
         </div>
@@ -124,7 +125,25 @@
       </div>
     </div>
   </dialog>
+  <dialog id="adminStatsDialog" class="account-dialog admin-stats-dialog" aria-labelledby="adminStatsTitle">
+    <section class="account-dialog-card admin-stats-dialog-card">
+      <div class="admin-stats-heading">
+        <div><p class="eyebrow">FANPAGE ADMIN</p><h2 id="adminStatsTitle">팬페이지 통계</h2></div>
+        <button class="button profile-settings-close" id="closeAdminStats" type="button" aria-label="통계 닫기">×</button>
+      </div>
+      <div class="admin-stats-toolbar">
+        <label class="hidden" for="adminStatsSearch">스트리머 검색</label>
+        <input id="adminStatsSearch" type="search" maxlength="40" aria-label="스트리머 닉네임 또는 SOOP 아이디 검색" placeholder="스트리머 닉네임 또는 SOOP 아이디 검색" autocomplete="off">
+        <button class="button" id="refreshAdminStats" type="button">↻ 새로고침</button>
+      </div>
+      <p class="admin-stats-status" id="adminStatsStatus" role="status" aria-live="polite">관리자 통계를 불러옵니다.</p>
+      <p class="admin-stats-note">집계는 기능 적용 후부터 시작하며 관리자와 해당 스트리머 본인의 열람은 제외합니다. 일별 순방문은 한국 날짜별 계정 중복을 제외한 합계예요.</p>
+      <div class="admin-stats-summary" id="adminStatsSummary"></div>
+      <div class="admin-stats-list-heading"><strong>스트리머별 집계</strong><span id="adminStatsStreamerCount"></span></div>
+      <div class="admin-stats-list" id="adminStatsList"></div>
+    </section>
+  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261007-vod-chat"></script>
+  <script type="module" src="app.js?v=20261007-admin-stats"></script>
 </body>
 </html>

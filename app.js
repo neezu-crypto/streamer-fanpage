@@ -20,6 +20,7 @@ const functions = getFunctions(app, 'us-central1');
 const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
 const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
 const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
+const callAdminStats = httpsCallable(functions, 'streamerFanPageAdminStats');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
 const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
 const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh', { timeout: 3600000 });
@@ -45,6 +46,9 @@ let liveStatusTimer = 0;
 let stockPriceUnsubscribe = null;
 let stockPriceSparklineRequest = 0;
 let verifiedStreamerUid = '';
+let isAdminUser = false;
+let adminStatsLoading = false;
+let adminStatsData = null;
 let verifiedStatusUnsubscribe = null;
 let switchApprovalUnsubscribe = null;
 let switchHandoffInProgress = false;
@@ -105,6 +109,7 @@ function renderAuthControls() {
       : googleLinked
         ? 'Google 계정 연결됨'
         : '카카오 계정 연결됨';
+  $('openAdminStats').classList.toggle('hidden', !isAdminUser);
   $('openLoginOptions').classList.toggle('hidden', !!(user && (!user.isAnonymous || kakaoLinked || streamerVerified)));
   $('choiceGoogleLogin').classList.toggle('hidden', googleLinked);
   $('choiceGoogleLogin').textContent = user && !user.isAnonymous ? 'Google 계정 연결' : 'Google로 로그인';
@@ -333,6 +338,114 @@ function renderList(container, items, recent = false, emptyText = '검색 결과
     return;
   }
   items.forEach((item) => container.append(streamerCard(item, recent)));
+}
+function formatStatCount(value) {
+  return Math.max(0, Math.floor(Number(value) || 0)).toLocaleString('ko-KR');
+}
+function renderAdminStatsList(streamers) {
+  const container = $('adminStatsList');
+  const query = $('adminStatsSearch').value.trim().toLocaleLowerCase('ko-KR');
+  const allStreamers = Array.isArray(streamers) ? streamers : [];
+  const filtered = allStreamers.filter((streamer) =>
+    !query || streamer.nickname.toLocaleLowerCase('ko-KR').includes(query)
+      || streamer.soopId.toLocaleLowerCase().includes(query));
+  container.replaceChildren();
+  $('adminStatsStreamerCount').textContent = query
+    ? `${filtered.length.toLocaleString('ko-KR')} / ${allStreamers.length.toLocaleString('ko-KR')}명`
+    : `${filtered.length.toLocaleString('ko-KR')}명`;
+  if (!filtered.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state admin-stats-empty';
+    empty.textContent = query ? '검색 결과가 없어요.' : '집계할 인증 스트리머가 없어요.';
+    container.append(empty);
+    return;
+  }
+
+  for (const streamer of filtered) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'admin-stat-card';
+    card.setAttribute('aria-label', `${streamer.nickname} 팬페이지 열기`);
+    card.addEventListener('click', () => {
+      $('adminStatsDialog').close();
+      if (routeId() !== streamer.id) goPage(streamer.id);
+    });
+
+    const identity = document.createElement('span'); identity.className = 'admin-stat-identity';
+    const avatar = document.createElement('img'); avatar.className = 'avatar';
+    setImage(avatar, streamer.avatarUrl, streamer.nickname);
+    const name = document.createElement('span'); name.className = 'admin-stat-name';
+    const nickname = document.createElement('strong'); nickname.textContent = streamer.nickname;
+    const soopId = document.createElement('small'); soopId.textContent = `@${streamer.soopId}`;
+    name.append(nickname, soopId); identity.append(avatar, name);
+
+    const metrics = document.createElement('span'); metrics.className = 'admin-stat-metrics';
+    [
+      ['누적 조회', streamer.totalViews],
+      ['최근 7일', streamer.last7Views],
+      ['최근 30일', streamer.last30Views],
+      ['일별 순방문 합', streamer.last30DailyUniqueVisitors],
+    ].forEach(([label, value]) => {
+      const metric = document.createElement('span'); metric.className = 'admin-stat-metric';
+      const metricLabel = document.createElement('small'); metricLabel.textContent = label;
+      const metricValue = document.createElement('strong'); metricValue.textContent = formatStatCount(value);
+      metric.append(metricLabel, metricValue); metrics.append(metric);
+    });
+
+    const chart = document.createElement('span');
+    chart.className = 'admin-stat-sparkline';
+    chart.setAttribute('aria-label', '최근 30일 하루별 조회 추이');
+    const daily = Array.isArray(streamer.daily) ? streamer.daily : [];
+    const maxViews = Math.max(0, ...daily.map((day) => Number(day.views) || 0));
+    daily.forEach((day) => {
+      const bar = document.createElement('span');
+      const views = Math.max(0, Number(day.views) || 0);
+      bar.style.height = `${maxViews ? Math.max(5, views / maxViews * 100) : 5}%`;
+      bar.title = `${day.date}: 조회 ${formatStatCount(views)}회 · 일별 순방문 ${formatStatCount(day.uniqueVisitors)}명`;
+      chart.append(bar);
+    });
+    card.append(identity, metrics, chart);
+    container.append(card);
+  }
+}
+function renderAdminStats(data) {
+  const totals = data && data.totals ? data.totals : {};
+  $('adminStatsSummary').replaceChildren();
+  [
+    ['인증 스트리머', `${formatStatCount(totals.streamerCount)}명`],
+    ['누적 조회', `${formatStatCount(totals.totalViews)}회`],
+    ['최근 7일 조회', `${formatStatCount(totals.last7Views)}회`],
+    ['최근 30일 조회', `${formatStatCount(totals.last30Views)}회`],
+  ].forEach(([label, value]) => {
+    const tile = document.createElement('div'); tile.className = 'admin-stats-tile';
+    const title = document.createElement('span'); title.textContent = label;
+    const count = document.createElement('strong'); count.textContent = value;
+    tile.append(title, count); $('adminStatsSummary').append(tile);
+  });
+  renderAdminStatsList(data && data.streamers);
+}
+async function loadAdminStats() {
+  if (!isAdminUser || adminStatsLoading) return;
+  adminStatsLoading = true;
+  $('refreshAdminStats').disabled = true;
+  $('refreshAdminStats').textContent = '불러오는 중…';
+  $('adminStatsStatus').textContent = '스트리머별 집계를 불러오고 있어요.';
+  try {
+    const result = await callAdminStats();
+    if (!isAdminUser) return;
+    adminStatsData = result.data;
+    renderAdminStats(adminStatsData);
+    const generatedAt = Number(adminStatsData.generatedAt);
+    $('adminStatsStatus').textContent = Number.isFinite(generatedAt)
+      ? `최근 집계 ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(generatedAt))} · 최근 30일 기준`
+      : '최근 30일 기준 집계예요.';
+  } catch (error) {
+    $('adminStatsStatus').textContent = error.message || '통계를 불러오지 못했어요.';
+  } finally {
+    adminStatsLoading = false;
+    $('refreshAdminStats').disabled = false;
+    $('refreshAdminStats').textContent = '↻ 새로고침';
+  }
 }
 async function waitForPageAssets() {
   const images = [...document.querySelectorAll('#mainContent img')]
@@ -1881,6 +1994,7 @@ async function loadApp() {
       requestedId = result.redirectTo;
       result = (await callBootstrap({ streamerId: requestedId })).data;
     }
+    isAdminUser = result.isAdmin === true;
     verifiedStreamerUid = result.verifiedStreamer ? auth.currentUser.uid : '';
     renderAuthControls();
     if (requestedId && !result.page) throw new Error('팬페이지를 찾을 수 없습니다.');
@@ -1928,6 +2042,19 @@ $('streamerVerificationForm').addEventListener('submit', (event) => {
   submitOrCheckStreamerVerification(false);
 });
 $('logoutButton').addEventListener('click', logout);
+$('openAdminStats').addEventListener('click', () => {
+  if (!isAdminUser) return;
+  $('adminStatsDialog').showModal();
+  loadAdminStats();
+});
+$('closeAdminStats').addEventListener('click', () => $('adminStatsDialog').close());
+$('adminStatsDialog').addEventListener('click', (event) => {
+  if (event.target === $('adminStatsDialog')) $('adminStatsDialog').close();
+});
+$('refreshAdminStats').addEventListener('click', loadAdminStats);
+$('adminStatsSearch').addEventListener('input', () => {
+  if (adminStatsData) renderAdminStatsList(adminStatsData.streamers);
+});
 window.addEventListener('hashchange', loadApp);
 loadApp();
 

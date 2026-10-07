@@ -128,6 +128,45 @@
 .vod-player-footer .button{flex:none}
 @media(max-width:560px){.vod-player-card{padding:13px}.vod-player-heading h2{font-size:15px}.vod-player-footer{align-items:stretch;flex-direction:column}.vod-player-footer .button{width:100%}}
 
+/* Administrator-only fanpage statistics */
+.admin-stats-dialog{width:min(980px,calc(100% - 24px));max-width:none;max-height:calc(100dvh - 24px);overflow:hidden}
+.admin-stats-dialog-card{display:flex;max-height:calc(100dvh - 26px);flex-direction:column;padding:22px}
+.admin-stats-heading,.admin-stats-toolbar,.admin-stats-list-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.admin-stats-heading{margin-bottom:16px}
+.admin-stats-heading .eyebrow{margin-bottom:6px}
+.admin-stats-heading h2{margin:0;font:24px var(--display)}
+.admin-stats-toolbar{margin-bottom:12px}
+.admin-stats-toolbar input{width:min(440px,100%);height:40px;padding:0 12px;border:1px solid #ffffff20;border-radius:9px;outline:0;background:#15131c;color:var(--text);font:12px var(--font)}
+.admin-stats-toolbar input:focus{border-color:#f58cac99;box-shadow:0 0 0 3px #f58cac16}
+.admin-stats-toolbar .button{flex:none}
+.admin-stats-status{min-height:18px;margin:0 0 12px;color:#aaa3b1;font-size:10px}
+.admin-stats-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:18px}
+.admin-stats-tile{min-width:0;padding:12px;border:1px solid #ffffff14;border-radius:11px;background:#ffffff05}
+.admin-stats-tile span,.admin-stats-tile strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-stats-tile span{color:#aaa3b1;font-size:10px}
+.admin-stats-tile strong{margin-top:6px;font:20px var(--display)}
+.admin-stats-list-heading{margin-bottom:9px;color:#e9e2ed;font-size:12px}
+.admin-stats-list-heading span{color:#968e9c;font-size:10px}
+.admin-stats-list{display:grid;flex:1 1 auto;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-height:100px;max-height:58vh;overflow-y:auto;padding:1px 5px 2px 1px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
+.admin-stats-note{margin:0 0 12px!important;color:#938b9a!important;font-size:10px!important;line-height:1.6}
+.admin-stat-card{display:grid;min-width:0;gap:10px;padding:12px;border:1px solid #ffffff14;border-radius:12px;background:#ffffff05;color:var(--text);text-align:left;transition:border-color .15s,background .15s}
+.admin-stat-card:hover,.admin-stat-card:focus-visible{border-color:#f58cac70;background:#f58cac0b}
+.admin-stat-identity{display:flex;align-items:center;gap:9px;min-width:0}
+.admin-stat-identity .avatar{width:35px;height:35px;flex-basis:35px}
+.admin-stat-name{display:block;min-width:0}
+.admin-stat-name strong,.admin-stat-name small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-stat-name strong{font-size:12px}
+.admin-stat-name small{margin-top:3px;color:#968e9c;font-size:10px}
+.admin-stat-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.admin-stat-metric{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:6px;padding:7px 8px;border-radius:8px;background:#00000020}
+.admin-stat-metric small{overflow:hidden;color:#aaa3b1;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.admin-stat-metric strong{font-size:11px;white-space:nowrap}
+.admin-stat-sparkline{display:flex;height:28px;align-items:flex-end;gap:2px;overflow:hidden}
+.admin-stat-sparkline span{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#f58cac,#b76b88);opacity:.85}
+.admin-stats-empty{grid-column:1/-1}
+@media(max-width:720px){.admin-stats-dialog-card{padding:17px}.admin-stats-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-stats-list{grid-template-columns:1fr;max-height:55vh}}
+@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}}
+
 /* Scrollable replay area and SOOP schedule calendar */
 .vod-scrollbox{max-height:min(72vh,680px);overflow-y:auto;overscroll-behavior:contain;padding:0 8px 4px 0;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
 .vod-scrollbox::-webkit-scrollbar{width:8px}
