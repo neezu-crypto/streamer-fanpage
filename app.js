@@ -43,6 +43,7 @@ let searchTimer = 0;
 let toastTimer = 0;
 let liveStatusTimer = 0;
 let stockPriceUnsubscribe = null;
+let stockPriceSparklineRequest = 0;
 let verifiedStreamerUid = '';
 let verifiedStatusUnsubscribe = null;
 let switchApprovalUnsubscribe = null;
@@ -356,6 +357,7 @@ function setVisibleView(page) {
     stockPriceUnsubscribe();
     stockPriceUnsubscribe = null;
   }
+  if (!page) stockPriceSparklineRequest += 1;
   $('homeView').classList.toggle('hidden', !!page);
   $('fanPageView').classList.toggle('hidden', !page);
   $('devbar').classList.toggle('hidden', !!page);
@@ -372,6 +374,7 @@ function renderFanPage(page) {
     stockPriceUnsubscribe();
     stockPriceUnsubscribe = null;
   }
+  stockPriceSparklineRequest += 1;
   currentPage = page;
   const view = $('fanPageView');
   view.replaceChildren();
@@ -584,26 +587,116 @@ function renderStreamerStockPrice(page) {
   meta.textContent = stock ? `${stock.name} · 출처: 스트리머 주식시장` : '종목 정보를 찾을 수 없어요 · 출처: 스트리머 주식시장';
   copy.append(eyebrow, title, meta);
 
+  const chart = document.createElement('span'); chart.className = 'profile-stock-chart';
+  chart.setAttribute('aria-label', '최근 주가 흐름');
   const price = document.createElement('strong'); price.className = 'profile-stock-price';
   price.textContent = stock ? '불러오는 중…' : '종목 미등록';
+  const change = document.createElement('span'); change.className = 'profile-stock-change';
+  change.textContent = stock ? '0.00%' : '';
+  const quote = document.createElement('span'); quote.className = 'profile-stock-quote';
+  quote.append(price, change);
   const arrow = document.createElement('span'); arrow.className = 'profile-stock-arrow'; arrow.setAttribute('aria-hidden', 'true'); arrow.textContent = '↗';
-  link.append(copy, price, arrow);
+  link.append(copy, chart, quote, arrow);
 
   if (stock) {
+    const requestId = stockPriceSparklineRequest;
+    let latestPrice = null;
+    let history = [];
+    let pendingTicks = [];
+    let historySeeded = false;
+
+    const recordPrice = (value) => {
+      if (!history.length || history[history.length - 1] !== value) {
+        history.push(value);
+        if (history.length > 20) history.shift();
+      }
+    };
+    const drawQuote = () => {
+      const points = history.length >= 2
+        ? history.slice(-20)
+        : latestPrice === null ? [] : [latestPrice, latestPrice];
+      if (points.length) {
+        const min = Math.min(...points);
+        const max = Math.max(...points);
+        const range = max - min || 1;
+        const coordinates = points.map((value, index) => {
+          const x = points.length === 1 ? 2 : 2 + (index / (points.length - 1)) * 96;
+          const y = 32 - ((value - min) / range) * 28;
+          return `${x},${y}`;
+        }).join(' ');
+        const isUp = points[points.length - 1] >= points[0];
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 100 36');
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.classList.add('profile-stock-sparkline');
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        line.setAttribute('points', coordinates);
+        line.classList.add('profile-stock-sparkline-line', isUp ? 'is-up' : 'is-down');
+        svg.append(line);
+        chart.replaceChildren(svg);
+        chart.classList.toggle('is-up', isUp);
+        chart.classList.toggle('is-down', !isUp);
+      }
+
+      if (latestPrice !== null) price.textContent = `${latestPrice.toLocaleString('ko-KR')}원`;
+      const baseline = history.length >= 2 ? history[0] : latestPrice;
+      const latest = history.length >= 2 ? history[history.length - 1] : latestPrice;
+      const percent = baseline > 0 && latest !== null ? ((latest - baseline) / baseline) * 100 : 0;
+      const isUp = percent >= 0;
+      change.textContent = `${isUp ? '+' : ''}${percent.toFixed(2)}%`;
+      change.classList.toggle('is-up', isUp);
+      change.classList.toggle('is-down', !isUp);
+    };
+
     stockPriceUnsubscribe = onValue(ref(db, `stocksPublic/${stock.id}`), (snapshot) => {
       const value = snapshot.val();
       const currentPrice = Number(value && value.price);
       if (!snapshot.exists() || !value || value.price === null || value.price === '' || !Number.isFinite(currentPrice)) {
         price.textContent = '주가를 불러올 수 없어요';
+        change.textContent = '';
+        chart.replaceChildren();
         return;
       }
-      price.textContent = `${currentPrice.toLocaleString('ko-KR')}원`;
+      latestPrice = currentPrice;
+      if (historySeeded) recordPrice(currentPrice);
+      else if (!pendingTicks.length || pendingTicks[pendingTicks.length - 1] !== currentPrice) {
+        pendingTicks.push(currentPrice);
+        if (pendingTicks.length > 20) pendingTicks.shift();
+      }
+      drawQuote();
       if (typeof value.name === 'string' && value.name.trim()) {
         meta.textContent = `${value.name.trim()} · 출처: 스트리머 주식시장`;
       }
     }, () => {
       price.textContent = '주가를 불러올 수 없어요';
+      change.textContent = '';
+      chart.replaceChildren();
     });
+
+    get(ref(db, `sparklines/${stock.id}`)).then((snapshot) => {
+      if (requestId !== stockPriceSparklineRequest) return;
+      const saved = snapshot.val();
+      history = Array.isArray(saved)
+        ? saved.map(Number).filter((item) => Number.isFinite(item) && item > 0).slice(-20)
+        : [];
+      pendingTicks.forEach(recordPrice);
+      pendingTicks = [];
+      if (latestPrice !== null) recordPrice(latestPrice);
+      historySeeded = true;
+      drawQuote();
+    }).catch(() => {
+      if (requestId !== stockPriceSparklineRequest) return;
+      historySeeded = true;
+      pendingTicks.forEach(recordPrice);
+      pendingTicks = [];
+      if (latestPrice !== null) recordPrice(latestPrice);
+      drawQuote();
+    });
+  } else {
+    link.classList.add('is-unavailable');
+    chart.hidden = true;
+    change.hidden = true;
   }
   return link;
 }
