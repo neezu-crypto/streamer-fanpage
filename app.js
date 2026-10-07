@@ -2670,8 +2670,9 @@ async function submitOrCheckStreamerVerification(checkOnly, renewOnly = false) {
     }
     if (result.action === 'pending') {
       const note = $('verificationNote');
-      note.hidden = !!result.isSwitch;
-      if (!result.isSwitch) {
+      const canSendNote = result.noteEligible === true || (!result.isSwitch && result.noteEligible !== false);
+      note.hidden = !canSendNote;
+      if (canSendNote) {
         const code = Number(result.verificationCodeExpiresAt) > Date.now()
           ? result.verificationCode || (checkOnly ? previousCode : '') : '';
         const codeButton = $('verificationNoteCode');
@@ -2683,9 +2684,13 @@ async function submitOrCheckStreamerVerification(checkOnly, renewOnly = false) {
           catch (_) { $('verificationNoteStatus').textContent = '코드를 선택해 직접 복사해주세요.'; }
         };
       }
-      status.textContent = checkOnly
-        ? `${result.nickname || '스트리머'} 인증은 아직 검토 중이에요. 승인 후 다시 확인해 주세요.`
-        : '인증 신청을 접수했어요. SOOP 쪽지의 발신자 아이디와 코드를 대조해 자동 승인합니다.';
+      status.textContent = result.isSwitch
+        ? (canSendNote
+          ? '계정 전환 신청이 접수됐어요. 기존 인증 스트리머의 SOOP 아이디로 코드를 보내면 확인 후 이 기기에서도 기존 계정으로 전환됩니다.'
+          : '계정 전환 신청은 관리자 수동 검수가 필요합니다.')
+        : checkOnly
+          ? `${result.nickname || '스트리머'} 인증은 아직 검토 중이에요. 승인 후 다시 확인해 주세요.`
+          : '인증 신청을 접수했어요. SOOP 쪽지의 발신자 아이디와 코드를 대조해 자동 승인합니다.';
       return;
     }
     throw new Error('인증 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
