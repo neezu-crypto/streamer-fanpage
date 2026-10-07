@@ -4,12 +4,13 @@ const { initializeApp } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
-const { randomUUID } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 
 initializeApp();
 const db = getDatabase();
 const MAX_INTRO_LENGTH = 700;
 const RECENT_PAGE_LIMIT = 8;
+const FANPAGE_STATS_DAYS = 30;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const SOOP_VOD_PAGE_SIZE = 60;
 const FANPAGE_VOD_PAGE_SIZE = 24;
@@ -104,6 +105,58 @@ async function recordRecentVisit(uid, streamerId) {
     visits.slice(0, visits.length - RECENT_PAGE_LIMIT).forEach(([id]) => { updates[id] = null; });
     await ref.update(updates);
   }
+}
+
+function fanPageStatsDateKey(timestamp = Date.now()) {
+  return new Date(timestamp + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function metricCount(value) {
+  const count = Math.floor(Number(value) || 0);
+  return Number.isSafeInteger(count) && count > 0 ? count : 0;
+}
+
+async function pruneFanPageDailyStats(streamerId, today) {
+  const cutoffDate = new Date(`${today}T00:00:00Z`);
+  cutoffDate.setUTCDate(cutoffDate.getUTCDate() - (FANPAGE_STATS_DAYS - 1));
+  const cutoff = fanPageStatsDateKey(cutoffDate.getTime());
+  const datesRef = db.ref(`streamerFanPageStats/${streamerId}/dailyVisitorDates`);
+  const dates = (await datesRef.get()).val() || {};
+  const expiredDates = Object.keys(dates).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date) && date < cutoff);
+  if (!expiredDates.length) return;
+
+  const updates = {};
+  for (const date of expiredDates) {
+    updates[`streamerFanPageStats/${streamerId}/daily/${date}`] = null;
+    updates[`streamerFanPageStats/${streamerId}/dailyVisitorDates/${date}`] = null;
+    updates[`streamerFanPageDailyVisitors/${streamerId}/${date}`] = null;
+  }
+  await db.ref().update(updates);
+}
+
+async function recordFanPageView(uid, streamerId) {
+  const now = Date.now();
+  const date = fanPageStatsDateKey(now);
+  const visitorHash = createHash('sha256').update(`${streamerId}:${uid}`).digest('hex');
+  const statsRef = db.ref(`streamerFanPageStats/${streamerId}`);
+  const dailyRef = statsRef.child(`daily/${date}`);
+  const markerRef = db.ref(`streamerFanPageDailyVisitors/${streamerId}/${date}/${visitorHash}`);
+  const [visitorResult] = await Promise.all([
+    markerRef.transaction((current) => current === true ? undefined : true),
+    statsRef.child(`dailyVisitorDates/${date}`).set(true),
+  ]);
+
+  await Promise.all([
+    statsRef.child('summary/totalViews').transaction((current) => metricCount(current) + 1),
+    dailyRef.transaction((current) => {
+      const record = current && typeof current === 'object' ? current : {};
+      return {
+        views: metricCount(record.views) + 1,
+        uniqueVisitors: metricCount(record.uniqueVisitors) + (visitorResult.committed ? 1 : 0),
+      };
+    }),
+  ]);
+  await pruneFanPageDailyStats(streamerId, date);
 }
 
 function pageRef(streamerId) {
@@ -1063,6 +1116,11 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
     readVodPage(target.streamer.id),
     db.ref('streamerNames').get(),
     recordRecentVisit(uid, target.streamer.id),
+    ...(!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)
+      ? [recordFanPageView(uid, target.streamer.id).catch((error) => {
+        console.warn('Could not record the fanpage view:', error);
+      })]
+      : []),
   ]);
   const stock = findStockForStreamer(target.streamer, stockNamesSnap.val());
   return {
@@ -1375,6 +1433,64 @@ exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => 
     return record ? { ...record.streamer, visitedAt: visit.visitedAt } : null;
   }));
   return { streamers: streamers.filter(Boolean) };
+});
+
+exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request) => {
+  const uid = requireAuth(request);
+  if (!await isAdminUid(uid)) {
+    throw new HttpsError('permission-denied', '관리자만 팬페이지 통계를 볼 수 있습니다.');
+  }
+
+  const [verifiedSnap, statsSnap] = await Promise.all([
+    db.ref('streamerVerifications').get(),
+    db.ref('streamerFanPageStats').get(),
+  ]);
+  const verifiedById = new Map();
+  Object.entries(verifiedSnap.val() || {}).forEach(([key, record]) => {
+    const streamer = publicStreamer(key, record);
+    if (streamer) verifiedById.set(streamer.id, streamer);
+  });
+
+  const today = new Date(`${fanPageStatsDateKey()}T00:00:00Z`);
+  const dateKeys = Array.from({ length: FANPAGE_STATS_DAYS }, (_, index) =>
+    fanPageStatsDateKey(today.getTime() - (FANPAGE_STATS_DAYS - index - 1) * 24 * 60 * 60 * 1000));
+  const statsById = statsSnap.val() || {};
+  const streamers = [...verifiedById.values()].map((streamer) => {
+    const record = statsById[streamer.id] && typeof statsById[streamer.id] === 'object'
+      ? statsById[streamer.id]
+      : {};
+    const dailyRecords = record.daily && typeof record.daily === 'object' ? record.daily : {};
+    const daily = dateKeys.map((date) => {
+      const day = dailyRecords[date] && typeof dailyRecords[date] === 'object' ? dailyRecords[date] : {};
+      return {
+        date,
+        views: metricCount(day.views),
+        uniqueVisitors: metricCount(day.uniqueVisitors),
+      };
+    });
+    const last7 = daily.slice(-7);
+    return {
+      ...streamer,
+      totalViews: metricCount(record.summary && record.summary.totalViews),
+      last7Views: last7.reduce((total, day) => total + day.views, 0),
+      last30Views: daily.reduce((total, day) => total + day.views, 0),
+      last30DailyUniqueVisitors: daily.reduce((total, day) => total + day.uniqueVisitors, 0),
+      daily,
+    };
+  }).sort((a, b) => b.last30Views - a.last30Views
+    || b.totalViews - a.totalViews
+    || a.nickname.localeCompare(b.nickname, 'ko'));
+
+  return {
+    generatedAt: Date.now(),
+    totals: {
+      streamerCount: streamers.length,
+      totalViews: streamers.reduce((total, streamer) => total + streamer.totalViews, 0),
+      last7Views: streamers.reduce((total, streamer) => total + streamer.last7Views, 0),
+      last30Views: streamers.reduce((total, streamer) => total + streamer.last30Views, 0),
+    },
+    streamers,
+  };
 });
 
 exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
