@@ -41,6 +41,7 @@ let currentPage = null;
 let searchTimer = 0;
 let toastTimer = 0;
 let liveStatusTimer = 0;
+let stockPriceUnsubscribe = null;
 let verifiedStreamerUid = '';
 let verifiedStatusUnsubscribe = null;
 let switchApprovalUnsubscribe = null;
@@ -349,6 +350,10 @@ function setVisibleView(page) {
     window.clearInterval(liveStatusTimer);
     liveStatusTimer = 0;
   }
+  if (!page && stockPriceUnsubscribe) {
+    stockPriceUnsubscribe();
+    stockPriceUnsubscribe = null;
+  }
   $('homeView').classList.toggle('hidden', !!page);
   $('fanPageView').classList.toggle('hidden', !page);
   $('devbar').classList.toggle('hidden', !!page);
@@ -361,6 +366,10 @@ function setVisibleView(page) {
 function renderFanPage(page) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
+  if (stockPriceUnsubscribe) {
+    stockPriceUnsubscribe();
+    stockPriceUnsubscribe = null;
+  }
   currentPage = page;
   const view = $('fanPageView');
   view.replaceChildren();
@@ -424,6 +433,7 @@ function renderFanPage(page) {
     const description = document.createElement('span'); description.className = 'profile-detail-value'; description.textContent = value || '미등록';
     item.append(term, description); details.append(item);
   });
+  const stockCard = renderStreamerStockPrice(page);
 
   const actions = document.createElement('div'); actions.className = 'profile-actions';
   const soop = document.createElement('a');
@@ -443,7 +453,7 @@ function renderFanPage(page) {
   }
   section.append(label, identity, facts);
   if (about) section.append(about);
-  section.append(details, actions);
+  section.append(details, stockCard, actions);
   if (!page.isOwner) view.append(back);
   view.append(section);
   const messengerSection = renderMessengerSection(page);
@@ -539,6 +549,50 @@ function renderFanPage(page) {
     editorDialog.addEventListener('click', (event) => { if (event.target === editorDialog) editorDialog.close(); });
     view.append(editorDialog);
   }
+}
+
+function renderStreamerStockPrice(page) {
+  const stock = page.stock && typeof page.stock.id === 'string' ? page.stock : null;
+  const link = document.createElement('a');
+  link.className = 'profile-stock-card';
+  link.href = stock
+    ? `https://neezu-crypto.github.io/soop-stock-market/index.html?stockId=${encodeURIComponent(stock.id)}`
+    : 'https://neezu-crypto.github.io/soop-stock-market/';
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.setAttribute('aria-label', `${page.streamer.nickname} 주가, 스트리머 주식시장 바로가기`);
+
+  const copy = document.createElement('span'); copy.className = 'profile-stock-copy';
+  const eyebrow = document.createElement('span'); eyebrow.className = 'profile-stock-eyebrow';
+  eyebrow.textContent = 'STREAMER STOCK';
+  const title = document.createElement('strong');
+  title.textContent = page.isStreamerOwner ? '현재 내 주가' : '현재 주가';
+  const meta = document.createElement('span'); meta.className = 'profile-stock-meta';
+  meta.textContent = stock ? `${stock.name} · 출처: 스트리머 주식시장` : '종목 정보를 찾을 수 없어요 · 출처: 스트리머 주식시장';
+  copy.append(eyebrow, title, meta);
+
+  const price = document.createElement('strong'); price.className = 'profile-stock-price';
+  price.textContent = stock ? '불러오는 중…' : '종목 미등록';
+  const arrow = document.createElement('span'); arrow.className = 'profile-stock-arrow'; arrow.setAttribute('aria-hidden', 'true'); arrow.textContent = '↗';
+  link.append(copy, price, arrow);
+
+  if (stock) {
+    stockPriceUnsubscribe = onValue(ref(db, `stocksPublic/${stock.id}`), (snapshot) => {
+      const value = snapshot.val();
+      const currentPrice = Number(value && value.price);
+      if (!snapshot.exists() || !value || value.price === null || value.price === '' || !Number.isFinite(currentPrice)) {
+        price.textContent = '주가를 불러올 수 없어요';
+        return;
+      }
+      price.textContent = `${currentPrice.toLocaleString('ko-KR')}원`;
+      if (typeof value.name === 'string' && value.name.trim()) {
+        meta.textContent = `${value.name.trim()} · 출처: 스트리머 주식시장`;
+      }
+    }, () => {
+      price.textContent = '주가를 불러올 수 없어요';
+    });
+  }
+  return link;
 }
 
 function renderMessengerSection(page) {
