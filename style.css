@@ -303,3 +303,18 @@
 .cafe-retry-button{min-height:31px;padding:6px 10px;font-size:10px}
 .cafe-stale-note{margin:10px 0 0;color:#f7d890;font-size:10px}
 @media(max-width:600px){.cafe-heading h2{font-size:21px}.cafe-post-row{grid-template-columns:minmax(0,1fr);gap:5px;padding:10px 4px}.cafe-post-meta{display:flex;align-items:center;gap:12px;min-width:0}.cafe-post-author{flex:1}.cafe-post-date,.cafe-post-comments{flex:none}.cafe-post-comments{min-width:24px;text-align:right}}
+
+/* Streamer stock quote with the stock market's recent-trade sparkline. */
+.profile-stock-card{grid-template-columns:minmax(0,1fr) 112px auto 22px}
+.profile-stock-card.is-unavailable{grid-template-columns:minmax(0,1fr) auto 22px}
+.profile-stock-chart{display:block;width:112px;height:38px;overflow:hidden}
+.profile-stock-sparkline{display:block;width:100%;height:100%;overflow:visible}
+.profile-stock-sparkline-line{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.profile-stock-sparkline-line.is-up{stroke:#ef4444}
+.profile-stock-sparkline-line.is-down{stroke:#3b82f6}
+.profile-stock-quote{display:grid;justify-items:end;gap:2px}
+.profile-stock-change{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.profile-stock-change.is-up{color:#ef4444}
+.profile-stock-change.is-down{color:#3b82f6}
+@media(max-width:720px){.profile-stock-card{grid-template-columns:minmax(0,1fr) 68px auto 15px;gap:8px;padding:13px}.profile-stock-chart{width:68px;height:32px}.profile-stock-copy>strong{font-size:17px}.profile-stock-meta{font-size:9px}.profile-stock-price{font-size:18px}.profile-stock-change{font-size:11px}}
+@media(max-width:420px){.profile-stock-card{grid-template-columns:minmax(0,1fr) 50px auto 12px;gap:6px;padding:11px}.profile-stock-chart{width:50px;height:30px}.profile-stock-price{font-size:16px}.profile-stock-change{font-size:10px}}
