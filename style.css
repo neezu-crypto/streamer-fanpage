@@ -621,3 +621,12 @@
 #fanPageView.fanpage-theme-sora .roulette-donation-count{color:#CADBFF}
 #fanPageView.fanpage-theme-sora .roulette-item-type{border-color:#6387D155;color:#CADBFF}
 #fanPageView.fanpage-theme-sora .roulette-item-meter-fill{background:#6387D1}
+
+#fanPageView.fanpage-theme-sora .fan-character-card{position:relative;isolation:isolate;display:flex;align-items:center;min-height:190px;overflow:hidden;margin-top:18px;padding:24px clamp(22px,4vw,42px);border:1px solid #6387D155;border-radius:20px;background:radial-gradient(ellipse at 82% 45%,#6387D12d,transparent 38%),linear-gradient(115deg,#202532,#1a1d28);box-shadow:0 18px 48px #0003}
+#fanPageView.fanpage-theme-sora .fan-character-card::before{position:absolute;z-index:-1;right:12%;top:-86px;width:230px;height:230px;border:1px solid #CADBFF18;border-radius:50%;content:"";box-shadow:0 0 0 24px #CADBFF08,0 0 0 48px #CADBFF05}
+#fanPageView.fanpage-theme-sora .fan-character-copy{position:relative;z-index:1;max-width:62%}
+#fanPageView.fanpage-theme-sora .fan-character-copy .eyebrow{margin:0 0 8px;color:#CADBFF}
+#fanPageView.fanpage-theme-sora .fan-character-copy h2{margin:0;font:clamp(21px,3vw,30px)/1.25 var(--display)}
+#fanPageView.fanpage-theme-sora .fan-character-image{position:absolute;right:clamp(12px,4vw,40px);bottom:0;width:min(34%,300px);height:calc(100% - 8px);object-fit:contain;object-position:bottom right;filter:drop-shadow(0 8px 20px #6387D144)}
+@media(max-width:720px){#fanPageView.fanpage-theme-sora .fan-character-card{min-height:158px;margin-top:14px;padding:19px 145px 19px 19px;border-radius:17px}#fanPageView.fanpage-theme-sora .fan-character-copy{max-width:100%}#fanPageView.fanpage-theme-sora .fan-character-copy .eyebrow{font-size:8px;letter-spacing:.15em}#fanPageView.fanpage-theme-sora .fan-character-copy h2{font-size:20px}#fanPageView.fanpage-theme-sora .fan-character-image{right:5px;width:142px;height:calc(100% - 4px)}}
+@media(max-width:390px){#fanPageView.fanpage-theme-sora .fan-character-card{min-height:140px;padding-right:116px}#fanPageView.fanpage-theme-sora .fan-character-image{width:116px}#fanPageView.fanpage-theme-sora .fan-character-copy h2{font-size:18px}}
