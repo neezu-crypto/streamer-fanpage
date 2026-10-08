@@ -562,13 +562,13 @@ function renderUpboSection(page) {
   const copy = document.createElement('div');
   const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'SUPPORT REWARDS';
   const title = document.createElement('h2'); title.textContent = '업보 정리';
-  const subtitle = document.createElement('p'); subtitle.className = 'upbo-subtitle'; subtitle.textContent = '주제별 누적 후원 내역과 약속한 보상을 확인해 보세요.';
+  const subtitle = document.createElement('p'); subtitle.className = 'upbo-subtitle'; subtitle.textContent = '누적 공약·개인 보상·시청자별 후원 내역을 주제별로 정리해요.';
   copy.append(eyebrow, title, subtitle);
   const actions = document.createElement('div'); actions.className = 'upbo-heading-actions';
   const refresh = upboButton(state.loadingTopics ? '불러오는 중…' : '↻ 새로고침', 'upbo-refresh-button', () => loadUpboTopics(page.streamer.id));
   refresh.disabled = state.loadingTopics || state.loadingTopic || state.saving;
   actions.append(refresh);
-  if (state.canManage) {
+  if (state.canManage && state.topics.length) {
     const addTopic = upboButton('+ 주제 추가', 'button-primary upbo-add-topic', () => openUpboTopicEditor(page));
     addTopic.disabled = state.saving; actions.append(addTopic);
   }
@@ -584,10 +584,13 @@ function renderUpboSection(page) {
   }
   if (!state.topics.length) {
     const empty = document.createElement('div'); empty.className = 'upbo-empty';
-    const message = document.createElement('p'); message.textContent = state.canManage
-      ? '주제를 만들고 누적 후원 공약과 시청자별 보상을 정리해 보세요.'
-      : '아직 공개된 업보 정리가 없어요.';
-    empty.append(message);
+    const mark = document.createElement('span'); mark.className = 'upbo-empty-mark'; mark.setAttribute('aria-hidden', 'true'); mark.textContent = '✳';
+    const copy = document.createElement('div'); copy.className = 'upbo-empty-copy';
+    const message = document.createElement('strong'); message.textContent = state.canManage ? '아직 정리된 주제가 없어요.' : '아직 공개된 업보 정리가 없어요.';
+    const description = document.createElement('p'); description.textContent = state.canManage
+      ? '주제별 누적 공약, 개인 보상 구간, 시청자별 후원 기록을 한곳에 정리해 보세요.'
+      : '스트리머가 누적 후원 공약과 시청자별 보상 내역을 정리하면 여기에 표시됩니다.';
+    copy.append(message, description); empty.append(mark, copy);
     if (state.canManage) empty.append(upboButton('첫 주제 만들기', 'button-primary', () => openUpboTopicEditor(page)));
     section.append(empty); return section;
   }
@@ -633,24 +636,26 @@ function renderUpboSection(page) {
     const error = document.createElement('p'); error.className = 'upbo-status is-error'; error.textContent = state.error; section.append(error);
   }
 
+  const rangeGrid = document.createElement('div'); rangeGrid.className = 'upbo-range-grid';
   if (topic.promises.length || state.canManage) {
-    const promises = document.createElement('section'); promises.className = 'upbo-subsection';
+    const promises = document.createElement('section'); promises.className = 'upbo-range-panel';
     const subheading = document.createElement('div'); subheading.className = 'upbo-subsection-heading';
     const subTitle = document.createElement('h4'); subTitle.textContent = '후원 총 누적 공약'; subheading.append(subTitle);
     if (!topic.promises.length) {
       const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 등록된 공약이 없어요.'; promises.append(subheading, empty);
     } else promises.append(subheading, renderUpboRangeTable(topic.promises, 'promise'));
-    section.append(promises);
+    rangeGrid.append(promises);
   }
   if (topic.rewardTiers.length || state.canManage) {
-    const rewards = document.createElement('section'); rewards.className = 'upbo-subsection';
+    const rewards = document.createElement('section'); rewards.className = 'upbo-range-panel';
     const subheading = document.createElement('div'); subheading.className = 'upbo-subsection-heading';
     const subTitle = document.createElement('h4'); subTitle.textContent = '개인 누적 후원 보상'; subheading.append(subTitle);
     if (!topic.rewardTiers.length) {
       const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 등록된 보상 구간이 없어요.'; rewards.append(subheading, empty);
     } else rewards.append(subheading, renderUpboRangeTable(topic.rewardTiers, 'reward'));
-    section.append(rewards);
+    rangeGrid.append(rewards);
   }
+  if (rangeGrid.childElementCount) section.append(rangeGrid);
 
   const viewersSection = document.createElement('section'); viewersSection.className = 'upbo-subsection upbo-viewers-section';
   const viewersHeading = document.createElement('div'); viewersHeading.className = 'upbo-subsection-heading';
