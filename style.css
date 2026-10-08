@@ -507,6 +507,20 @@
 .cafe-stale-note{margin:10px 0 0;color:#f7d890;font-size:10px}
 @media(max-width:600px){.cafe-heading h2{font-size:21px}.cafe-post-row{grid-template-columns:minmax(0,1fr);gap:5px;padding:10px 4px}.cafe-post-meta{display:flex;align-items:center;gap:12px;min-width:0}.cafe-post-author{flex:1}.cafe-post-date,.cafe-post-comments{flex:none}.cafe-post-comments{min-width:24px;text-align:right}}
 
+/* Link-driven fanpage sections stay visible and let their owner configure them inline. */
+.profile-link-empty-state{margin:14px 0 0;padding:20px 14px;border:1px dashed #ffffff20;border-radius:11px;background:#ffffff04;color:#aaa3b1;font-size:12px;line-height:1.65;text-align:center}
+.profile-link-editor{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:9px 10px;margin-top:14px;padding:14px;border:1px solid #f58cac35;border-radius:12px;background:#f58cac08}
+.profile-link-editor label{grid-column:1/-1;color:#e5dce8;font-size:12px;font-weight:700}
+.profile-link-editor input{width:100%;min-width:0;height:40px;padding:0 11px;border:1px solid #ffffff20;border-radius:9px;outline:0;background:#111018;color:var(--text);font:13px var(--font)}
+.profile-link-editor input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.profile-link-editor .button{min-width:110px;min-height:40px;white-space:nowrap}
+.profile-link-editor-note,.profile-link-editor-status{grid-column:1/-1;margin:0;color:#928a9a;font-size:11px;line-height:1.55}
+.profile-link-editor-status:empty{display:none}
+.profile-link-editor-status.is-error{color:#f2b2c6}
+.profile-link-edit-button{flex:none;white-space:nowrap}
+.cafe-heading-actions{display:flex;align-items:center;gap:10px}
+@media(max-width:560px){.profile-link-editor{grid-template-columns:minmax(0,1fr) auto;padding:12px}.profile-link-editor .button{min-width:92px;padding-inline:11px}.cafe-heading-actions{gap:8px}.cafe-heading-actions .button{padding:8px 10px;font-size:10px}}
+
 /* Streamer stock quote with the stock market's recent-trade sparkline. */
 .profile-stock-module{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;gap:12px;min-width:0}
 .profile-stock-module .profile-stock-card{grid-column:auto;min-width:0}

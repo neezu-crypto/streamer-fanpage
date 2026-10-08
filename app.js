@@ -1037,18 +1037,20 @@ function renderFanPage(page) {
   const stockCard = renderStreamerStockPrice(page);
 
   const actions = document.createElement('div'); actions.className = 'profile-actions';
+  actions.id = 'profileActions';
   const soop = document.createElement('a');
   soop.className = 'button'; soop.href = page.streamer.soopUrl; soop.target = '_blank';
   soop.rel = 'noopener noreferrer'; soop.textContent = 'SOOP 방송국 ↗';
   actions.append(soop);
   if (profile.rouletteUrl) {
     const roulette = document.createElement('a');
+    roulette.id = 'profileRouletteLink';
     roulette.className = 'button button-primary'; roulette.href = profile.rouletteUrl;
     roulette.target = '_blank'; roulette.rel = 'noopener noreferrer'; roulette.textContent = '룰렛 확률 ↗';
     actions.append(roulette);
   }
   if (page.isOwner) {
-    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'button'; edit.textContent = '⚙ 설정';
+    const edit = document.createElement('button'); edit.id = 'profileSettingsButton'; edit.type = 'button'; edit.className = 'button'; edit.textContent = '⚙ 설정';
     edit.addEventListener('click', () => $('profileSettingsDialog').showModal());
     actions.append(edit);
   }
@@ -1076,8 +1078,8 @@ function renderFanPage(page) {
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
-  if (youtubeSection) loadYouTubeVideos(page.streamer.id);
-  if (cafeSection) loadCafePosts(page.streamer.id);
+  if (page.profile && page.profile.youtubeChannelUrl) loadYouTubeVideos(page.streamer.id);
+  if (page.profile && page.profile.cafeUrl) loadCafePosts(page.streamer.id);
   loadCalendar(page.streamer.id);
   loadUpboTopics(page.streamer.id);
 
@@ -1168,22 +1170,145 @@ function renderFanPage(page) {
   }
 }
 
+function refreshProfileRouletteAction(page) {
+  const actions = $('profileActions');
+  if (!actions) return;
+  actions.querySelector('#profileRouletteLink')?.remove();
+  const url = String(page.profile && page.profile.rouletteUrl || '').trim();
+  if (!url) return;
+  const link = document.createElement('a');
+  link.id = 'profileRouletteLink'; link.className = 'button button-primary';
+  link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+  link.textContent = '룰렛 확률 ↗';
+  const settings = $('profileSettingsButton');
+  actions.insertBefore(link, settings || null);
+}
+
+function profileForLinkSave(source, field, value) {
+  const profile = source || {};
+  const saved = {
+    birthday: String(profile.birthday || ''), mbti: String(profile.mbti || ''),
+    major: String(profile.major || ''), debutDate: String(profile.debutDate || ''),
+    fanNickname: String(profile.fanNickname || ''), fandomName: String(profile.fandomName || ''),
+    contents: Array.isArray(profile.contents) ? profile.contents.filter((item) => typeof item === 'string').slice(0, 8) : [],
+    scheduleText: String(profile.scheduleText || ''), rouletteUrl: String(profile.rouletteUrl || ''),
+  };
+  saved[field] = value;
+  return saved;
+}
+
+function normalizeProfileLink(field, value) {
+  const link = String(value || '').trim();
+  if (!link) return '';
+  let parsed;
+  try { parsed = new URL(link); } catch (_) { throw new Error('링크 주소를 확인해 주세요.'); }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+    throw new Error('HTTPS 링크를 입력해 주세요.');
+  }
+  if (field === 'rouletteUrl') {
+    if (!['weflab.com', 'www.weflab.com'].includes(parsed.hostname) || parsed.port
+      || !/^\/user\/[A-Za-z0-9_-]{4,128}\/?$/.test(parsed.pathname)) {
+      throw new Error('위플랩 공개 룰렛 사용자 링크를 입력해 주세요.');
+    }
+    return `https://weflab.com${parsed.pathname.replace(/\/$/, '')}`;
+  }
+  return parsed.href;
+}
+
+function createProfileLinkEditor(page, field, options) {
+  const hasLink = options.hasLink === undefined ? !!options.value : options.hasLink;
+  const form = document.createElement('form');
+  form.className = 'profile-link-editor';
+  if (hasLink) form.classList.add('hidden');
+  const label = document.createElement('label');
+  label.textContent = options.label;
+  const input = document.createElement('input');
+  input.type = 'url'; input.name = field; input.maxLength = 300;
+  input.placeholder = options.placeholder; input.value = options.value || '';
+  input.autocomplete = 'url'; input.setAttribute('aria-label', options.label);
+  const save = document.createElement('button');
+  save.type = 'submit'; save.className = 'button button-primary';
+  save.textContent = '링크 저장';
+  const note = document.createElement('small');
+  note.className = 'profile-link-editor-note'; note.textContent = options.note;
+  const status = document.createElement('p');
+  status.className = 'profile-link-editor-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+  form.append(label, input, save, note, status);
+
+  let toggleButton = null;
+  if (hasLink) {
+    toggleButton = document.createElement('button');
+    toggleButton.type = 'button'; toggleButton.className = 'button profile-link-edit-button';
+    toggleButton.textContent = '링크 수정';
+    toggleButton.addEventListener('click', () => {
+      const opening = form.classList.contains('hidden');
+      form.classList.toggle('hidden', !opening);
+      if (opening) input.focus();
+    });
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!page.isOwner || save.disabled) return;
+    if (!input.checkValidity()) { input.reportValidity(); return; }
+    let value;
+    try { value = normalizeProfileLink(field, input.value); }
+    catch (error) { status.textContent = error.message; status.classList.add('is-error'); input.focus(); return; }
+    save.disabled = true; save.textContent = '저장 중…';
+    status.textContent = ''; status.classList.remove('is-error');
+    try {
+      const result = await callSave({
+        streamerId: page.streamer.id,
+        profile: profileForLinkSave(page.profile, field, value),
+      });
+      if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+      currentPage.profile = result.data.page.profile;
+      page.profile = currentPage.profile;
+      const settingsInput = document.querySelector(`#profileSettingsDialog [name="${field}"]`);
+      if (settingsInput) settingsInput.value = currentPage.profile[field] || '';
+      if (field === 'rouletteUrl') {
+        refreshProfileRouletteAction(currentPage);
+        rouletteStates.delete(page.streamer.id);
+        refreshRouletteSection(page.streamer.id);
+      } else if (field === 'youtubeChannelUrl') {
+        youtubeStates.delete(page.streamer.id);
+        refreshYouTubeSection(page.streamer.id);
+        if (value) loadYouTubeVideos(page.streamer.id);
+      } else if (field === 'cafeUrl') {
+        cafeStates.delete(page.streamer.id);
+        refreshCafeSection(page.streamer.id);
+        if (value) loadCafePosts(page.streamer.id);
+      }
+      showToast('링크를 저장했어요.');
+    } catch (error) {
+      status.textContent = error.message || '링크를 저장하지 못했어요.';
+      status.classList.add('is-error');
+    } finally {
+      save.disabled = false; save.textContent = '링크 저장';
+    }
+  });
+
+  return { element: form, toggleButton };
+}
+
 function renderRouletteSection(page) {
   const profile = page.profile || {};
+  const configuredUrl = String(profile.rouletteUrl || '').trim();
   let rouletteUrl;
   try {
-    const parsed = new URL(profile.rouletteUrl || '');
+    const parsed = new URL(configuredUrl);
     if (parsed.protocol !== 'https:'
       || !['weflab.com', 'www.weflab.com'].includes(parsed.hostname)
       || !/^\/user\/[A-Za-z0-9_-]{4,128}\/?$/.test(parsed.pathname)
-      || parsed.username || parsed.password || parsed.port) return null;
+      || parsed.username || parsed.password || parsed.port) throw new Error('invalid WeFlab URL');
     rouletteUrl = `https://weflab.com${parsed.pathname.replace(/\/$/, '')}`;
   } catch (_) {
-    return null;
+    rouletteUrl = '';
   }
 
   const section = document.createElement('section');
   section.className = 'content-card roulette-section';
+  section.id = 'rouletteSection';
   section.dataset.streamerId = page.streamer.id;
   const heading = document.createElement('div');
   heading.className = 'roulette-heading';
@@ -1196,24 +1321,41 @@ function renderRouletteSection(page) {
   title.textContent = '룰렛 확률';
   const description = document.createElement('p');
   description.className = 'roulette-description';
-  description.textContent = `${page.streamer.nickname}님이 위플랩에서 공유한 룰렛 확률입니다.`;
+  description.textContent = `${page.streamer.nickname}님의 공개 룰렛 확률을 팬페이지 디자인으로 표시합니다.`;
   copy.append(eyebrow, title, description);
 
-  const openLink = document.createElement('a');
-  openLink.className = 'button roulette-open-link';
-  openLink.href = rouletteUrl;
-  openLink.target = '_blank';
-  openLink.rel = 'noopener noreferrer';
-  openLink.textContent = '위플랩에서 열기 ↗';
   const controls = document.createElement('div');
   controls.className = 'roulette-controls';
-  const refreshButton = document.createElement('button');
-  refreshButton.type = 'button';
-  refreshButton.className = 'button roulette-refresh-button';
-  refreshButton.textContent = '↻ 목록 새로고침';
-  refreshButton.addEventListener('click', () => loadRouletteData(section, page.streamer.id, true));
-  controls.append(openLink, refreshButton);
+  const editor = page.isOwner ? createProfileLinkEditor(page, 'rouletteUrl', {
+    label: '위플랩 공개 룰렛 링크', placeholder: 'https://weflab.com/user/아이디',
+    note: '공개 룰렛 사용자 페이지 링크를 입력하면 확률표를 불러옵니다.',
+    value: configuredUrl, hasLink: !!rouletteUrl,
+  }) : null;
+  if (rouletteUrl) {
+    const openLink = document.createElement('a');
+    openLink.className = 'button roulette-open-link';
+    openLink.href = rouletteUrl;
+    openLink.target = '_blank';
+    openLink.rel = 'noopener noreferrer';
+    openLink.textContent = '위플랩에서 열기 ↗';
+    const refreshButton = document.createElement('button');
+    refreshButton.type = 'button';
+    refreshButton.className = 'button roulette-refresh-button';
+    refreshButton.textContent = '↻ 목록 새로고침';
+    refreshButton.addEventListener('click', () => loadRouletteData(section, page.streamer.id, true));
+    controls.append(openLink, refreshButton);
+  }
+  if (editor && editor.toggleButton) controls.append(editor.toggleButton);
   heading.append(copy, controls);
+
+  if (!rouletteUrl) {
+    const empty = document.createElement('p');
+    empty.className = 'profile-link-empty-state';
+    empty.textContent = '룰렛 링크가 아직 등록되지 않았어요.';
+    section.append(heading, empty);
+    if (editor) section.append(editor.element);
+    return section;
+  }
 
   const status = document.createElement('p');
   status.className = 'roulette-status';
@@ -1228,9 +1370,17 @@ function renderRouletteSection(page) {
   note.className = 'roulette-scroll-note';
   note.textContent = '위플랩에서 공개한 항목과 확률을 팬페이지에 맞춰 표시합니다.';
   section.append(heading, status, viewport, note);
+  if (editor) section.append(editor.element);
   renderRouletteData(section, rouletteStates.get(page.streamer.id) || { loading: true });
   loadRouletteData(section, page.streamer.id, false);
   return section;
+}
+
+function refreshRouletteSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('rouletteSection');
+  if (!section) return;
+  section.replaceWith(renderRouletteSection(currentPage));
 }
 
 function formatRouletteDateTime(timestamp) {
@@ -1835,9 +1985,12 @@ function youtubeStateFor(streamerId) {
 
 function renderYouTubeSection(page) {
   const channelUrl = String(page.profile && page.profile.youtubeChannelUrl || '').trim();
-  if (!channelUrl) return null;
   const streamerId = page.streamer.id;
   const state = youtubeStateFor(streamerId);
+  const editor = page.isOwner ? createProfileLinkEditor(page, 'youtubeChannelUrl', {
+    label: 'YouTube 채널 링크', placeholder: 'https://www.youtube.com/@채널명',
+    note: '채널 또는 사용자 URL을 입력하면 공개 영상 목록을 표시합니다.', value: channelUrl,
+  }) : null;
   const section = document.createElement('section');
   section.className = 'youtube-section content-card';
   section.id = 'youtubeSection';
@@ -1847,15 +2000,18 @@ function renderYouTubeSection(page) {
   const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'YOUTUBE VIDEOS';
   const title = document.createElement('h2'); title.textContent = 'YouTube 영상';
   const count = document.createElement('span'); count.className = 'vod-count';
-  count.textContent = state.data ? `전체 ${Number(state.data.totalCount || 0).toLocaleString('ko-KR')}개` : '';
+  count.textContent = channelUrl && state.data ? `전체 ${Number(state.data.totalCount || 0).toLocaleString('ko-KR')}개` : '';
   copy.append(eyebrow, title, count);
 
   const actions = document.createElement('div'); actions.className = 'youtube-heading-actions';
-  const channel = document.createElement('a'); channel.className = 'button youtube-channel-link';
-  channel.href = channelUrl; channel.target = '_blank'; channel.rel = 'noopener noreferrer';
-  channel.textContent = '채널 보기 ↗';
-  actions.append(channel);
-  if (page.isOwner) {
+  if (channelUrl) {
+    const channel = document.createElement('a'); channel.className = 'button youtube-channel-link';
+    channel.href = channelUrl; channel.target = '_blank'; channel.rel = 'noopener noreferrer';
+    channel.textContent = '채널 보기 ↗';
+    actions.append(channel);
+  }
+  if (editor && editor.toggleButton) actions.append(editor.toggleButton);
+  if (page.isOwner && channelUrl) {
     const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'button youtube-refresh-button';
     refresh.dataset.youtubeFocus = 'refresh';
     refresh.disabled = state.loading;
@@ -1865,6 +2021,16 @@ function renderYouTubeSection(page) {
   }
   heading.append(copy, actions);
   section.append(heading);
+
+  if (!channelUrl) {
+    const empty = document.createElement('p');
+    empty.className = 'profile-link-empty-state';
+    empty.textContent = 'YouTube 채널 링크가 아직 등록되지 않았어요.';
+    section.append(empty);
+    if (editor) section.append(editor.element);
+    return section;
+  }
+  if (editor) section.append(editor.element);
 
   const status = document.createElement('p'); status.className = 'youtube-status';
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
@@ -1973,9 +2139,12 @@ function cafeStateFor(streamerId) {
 
 function renderCafeSection(page) {
   const cafeUrl = String(page.profile && page.profile.cafeUrl || '').trim();
-  if (!cafeUrl) return null;
   const streamerId = page.streamer.id;
   const state = cafeStateFor(streamerId);
+  const editor = page.isOwner ? createProfileLinkEditor(page, 'cafeUrl', {
+    label: '네이버 카페 주소', placeholder: 'https://cafe.naver.com/카페주소',
+    note: '카페 홈 또는 전체글보기 주소를 입력하면 공개 게시글을 표시합니다.', value: cafeUrl,
+  }) : null;
   const section = document.createElement('section');
   section.className = 'cafe-section content-card';
   section.id = 'cafeSection';
@@ -1985,10 +2154,25 @@ function renderCafeSection(page) {
   const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'NAVER CAFE';
   const title = document.createElement('h2'); title.textContent = '네이버 카페 전체글보기';
   copy.append(eyebrow, title);
-  const more = document.createElement('a'); more.className = 'cafe-more-link';
-  more.href = (state.data && state.data.cafeListUrl) || cafeUrl;
-  more.target = '_blank'; more.rel = 'noopener noreferrer'; more.textContent = '더보기 ↗';
-  heading.append(copy, more); section.append(heading);
+  const actions = document.createElement('div'); actions.className = 'cafe-heading-actions';
+  if (cafeUrl) {
+    const more = document.createElement('a'); more.className = 'cafe-more-link';
+    more.href = (state.data && state.data.cafeListUrl) || cafeUrl;
+    more.target = '_blank'; more.rel = 'noopener noreferrer'; more.textContent = '더보기 ↗';
+    actions.append(more);
+  }
+  if (editor && editor.toggleButton) actions.append(editor.toggleButton);
+  heading.append(copy, actions); section.append(heading);
+
+  if (!cafeUrl) {
+    const empty = document.createElement('p');
+    empty.className = 'profile-link-empty-state';
+    empty.textContent = '네이버 카페 주소가 아직 등록되지 않았어요.';
+    section.append(empty);
+    if (editor) section.append(editor.element);
+    return section;
+  }
+  if (editor) section.append(editor.element);
 
   if (state.loading && !state.hasLoaded) {
     const status = document.createElement('p'); status.className = 'cafe-status';
