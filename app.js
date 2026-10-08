@@ -1090,6 +1090,7 @@ function renderFanPage(page) {
   view.append(renderVodSection(page));
   const youtubeSection = renderYouTubeSection(page);
   if (youtubeSection) view.append(youtubeSection);
+  view.append(renderOgqSection(page));
   const cafeSection = renderCafeSection(page);
   if (cafeSection) view.append(cafeSection);
   view.append(renderCalendarSection(page));
@@ -1120,6 +1121,7 @@ function renderFanPage(page) {
       ['scheduleText', '방송 시간', 120], ['rouletteUrl', '룰렛 확률 링크', 300],
       ['youtubeChannelUrl', 'YouTube 채널 링크', 300],
       ['cafeUrl', '네이버 카페 주소', 300],
+      ['ogqEmoticonUrl', 'OGQ 이모티콘 링크', 300],
     ];
     const inputMap = {};
     const grid = document.createElement('div'); grid.className = 'profile-editor-grid';
@@ -1127,7 +1129,7 @@ function renderFanPage(page) {
       const wrapper = document.createElement('label'); wrapper.className = 'profile-editor-field'; wrapper.textContent = labelText;
       const input = key === 'scheduleText' ? document.createElement('textarea') : document.createElement('input');
       input.name = key; input.maxLength = maxLength;
-      if (key === 'rouletteUrl' || key === 'youtubeChannelUrl' || key === 'cafeUrl') { input.type = 'url'; input.placeholder = 'https://'; }
+      if (key === 'rouletteUrl' || key === 'youtubeChannelUrl' || key === 'cafeUrl' || key === 'ogqEmoticonUrl') { input.type = 'url'; input.placeholder = 'https://'; }
       input.value = key === 'contents' ? (profile.contents || []).join(', ') : (profile[key] || '');
       wrapper.append(input);
       if (key === 'rouletteUrl') {
@@ -1146,6 +1148,12 @@ function renderFanPage(page) {
         const hint = document.createElement('small');
         hint.className = 'profile-editor-hint';
         hint.textContent = '공개 글 6개의 제목·작성자·날짜·댓글 수만 표시하고, 글을 누르면 네이버 카페에서 열립니다.';
+        wrapper.append(hint);
+      }
+      if (key === 'ogqEmoticonUrl') {
+        const hint = document.createElement('small');
+        hint.className = 'profile-editor-hint';
+        hint.textContent = '공개 SOOP OGQ 이모티콘 상품 주소를 등록하면 대표 이미지 미리보기를 표시합니다.';
         wrapper.append(hint);
       }
       grid.append(wrapper); inputMap[key] = input;
@@ -1171,7 +1179,7 @@ function renderFanPage(page) {
             fanNickname: value('fanNickname'), fandomName: value('fandomName'),
             contents: value('contents').split(',').map((item) => item.trim()).filter(Boolean),
             scheduleText: value('scheduleText'), rouletteUrl: value('rouletteUrl'),
-            youtubeChannelUrl: value('youtubeChannelUrl'), cafeUrl: value('cafeUrl'),
+            youtubeChannelUrl: value('youtubeChannelUrl'), cafeUrl: value('cafeUrl'), ogqEmoticonUrl: value('ogqEmoticonUrl'),
           },
         });
         currentPage.intro = result.data.page.intro;
@@ -1214,6 +1222,7 @@ function profileForLinkSave(source, field, value) {
     fanNickname: String(profile.fanNickname || ''), fandomName: String(profile.fandomName || ''),
     contents: Array.isArray(profile.contents) ? profile.contents.filter((item) => typeof item === 'string').slice(0, 8) : [],
     scheduleText: String(profile.scheduleText || ''), rouletteUrl: String(profile.rouletteUrl || ''),
+    ogqEmoticonUrl: String(profile.ogqEmoticonUrl || ''),
   };
   saved[field] = value;
   return saved;
@@ -1233,6 +1242,13 @@ function normalizeProfileLink(field, value) {
       throw new Error('위플랩 공개 룰렛 사용자 링크를 입력해 주세요.');
     }
     return `https://weflab.com${parsed.pathname.replace(/\/$/, '')}`;
+  }
+  if (field === 'ogqEmoticonUrl') {
+    if (parsed.hostname !== 'ogqmarket.sooplive.com' || parsed.port
+      || !/^\/emoticon\/[A-Za-z0-9_-]{8,64}\/?$/.test(parsed.pathname)) {
+      throw new Error('SOOP OGQ 이모티콘 상품 주소를 입력해 주세요.');
+    }
+    return `https://ogqmarket.sooplive.com${parsed.pathname.replace(/\/$/, '')}`;
   }
   return parsed.href;
 }
@@ -1300,6 +1316,8 @@ function createProfileLinkEditor(page, field, options) {
         cafeStates.delete(page.streamer.id);
         refreshCafeSection(page.streamer.id);
         if (value) loadCafePosts(page.streamer.id);
+      } else if (field === 'ogqEmoticonUrl') {
+        refreshOgqSection(page.streamer.id);
       }
       showToast('링크를 저장했어요.');
     } catch (error) {
@@ -2110,6 +2128,72 @@ function renderYouTubeSection(page) {
   });
   scrollbox.append(grid); section.append(scrollbox);
   return section;
+}
+
+function renderOgqSection(page) {
+  const profile = page.profile || {};
+  const streamerId = page.streamer.id;
+  let ogqUrl = '';
+  let emoticonId = '';
+  try {
+    ogqUrl = normalizeProfileLink('ogqEmoticonUrl', profile.ogqEmoticonUrl);
+    emoticonId = new URL(ogqUrl).pathname.split('/').filter(Boolean).at(-1) || '';
+  } catch (_) {}
+
+  const section = document.createElement('section');
+  section.className = 'ogq-section content-card';
+  section.id = 'ogqSection';
+  const heading = document.createElement('div');
+  heading.className = 'ogq-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'SOOP OGQ EMOTICONS';
+  const title = document.createElement('h2'); title.textContent = 'OGQ 이모티콘';
+  copy.append(eyebrow, title);
+  const actions = document.createElement('div'); actions.className = 'ogq-heading-actions';
+  if (ogqUrl) {
+    const openLink = document.createElement('a'); openLink.className = 'button ogq-open-link';
+    openLink.href = ogqUrl; openLink.target = '_blank'; openLink.rel = 'noopener noreferrer';
+    openLink.textContent = 'OGQ에서 보기 ↗'; actions.append(openLink);
+  }
+  const editor = page.isOwner ? createProfileLinkEditor(page, 'ogqEmoticonUrl', {
+    label: 'SOOP OGQ 이모티콘 링크', placeholder: 'https://ogqmarket.sooplive.com/emoticon/상품ID',
+    note: '상품 링크를 등록하면 대표 이미지 미리보기와 OGQ 바로가기를 표시합니다.',
+    value: String(profile.ogqEmoticonUrl || ''),
+  }) : null;
+  if (editor && editor.toggleButton) actions.append(editor.toggleButton);
+  heading.append(copy, actions); section.append(heading);
+
+  if (!ogqUrl || !emoticonId) {
+    const empty = document.createElement('p'); empty.className = 'profile-link-empty-state';
+    empty.textContent = 'OGQ 이모티콘 링크가 아직 등록되지 않았어요.';
+    section.append(empty);
+    if (editor) section.append(editor.element);
+    return section;
+  }
+
+  const preview = document.createElement('a'); preview.className = 'ogq-product-preview';
+  preview.href = ogqUrl; preview.target = '_blank'; preview.rel = 'noopener noreferrer';
+  const imageFrame = document.createElement('span'); imageFrame.className = 'ogq-product-image-frame';
+  const image = document.createElement('img'); image.className = 'ogq-product-image';
+  image.src = `https://ogqmarket.img.sooplive.com/sticker/${encodeURIComponent(emoticonId)}/main.png`;
+  image.alt = `${page.streamer.nickname} OGQ 이모티콘 대표 이미지`; image.loading = 'lazy'; image.decoding = 'async';
+  const fallback = document.createElement('span'); fallback.className = 'ogq-product-image-fallback';
+  fallback.textContent = 'OGQ'; fallback.setAttribute('aria-hidden', 'true');
+  image.addEventListener('error', () => { image.remove(); imageFrame.classList.add('is-missing'); }, { once: true });
+  imageFrame.append(image, fallback);
+  const details = document.createElement('span'); details.className = 'ogq-product-details';
+  const productLabel = document.createElement('span'); productLabel.className = 'ogq-product-label'; productLabel.textContent = 'SOOP OGQ EMOTICON';
+  const productTitle = document.createElement('strong'); productTitle.textContent = '공식 이모티콘 미리보기';
+  const productHint = document.createElement('span'); productHint.textContent = '대표 이미지를 누르면 상품 페이지로 이동합니다.';
+  details.append(productLabel, productTitle, productHint); preview.append(imageFrame, details); section.append(preview);
+  if (editor) section.append(editor.element);
+  return section;
+}
+
+function refreshOgqSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('ogqSection');
+  if (section) section.replaceWith(renderOgqSection(currentPage));
 }
 
 function refreshYouTubeSection(streamerId) {
