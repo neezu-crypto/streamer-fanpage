@@ -1060,6 +1060,27 @@ function renderFanPage(page) {
   section.append(details, stockCard, actions);
   if (!page.isOwner) view.append(back);
   view.append(section);
+  if (String(page.streamer.id || '').toLowerCase() === 'yuhatty') {
+    const character = document.createElement('section');
+    character.className = 'fan-character-card';
+    character.setAttribute('aria-label', '유하띠 팬 캐릭터');
+    const characterCopy = document.createElement('div');
+    characterCopy.className = 'fan-character-copy';
+    const characterEyebrow = document.createElement('p');
+    characterEyebrow.className = 'eyebrow';
+    characterEyebrow.textContent = 'YUHATTI FAN CHARACTER';
+    const characterTitle = document.createElement('h2');
+    characterTitle.textContent = '유하띠 팬 캐릭터';
+    characterCopy.append(characterEyebrow, characterTitle);
+    const characterImage = document.createElement('img');
+    characterImage.className = 'fan-character-image';
+    characterImage.src = 'https://stimg.sooplive.com/NORMAL_BBS/9/24898419/45496758cfde40ffd.gif';
+    characterImage.alt = '유하띠 팬 캐릭터';
+    characterImage.loading = 'lazy';
+    characterImage.decoding = 'async';
+    character.append(characterCopy, characterImage);
+    view.append(character);
+  }
   view.append(renderUpboSection(page));
   const rouletteSection = renderRouletteSection(page);
   if (rouletteSection) view.append(rouletteSection);
