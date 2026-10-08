@@ -2559,14 +2559,9 @@ exports.streamerFanPageSongbook = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxI
   if (action === 'delete') {
     const videoId = String(data.videoId || '').trim();
     if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) throw new HttpsError('invalid-argument', '삭제할 노래를 확인해 주세요.');
-    const transaction = await rootRef.transaction((current) => {
-      if (!current || typeof current !== 'object' || Array.isArray(current) || !Object.prototype.hasOwnProperty.call(current, videoId)) return undefined;
-      const entries = { ...current };
-      delete entries[videoId];
-      return Object.keys(entries).length ? entries : null;
-    });
+    const transaction = await rootRef.child(videoId).transaction((current) => current ? null : undefined);
     if (!transaction.committed) throw new HttpsError('not-found', '삭제할 노래를 찾을 수 없습니다.');
-    return { songbook: normalizeSongbookEntries(transaction.snapshot.val()) };
+    return { songbook: normalizeSongbookEntries((await rootRef.get()).val()) };
   }
 
   throw new HttpsError('invalid-argument', '노래책 요청을 확인해 주세요.');
