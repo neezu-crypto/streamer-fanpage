@@ -295,28 +295,28 @@
 .upbo-section{margin-top:18px}
 .upbo-heading,.upbo-topic-heading,.upbo-subsection-heading,.upbo-editor-section-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .upbo-heading{align-items:flex-end;margin-bottom:16px}
-.upbo-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.upbo-heading .eyebrow{margin:0 0 5px;font-size:11px}
 .upbo-heading h2{margin:0;font:23px var(--display)}
-.upbo-subtitle,.upbo-topic-copy p{margin:5px 0 0;color:#aaa3b1;font-size:11px;line-height:1.6}
+.upbo-subtitle,.upbo-topic-copy p{margin:5px 0 0;color:#aaa3b1;font-size:13px;line-height:1.6}
 .upbo-heading-actions,.upbo-topic-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
-.upbo-heading-actions .button,.upbo-topic-actions .button{min-height:34px;padding:8px 11px;font-size:10px;white-space:nowrap}
+.upbo-heading-actions .button,.upbo-topic-actions .button{min-height:36px;padding:8px 11px;font-size:12px;white-space:nowrap}
 .upbo-refresh-button:disabled,.upbo-more-button:disabled{opacity:.6;cursor:wait}
 .upbo-status{margin:0;padding:22px 14px;border:1px dashed #ffffff1c;border-radius:11px;color:#a9a1b0;text-align:center;font-size:12px;line-height:1.7}
 .upbo-empty{display:flex;align-items:center;gap:15px;min-height:118px;margin:0;padding:20px;border:1px solid #f58cac2b;border-radius:13px;background:radial-gradient(ellipse at 0 50%,#f58cac16,transparent 56%),linear-gradient(120deg,#ffffff04,#ffffff01);color:#a9a1b0;font-size:12px;line-height:1.7;text-align:left}
 .upbo-empty-mark{display:grid;place-items:center;flex:none;width:46px;height:46px;border:1px solid #f58cac48;border-radius:14px;background:#f58cac12;color:var(--pink);font-size:25px;text-shadow:0 0 15px #f58cac66}
 .upbo-empty-copy{min-width:0;flex:1}
 .upbo-empty-copy strong{display:block;color:#f1eaf3;font:15px var(--display)}
-.upbo-empty-copy p{margin:5px 0 0;color:#aaa3b1;font-size:11px;line-height:1.6}
+.upbo-empty-copy p{margin:5px 0 0;color:#aaa3b1;font-size:13px;line-height:1.6}
 .upbo-empty .button{flex:none;min-height:38px;margin-left:auto}
 .upbo-status.is-error{color:#f2b6c8}
 .upbo-topic-tabs{display:flex;gap:7px;overflow-x:auto;padding:2px 1px 8px;scrollbar-width:thin;scrollbar-color:#66505f transparent}
-.upbo-topic-tab{flex:none;max-width:240px;overflow:hidden;padding:8px 13px;border:1px solid #ffffff1c;border-radius:999px;background:#ffffff06;color:#c9c1ce;font:600 11px var(--font);text-overflow:ellipsis;white-space:nowrap}
+.upbo-topic-tab{flex:none;max-width:240px;overflow:hidden;padding:8px 13px;border:1px solid #ffffff1c;border-radius:999px;background:#ffffff06;color:#c9c1ce;font:600 13px var(--font);text-overflow:ellipsis;white-space:nowrap}
 .upbo-topic-tab:hover{border-color:#f58cac70;background:#f58cac12}
 .upbo-topic-tab.is-active{border-color:var(--pink);background:var(--pink);color:#25171e}
 .upbo-topic-heading{align-items:flex-start;margin:7px 0 17px;padding:15px 16px;border:1px solid #f58cac2b;border-radius:12px;background:linear-gradient(110deg,#f58cac12,#b6a3ff08)}
 .upbo-topic-copy{min-width:0}
 .upbo-topic-copy h3{margin:0;font:18px var(--display);overflow-wrap:anywhere}
-.upbo-topic-copy p{font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere}
+.upbo-topic-copy p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
 .upbo-topic-actions{flex:none}
 .upbo-danger-button{border-color:#ef7b8150;color:#ffb3b7}
 .upbo-danger-button:hover{border-color:#ef7b81aa;background:#ef7b8118}
@@ -325,33 +325,33 @@
 .upbo-subsection{margin-top:17px;padding-top:16px;border-top:1px solid #ffffff12}
 .upbo-subsection-heading{justify-content:flex-start;margin-bottom:10px}
 .upbo-subsection-heading h4{margin:0;font:16px var(--display)}
-.upbo-subsection-heading .button{min-height:31px;padding:6px 10px;font-size:10px}
-.upbo-viewer-total{color:#928a9a;font-size:10px}
-.upbo-inline-empty{margin:0;padding:13px;border-radius:9px;background:#ffffff04;color:#918a98;font-size:11px;text-align:center}
+.upbo-subsection-heading .button{min-height:33px;padding:6px 10px;font-size:12px}
+.upbo-viewer-total{color:#928a9a;font-size:12px}
+.upbo-inline-empty{margin:0;padding:13px;border-radius:9px;background:#ffffff04;color:#918a98;font-size:13px;text-align:center}
 .upbo-range-table{overflow:hidden;border:1px solid #ffffff12;border-radius:10px;background:#11101845}
 .upbo-range-head,.upbo-range-row{display:grid;align-items:stretch;min-width:0}
 .upbo-promise-grid{grid-template-columns:120px minmax(0,1fr) 96px}
 .upbo-reward-grid{grid-template-columns:150px minmax(0,1fr)}
-.upbo-range-head{min-height:35px;background:#f58cac12;color:#e5dbe7;font-size:10px}
+.upbo-range-head{min-height:37px;background:#f58cac12;color:#e5dbe7;font-size:12px}
 .upbo-range-head strong,.upbo-range-row>*{display:flex;align-items:center;justify-content:center;padding:8px 12px;text-align:center}
 .upbo-range-head strong+strong,.upbo-range-row>*+*{border-left:1px solid #ffffff12}
-.upbo-range-row{min-height:43px;border-top:1px solid #ffffff12;color:#eae4ec;font-size:11px}
+.upbo-range-row{min-height:45px;border-top:1px solid #ffffff12;color:#eae4ec;font-size:13px}
 .upbo-range-count{background:#f58cac0b;color:#f4c0d0;font-variant-numeric:tabular-nums;white-space:nowrap}
 .upbo-range-reward{overflow-wrap:anywhere;white-space:pre-wrap}
-.upbo-achievement{color:#aaa3b1;font-size:10px}
-.upbo-achievement.is-achieved{background:#89d8ae1c;color:#9be0b7;font-size:12px;font-weight:800}
+.upbo-achievement{color:#aaa3b1;font-size:12px}
+.upbo-achievement.is-achieved{background:#89d8ae1c;color:#9be0b7;font-size:13px;font-weight:800}
 .upbo-viewer-table{overflow:hidden;border:1px solid #ffffff12;border-radius:10px;background:#11101845}
-.upbo-viewer-row{display:grid;grid-template-columns:minmax(100px,.9fr) 94px minmax(120px,1.25fr) minmax(120px,1.25fr) minmax(110px,1fr);align-items:stretch;min-width:0;border-top:1px solid #ffffff12;color:#e8e1eb;font-size:11px}
+.upbo-viewer-row{display:grid;grid-template-columns:minmax(100px,.9fr) 94px minmax(120px,1.25fr) minmax(120px,1.25fr) minmax(110px,1fr);align-items:stretch;min-width:0;border-top:1px solid #ffffff12;color:#e8e1eb;font-size:13px}
 .upbo-viewer-table.is-manage .upbo-viewer-row{grid-template-columns:minmax(90px,.85fr) 88px minmax(100px,1.1fr) minmax(100px,1.1fr) minmax(90px,.9fr) 98px}
-.upbo-viewer-head{min-height:34px;border-top:0;background:#ffffff08;color:#aaa3b1;font-size:10px}
+.upbo-viewer-head{min-height:36px;border-top:0;background:#ffffff08;color:#aaa3b1;font-size:12px}
 .upbo-viewer-row>*{min-width:0;padding:10px 9px;overflow-wrap:anywhere;white-space:pre-wrap}
 .upbo-viewer-row>*+*{border-left:1px solid #ffffff0c}
 .upbo-viewer-row .upbo-viewer-cell-name{color:#f5c5d4}
 .upbo-viewer-row .upbo-viewer-cell-count{color:#f2edf4;text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
 .upbo-viewer-row .upbo-viewer-cell-history,.upbo-viewer-row .upbo-viewer-cell-reward,.upbo-viewer-row .upbo-viewer-cell-request{color:#c8c0ce}
-.upbo-rank-heading{padding:8px 11px;border-top:1px solid #ffffff12;background:#f58cac13;color:#f3bed0;font-size:11px;font-weight:800}
+.upbo-rank-heading{padding:8px 11px;border-top:1px solid #ffffff12;background:#f58cac13;color:#f3bed0;font-size:13px;font-weight:800}
 .upbo-viewer-controls{display:flex;align-items:center;justify-content:center;gap:5px;padding:6px!important}
-.upbo-small-button{min-height:27px;padding:5px 7px;font-size:9px}
+.upbo-small-button{min-height:30px;padding:5px 7px;font-size:11px}
 .upbo-more-button{display:flex;width:min(280px,100%);margin:12px auto 0;justify-content:center}
 .upbo-editor-dialog{width:min(820px,calc(100% - 28px));max-height:calc(100dvh - 28px);overflow-y:auto}
 .upbo-editor-form{display:grid;gap:13px;padding:22px}
@@ -388,10 +388,10 @@
   .upbo-reward-grid{grid-template-columns:100px minmax(0,1fr)}
   .upbo-viewer-head{display:none}
   .upbo-viewer-row,.upbo-viewer-table.is-manage .upbo-viewer-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:0;padding:4px 8px;border-top:1px solid #ffffff15}
-  .upbo-viewer-row>*{display:grid;grid-template-columns:82px minmax(0,1fr);align-items:start;gap:7px;padding:7px 4px;border:0!important;font-size:10px;text-align:left}
-  .upbo-viewer-row>*:before{content:attr(data-label);color:#928a9a;font-size:9px}
-  .upbo-viewer-row .upbo-viewer-cell-name{grid-column:1/-1;font-size:12px}
-  .upbo-viewer-row .upbo-viewer-cell-name:before{font-size:9px}
+  .upbo-viewer-row>*{display:grid;grid-template-columns:82px minmax(0,1fr);align-items:start;gap:7px;padding:7px 4px;border:0!important;font-size:12px;text-align:left}
+  .upbo-viewer-row>*:before{content:attr(data-label);color:#928a9a;font-size:11px}
+  .upbo-viewer-row .upbo-viewer-cell-name{grid-column:1/-1;font-size:13px}
+  .upbo-viewer-row .upbo-viewer-cell-name:before{font-size:11px}
   .upbo-viewer-row .upbo-viewer-cell-count{text-align:left}
   .upbo-viewer-row .upbo-viewer-cell-history,.upbo-viewer-row .upbo-viewer-cell-reward,.upbo-viewer-row .upbo-viewer-cell-request{grid-column:1/-1}
   .upbo-viewer-controls{grid-column:1/-1;justify-content:flex-end;padding:5px 3px!important}
@@ -402,12 +402,12 @@
 @media(max-width:480px){
   .upbo-heading h2{font-size:21px}.upbo-heading-actions{gap:6px}
   .upbo-empty{gap:9px 10px;padding:13px}
-  .upbo-empty-copy strong{font-size:14px}.upbo-empty-copy p{font-size:10px}
-  .upbo-topic-actions{gap:6px}.upbo-topic-actions .button{padding:7px 8px;font-size:9px}
+  .upbo-empty-copy strong{font-size:14px}.upbo-empty-copy p{font-size:12px}
+  .upbo-topic-actions{gap:6px}.upbo-topic-actions .button{padding:7px 8px;font-size:11px}
   .upbo-subsection-heading h4{font-size:14px}
   .upbo-promise-grid{grid-template-columns:72px minmax(0,1fr) 64px}
-  .upbo-range-head strong,.upbo-range-row>*{padding:7px 6px;font-size:9px}
-  .upbo-viewer-row>*{grid-template-columns:68px minmax(0,1fr);gap:5px;padding:6px 3px;font-size:9px}
+  .upbo-range-head strong,.upbo-range-row>*{padding:7px 6px;font-size:11px}
+  .upbo-viewer-row>*{grid-template-columns:76px minmax(0,1fr);gap:5px;padding:6px 3px;font-size:11px}
   .upbo-viewer-editor-grid{grid-template-columns:1fr}.upbo-viewer-editor-grid .profile-editor-field:nth-child(n+4){grid-column:auto}
   .upbo-editor-form{padding:17px}.upbo-editor-row{grid-template-columns:1fr 1.2fr auto;gap:6px;padding:7px}
   .upbo-editor-footer{align-items:flex-start;flex-direction:column}.upbo-editor-footer-actions{width:100%;justify-content:flex-end}
