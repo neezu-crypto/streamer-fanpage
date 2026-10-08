@@ -1033,6 +1033,20 @@ function parseNaverCafeUrl(value) {
   }
 }
 
+function parseOgqEmoticonUrl(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 300) return null;
+  try {
+    const parsed = new URL(value.trim());
+    if (parsed.protocol !== 'https:' || parsed.hostname !== 'ogqmarket.sooplive.com'
+      || parsed.username || parsed.password || parsed.port) return null;
+    const match = /^\/emoticon\/([A-Za-z0-9_-]{8,64})\/?$/.exec(parsed.pathname);
+    if (!match) return null;
+    return { id: match[1], url: `https://ogqmarket.sooplive.com/emoticon/${match[1]}` };
+  } catch (_) {
+    return null;
+  }
+}
+
 function cafeCacheRef(streamerId) {
   return db.ref(`streamerFanPageCafeCache/${streamerId}`);
 }
@@ -1413,6 +1427,7 @@ function normalizePage(streamer, value) {
     rouletteUrl: cleanHttpsUrl(sourceProfile.rouletteUrl),
     youtubeChannelUrl: parseYouTubeChannelUrl(sourceProfile.youtubeChannelUrl)?.url || '',
     cafeUrl: parseNaverCafeUrl(sourceProfile.cafeUrl)?.url || '',
+    ogqEmoticonUrl: parseOgqEmoticonUrl(sourceProfile.ogqEmoticonUrl)?.url || '',
   };
   return {
     streamer,
@@ -2354,11 +2369,13 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       || stringFields.some((field) => typeof profile[field] !== 'string')
       || (Object.prototype.hasOwnProperty.call(profile, 'youtubeChannelUrl') && typeof profile.youtubeChannelUrl !== 'string')
       || (Object.prototype.hasOwnProperty.call(profile, 'cafeUrl') && typeof profile.cafeUrl !== 'string')
+      || (Object.prototype.hasOwnProperty.call(profile, 'ogqEmoticonUrl') && typeof profile.ogqEmoticonUrl !== 'string')
       || !Array.isArray(profile.contents)
       || profile.contents.length > 8
       || stringFields.some((field) => profile[field].length > ({ birthday: 20, mbti: 8, major: 50, debutDate: 20, fanNickname: 30, fandomName: 30, scheduleText: 120, rouletteUrl: 300 })[field])
       || (typeof profile.youtubeChannelUrl === 'string' && profile.youtubeChannelUrl.length > 300)
       || (typeof profile.cafeUrl === 'string' && profile.cafeUrl.length > 300)
+      || (typeof profile.ogqEmoticonUrl === 'string' && profile.ogqEmoticonUrl.length > 300)
       || profile.contents.some((item) => typeof item !== 'string' || item.length > 20)) {
       throw new HttpsError('invalid-argument', '프로필 항목을 확인해 주세요.');
     }
@@ -2389,6 +2406,13 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
     if (cafeUrlInput && !cafe) {
       throw new HttpsError('invalid-argument', '네이버 카페 링크는 카페 홈 또는 전체글보기 주소로 입력해 주세요.');
     }
+    const ogqUrlInput = Object.prototype.hasOwnProperty.call(profile, 'ogqEmoticonUrl')
+      ? profile.ogqEmoticonUrl.trim()
+      : String(previousProfile.ogqEmoticonUrl || '').trim();
+    const ogqEmoticon = ogqUrlInput ? parseOgqEmoticonUrl(ogqUrlInput) : null;
+    if (ogqUrlInput && !ogqEmoticon) {
+      throw new HttpsError('invalid-argument', 'SOOP OGQ 이모티콘 상품 주소를 입력해 주세요.');
+    }
     const previousCafeUrl = parseNaverCafeUrl(previousProfile.cafeUrl)?.url || '';
     clearRouletteCache = previousRouletteUrl !== (parseWeFlabRouletteUrl(rouletteUrl) || '');
     updates.profile = {
@@ -2403,6 +2427,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       rouletteUrl,
       youtubeChannelUrl: youtubeChannel ? youtubeChannel.url : '',
       cafeUrl: cafe ? cafe.url : '',
+      ogqEmoticonUrl: ogqEmoticon ? ogqEmoticon.url : '',
     };
     clearYouTubeCache = hasYouTubeUrl;
     clearCafeCache = Object.prototype.hasOwnProperty.call(profile, 'cafeUrl') && previousCafeUrl !== (cafe ? cafe.url : '');
