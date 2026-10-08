@@ -41,6 +41,10 @@ const NAVER_CAFE_API_BASE = 'https://apis.naver.com/cafe-web/cafe-boardlist-api/
 const WEFLAB_ROULETTE_CACHE_TTL_MS = 60 * 1000;
 const WEFLAB_ROULETTE_REFRESH_COOLDOWN_MS = 30 * 1000;
 const WEFLAB_ROULETTE_MAX_HTML_BYTES = 2 * 1024 * 1024;
+const FANPAGE_UPBO_MAX_TOPICS = 20;
+const FANPAGE_UPBO_MAX_ROWS = 50;
+const FANPAGE_UPBO_VIEWER_PAGE_SIZE = 100;
+const FANPAGE_UPBO_MAX_VIEWER_COUNT = 5000;
 const YOUTUBE_DATA_API_KEY = defineSecret('YOUTUBE_DATA_API_KEY');
 const GALLERY_PUBLIC_IMAGE_HOST = 'pub-aa5574dbd45e4404b18ab8efaae54e67.r2.dev';
 const GALLERY_CATEGORY_LABELS = Object.freeze({
@@ -190,6 +194,127 @@ async function recordFanPageView(uid, streamerId) {
 
 function pageRef(streamerId) {
   return db.ref(`streamerFanPages/${streamerId}`);
+}
+
+function upboRootRef(streamerId) {
+  return db.ref(`streamerFanPageUpbo/${streamerId}`);
+}
+
+function validUpboId(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value);
+}
+
+function upboText(value, maxLength, required = false) {
+  if (typeof value !== 'string') throw new HttpsError('invalid-argument', '업보 정리의 텍스트 항목을 확인해 주세요.');
+  const text = value.trim();
+  if (text.length > maxLength || (required && !text)) {
+    throw new HttpsError('invalid-argument', '업보 정리의 입력 길이 또는 필수 항목을 확인해 주세요.');
+  }
+  return text;
+}
+
+function upboCount(value) {
+  const count = Number(value);
+  if (!Number.isSafeInteger(count) || count < 0 || count > 1_000_000_000) {
+    throw new HttpsError('invalid-argument', '후원 개수는 0 이상 10억 이하의 정수로 입력해 주세요.');
+  }
+  return count;
+}
+
+function normalizeUpboRows(value, rowType) {
+  if (!Array.isArray(value) || value.length > FANPAGE_UPBO_MAX_ROWS) {
+    throw new HttpsError('invalid-argument', '주제별 공약과 보상은 각각 50개까지 등록할 수 있습니다.');
+  }
+  const ids = new Set();
+  return value.map((row) => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      throw new HttpsError('invalid-argument', '공약 또는 보상 항목을 확인해 주세요.');
+    }
+    const id = typeof row.id === 'string' && row.id ? row.id : randomUUID();
+    if (!validUpboId(id) || ids.has(id)) throw new HttpsError('invalid-argument', '공약 또는 보상 ID가 올바르지 않습니다.');
+    ids.add(id);
+    const normalized = {
+      id,
+      donationCount: upboCount(row.donationCount),
+      reward: upboText(row.reward, 300, true),
+    };
+    if (rowType === 'promise') normalized.achieved = row.achieved === true;
+    return normalized;
+  });
+}
+
+function validateUpboTopic(value, existingMeta = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new HttpsError('invalid-argument', '업보 주제 내용을 확인해 주세요.');
+  }
+  const id = typeof value.id === 'string' && value.id ? value.id : randomUUID();
+  if (!validUpboId(id)) throw new HttpsError('invalid-argument', '업보 주제 ID가 올바르지 않습니다.');
+  return {
+    id,
+    title: upboText(value.title, 60, true),
+    description: upboText(value.description || '', 300),
+    promises: normalizeUpboRows(value.promises || [], 'promise'),
+    rewardTiers: normalizeUpboRows(value.rewardTiers || [], 'reward'),
+    createdAt: Number(existingMeta.createdAt) || Date.now(),
+    updatedAt: Date.now(),
+  };
+}
+
+function normalizeStoredUpboTopic(id, value) {
+  if (!validUpboId(id) || !value || typeof value !== 'object' || typeof value.title !== 'string') return null;
+  const rows = (source, rowType) => Object.values(source && typeof source === 'object' ? source : {})
+    .filter((row) => row && typeof row === 'object' && validUpboId(row.id))
+    .slice(0, FANPAGE_UPBO_MAX_ROWS)
+    .map((row) => ({
+      id: row.id,
+      donationCount: metricCount(row.donationCount),
+      reward: typeof row.reward === 'string' ? row.reward.slice(0, 300) : '',
+      ...(rowType === 'promise' ? { achieved: row.achieved === true } : {}),
+    }))
+    .filter((row) => row.reward);
+  return {
+    id,
+    title: value.title.slice(0, 60),
+    description: typeof value.description === 'string' ? value.description.slice(0, 300) : '',
+    promises: rows(value.promises, 'promise'),
+    rewardTiers: rows(value.rewardTiers, 'reward'),
+    createdAt: Number(value.createdAt) || 0,
+    updatedAt: Number(value.updatedAt) || 0,
+  };
+}
+
+function normalizeStoredUpboViewer(id, value) {
+  if (!validUpboId(id) || !value || typeof value !== 'object' || typeof value.nickname !== 'string') return null;
+  return {
+    id,
+    nickname: value.nickname.slice(0, 40),
+    rank: typeof value.rank === 'string' ? value.rank.slice(0, 30) : '',
+    donationCount: metricCount(value.donationCount),
+    history: typeof value.history === 'string' ? value.history.slice(0, 300) : '',
+    reward: typeof value.reward === 'string' ? value.reward.slice(0, 300) : '',
+    request: typeof value.request === 'string' ? value.request.slice(0, 300) : '',
+    createdAt: Number(value.createdAt) || 0,
+    updatedAt: Number(value.updatedAt) || 0,
+  };
+}
+
+function validateUpboViewer(value, existing = null) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new HttpsError('invalid-argument', '시청자 후원 기록을 확인해 주세요.');
+  }
+  const id = typeof value.id === 'string' && value.id ? value.id : '';
+  if (id && !validUpboId(id)) throw new HttpsError('invalid-argument', '시청자 기록 ID가 올바르지 않습니다.');
+  return {
+    id,
+    nickname: upboText(value.nickname, 40, true),
+    rank: upboText(value.rank || '', 30),
+    donationCount: upboCount(value.donationCount),
+    history: upboText(value.history || '', 300),
+    reward: upboText(value.reward || '', 300),
+    request: upboText(value.request || '', 300),
+    createdAt: Number(existing && existing.createdAt) || Date.now(),
+    updatedAt: Date.now(),
+  };
 }
 
 function normalizeStreamerName(value) {
@@ -2059,6 +2184,143 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     },
     streamers,
   };
+});
+
+exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const action = typeof data.action === 'string' ? data.action : 'listTopics';
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+  const canManage = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
+  const rootRef = upboRootRef(target.streamer.id);
+  const topicsRef = rootRef.child('topics');
+
+  if (action === 'listTopics') {
+    const snapshot = await topicsRef.get();
+    const topics = Object.entries(snapshot.val() || {})
+      .map(([id, value]) => normalizeStoredUpboTopic(id, value))
+      .filter(Boolean)
+      .sort((a, b) => a.createdAt - b.createdAt || a.title.localeCompare(b.title, 'ko'))
+      .slice(0, FANPAGE_UPBO_MAX_TOPICS)
+      .map((topic) => ({ ...topic, viewerCount: metricCount((snapshot.val() || {})[topic.id]?.viewerCount) }));
+    return { topics, canManage };
+  }
+
+  const topicId = String(data.topicId || '').trim();
+  if (!validUpboId(topicId)) throw new HttpsError('invalid-argument', '업보 주제를 확인해 주세요.');
+  const topicRef = topicsRef.child(topicId);
+  const topicSnapshot = await topicRef.get();
+
+  if (action === 'loadTopic') {
+    if (!topicSnapshot.exists()) throw new HttpsError('not-found', '업보 주제를 찾을 수 없습니다.');
+    const topic = normalizeStoredUpboTopic(topicId, topicSnapshot.val());
+    if (!topic) throw new HttpsError('failed-precondition', '업보 주제 데이터를 읽을 수 없습니다.');
+    const viewersRef = rootRef.child('viewers').child(topicId);
+    const cursor = typeof data.cursor === 'string' && validUpboId(data.cursor) ? data.cursor : '';
+    let query = viewersRef.orderByKey();
+    if (cursor) query = query.startAt(cursor);
+    const viewerSnapshot = await query.limitToFirst(FANPAGE_UPBO_VIEWER_PAGE_SIZE + 1 + (cursor ? 1 : 0)).get();
+    const viewers = [];
+    viewerSnapshot.forEach((child) => {
+      if (cursor && child.key <= cursor) return false;
+      const viewer = normalizeStoredUpboViewer(child.key, child.val());
+      if (viewer) viewers.push(viewer);
+      return viewers.length >= FANPAGE_UPBO_VIEWER_PAGE_SIZE + 1;
+    });
+    const hasMore = viewers.length > FANPAGE_UPBO_VIEWER_PAGE_SIZE;
+    const pageViewers = viewers.slice(0, FANPAGE_UPBO_VIEWER_PAGE_SIZE);
+    return {
+      topic,
+      viewers: pageViewers,
+      hasMore,
+      nextCursor: hasMore && pageViewers.length ? pageViewers[pageViewers.length - 1].id : '',
+      viewerCount: metricCount(topicSnapshot.val().viewerCount),
+      canManage,
+    };
+  }
+
+  if (!canManage) throw new HttpsError('permission-denied', '업보 정리는 해당 스트리머와 관리자만 수정할 수 있습니다.');
+
+  if (action === 'saveTopic') {
+    const existing = topicSnapshot.val() || {};
+    if (!topicSnapshot.exists() && Object.keys((await topicsRef.get()).val() || {}).length >= FANPAGE_UPBO_MAX_TOPICS) {
+      throw new HttpsError('resource-exhausted', `업보 주제는 ${FANPAGE_UPBO_MAX_TOPICS}개까지 만들 수 있습니다.`);
+    }
+    const topic = validateUpboTopic(data.topic, existing);
+    if (topic.id !== topicId) throw new HttpsError('invalid-argument', '주제 ID가 요청과 일치하지 않습니다.');
+    await topicRef.update({
+      id: topic.id,
+      title: topic.title,
+      description: topic.description,
+      promises: topic.promises,
+      rewardTiers: topic.rewardTiers,
+      createdAt: topic.createdAt,
+      updatedAt: topic.updatedAt,
+    });
+    return { topic, canManage };
+  }
+
+  if (action === 'deleteTopic') {
+    if (!topicSnapshot.exists()) throw new HttpsError('not-found', '삭제할 업보 주제를 찾을 수 없습니다.');
+    await rootRef.update({
+      [`topics/${topicId}`]: null,
+      [`viewers/${topicId}`]: null,
+    });
+    return { deleted: true, canManage };
+  }
+
+  if (action === 'saveViewer') {
+    if (!topicSnapshot.exists()) throw new HttpsError('not-found', '업보 주제를 찾을 수 없습니다.');
+    const input = data.viewer;
+    const viewerId = input && typeof input.id === 'string' && input.id ? input.id : '';
+    const viewersRef = rootRef.child('viewers').child(topicId);
+    const viewerRef = viewerId ? viewersRef.child(viewerId) : null;
+    const existingViewer = viewerRef ? (await viewerRef.get()).val() : null;
+    if (viewerId && (!validUpboId(viewerId) || !existingViewer)) {
+      throw new HttpsError('not-found', '수정할 시청자 기록을 찾을 수 없습니다.');
+    }
+    const viewer = validateUpboViewer(input, existingViewer);
+    if (viewerId && viewer.id !== viewerId) throw new HttpsError('invalid-argument', '시청자 기록 ID가 요청과 일치하지 않습니다.');
+    let savedId = viewerId;
+    if (!savedId) {
+      const countRef = topicRef.child('viewerCount');
+      const countTransaction = await countRef.transaction((current) => {
+        const count = metricCount(current);
+        return count >= FANPAGE_UPBO_MAX_VIEWER_COUNT ? undefined : count + 1;
+      });
+      if (!countTransaction.committed) {
+        throw new HttpsError('resource-exhausted', `주제별 시청자는 ${FANPAGE_UPBO_MAX_VIEWER_COUNT.toLocaleString('ko-KR')}명까지 등록할 수 있습니다.`);
+      }
+      const reverseTime = String(Number.MAX_SAFE_INTEGER - Date.now()).padStart(16, '0');
+      savedId = `${reverseTime}_${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    }
+    const savedViewer = { ...viewer, id: savedId };
+    delete savedViewer.id;
+    try {
+      await viewersRef.child(savedId).set(savedViewer);
+    } catch (error) {
+      if (!viewerId) await topicRef.child('viewerCount').transaction((current) => Math.max(0, metricCount(current) - 1));
+      throw error;
+    }
+    const viewerCount = metricCount((await topicRef.child('viewerCount').get()).val());
+    return { viewer: { ...savedViewer, id: savedId }, viewerCount, canManage };
+  }
+
+  if (action === 'deleteViewer') {
+    if (!topicSnapshot.exists()) throw new HttpsError('not-found', '업보 주제를 찾을 수 없습니다.');
+    const viewerId = String(data.viewerId || '').trim();
+    if (!validUpboId(viewerId)) throw new HttpsError('invalid-argument', '시청자 기록을 확인해 주세요.');
+    const viewerRef = rootRef.child('viewers').child(topicId).child(viewerId);
+    const deletion = await viewerRef.transaction((current) => current ? null : undefined);
+    if (!deletion.committed) throw new HttpsError('not-found', '삭제할 시청자 기록을 찾을 수 없습니다.');
+    await topicRef.child('viewerCount').transaction((current) => Math.max(0, metricCount(current) - 1));
+    return { deleted: true, canManage };
+  }
+
+  throw new HttpsError('invalid-argument', '업보 정리 요청을 확인해 주세요.');
 });
 
 exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {

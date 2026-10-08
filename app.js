@@ -36,6 +36,7 @@ const callScheduleDelete = httpsCallable(functions, 'streamerFanPageScheduleDele
 const callYouTubeVideos = httpsCallable(functions, 'streamerFanPageYouTubeVideos');
 const callCafePosts = httpsCallable(functions, 'streamerFanPageCafePosts');
 const callRoulette = httpsCallable(functions, 'streamerFanPageRoulette');
+const callUpbo = httpsCallable(functions, 'streamerFanPageUpbo');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
 const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
@@ -67,6 +68,7 @@ const liveStatusStates = new Map();
 const youtubeStates = new Map();
 const cafeStates = new Map();
 const rouletteStates = new Map();
+const upboStates = new Map();
 let galleryLoadPromise = Promise.resolve();
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
@@ -500,6 +502,462 @@ function setVisibleView(page) {
   document.title = pageName;
   if (page) renderFanPage(page);
 }
+function upboStateFor(streamerId) {
+  if (!upboStates.has(streamerId)) {
+    upboStates.set(streamerId, {
+      loaded: false, loadingTopics: false, loadingTopic: false, saving: false,
+      error: '', topics: [], canManage: false, activeTopicId: '', topic: null,
+      viewers: [], viewerCount: 0, hasMore: false, nextCursor: '',
+      topicsRequestId: 0, topicRequestId: 0,
+    });
+  }
+  return upboStates.get(streamerId);
+}
+
+function createUpboId() {
+  return window.crypto && typeof window.crypto.randomUUID === 'function'
+    ? window.crypto.randomUUID()
+    : `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function upboButton(label, className, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = `button ${className || ''}`.trim(); button.textContent = label;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function formatUpboCount(value) {
+  return `${Math.max(0, Math.floor(Number(value) || 0)).toLocaleString('ko-KR')}개`;
+}
+
+function renderUpboRangeTable(rows, kind) {
+  const wrapper = document.createElement('div'); wrapper.className = `upbo-range-table upbo-${kind}-table`;
+  const header = document.createElement('div'); header.className = `upbo-range-head upbo-${kind}-grid`;
+  const countHeading = document.createElement('strong'); countHeading.textContent = '누적 후원';
+  const rewardHeading = document.createElement('strong'); rewardHeading.textContent = kind === 'promise' ? '공약' : '보상';
+  header.append(countHeading, rewardHeading);
+  if (kind === 'promise') {
+    const statusHeading = document.createElement('strong'); statusHeading.textContent = '달성'; header.append(statusHeading);
+  }
+  wrapper.append(header);
+  rows.forEach((row) => {
+    const line = document.createElement('div'); line.className = `upbo-range-row upbo-${kind}-grid`;
+    const count = document.createElement('strong'); count.className = 'upbo-range-count'; count.textContent = formatUpboCount(row.donationCount);
+    const reward = document.createElement('span'); reward.className = 'upbo-range-reward'; reward.textContent = row.reward;
+    line.append(count, reward);
+    if (kind === 'promise') {
+      const status = document.createElement('span'); status.className = `upbo-achievement${row.achieved ? ' is-achieved' : ''}`;
+      status.textContent = row.achieved ? '✓ 달성' : '진행 중'; line.append(status);
+    }
+    wrapper.append(line);
+  });
+  return wrapper;
+}
+
+function renderUpboSection(page) {
+  const state = upboStateFor(page.streamer.id);
+  const section = document.createElement('section'); section.id = 'upboSection'; section.className = 'content-card upbo-section';
+  const heading = document.createElement('div'); heading.className = 'upbo-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'SUPPORT REWARDS';
+  const title = document.createElement('h2'); title.textContent = '업보 정리';
+  const subtitle = document.createElement('p'); subtitle.className = 'upbo-subtitle'; subtitle.textContent = '주제별 누적 후원 내역과 약속한 보상을 확인해 보세요.';
+  copy.append(eyebrow, title, subtitle);
+  const actions = document.createElement('div'); actions.className = 'upbo-heading-actions';
+  const refresh = upboButton(state.loadingTopics ? '불러오는 중…' : '↻ 새로고침', 'upbo-refresh-button', () => loadUpboTopics(page.streamer.id));
+  refresh.disabled = state.loadingTopics || state.loadingTopic || state.saving;
+  actions.append(refresh);
+  if (state.canManage) {
+    const addTopic = upboButton('+ 주제 추가', 'button-primary upbo-add-topic', () => openUpboTopicEditor(page));
+    addTopic.disabled = state.saving; actions.append(addTopic);
+  }
+  heading.append(copy, actions); section.append(heading);
+
+  if (!state.loaded || state.loadingTopics) {
+    const status = document.createElement('p'); status.className = 'upbo-status'; status.textContent = '업보 정리를 불러오고 있어요.';
+    section.append(status); return section;
+  }
+  if (state.error && !state.topics.length) {
+    const status = document.createElement('p'); status.className = 'upbo-status is-error'; status.textContent = state.error;
+    section.append(status); return section;
+  }
+  if (!state.topics.length) {
+    const empty = document.createElement('div'); empty.className = 'upbo-empty';
+    const message = document.createElement('p'); message.textContent = state.canManage
+      ? '주제를 만들고 누적 후원 공약과 시청자별 보상을 정리해 보세요.'
+      : '아직 공개된 업보 정리가 없어요.';
+    empty.append(message);
+    if (state.canManage) empty.append(upboButton('첫 주제 만들기', 'button-primary', () => openUpboTopicEditor(page)));
+    section.append(empty); return section;
+  }
+
+  const tabs = document.createElement('div'); tabs.className = 'upbo-topic-tabs'; tabs.setAttribute('role', 'tablist');
+  state.topics.forEach((topic) => {
+    const tab = document.createElement('button'); tab.type = 'button'; tab.className = `upbo-topic-tab${topic.id === state.activeTopicId ? ' is-active' : ''}`;
+    tab.setAttribute('role', 'tab'); tab.setAttribute('aria-selected', String(topic.id === state.activeTopicId)); tab.textContent = topic.title;
+    tab.addEventListener('click', () => {
+      if (topic.id === state.activeTopicId || state.loadingTopic) return;
+      state.activeTopicId = topic.id; state.topic = null; state.viewers = []; state.viewerCount = topic.viewerCount || 0;
+      state.hasMore = false; state.nextCursor = ''; state.error = '';
+      refreshUpboSection(page.streamer.id); loadUpboTopic(page.streamer.id, topic.id);
+    });
+    tabs.append(tab);
+  });
+  section.append(tabs);
+
+  const topic = state.topic && state.topic.id === state.activeTopicId
+    ? state.topic
+    : state.topics.find((item) => item.id === state.activeTopicId);
+  if (!topic) {
+    const status = document.createElement('p'); status.className = 'upbo-status';
+    status.textContent = state.error || '주제 내용을 불러오고 있어요.'; section.append(status); return section;
+  }
+
+  const topicHeader = document.createElement('div'); topicHeader.className = 'upbo-topic-heading';
+  const topicCopy = document.createElement('div'); topicCopy.className = 'upbo-topic-copy';
+  const topicTitle = document.createElement('h3'); topicTitle.textContent = topic.title;
+  topicCopy.append(topicTitle);
+  if (topic.description) {
+    const description = document.createElement('p'); description.textContent = topic.description; topicCopy.append(description);
+  }
+  const topicActions = document.createElement('div'); topicActions.className = 'upbo-topic-actions';
+  if (state.canManage) {
+    topicActions.append(
+      upboButton('주제·공약 설정', '', () => openUpboTopicEditor(page, topic)),
+      upboButton('주제 삭제', 'upbo-danger-button', () => deleteUpboTopic(page, topic.id)),
+    );
+  }
+  topicHeader.append(topicCopy, topicActions); section.append(topicHeader);
+  if (state.error) {
+    const error = document.createElement('p'); error.className = 'upbo-status is-error'; error.textContent = state.error; section.append(error);
+  }
+
+  if (topic.promises.length || state.canManage) {
+    const promises = document.createElement('section'); promises.className = 'upbo-subsection';
+    const subheading = document.createElement('div'); subheading.className = 'upbo-subsection-heading';
+    const subTitle = document.createElement('h4'); subTitle.textContent = '후원 총 누적 공약'; subheading.append(subTitle);
+    if (!topic.promises.length) {
+      const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 등록된 공약이 없어요.'; promises.append(subheading, empty);
+    } else promises.append(subheading, renderUpboRangeTable(topic.promises, 'promise'));
+    section.append(promises);
+  }
+  if (topic.rewardTiers.length || state.canManage) {
+    const rewards = document.createElement('section'); rewards.className = 'upbo-subsection';
+    const subheading = document.createElement('div'); subheading.className = 'upbo-subsection-heading';
+    const subTitle = document.createElement('h4'); subTitle.textContent = '개인 누적 후원 보상'; subheading.append(subTitle);
+    if (!topic.rewardTiers.length) {
+      const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 등록된 보상 구간이 없어요.'; rewards.append(subheading, empty);
+    } else rewards.append(subheading, renderUpboRangeTable(topic.rewardTiers, 'reward'));
+    section.append(rewards);
+  }
+
+  const viewersSection = document.createElement('section'); viewersSection.className = 'upbo-subsection upbo-viewers-section';
+  const viewersHeading = document.createElement('div'); viewersHeading.className = 'upbo-subsection-heading';
+  const viewersTitle = document.createElement('h4'); viewersTitle.textContent = '시청자별 후원 기록';
+  const viewerCount = document.createElement('span'); viewerCount.className = 'upbo-viewer-total';
+  viewerCount.textContent = `${Number(state.viewerCount || 0).toLocaleString('ko-KR')}명`;
+  viewersHeading.append(viewersTitle, viewerCount);
+  if (state.canManage) viewersHeading.append(upboButton('+ 시청자 추가', 'button-primary upbo-add-viewer', () => openUpboViewerEditor(page, topic)));
+  viewersSection.append(viewersHeading);
+  if (state.loadingTopic && !state.viewers.length) {
+    const loading = document.createElement('p'); loading.className = 'upbo-inline-empty'; loading.textContent = '시청자 기록을 불러오고 있어요.'; viewersSection.append(loading);
+  } else if (!state.viewers.length) {
+    const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '이 주제에 등록된 시청자 기록이 없어요.'; viewersSection.append(empty);
+  } else {
+    const table = document.createElement('div'); table.className = `upbo-viewer-table${state.canManage ? ' is-manage' : ''}`;
+    const tableHeader = document.createElement('div'); tableHeader.className = 'upbo-viewer-row upbo-viewer-head';
+    ['닉네임', '누적 후원', '후원 내역', '보상', '요청사항', ...(state.canManage ? ['관리'] : [])].forEach((labelText) => {
+      const cell = document.createElement('strong'); cell.textContent = labelText; tableHeader.append(cell);
+    });
+    table.append(tableHeader);
+    const groups = new Map();
+    state.viewers.forEach((viewer) => {
+      const rank = viewer.rank || '시청자 기록';
+      if (!groups.has(rank)) groups.set(rank, []);
+      groups.get(rank).push(viewer);
+    });
+    for (const [rank, viewers] of groups) {
+      if (rank !== '시청자 기록') {
+        const groupHeading = document.createElement('div'); groupHeading.className = 'upbo-rank-heading'; groupHeading.textContent = rank;
+        table.append(groupHeading);
+      }
+      viewers.forEach((viewer) => {
+        const row = document.createElement('div'); row.className = 'upbo-viewer-row';
+        const cells = [viewer.nickname, formatUpboCount(viewer.donationCount), viewer.history || '—', viewer.reward || '—', viewer.request || '—'];
+        const cellLabels = ['닉네임', '누적 후원', '후원 내역', '보상', '요청사항'];
+        cells.forEach((value, index) => {
+          const cell = document.createElement(index === 0 ? 'strong' : 'span');
+          cell.className = `upbo-viewer-cell upbo-viewer-cell-${['name', 'count', 'history', 'reward', 'request'][index]}`;
+          cell.dataset.label = cellLabels[index];
+          cell.textContent = value; row.append(cell);
+        });
+        if (state.canManage) {
+          const controls = document.createElement('span'); controls.className = 'upbo-viewer-controls';
+          controls.append(
+            upboButton('수정', 'upbo-small-button', () => openUpboViewerEditor(page, topic, viewer)),
+            upboButton('삭제', 'upbo-small-button upbo-danger-button', () => deleteUpboViewer(page, topic.id, viewer)),
+          );
+          row.append(controls);
+        }
+        table.append(row);
+      });
+    }
+    viewersSection.append(table);
+  }
+  if (state.loadingTopic && state.viewers.length) {
+    const loading = document.createElement('p'); loading.className = 'upbo-inline-empty'; loading.textContent = '기록을 새로 불러오고 있어요.'; viewersSection.append(loading);
+  } else if (state.hasMore) {
+    const more = upboButton('시청자 기록 더 보기', 'upbo-more-button', () => loadMoreUpboViewers(page.streamer.id));
+    more.disabled = state.loadingTopic; viewersSection.append(more);
+  }
+  section.append(viewersSection);
+  return section;
+}
+
+function refreshUpboSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('upboSection');
+  if (section) section.replaceWith(renderUpboSection(currentPage));
+}
+
+async function loadUpboTopics(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const state = upboStateFor(streamerId);
+  const requestId = ++state.topicsRequestId;
+  state.loadingTopics = true; state.error = ''; refreshUpboSection(streamerId);
+  try {
+    const result = (await callUpbo({ action: 'listTopics', streamerId })).data;
+    if (!currentPage || currentPage.streamer.id !== streamerId || requestId !== state.topicsRequestId) return;
+    state.topics = Array.isArray(result.topics) ? result.topics : [];
+    state.canManage = result.canManage === true; state.loaded = true;
+    if (!state.topics.some((topic) => topic.id === state.activeTopicId)) state.activeTopicId = state.topics[0]?.id || '';
+    state.topic = null; state.viewers = []; state.hasMore = false; state.nextCursor = '';
+    state.viewerCount = state.topics.find((topic) => topic.id === state.activeTopicId)?.viewerCount || 0;
+    state.loadingTopics = false; refreshUpboSection(streamerId);
+    if (state.activeTopicId) await loadUpboTopic(streamerId, state.activeTopicId);
+  } catch (error) {
+    if (!currentPage || currentPage.streamer.id !== streamerId || requestId !== state.topicsRequestId) return;
+    state.loadingTopics = false; state.loaded = true; state.error = error.message || '업보 정리를 불러오지 못했어요.';
+    refreshUpboSection(streamerId);
+  }
+}
+
+async function loadUpboTopic(streamerId, topicId, cursor = '') {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const state = upboStateFor(streamerId);
+  const requestId = ++state.topicRequestId;
+  state.loadingTopic = true; state.error = '';
+  if (!cursor) { state.viewers = []; state.nextCursor = ''; state.hasMore = false; }
+  refreshUpboSection(streamerId);
+  try {
+    const result = (await callUpbo({ action: 'loadTopic', streamerId, topicId, cursor })).data;
+    if (!currentPage || currentPage.streamer.id !== streamerId || requestId !== state.topicRequestId || topicId !== state.activeTopicId) return;
+    state.topic = result.topic; state.canManage = result.canManage === true;
+    state.viewerCount = Number(result.viewerCount) || 0;
+    state.viewers = cursor ? [...state.viewers, ...(result.viewers || [])] : (result.viewers || []);
+    state.hasMore = result.hasMore === true; state.nextCursor = result.nextCursor || '';
+  } catch (error) {
+    if (!currentPage || currentPage.streamer.id !== streamerId || requestId !== state.topicRequestId) return;
+    state.error = error.message || '시청자 기록을 불러오지 못했어요.';
+  } finally {
+    if (currentPage && currentPage.streamer.id === streamerId && requestId === state.topicRequestId) {
+      state.loadingTopic = false; refreshUpboSection(streamerId);
+    }
+  }
+}
+
+function loadMoreUpboViewers(streamerId) {
+  const state = upboStateFor(streamerId);
+  if (state.loadingTopic || !state.hasMore || !state.nextCursor || !state.activeTopicId) return;
+  loadUpboTopic(streamerId, state.activeTopicId, state.nextCursor);
+}
+
+function upboEditorField(labelText, tagName, attributes = {}) {
+  const label = document.createElement('label'); label.className = 'profile-editor-field'; label.append(document.createTextNode(labelText));
+  const field = document.createElement(tagName);
+  Object.entries(attributes).forEach(([key, value]) => field.setAttribute(key, String(value)));
+  label.append(field); return { label, field };
+}
+
+function appendUpboRangeEditorRow(container, kind, value = {}) {
+  const row = document.createElement('div'); row.className = 'upbo-editor-row'; row.dataset.id = value.id || createUpboId();
+  const count = upboEditorField('누적 후원 개수', 'input', { type: 'number', min: 0, max: 1000000000, step: 1, required: true, value: value.donationCount ?? 0 });
+  count.field.className = 'upbo-editor-count';
+  const reward = upboEditorField(kind === 'promise' ? '공약 내용' : '보상 내용', 'input', { type: 'text', maxlength: 300, required: true, value: value.reward || '', placeholder: kind === 'promise' ? '예: 공포게임 2시간' : '예: 체키 방셀' });
+  reward.field.className = 'upbo-editor-reward';
+  row.append(count.label, reward.label);
+  if (kind === 'promise') {
+    const achieved = document.createElement('label'); achieved.className = 'upbo-editor-check';
+    const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = value.achieved === true;
+    const text = document.createElement('span'); text.textContent = '달성'; achieved.append(checkbox, text); row.append(achieved);
+  }
+  const remove = upboButton('삭제', 'upbo-small-button upbo-danger-button', () => row.remove());
+  row.append(remove); container.append(row);
+}
+
+function collectUpboRangeEditorRows(container, kind) {
+  return [...container.querySelectorAll('.upbo-editor-row')].map((row) => ({
+    id: row.dataset.id,
+    donationCount: Number(row.querySelector('.upbo-editor-count').value),
+    reward: row.querySelector('.upbo-editor-reward').value.trim(),
+    ...(kind === 'promise' ? { achieved: row.querySelector('input[type="checkbox"]').checked } : {}),
+  }));
+}
+
+function openUpboTopicEditor(page, existingTopic = null) {
+  const state = upboStateFor(page.streamer.id);
+  if (!state.canManage || state.saving) return;
+  const dialog = document.createElement('dialog'); dialog.className = 'account-dialog upbo-editor-dialog';
+  const form = document.createElement('form'); form.className = 'account-dialog-card upbo-editor-form';
+  const heading = document.createElement('div'); heading.className = 'profile-editor-heading';
+  const title = document.createElement('h2'); title.textContent = existingTopic ? '업보 주제 설정' : '업보 주제 추가';
+  const close = upboButton('×', 'profile-settings-close', () => dialog.close()); close.setAttribute('aria-label', '주제 설정 닫기');
+  heading.append(title, close);
+  const titleField = upboEditorField('주제 이름', 'input', { type: 'text', maxlength: 60, required: true, value: existingTopic?.title || '', placeholder: '예: 2026 누적 후원 기록' });
+  const descriptionField = upboEditorField('설명', 'textarea', { maxlength: 300, rows: 2, placeholder: '주제와 기록 기준을 소개해 주세요.' });
+  descriptionField.field.value = existingTopic?.description || '';
+  form.append(heading, titleField.label, descriptionField.label);
+
+  const promiseSection = document.createElement('section'); promiseSection.className = 'upbo-editor-section';
+  const promiseHeading = document.createElement('div'); promiseHeading.className = 'upbo-editor-section-heading';
+  const promiseTitle = document.createElement('h3'); promiseTitle.textContent = '후원 총 누적 공약';
+  const addPromise = upboButton('+ 공약 추가', 'upbo-small-button', () => appendUpboRangeEditorRow(promiseRows, 'promise'));
+  promiseHeading.append(promiseTitle, addPromise);
+  const promiseRows = document.createElement('div'); promiseRows.className = 'upbo-editor-rows';
+  (existingTopic?.promises || []).forEach((row) => appendUpboRangeEditorRow(promiseRows, 'promise', row));
+  promiseSection.append(promiseHeading, promiseRows);
+
+  const rewardSection = document.createElement('section'); rewardSection.className = 'upbo-editor-section';
+  const rewardHeading = document.createElement('div'); rewardHeading.className = 'upbo-editor-section-heading';
+  const rewardTitle = document.createElement('h3'); rewardTitle.textContent = '개인 누적 후원 보상';
+  const addReward = upboButton('+ 보상 구간 추가', 'upbo-small-button', () => appendUpboRangeEditorRow(rewardRows, 'reward'));
+  rewardHeading.append(rewardTitle, addReward);
+  const rewardRows = document.createElement('div'); rewardRows.className = 'upbo-editor-rows';
+  (existingTopic?.rewardTiers || []).forEach((row) => appendUpboRangeEditorRow(rewardRows, 'reward', row));
+  rewardSection.append(rewardHeading, rewardRows);
+  form.append(promiseSection, rewardSection);
+
+  const note = document.createElement('p'); note.className = 'upbo-editor-note'; note.textContent = '공개로 저장되며, 달성 여부는 스트리머가 직접 관리합니다.';
+  const footer = document.createElement('div'); footer.className = 'profile-editor-footer upbo-editor-footer';
+  const hint = document.createElement('small'); hint.textContent = '주제는 최대 20개, 구간은 종류별 50개까지 저장할 수 있어요.';
+  const actions = document.createElement('div'); actions.className = 'profile-editor-footer-actions';
+  const cancel = upboButton('취소', '', () => dialog.close());
+  const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = '저장';
+  actions.append(cancel, save); footer.append(hint, actions); form.append(note, footer); dialog.append(form);
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity() || save.disabled) return;
+    save.disabled = true; save.textContent = '저장 중…'; state.saving = true;
+    try {
+      const topicId = existingTopic?.id || createUpboId();
+      const payload = {
+        id: topicId, title: titleField.field.value.trim(), description: descriptionField.field.value.trim(),
+        promises: collectUpboRangeEditorRows(promiseRows, 'promise'),
+        rewardTiers: collectUpboRangeEditorRows(rewardRows, 'reward'),
+      };
+      const result = (await callUpbo({ action: 'saveTopic', streamerId: page.streamer.id, topicId, topic: payload })).data;
+      const savedTopic = { ...result.topic, viewerCount: existingTopic?.viewerCount || 0 };
+      const index = state.topics.findIndex((topic) => topic.id === savedTopic.id);
+      if (index < 0) state.topics.push(savedTopic); else state.topics[index] = savedTopic;
+      state.topics.sort((a, b) => a.createdAt - b.createdAt || a.title.localeCompare(b.title, 'ko'));
+      state.activeTopicId = savedTopic.id; state.topic = savedTopic; state.canManage = result.canManage === true;
+      dialog.close(); await loadUpboTopic(page.streamer.id, savedTopic.id); showToast('업보 주제를 저장했어요.');
+    } catch (error) {
+      showToast(error.message || '업보 주제를 저장하지 못했어요.');
+    } finally {
+      state.saving = false; save.disabled = false; save.textContent = '저장'; refreshUpboSection(page.streamer.id);
+    }
+  });
+  document.body.append(dialog); dialog.showModal();
+}
+
+function openUpboViewerEditor(page, topic, existingViewer = null) {
+  const state = upboStateFor(page.streamer.id);
+  if (!state.canManage || state.saving) return;
+  const dialog = document.createElement('dialog'); dialog.className = 'account-dialog upbo-editor-dialog';
+  const form = document.createElement('form'); form.className = 'account-dialog-card upbo-editor-form';
+  const heading = document.createElement('div'); heading.className = 'profile-editor-heading';
+  const title = document.createElement('h2'); title.textContent = existingViewer ? '시청자 기록 수정' : '시청자 추가';
+  const close = upboButton('×', 'profile-settings-close', () => dialog.close()); close.setAttribute('aria-label', '시청자 편집 닫기');
+  heading.append(title, close);
+  const grid = document.createElement('div'); grid.className = 'upbo-viewer-editor-grid';
+  const nickname = upboEditorField('닉네임', 'input', { type: 'text', maxlength: 40, required: true, value: existingViewer?.nickname || '', placeholder: '시청자 닉네임' });
+  const rank = upboEditorField('랭크 / 구분', 'input', { type: 'text', maxlength: 30, value: existingViewer?.rank || '', placeholder: '예: 전설 RANK' });
+  const count = upboEditorField('누적 후원 개수', 'input', { type: 'number', min: 0, max: 1000000000, step: 1, required: true, value: existingViewer?.donationCount ?? 0 });
+  const history = upboEditorField('후원 내역', 'textarea', { maxlength: 300, rows: 3, placeholder: '예: 체키 3회, 편지 방셀' }); history.field.value = existingViewer?.history || '';
+  const reward = upboEditorField('보상 내역', 'textarea', { maxlength: 300, rows: 3, placeholder: '시청자가 받은 보상을 정리해 주세요.' }); reward.field.value = existingViewer?.reward || '';
+  const request = upboEditorField('요청사항', 'textarea', { maxlength: 300, rows: 2, placeholder: '전달할 요청이나 참고사항' }); request.field.value = existingViewer?.request || '';
+  grid.append(nickname.label, rank.label, count.label, history.label, reward.label, request.label);
+  const note = document.createElement('p'); note.className = 'upbo-editor-note'; note.textContent = '시청자 닉네임과 기록은 이 팬페이지 방문자에게 공개됩니다.';
+  const footer = document.createElement('div'); footer.className = 'profile-editor-footer upbo-editor-footer';
+  const hint = document.createElement('small'); hint.textContent = '수정 내용은 서버 데이터베이스에 저장됩니다.';
+  const actions = document.createElement('div'); actions.className = 'profile-editor-footer-actions';
+  const cancel = upboButton('취소', '', () => dialog.close());
+  const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = existingViewer ? '기록 저장' : '시청자 추가';
+  actions.append(cancel, save); footer.append(hint, actions);
+  form.append(heading, grid, note, footer); dialog.append(form);
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity() || save.disabled) return;
+    save.disabled = true; save.textContent = '저장 중…'; state.saving = true;
+    try {
+      const viewer = {
+        ...(existingViewer ? { id: existingViewer.id } : {}), nickname: nickname.field.value.trim(), rank: rank.field.value.trim(),
+        donationCount: Number(count.field.value), history: history.field.value.trim(), reward: reward.field.value.trim(), request: request.field.value.trim(),
+      };
+      const result = (await callUpbo({ action: 'saveViewer', streamerId: page.streamer.id, topicId: topic.id, viewer })).data;
+      const isNewViewer = !existingViewer;
+      const loadedPageWasFull = state.viewers.length >= 100;
+      const index = state.viewers.findIndex((item) => item.id === result.viewer.id);
+      if (index < 0) state.viewers.unshift(result.viewer); else state.viewers[index] = result.viewer;
+      state.viewers = state.viewers.slice(0, 100); state.viewerCount = Number(result.viewerCount) || state.viewerCount + (existingViewer ? 0 : 1);
+      if (isNewViewer && loadedPageWasFull && state.hasMore) state.nextCursor = state.viewers.at(-1)?.id || state.nextCursor;
+      state.canManage = result.canManage === true;
+      dialog.close(); showToast(existingViewer ? '시청자 기록을 수정했어요.' : '시청자를 추가했어요.');
+    } catch (error) {
+      showToast(error.message || '시청자 기록을 저장하지 못했어요.');
+    } finally {
+      state.saving = false; save.disabled = false; refreshUpboSection(page.streamer.id);
+    }
+  });
+  document.body.append(dialog); dialog.showModal();
+}
+
+async function deleteUpboViewer(page, topicId, viewer) {
+  const state = upboStateFor(page.streamer.id);
+  if (!state.canManage || state.saving || !confirm(`${viewer.nickname}님의 후원 기록을 삭제할까요?`)) return;
+  state.saving = true; refreshUpboSection(page.streamer.id);
+  try {
+    await callUpbo({ action: 'deleteViewer', streamerId: page.streamer.id, topicId, viewerId: viewer.id });
+    state.viewers = state.viewers.filter((item) => item.id !== viewer.id);
+    state.viewerCount = Math.max(0, state.viewerCount - 1); showToast('시청자 기록을 삭제했어요.');
+  } catch (error) {
+    showToast(error.message || '시청자 기록을 삭제하지 못했어요.');
+  } finally { state.saving = false; refreshUpboSection(page.streamer.id); }
+}
+
+async function deleteUpboTopic(page, topicId) {
+  const state = upboStateFor(page.streamer.id);
+  const topic = state.topics.find((item) => item.id === topicId);
+  if (!state.canManage || state.saving || !topic || !confirm(`“${topic.title}” 주제와 시청자 기록을 모두 삭제할까요?`)) return;
+  state.saving = true; refreshUpboSection(page.streamer.id);
+  try {
+    await callUpbo({ action: 'deleteTopic', streamerId: page.streamer.id, topicId });
+    state.topics = state.topics.filter((item) => item.id !== topicId);
+    state.activeTopicId = state.topics[0]?.id || ''; state.topic = null; state.viewers = [];
+    state.viewerCount = state.topics[0]?.viewerCount || 0; state.hasMore = false; state.nextCursor = '';
+    showToast('업보 주제를 삭제했어요.');
+    if (state.activeTopicId) await loadUpboTopic(page.streamer.id, state.activeTopicId);
+  } catch (error) {
+    showToast(error.message || '업보 주제를 삭제하지 못했어요.');
+  } finally { state.saving = false; refreshUpboSection(page.streamer.id); }
+}
+
 function renderFanPage(page) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
@@ -594,6 +1052,7 @@ function renderFanPage(page) {
   section.append(details, stockCard, actions);
   if (!page.isOwner) view.append(back);
   view.append(section);
+  view.append(renderUpboSection(page));
   const rouletteSection = renderRouletteSection(page);
   if (rouletteSection) view.append(rouletteSection);
   const messengerSection = renderMessengerSection(page);
@@ -615,6 +1074,7 @@ function renderFanPage(page) {
   if (youtubeSection) loadYouTubeVideos(page.streamer.id);
   if (cafeSection) loadCafePosts(page.streamer.id);
   loadCalendar(page.streamer.id);
+  loadUpboTopics(page.streamer.id);
 
   if (page.isOwner) {
     const editorDialog = document.createElement('dialog');
