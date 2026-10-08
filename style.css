@@ -577,3 +577,47 @@
 .footer-policy-links{display:flex;align-items:center;justify-content:center;gap:13px;flex-wrap:wrap}.footer-policy-links a{color:inherit;text-decoration:none;border-bottom:1px solid #ffffff33}.footer-policy-links a:hover{color:var(--pink);border-color:currentColor}
 .policy-page{min-height:100vh;background:radial-gradient(ellipse at 50% -15%,#36263e 0,transparent 48%),var(--bg);color:var(--text)}.policy-header{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:72px;padding:14px clamp(18px,6vw,80px);border-bottom:1px solid var(--line);background:#111018bd}.policy-brand{color:var(--text);font:18px var(--display);text-decoration:none}.policy-back{color:var(--muted);font-size:12px;text-decoration:none}.policy-main{width:min(900px,calc(100% - 32px));margin:28px auto 60px}.policy-card{padding:clamp(22px,5vw,48px);border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,#1d1a27f2,#17151ef2);box-shadow:0 22px 70px #0003}.policy-card .eyebrow{margin:0 0 9px;color:var(--pink);font-size:10px;font-weight:700;letter-spacing:.18em}.policy-card h1{margin:0 0 8px;font:32px var(--display);letter-spacing:-.03em}.policy-effective{margin:0 0 25px;color:var(--muted);font-size:11px}.policy-card>p{color:#c8c1d0;font-size:13px;line-height:1.9}.policy-card h2{margin:30px 0 9px;padding-top:17px;border-top:1px solid var(--line);font:20px var(--display)}.policy-card h3{margin:18px 0 6px;color:#f0d8e4;font-size:14px}.policy-card li,.policy-card .policy-detail{color:#c8c1d0;font-size:12px;line-height:1.9}.policy-card ul{display:grid;gap:9px;padding-left:20px}.policy-card strong{color:#f5eff8}.policy-card a{color:#f4a7c4}.policy-data-list{display:grid;gap:9px}.policy-data-item{padding:13px 15px;border:1px solid var(--line);border-radius:13px;background:#ffffff06}.policy-data-item p{margin:4px 0;color:#c8c1d0;font-size:12px;line-height:1.8}.policy-notice{padding:13px 15px;border-radius:13px;background:#f58cac12;color:#d7c8d4!important}.policy-return{display:inline-flex;margin-top:27px;padding:10px 14px;border:1px solid #ffffff24;border-radius:12px;color:var(--text)!important;text-decoration:none}.policy-return:hover{background:#ffffff0b}
 @media(max-width:560px){.policy-header{min-height:62px}.policy-main{margin-top:15px}.policy-card{border-radius:17px}.policy-card h1{font-size:26px}.footer-policy-links{gap:9px}.footer-policy-links a{white-space:nowrap}}
+
+/* Yuhatti's fanpage uses her sora-blue personal palette. */
+#fanPageView.fanpage-theme-sora{--pink:#CADBFF;--lav:#6387D1;--line:#CADBFF20;background:radial-gradient(ellipse at 50% 0%,#6387D11c,transparent 58%)}
+#fanPageView.fanpage-theme-sora .content-card{border-color:#CADBFF24;background:radial-gradient(ellipse at 100% 0%,#6387D10c,transparent 46%),linear-gradient(140deg,#202330,#191a23)}
+#fanPageView.fanpage-theme-sora .profile-board{border-color:#CADBFF;background:radial-gradient(ellipse at 91% 5%,#6387D126,transparent 38%),linear-gradient(145deg,#222633,#1c1d27);box-shadow:0 24px 70px #0004,0 0 36px #6387D111}
+#fanPageView.fanpage-theme-sora .profile-tab{background:#CADBFF;color:#263451}
+#fanPageView.fanpage-theme-sora .profile-avatar{border-color:#CADBFF;box-shadow:0 0 0 5px #6387D12b,0 8px 30px #0007}
+#fanPageView.fanpage-theme-sora .profile-fact span{background:linear-gradient(110deg,#CADBFF,#B9CCF4);color:#263451}
+#fanPageView.fanpage-theme-sora .profile-about strong,#fanPageView.fanpage-theme-sora .profile-detail-label{color:#CADBFF}
+#fanPageView.fanpage-theme-sora .profile-details{border-top-color:#CADBFF55}
+#fanPageView.fanpage-theme-sora .profile-stock-card{border-color:#6387D155;background:linear-gradient(110deg,#6387D11d,#CADBFF0a)}
+#fanPageView.fanpage-theme-sora .profile-stock-card:hover{border-color:#CADBFFaa;background:linear-gradient(110deg,#6387D129,#CADBFF13)}
+#fanPageView.fanpage-theme-sora .profile-stock-attendance{border-color:#6387D166;background:#6387D11c;color:#CADBFF}
+#fanPageView.fanpage-theme-sora .profile-editor-field input:focus,#fanPageView.fanpage-theme-sora .profile-editor-field textarea:focus,#fanPageView.fanpage-theme-sora .calendar-editor-form .profile-editor-field select:focus{border-color:#6387D1;box-shadow:0 0 0 3px #6387D124}
+#fanPageView.fanpage-theme-sora .button-primary{border-color:#6387D1;background:#6387D1;color:#1d2a49}
+#fanPageView.fanpage-theme-sora .button-primary:hover{border-color:#7898dc;background:#7898dc}
+#fanPageView.fanpage-theme-sora .fan-gallery-tabs button.is-active,#fanPageView.fanpage-theme-sora .upbo-topic-tab.is-active,#fanPageView.fanpage-theme-sora .calendar-mode-button.is-active{border-color:#6387D1;background:#6387D1;color:#1d2a49}
+#fanPageView.fanpage-theme-sora .fan-gallery-tabs button:hover,#fanPageView.fanpage-theme-sora .fan-gallery-card:hover,#fanPageView.fanpage-theme-sora .vod-card:hover{border-color:#CADBFF75;background-color:#6387D111}
+#fanPageView.fanpage-theme-sora .vod-card:focus-visible,#fanPageView.fanpage-theme-sora .vod-more-button:focus-visible,#fanPageView.fanpage-theme-sora .live-refresh-button:focus-visible,#fanPageView.fanpage-theme-sora .live-preview-link:focus-visible,#fanPageView.fanpage-theme-sora .live-watch-button:focus-visible,#fanPageView.fanpage-theme-sora .live-station-link:focus-visible{outline-color:#CADBFF}
+#fanPageView.fanpage-theme-sora .vod-comments-tabs button.is-active{border-color:#6387D1}
+#fanPageView.fanpage-theme-sora .upbo-empty{border-color:#6387D155;background:radial-gradient(ellipse at 0 50%,#6387D123,transparent 56%),linear-gradient(120deg,#ffffff04,#ffffff01)}
+#fanPageView.fanpage-theme-sora .upbo-empty-mark,#fanPageView.fanpage-theme-sora .messenger-link-icon{border-color:#6387D166;background:#6387D11c;color:#CADBFF;text-shadow:0 0 15px #6387D155}
+#fanPageView.fanpage-theme-sora .upbo-topic-tab:hover{border-color:#CADBFF75;background:#6387D11b}
+#fanPageView.fanpage-theme-sora .upbo-topic-heading,#fanPageView.fanpage-theme-sora .messenger-link-section{border-color:#6387D14d;background:linear-gradient(110deg,#6387D11b,#CADBFF08)}
+#fanPageView.fanpage-theme-sora .upbo-editor-check input{accent-color:#6387D1}
+#fanPageView.fanpage-theme-sora .live-preview-card{border-color:#6387D155}
+#fanPageView.fanpage-theme-sora .live-badge{background:#6387D1;color:#1d2a49}
+#fanPageView.fanpage-theme-sora .live-status-label,#fanPageView.fanpage-theme-sora .calendar-event-time{color:#CADBFF}
+#fanPageView.fanpage-theme-sora .calendar-day:hover{background:#6387D114}
+#fanPageView.fanpage-theme-sora .calendar-day.is-selected{box-shadow:inset 0 0 0 2px #6387D1;background:#6387D11c}
+#fanPageView.fanpage-theme-sora .calendar-type-2 i,#fanPageView.fanpage-theme-sora .calendar-type-2.calendar-event-category{background:#6387D1;color:#1d2a49}
+#fanPageView.fanpage-theme-sora .calendar-event-chip.calendar-type-2{border-left-color:#6387D1}
+#fanPageView.fanpage-theme-sora .calendar-source-fanpage i,#fanPageView.fanpage-theme-sora .calendar-event-chip.calendar-source-fanpage{background:#6387D1;border-color:#6387D1}
+#fanPageView.fanpage-theme-sora .calendar-source-fanpage.calendar-event-category{background:#6387D1;color:#1d2a49}
+#fanPageView.fanpage-theme-sora .calendar-source-badge.calendar-source-fanpage{border-color:#6387D166;background:#6387D11b;color:#CADBFF}
+#fanPageView.fanpage-theme-sora .calendar-event-delete-button{border-color:#6387D155;background:#6387D111;color:#CADBFF}
+#fanPageView.fanpage-theme-sora .calendar-event-delete-button:hover:not(:disabled){border-color:#6387D1;background:#6387D122}
+#fanPageView.fanpage-theme-sora .cafe-more-link:hover{color:#CADBFF}
+#fanPageView.fanpage-theme-sora .profile-link-editor{border-color:#6387D155;background:#6387D10f}
+#fanPageView.fanpage-theme-sora .profile-link-editor input:focus,#fanPageView.fanpage-theme-sora .vod-comment-input:focus,#fanPageView.fanpage-theme-sora .vod-comment-profile-fields input:focus{border-color:#6387D1;box-shadow:0 0 0 3px #6387D124}
+#fanPageView.fanpage-theme-sora .roulette-group-heading{background:#6387D111}
+#fanPageView.fanpage-theme-sora .roulette-donation-count{color:#CADBFF}
+#fanPageView.fanpage-theme-sora .roulette-item-type{border-color:#6387D155;color:#CADBFF}
+#fanPageView.fanpage-theme-sora .roulette-item-meter-fill{background:#6387D1}
