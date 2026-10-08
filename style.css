@@ -371,7 +371,7 @@
 .upbo-editor-check input{accent-color:var(--pink)}
 .upbo-editor-note{margin:0;padding:10px 11px;border-radius:8px;background:#ffffff06;color:#aaa3b1;font-size:10px;line-height:1.6}
 .upbo-editor-footer{align-items:center;margin:0}
-.upbo-editor-footer small{color:#928a9a;font-size:10px}
+.upbo-editor-footer small{color:#928a9a;font-size:13px}
 .upbo-viewer-editor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
 .upbo-viewer-editor-grid .profile-editor-field:nth-child(n+4){grid-column:1/-1}
 @media(max-width:720px){
