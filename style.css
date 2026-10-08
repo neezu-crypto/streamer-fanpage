@@ -232,6 +232,31 @@
 .youtube-video-card .vod-metadata span:last-child{color:#f2a4a0}
 @media(max-width:720px){.youtube-heading{align-items:flex-start;flex-direction:column;gap:11px}.youtube-heading h2{font-size:21px}.youtube-heading-actions{width:100%}.youtube-heading-actions .button{flex:1;min-width:0;padding-inline:9px;font-size:11px}.youtube-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
 @media(max-width:380px){.youtube-grid{grid-template-columns:1fr}}
+.songbook-section{margin-top:18px}
+.songbook-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.songbook-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.songbook-heading h2{display:inline-block;margin:0;font:23px var(--display)}
+.songbook-count{margin-left:9px;color:var(--muted);font-size:12px}
+.songbook-description{margin:8px 0 14px;color:#aaa3b1;font-size:12px;line-height:1.6}
+.songbook-add-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:13px}
+.songbook-add-form input{width:100%;min-width:0;min-height:42px;padding:9px 12px;border:1px solid #ffffff20;border-radius:10px;background:#111018;color:var(--text);outline:0;font:12px var(--font)}
+.songbook-add-form input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.songbook-add-form .button{white-space:nowrap}
+.songbook-owner-hint{grid-column:1/-1;color:#8f8997;font-size:11px;line-height:1.5}
+.songbook-empty-state{margin:0;padding:15px;border-radius:10px;background:#ffffff04;color:#96909d;text-align:center;font-size:12px}
+.songbook-list{display:grid;gap:8px;max-height:min(60vh,520px);overflow-y:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
+.songbook-row{display:flex;align-items:center;gap:10px;min-width:0;padding:8px;border:1px solid #ffffff12;border-radius:11px;background:#ffffff04}
+.songbook-entry{display:flex;align-items:center;gap:13px;flex:1;min-width:0;padding:0;border:0;background:transparent;color:var(--text);text-align:left}
+.songbook-entry:hover .songbook-entry-details strong{color:var(--pink)}
+.songbook-thumbnail-frame{position:relative;display:grid;place-items:center;flex:0 0 132px;width:132px;height:74px;overflow:hidden;border:1px solid #ffffff12;border-radius:8px;background:linear-gradient(135deg,#302631,#17151e)}
+.songbook-thumbnail-frame.is-missing::after{content:'YOUTUBE';color:#ffffff55;font-size:10px;font-weight:800;letter-spacing:.14em}
+.songbook-thumbnail{width:100%;height:100%;object-fit:cover}
+.songbook-entry-details{display:grid;gap:6px;min-width:0}
+.songbook-entry-details strong{overflow:hidden;font-size:14px;text-overflow:ellipsis;white-space:nowrap;transition:color .18s}
+.songbook-entry-details>span{color:#928a9a;font-size:11px}
+.songbook-delete-button{flex:none;padding:8px 11px;color:#efb0bd;font-size:11px}
+@media(max-width:720px){.songbook-heading h2{font-size:21px}.songbook-add-form{grid-template-columns:1fr}.songbook-add-form .button{width:100%}.songbook-entry{gap:10px}.songbook-thumbnail-frame{flex-basis:104px;width:104px;height:59px}.songbook-entry-details strong{font-size:13px}.songbook-delete-button{padding:7px 9px}}
+@media(max-width:380px){.songbook-row{gap:6px;padding:6px}.songbook-thumbnail-frame{flex-basis:88px;width:88px;height:50px}.songbook-entry-details strong{font-size:12px}.songbook-entry-details>span{font-size:10px}}
 .calendar-section{margin-top:18px}
 .calendar-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
 .calendar-heading .eyebrow{margin:0 0 5px;font-size:9px}

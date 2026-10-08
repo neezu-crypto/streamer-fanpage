@@ -22,6 +22,7 @@ const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
 const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
 const callAdminStats = httpsCallable(functions, 'streamerFanPageAdminStats');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
+const callSongbook = httpsCallable(functions, 'streamerFanPageSongbook');
 const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
 const callVodComments = httpsCallable(functions, 'streamerFanPageVodComments');
 const callVodCommentAdd = httpsCallable(functions, 'streamerFanPageVodCommentAdd');
@@ -1090,6 +1091,7 @@ function renderFanPage(page) {
   view.append(renderVodSection(page));
   const youtubeSection = renderYouTubeSection(page);
   if (youtubeSection) view.append(youtubeSection);
+  view.append(renderSongbookSection(page));
   view.append(renderOgqSection(page));
   const cafeSection = renderCafeSection(page);
   if (cafeSection) view.append(cafeSection);
@@ -2128,6 +2130,115 @@ function renderYouTubeSection(page) {
   });
   scrollbox.append(grid); section.append(scrollbox);
   return section;
+}
+
+function renderSongbookSection(page) {
+  const entries = Array.isArray(page.songbook) ? page.songbook : [];
+  const section = document.createElement('section');
+  section.className = 'songbook-section content-card';
+  section.id = 'songbookSection';
+
+  const heading = document.createElement('div'); heading.className = 'songbook-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'SONGBOOK';
+  const title = document.createElement('h2'); title.textContent = '노래책';
+  const count = document.createElement('span'); count.className = 'songbook-count';
+  count.textContent = `${entries.length.toLocaleString('ko-KR')}곡`;
+  copy.append(eyebrow, title, count); heading.append(copy); section.append(heading);
+
+  const description = document.createElement('p'); description.className = 'songbook-description';
+  description.textContent = '스트리머가 부를 수 있는 노래를 모아뒀어요. 곡을 누르면 팬페이지 안에서 재생됩니다.';
+  section.append(description);
+
+  if (page.isOwner) {
+    const form = document.createElement('form'); form.className = 'songbook-add-form';
+    const input = document.createElement('input'); input.type = 'url'; input.name = 'youtubeUrl';
+    input.required = true; input.maxLength = 500; input.placeholder = 'https://www.youtube.com/watch?v=…';
+    input.setAttribute('aria-label', '추가할 YouTube 노래 링크');
+    const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary';
+    add.textContent = '＋ 노래 추가';
+    form.append(input, add);
+    const hint = document.createElement('small'); hint.className = 'songbook-owner-hint';
+    hint.textContent = 'YouTube 영상 링크를 붙여 넣으면 제목과 썸네일을 불러옵니다. 최대 500곡까지 등록할 수 있어요.';
+    form.append(hint);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (form.reportValidity()) addSongbookEntry(page, input, add);
+    });
+    section.append(form);
+  }
+
+  if (!entries.length) {
+    const empty = document.createElement('p'); empty.className = 'songbook-empty-state';
+    empty.textContent = page.isOwner ? '아직 등록한 노래가 없어요. YouTube 링크를 추가해 보세요.' : '아직 등록된 노래가 없어요.';
+    section.append(empty);
+    return section;
+  }
+
+  const list = document.createElement('div'); list.className = 'songbook-list';
+  entries.forEach((entry) => {
+    if (!entry || !/^[A-Za-z0-9_-]{11}$/.test(String(entry.id || ''))) return;
+    const row = document.createElement('div'); row.className = 'songbook-row';
+    const play = document.createElement('button'); play.type = 'button'; play.className = 'songbook-entry';
+    play.setAttribute('aria-label', `${entry.title || '노래'} 재생`);
+    play.addEventListener('click', () => openYouTubePlayer({ id: entry.id, title: entry.title }));
+    const frame = document.createElement('span'); frame.className = 'songbook-thumbnail-frame';
+    const image = document.createElement('img'); image.className = 'songbook-thumbnail';
+    image.src = entry.thumbnailUrl || `https://i.ytimg.com/vi/${encodeURIComponent(entry.id)}/mqdefault.jpg`;
+    image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
+    image.addEventListener('error', () => { image.remove(); frame.classList.add('is-missing'); }, { once: true });
+    frame.append(image);
+    const details = document.createElement('span'); details.className = 'songbook-entry-details';
+    const songTitle = document.createElement('strong'); songTitle.textContent = entry.title || '제목 없음';
+    const source = document.createElement('span'); source.textContent = 'YouTube · 팬페이지에서 재생';
+    details.append(songTitle, source); play.append(frame, details); row.append(play);
+    if (page.isOwner) {
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button songbook-delete-button';
+      remove.textContent = '삭제'; remove.setAttribute('aria-label', `${entry.title || '노래'} 삭제`);
+      remove.addEventListener('click', () => deleteSongbookEntry(page, entry.id, remove));
+      row.append(remove);
+    }
+    list.append(row);
+  });
+  section.append(list);
+  return section;
+}
+
+async function addSongbookEntry(page, input, button) {
+  if (!page.isOwner || button.disabled) return;
+  button.disabled = true; button.textContent = '영상 확인 중…';
+  try {
+    const result = (await callSongbook({ action: 'add', streamerId: page.streamer.id, youtubeUrl: input.value.trim() })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    currentPage.songbook = Array.isArray(result.songbook) ? result.songbook : [];
+    refreshSongbookSection(page.streamer.id);
+    showToast('노래를 노래책에 추가했어요.');
+  } catch (error) {
+    showToast(error.message || '노래를 추가하지 못했어요.');
+  } finally {
+    button.disabled = false; button.textContent = '＋ 노래 추가';
+  }
+}
+
+async function deleteSongbookEntry(page, videoId, button) {
+  if (!page.isOwner || button.disabled || !confirm('이 노래를 노래책에서 삭제할까요?')) return;
+  button.disabled = true;
+  try {
+    const result = (await callSongbook({ action: 'delete', streamerId: page.streamer.id, videoId })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    currentPage.songbook = Array.isArray(result.songbook) ? result.songbook : [];
+    refreshSongbookSection(page.streamer.id);
+    showToast('노래를 노래책에서 삭제했어요.');
+  } catch (error) {
+    showToast(error.message || '노래를 삭제하지 못했어요.');
+    button.disabled = false;
+  }
+}
+
+function refreshSongbookSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('songbookSection');
+  if (section) section.replaceWith(renderSongbookSection(currentPage));
 }
 
 function renderOgqSection(page) {
