@@ -35,6 +35,7 @@ const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const YOUTUBE_VIDEO_PAGE_SIZE = 24;
 const YOUTUBE_CACHE_TTL_MS = 30 * 60 * 1000;
 const YOUTUBE_REFRESH_COOLDOWN_MS = 60 * 1000;
+const FANPAGE_SONGBOOK_MAX_ITEMS = 500;
 const CAFE_POST_PREVIEW_SIZE = 6;
 const CAFE_POST_CACHE_TTL_MS = 5 * 60 * 1000;
 const NAVER_CAFE_API_BASE = 'https://apis.naver.com/cafe-web/cafe-boardlist-api/v1';
@@ -1013,6 +1014,56 @@ function parseYouTubeChannelUrl(value) {
   }
 }
 
+function parseYouTubeVideoUrl(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 500) return null;
+  try {
+    const parsed = new URL(value.trim());
+    const hosts = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'www.youtu.be']);
+    if (parsed.protocol !== 'https:' || !hosts.has(parsed.hostname) || parsed.username || parsed.password || parsed.port) return null;
+    const path = decodeURIComponent(parsed.pathname).replace(/\/+$/, '');
+    let videoId = '';
+    if (parsed.hostname.endsWith('youtu.be')) {
+      videoId = path.replace(/^\//, '');
+    } else if (path === '/watch') {
+      videoId = parsed.searchParams.get('v') || '';
+    } else {
+      const match = /^\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{11})$/i.exec(path);
+      if (match) videoId = match[1];
+    }
+    if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) return null;
+    return { id: videoId, url: `https://www.youtube.com/watch?v=${videoId}` };
+  } catch (_) {
+    return null;
+  }
+}
+
+function songbookRef(streamerId) {
+  return db.ref(`streamerFanPageSongbooks/${streamerId}`);
+}
+
+function normalizeSongbookEntries(value) {
+  const entries = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return Object.entries(entries)
+    .map(([key, valueEntry]) => {
+      if (!/^[A-Za-z0-9_-]{11}$/.test(key) || !valueEntry || typeof valueEntry !== 'object') return null;
+      const thumbnailUrl = typeof valueEntry.thumbnailUrl === 'string' ? valueEntry.thumbnailUrl : '';
+      let safeThumbnailUrl = '';
+      try {
+        const parsed = new URL(thumbnailUrl);
+        if (parsed.protocol === 'https:' && parsed.hostname === 'i.ytimg.com') safeThumbnailUrl = parsed.href;
+      } catch (_) { /* A missing or unexpected thumbnail will use the YouTube fallback. */ }
+      return {
+        id: key,
+        title: typeof valueEntry.title === 'string' ? valueEntry.title.trim().slice(0, 300) : '제목 없음',
+        thumbnailUrl: safeThumbnailUrl,
+        createdAt: Number.isFinite(Number(valueEntry.createdAt)) ? Number(valueEntry.createdAt) : 0,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+    .slice(-FANPAGE_SONGBOOK_MAX_ITEMS);
+}
+
 function parseNaverCafeUrl(value) {
   if (typeof value !== 'string' || !value.trim() || value.length > 300) return null;
   try {
@@ -1600,10 +1651,11 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
 
   const target = await findVerifiedBySoopId(requestedId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
-  const [pageSnap, vods, stockNamesSnap] = await Promise.all([
+  const [pageSnap, vods, stockNamesSnap, songbookSnap] = await Promise.all([
     pageRef(target.streamer.id).get(),
     readVodPage(target.streamer.id),
     db.ref('streamerNames').get(),
+    songbookRef(target.streamer.id).get(),
     recordRecentVisit(uid, target.streamer.id),
     ...(!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)
       ? [recordFanPageView(uid, target.streamer.id).catch((error) => {
@@ -1615,7 +1667,7 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
   return {
     verifiedStreamer: verified ? verified.streamer : null,
     isAdmin,
-    page: { ...normalizePage(target.streamer, pageSnap.val()), vods, stock },
+    page: { ...normalizePage(target.streamer, pageSnap.val()), vods, stock, songbook: normalizeSongbookEntries(songbookSnap.val()) },
   };
 });
 
@@ -2447,6 +2499,77 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   }
   const saved = await pageRef(targetStreamer.streamer.id).get();
   return { page: normalizePage(targetStreamer.streamer, saved.val()) };
+});
+
+exports.streamerFanPageSongbook = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+  let targetStreamer;
+  if (isAdmin) {
+    const targetId = String(data.streamerId || '').trim().toLowerCase();
+    if (!targetId) throw new HttpsError('invalid-argument', '수정할 팬페이지를 지정해 주세요.');
+    targetStreamer = await findVerifiedBySoopId(targetId);
+    if (!targetStreamer) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  } else {
+    if (!verified) throw new HttpsError('permission-denied', '인증 스트리머 또는 관리자만 노래책을 수정할 수 있습니다.');
+    targetStreamer = verified;
+  }
+
+  const action = String(data.action || '');
+  const rootRef = songbookRef(targetStreamer.streamer.id);
+  if (action === 'add') {
+    const parsed = parseYouTubeVideoUrl(data.youtubeUrl);
+    if (!parsed) throw new HttpsError('invalid-argument', 'YouTube 영상 링크를 확인해 주세요.');
+    const existingSnapshot = await rootRef.get();
+    const existingEntries = existingSnapshot.val() && typeof existingSnapshot.val() === 'object'
+      ? existingSnapshot.val()
+      : {};
+    if (Object.prototype.hasOwnProperty.call(existingEntries, parsed.id)) {
+      throw new HttpsError('already-exists', '이미 노래책에 추가된 영상이에요.');
+    }
+    if (Object.keys(existingEntries).length >= FANPAGE_SONGBOOK_MAX_ITEMS) {
+      throw new HttpsError('resource-exhausted', `노래책은 최대 ${FANPAGE_SONGBOOK_MAX_ITEMS}곡까지 등록할 수 있어요.`);
+    }
+
+    const payload = await fetchYouTubeJson('videos', {
+      part: 'snippet',
+      id: parsed.id,
+    }, YOUTUBE_DATA_API_KEY.value());
+    const video = Array.isArray(payload.items) ? normalizeYouTubeVideo(payload.items[0]) : null;
+    if (!video) throw new HttpsError('failed-precondition', '영상 정보를 확인할 수 없어요. 공개된 YouTube 영상 링크인지 확인해 주세요.');
+    const entry = {
+      title: video.title || '제목 없음',
+      thumbnailUrl: video.thumbnailUrl || `https://i.ytimg.com/vi/${parsed.id}/mqdefault.jpg`,
+      createdAt: Date.now(),
+    };
+    const transaction = await rootRef.transaction((current) => {
+      const entries = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
+      if (Object.prototype.hasOwnProperty.call(entries, parsed.id) || Object.keys(entries).length >= FANPAGE_SONGBOOK_MAX_ITEMS) return undefined;
+      return { ...entries, [parsed.id]: entry };
+    });
+    if (!transaction.committed) {
+      const latest = (await rootRef.get()).val() || {};
+      if (Object.prototype.hasOwnProperty.call(latest, parsed.id)) throw new HttpsError('already-exists', '이미 노래책에 추가된 영상이에요.');
+      throw new HttpsError('resource-exhausted', `노래책은 최대 ${FANPAGE_SONGBOOK_MAX_ITEMS}곡까지 등록할 수 있어요.`);
+    }
+    return { songbook: normalizeSongbookEntries(transaction.snapshot.val()) };
+  }
+
+  if (action === 'delete') {
+    const videoId = String(data.videoId || '').trim();
+    if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) throw new HttpsError('invalid-argument', '삭제할 노래를 확인해 주세요.');
+    const transaction = await rootRef.transaction((current) => {
+      if (!current || typeof current !== 'object' || Array.isArray(current) || !Object.prototype.hasOwnProperty.call(current, videoId)) return undefined;
+      const entries = { ...current };
+      delete entries[videoId];
+      return Object.keys(entries).length ? entries : null;
+    });
+    if (!transaction.committed) throw new HttpsError('not-found', '삭제할 노래를 찾을 수 없습니다.');
+    return { songbook: normalizeSongbookEntries(transaction.snapshot.val()) };
+  }
+
+  throw new HttpsError('invalid-argument', '노래책 요청을 확인해 주세요.');
 });
 
 exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3600, memory: '1GiB' }, async (request) => {
