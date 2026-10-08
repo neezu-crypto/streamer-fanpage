@@ -3202,15 +3202,26 @@ async function runSearch() {
   } catch (error) { hint.textContent = error.message || '검색에 실패했어요.'; }
 }
 function showStartupError(error) {
+  const isStreamerNotFound = error && (
+    error.code === 'functions/not-found'
+    || error.code === 'not-found'
+    || /인증된 스트리머 팬페이지를 찾을 수 없습니다|팬페이지를 찾을 수 없습니다/.test(error.message || '')
+  );
   $('startupCover').classList.add('is-error');
-  $('startupTitle').textContent = '페이지를 불러오지 못했어요';
-  $('startupMessage').textContent = error && error.message ? error.message : '연결 상태를 확인한 뒤 다시 시도해 주세요.';
+  $('startupCover').classList.toggle('is-not-found', isStreamerNotFound);
+  $('startupTitle').textContent = isStreamerNotFound ? '팬페이지를 찾을 수 없어요' : '페이지를 불러오지 못했어요';
+  $('startupMessage').textContent = isStreamerNotFound
+    ? '해당 스트리머의 팬페이지가 없습니다. 팬페이지는 인증된 스트리머에게 제공되며, 방송국 아이디가 맞는지 확인해 주세요.'
+    : error && error.message ? error.message : '연결 상태를 확인한 뒤 다시 시도해 주세요.';
+  $('retryButton').textContent = isStreamerNotFound ? '스트리머 검색으로 이동' : '다시 불러오기';
   $('retryButton').classList.remove('hidden');
 }
 async function loadApp() {
   galleryLoadPromise = Promise.resolve();
   $('startupCover').classList.remove('is-error');
+  $('startupCover').classList.remove('is-not-found');
   $('retryButton').classList.add('hidden');
+  $('retryButton').textContent = '다시 불러오기';
   $('startupTitle').textContent = '페이지를 준비하고 있어요';
   $('startupMessage').textContent = '로그인 상태와 인증된 스트리머 정보를 확인하고 있습니다.';
   try {
@@ -3225,7 +3236,9 @@ async function loadApp() {
     isAdminUser = result.isAdmin === true;
     verifiedStreamerUid = result.verifiedStreamer ? auth.currentUser.uid : '';
     renderAuthControls();
-    if (requestedId && !result.page) throw new Error('팬페이지를 찾을 수 없습니다.');
+    if (requestedId && !result.page) {
+      throw Object.assign(new Error('팬페이지를 찾을 수 없습니다.'), { code: 'not-found' });
+    }
     const recentPromise = callRecent().then((value) => value.data.streamers);
     if (!requestedId) {
       const recent = await recentPromise;
@@ -3253,7 +3266,14 @@ async function loadApp() {
     $('siteShell').classList.add('is-ready');
   } catch (error) { showStartupError(error); }
 }
-$('retryButton').addEventListener('click', loadApp);
+$('retryButton').addEventListener('click', () => {
+  if ($('startupCover').classList.contains('is-not-found')) {
+    history.replaceState(null, '', `${location.pathname}${location.search}#/`);
+    loadApp();
+    return;
+  }
+  loadApp();
+});
 $('openLoginOptions').addEventListener('click', () => $('loginChoiceDialog').showModal());
 $('closeLoginChoices').addEventListener('click', () => $('loginChoiceDialog').close());
 $('choiceGoogleLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithGoogle(); });
