@@ -973,6 +973,7 @@ function renderFanPage(page) {
   stockPriceSparklineRequest += 1;
   currentPage = page;
   const view = $('fanPageView');
+  view.classList.toggle('fanpage-theme-sora', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   view.replaceChildren();
   const back = document.createElement('a');
   back.href = '#/';
