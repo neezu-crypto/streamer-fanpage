@@ -10,6 +10,7 @@ const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-ro
 initializeApp();
 const db = getDatabase();
 const MAX_INTRO_LENGTH = 700;
+const MAX_BANNER_IMAGE_ITEMS = 20;
 const RECENT_PAGE_LIMIT = 8;
 const FANPAGE_STATS_DAYS = 30;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
@@ -986,6 +987,21 @@ function cleanHttpsUrl(value) {
   }
 }
 
+function cleanHttpsImageUrl(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 2048) return '';
+  try {
+    const parsed = new URL(value.trim());
+    return parsed.protocol === 'https:' && parsed.hostname && !parsed.username && !parsed.password ? parsed.href : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function normalizeBannerImageUrls(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(cleanHttpsImageUrl).filter(Boolean))].slice(0, MAX_BANNER_IMAGE_ITEMS);
+}
+
 function parseYouTubeChannelUrl(value) {
   if (typeof value !== 'string' || !value.trim() || value.length > 300) return null;
   try {
@@ -1479,6 +1495,8 @@ function normalizePage(streamer, value) {
     youtubeChannelUrl: parseYouTubeChannelUrl(sourceProfile.youtubeChannelUrl)?.url || '',
     cafeUrl: parseNaverCafeUrl(sourceProfile.cafeUrl)?.url || '',
     ogqEmoticonUrl: parseOgqEmoticonUrl(sourceProfile.ogqEmoticonUrl)?.url || '',
+    topBannerImageUrls: normalizeBannerImageUrls(sourceProfile.topBannerImageUrls),
+    bottomBannerImageUrls: normalizeBannerImageUrls(sourceProfile.bottomBannerImageUrls),
   };
   return {
     streamer,
@@ -2422,6 +2440,12 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       || (Object.prototype.hasOwnProperty.call(profile, 'youtubeChannelUrl') && typeof profile.youtubeChannelUrl !== 'string')
       || (Object.prototype.hasOwnProperty.call(profile, 'cafeUrl') && typeof profile.cafeUrl !== 'string')
       || (Object.prototype.hasOwnProperty.call(profile, 'ogqEmoticonUrl') && typeof profile.ogqEmoticonUrl !== 'string')
+      || (Object.prototype.hasOwnProperty.call(profile, 'topBannerImageUrls') && (!Array.isArray(profile.topBannerImageUrls)
+        || profile.topBannerImageUrls.length > MAX_BANNER_IMAGE_ITEMS
+        || profile.topBannerImageUrls.some((url) => typeof url !== 'string' || url.length > 2048)))
+      || (Object.prototype.hasOwnProperty.call(profile, 'bottomBannerImageUrls') && (!Array.isArray(profile.bottomBannerImageUrls)
+        || profile.bottomBannerImageUrls.length > MAX_BANNER_IMAGE_ITEMS
+        || profile.bottomBannerImageUrls.some((url) => typeof url !== 'string' || url.length > 2048)))
       || !Array.isArray(profile.contents)
       || profile.contents.length > 8
       || stringFields.some((field) => profile[field].length > ({ birthday: 20, mbti: 8, major: 50, debutDate: 20, fanNickname: 30, fandomName: 30, scheduleText: 120, rouletteUrl: 300 })[field])
@@ -2466,6 +2490,21 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       throw new HttpsError('invalid-argument', 'SOOP OGQ 이모티콘 상품 주소를 입력해 주세요.');
     }
     const previousCafeUrl = parseNaverCafeUrl(previousProfile.cafeUrl)?.url || '';
+    const topBannerImageUrlsInput = Object.prototype.hasOwnProperty.call(profile, 'topBannerImageUrls')
+      ? profile.topBannerImageUrls
+      : previousProfile.topBannerImageUrls;
+    const bottomBannerImageUrlsInput = Object.prototype.hasOwnProperty.call(profile, 'bottomBannerImageUrls')
+      ? profile.bottomBannerImageUrls
+      : previousProfile.bottomBannerImageUrls;
+    const cleanBannerImageUrls = (input) => {
+      if (input === undefined) return [];
+      const values = Array.isArray(input) ? input : [];
+      const normalized = values.map((url) => cleanHttpsImageUrl(url));
+      if (normalized.some((url, index) => typeof values[index] === 'string' && values[index].trim() && !url)) {
+        throw new HttpsError('invalid-argument', '배너 이미지는 HTTPS 이미지 주소로 입력해 주세요.');
+      }
+      return normalizeBannerImageUrls(normalized);
+    };
     clearRouletteCache = previousRouletteUrl !== (parseWeFlabRouletteUrl(rouletteUrl) || '');
     updates.profile = {
       birthday: profile.birthday.trim(),
@@ -2480,6 +2519,8 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       youtubeChannelUrl: youtubeChannel ? youtubeChannel.url : '',
       cafeUrl: cafe ? cafe.url : '',
       ogqEmoticonUrl: ogqEmoticon ? ogqEmoticon.url : '',
+      topBannerImageUrls: cleanBannerImageUrls(topBannerImageUrlsInput),
+      bottomBannerImageUrls: cleanBannerImageUrls(bottomBannerImageUrlsInput),
     };
     clearYouTubeCache = hasYouTubeUrl;
     clearCafeCache = Object.prototype.hasOwnProperty.call(profile, 'cafeUrl') && previousCafeUrl !== (cafe ? cafe.url : '');
