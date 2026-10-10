@@ -46,6 +46,7 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
 const MAX_LOADED_VIDEO_ITEMS = 500;
+const MAX_BANNER_IMAGE_ITEMS = 20;
 const $ = (id) => document.getElementById(id);
 let currentPage = null;
 let searchTimer = 0;
@@ -1060,6 +1061,7 @@ function renderFanPage(page) {
   if (about) section.append(about);
   section.append(details, stockCard, actions);
   if (!page.isOwner) view.append(back);
+  view.append(renderBannerSection(page, 'top'));
   view.append(section);
   if (String(page.streamer.id || '').toLowerCase() === 'yuhatty') {
     const character = document.createElement('section');
@@ -1098,6 +1100,7 @@ function renderFanPage(page) {
   view.append(renderCalendarSection(page));
   const gallerySection = renderGallerySection(page);
   view.append(gallerySection);
+  view.append(renderBannerSection(page, 'bottom'));
   if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
@@ -1126,6 +1129,7 @@ function renderFanPage(page) {
       ['ogqEmoticonUrl', 'OGQ 이모티콘 링크', 300],
     ];
     const inputMap = {};
+    const bannerEditors = {};
     const grid = document.createElement('div'); grid.className = 'profile-editor-grid';
     fields.forEach(([key, labelText, maxLength]) => {
       const wrapper = document.createElement('label'); wrapper.className = 'profile-editor-field'; wrapper.textContent = labelText;
@@ -1160,6 +1164,13 @@ function renderFanPage(page) {
       }
       grid.append(wrapper); inputMap[key] = input;
     });
+    bannerEditors.topBannerImageUrls = createBannerSettingsEditor(
+      'topBannerImageUrls', '상단 배너 이미지', profile.topBannerImageUrls || [],
+    );
+    bannerEditors.bottomBannerImageUrls = createBannerSettingsEditor(
+      'bottomBannerImageUrls', '하단 배너 이미지', profile.bottomBannerImageUrls || [],
+    );
+    grid.append(bannerEditors.topBannerImageUrls.element, bannerEditors.bottomBannerImageUrls.element);
     const introLabel = document.createElement('label'); introLabel.className = 'profile-editor-field profile-editor-wide'; introLabel.textContent = 'ABOUT 문구';
     const introInput = document.createElement('textarea'); introInput.maxLength = 700; introInput.value = page.intro || '';
     introLabel.append(introInput); grid.append(introLabel);
@@ -1173,6 +1184,9 @@ function renderFanPage(page) {
       save.disabled = true;
       try {
         const value = (key) => inputMap[key].value.trim();
+        const readBannerUrls = (editor) => [...new Set(editor.values().map(normalizeBannerImageUrl).filter(Boolean))];
+        const topBannerImageUrls = readBannerUrls(bannerEditors.topBannerImageUrls);
+        const bottomBannerImageUrls = readBannerUrls(bannerEditors.bottomBannerImageUrls);
         const result = await callSave({
           streamerId: currentPage.streamer.id,
           intro: introInput.value,
@@ -1182,6 +1196,7 @@ function renderFanPage(page) {
             contents: value('contents').split(',').map((item) => item.trim()).filter(Boolean),
             scheduleText: value('scheduleText'), rouletteUrl: value('rouletteUrl'),
             youtubeChannelUrl: value('youtubeChannelUrl'), cafeUrl: value('cafeUrl'), ogqEmoticonUrl: value('ogqEmoticonUrl'),
+            topBannerImageUrls, bottomBannerImageUrls,
           },
         });
         currentPage.intro = result.data.page.intro;
@@ -1216,6 +1231,156 @@ function refreshProfileRouletteAction(page) {
   actions.insertBefore(link, settings || null);
 }
 
+function normalizeBannerImageUrl(value) {
+  const link = String(value || '').trim();
+  if (!link) return '';
+  if (link.length > 2048) throw new Error('배너 이미지 주소는 2,048자 이내로 입력해 주세요.');
+  let parsed;
+  try { parsed = new URL(link); } catch (_) { throw new Error('배너 이미지 주소를 확인해 주세요.'); }
+  if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) {
+    throw new Error('HTTPS 이미지 주소를 입력해 주세요.');
+  }
+  return parsed.href;
+}
+
+function createBannerSettingsEditor(field, labelText, sourceUrls) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'profile-editor-field profile-editor-wide banner-settings-editor';
+  const heading = document.createElement('div'); heading.className = 'banner-settings-heading';
+  const label = document.createElement('strong'); label.textContent = labelText;
+  const add = document.createElement('button'); add.type = 'button'; add.className = 'button banner-settings-add'; add.textContent = '+ 이미지 추가';
+  heading.append(label, add);
+  const rows = document.createElement('div'); rows.className = 'banner-settings-rows';
+  const urls = Array.isArray(sourceUrls) ? sourceUrls.filter((url) => typeof url === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [];
+  const addRow = (value = '') => {
+    if (rows.children.length >= MAX_BANNER_IMAGE_ITEMS) return;
+    const row = document.createElement('div'); row.className = 'banner-settings-row';
+    const input = document.createElement('input'); input.type = 'url'; input.maxLength = 2048;
+    input.placeholder = 'https://이미지주소'; input.value = value; input.autocomplete = 'url'; input.setAttribute('aria-label', `${labelText} 이미지 주소`);
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button banner-settings-remove';
+    remove.textContent = '삭제'; remove.setAttribute('aria-label', `${labelText} 주소 삭제`);
+    remove.addEventListener('click', () => row.remove());
+    row.append(input, remove); rows.append(row);
+    add.disabled = rows.children.length >= MAX_BANNER_IMAGE_ITEMS;
+  };
+  urls.forEach((url) => addRow(url));
+  add.addEventListener('click', () => addRow());
+  const note = document.createElement('small'); note.className = 'profile-editor-hint';
+  note.textContent = `배너 규격은 약 2045×298px이며, 상단·하단 각각 최대 ${MAX_BANNER_IMAGE_ITEMS}개까지 등록할 수 있어요.`;
+  wrapper.append(heading, rows, note);
+  return {
+    element: wrapper,
+    values() { return [...rows.querySelectorAll('input')].map((input) => input.value.trim()).filter(Boolean); },
+  };
+}
+
+function renderBannerSection(page, position) {
+  const isTop = position === 'top';
+  const field = isTop ? 'topBannerImageUrls' : 'bottomBannerImageUrls';
+  const section = document.createElement('section');
+  section.className = `fan-banner-section content-card fan-banner-${position}`;
+  section.id = `${position}BannerSection`;
+  const heading = document.createElement('div'); heading.className = 'fan-banner-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = isTop ? 'TOP FANPAGE BANNER' : 'BOTTOM FANPAGE BANNER';
+  const title = document.createElement('h2'); title.textContent = isTop ? '상단 배너' : '하단 배너';
+  copy.append(eyebrow, title); heading.append(copy); section.append(heading);
+
+  const storedUrls = page.profile && page.profile[field];
+  const urls = Array.isArray(storedUrls) ? storedUrls.map((url) => {
+    try { return normalizeBannerImageUrl(url); } catch (_) { return ''; }
+  }).filter(Boolean).slice(0, MAX_BANNER_IMAGE_ITEMS) : [];
+  const list = document.createElement('div'); list.className = 'fan-banner-list';
+  if (!urls.length) {
+    const empty = document.createElement('p'); empty.className = 'profile-link-empty-state';
+    empty.textContent = page.isOwner ? '배너 이미지가 아직 등록되지 않았어요. 이미지 주소를 추가해 보세요.' : '아직 등록된 배너 이미지가 없어요.';
+    list.append(empty);
+  } else {
+    urls.forEach((url, index) => {
+      const item = document.createElement('div'); item.className = 'fan-banner-item';
+      const image = document.createElement('img'); image.className = 'fan-banner-image';
+      image.src = url; image.alt = `${page.streamer.nickname} ${isTop ? '상단' : '하단'} 배너 ${index + 1}`;
+      image.loading = isTop && index === 0 ? 'eager' : 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
+      const fallback = document.createElement('span'); fallback.className = 'fan-banner-fallback hidden';
+      fallback.textContent = '배너 이미지를 불러오지 못했어요.';
+      image.addEventListener('error', () => { image.classList.add('hidden'); fallback.classList.remove('hidden'); }, { once: true });
+      item.append(image, fallback);
+      if (page.isOwner) {
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button fan-banner-remove';
+        remove.textContent = '이미지 삭제'; remove.setAttribute('aria-label', `${isTop ? '상단' : '하단'} 배너 이미지 ${index + 1} 삭제`);
+        remove.addEventListener('click', () => {
+          const nextUrls = urls.filter((_, itemIndex) => itemIndex !== index);
+          saveBannerImageUrls(page, field, nextUrls, remove);
+        });
+        item.append(remove);
+      }
+      list.append(item);
+    });
+  }
+  section.append(list);
+
+  if (page.isOwner) {
+    const form = document.createElement('form'); form.className = 'fan-banner-editor';
+    const input = document.createElement('input'); input.type = 'url'; input.maxLength = 2048;
+    input.placeholder = 'https://이미지주소'; input.required = true; input.autocomplete = 'url';
+    input.setAttribute('aria-label', `${isTop ? '상단' : '하단'} 배너 이미지 주소`);
+    const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary'; add.textContent = '+ 배너 추가';
+    const note = document.createElement('small'); note.className = 'fan-banner-editor-note';
+    note.textContent = `HTTPS 이미지 주소를 등록할 수 있어요. ${urls.length}/${MAX_BANNER_IMAGE_ITEMS}`;
+    const status = document.createElement('p'); status.className = 'profile-link-editor-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    add.disabled = urls.length >= MAX_BANNER_IMAGE_ITEMS;
+    form.append(input, add, note, status);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!input.checkValidity() || add.disabled) { input.reportValidity(); return; }
+      let url;
+      try { url = normalizeBannerImageUrl(input.value); }
+      catch (error) { status.textContent = error.message; status.classList.add('is-error'); input.focus(); return; }
+      if (urls.includes(url)) { status.textContent = '이미 등록된 이미지 주소예요.'; status.classList.add('is-error'); return; }
+      status.textContent = ''; status.classList.remove('is-error');
+      await saveBannerImageUrls(page, field, [...urls, url], add, status);
+    });
+    section.append(form);
+  }
+  return section;
+}
+
+async function saveBannerImageUrls(page, field, urls, button, status = null) {
+  if (!page.isOwner || !Array.isArray(urls)) return;
+  let normalizedUrls;
+  try {
+    normalizedUrls = [...new Set(urls.map(normalizeBannerImageUrl).filter(Boolean))];
+    if (normalizedUrls.length > MAX_BANNER_IMAGE_ITEMS) throw new Error(`배너는 위치별 최대 ${MAX_BANNER_IMAGE_ITEMS}개까지 등록할 수 있어요.`);
+  } catch (error) {
+    if (status) { status.textContent = error.message; status.classList.add('is-error'); }
+    else showToast(error.message || '배너 주소를 확인해 주세요.');
+    return;
+  }
+  button.disabled = true;
+  try {
+    const result = await callSave({
+      streamerId: page.streamer.id,
+      profile: profileForLinkSave(page.profile, field, normalizedUrls),
+    });
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    currentPage.profile = result.data.page.profile;
+    page.profile = currentPage.profile;
+    refreshBannerSection('top'); refreshBannerSection('bottom');
+    showToast('배너 이미지를 저장했어요.');
+  } catch (error) {
+    if (status) { status.textContent = error.message || '배너 이미지를 저장하지 못했어요.'; status.classList.add('is-error'); }
+    else showToast(error.message || '배너 이미지를 저장하지 못했어요.');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function refreshBannerSection(position) {
+  if (!currentPage) return;
+  const section = $(`${position}BannerSection`);
+  if (section) section.replaceWith(renderBannerSection(currentPage, position));
+}
+
 function profileForLinkSave(source, field, value) {
   const profile = source || {};
   const saved = {
@@ -1225,6 +1390,8 @@ function profileForLinkSave(source, field, value) {
     contents: Array.isArray(profile.contents) ? profile.contents.filter((item) => typeof item === 'string').slice(0, 8) : [],
     scheduleText: String(profile.scheduleText || ''), rouletteUrl: String(profile.rouletteUrl || ''),
     ogqEmoticonUrl: String(profile.ogqEmoticonUrl || ''),
+    topBannerImageUrls: Array.isArray(profile.topBannerImageUrls) ? profile.topBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
+    bottomBannerImageUrls: Array.isArray(profile.bottomBannerImageUrls) ? profile.bottomBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
   };
   saved[field] = value;
   return saved;

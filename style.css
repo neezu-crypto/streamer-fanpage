@@ -674,3 +674,33 @@
 .ogq-product-details>span:last-child{color:#a9a1b0;font-size:11px;line-height:1.6}
 #fanPageView.fanpage-theme-sora .ogq-product-preview:hover{border-color:#CADBFF75;background:#6387D111}
 @media(max-width:720px){.ogq-heading{align-items:flex-start;flex-direction:column;gap:11px}.ogq-heading-actions{width:100%}.ogq-heading-actions .button{flex:1;text-align:center}.ogq-product-preview{grid-template-columns:92px minmax(0,1fr);gap:13px;min-height:112px;padding:10px}.ogq-product-image-frame{width:92px;height:92px}.ogq-product-details strong{font-size:17px}.ogq-product-details>span:last-child{font-size:10px}}
+
+/* Optional top and bottom banner images, with inline multi-image management for page owners. */
+.fan-banner-section{margin-top:18px}
+.fan-banner-top{margin-top:0;margin-bottom:18px}
+.fan-banner-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:13px}
+.fan-banner-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.fan-banner-heading h2{margin:0;font:23px var(--display)}
+.fan-banner-list{display:grid;gap:10px}
+.fan-banner-item{position:relative;overflow:hidden;border:1px solid #ffffff18;border-radius:12px;background:#111018}
+.fan-banner-image{display:block;width:100%;aspect-ratio:2045/298;object-fit:cover;background:linear-gradient(110deg,#2c2532,#191720)}
+.fan-banner-fallback{display:grid;min-height:90px;place-items:center;color:#aaa3b1;font-size:12px}
+.fan-banner-remove{position:absolute;top:9px;right:9px;min-height:34px;padding:7px 10px;border-color:#ffffff40;background:#111018d9;backdrop-filter:blur(8px)}
+.fan-banner-editor{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:9px 10px;margin-top:13px;padding:13px;border:1px solid #f58cac35;border-radius:12px;background:#f58cac08}
+.fan-banner-editor input{width:100%;min-width:0;height:40px;padding:0 11px;border:1px solid #ffffff20;border-radius:9px;outline:0;background:#111018;color:var(--text);font:13px var(--font)}
+.fan-banner-editor input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.fan-banner-editor>.button{min-height:40px;white-space:nowrap}
+.fan-banner-editor-note,.fan-banner-editor .profile-link-editor-status{grid-column:1/-1;margin:0;color:#928a9a;font-size:11px;line-height:1.55}
+.banner-settings-editor{padding:13px;border:1px solid #ffffff16;border-radius:11px;background:#ffffff04}
+.banner-settings-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.banner-settings-heading strong{color:#e5dce8;font-size:12px}
+.banner-settings-add,.banner-settings-remove{min-height:34px;padding:7px 10px;white-space:nowrap}
+.banner-settings-rows{display:grid;gap:8px}
+.banner-settings-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.banner-settings-row input{width:100%;min-width:0;height:40px;padding:0 11px;border:1px solid #ffffff20;border-radius:9px;outline:0;background:#111018;color:var(--text);font:13px var(--font)}
+.banner-settings-row input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.banner-settings-editor .profile-editor-hint{line-height:1.5}
+#fanPageView.fanpage-theme-sora .fan-banner-item{border-color:#6387D155}
+#fanPageView.fanpage-theme-sora .fan-banner-editor,#fanPageView.fanpage-theme-sora .banner-settings-editor{border-color:#6387D155;background:#6387D10f}
+#fanPageView.fanpage-theme-sora .fan-banner-editor input:focus,#fanPageView.fanpage-theme-sora .banner-settings-row input:focus{border-color:#6387D1;box-shadow:0 0 0 3px #6387D124}
+@media(max-width:560px){.fan-banner-heading{align-items:flex-start}.fan-banner-heading h2{font-size:21px}.fan-banner-item{border-radius:9px}.fan-banner-editor{grid-template-columns:minmax(0,1fr) auto;padding:11px}.fan-banner-editor>.button{padding-inline:10px;font-size:11px}.banner-settings-heading{align-items:flex-start}.banner-settings-add,.banner-settings-remove{padding-inline:8px;font-size:10px}}
