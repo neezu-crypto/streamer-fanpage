@@ -356,7 +356,7 @@
 .upbo-range-table{overflow:hidden;border:1px solid #ffffff12;border-radius:10px;background:#11101845}
 .upbo-range-head,.upbo-range-row{display:grid;align-items:stretch;min-width:0}
 .upbo-promise-grid{grid-template-columns:120px minmax(0,1fr) 96px}
-.upbo-reward-grid{grid-template-columns:150px minmax(0,1fr)}
+.upbo-reward-grid{grid-template-columns:120px minmax(0,1fr) 96px}
 .upbo-range-head{min-height:37px;background:#f58cac12;color:#e5dbe7;font-size:12px}
 .upbo-range-head strong,.upbo-range-row>*{display:flex;align-items:center;justify-content:center;padding:8px 12px;text-align:center}
 .upbo-range-head strong+strong,.upbo-range-row>*+*{border-left:1px solid #ffffff12}
@@ -365,6 +365,9 @@
 .upbo-range-reward{overflow-wrap:anywhere;white-space:pre-wrap}
 .upbo-achievement{color:#aaa3b1;font-size:12px}
 .upbo-achievement.is-achieved{background:#89d8ae1c;color:#9be0b7;font-size:13px;font-weight:800}
+.upbo-achievement-control{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:25px;cursor:pointer;white-space:nowrap}
+.upbo-achievement-control input{width:16px;height:16px;margin:0;accent-color:#89d8ae;cursor:pointer}
+.upbo-achievement-control input:disabled{cursor:wait}
 .upbo-viewer-table{overflow:hidden;border:1px solid #ffffff12;border-radius:10px;background:#11101845}
 .upbo-viewer-row{display:grid;grid-template-columns:minmax(100px,.9fr) 94px minmax(120px,1.25fr) minmax(120px,1.25fr) minmax(110px,1fr);align-items:stretch;min-width:0;border-top:1px solid #ffffff12;color:#e8e1eb;font-size:13px}
 .upbo-viewer-table.is-manage .upbo-viewer-row{grid-template-columns:minmax(90px,.85fr) 88px minmax(100px,1.1fr) minmax(100px,1.1fr) minmax(90px,.9fr) 98px}
@@ -410,7 +413,7 @@
   .upbo-topic-heading{flex-direction:column;padding:13px;gap:12px}
   .upbo-topic-actions{width:100%}.upbo-topic-actions .button{flex:1}
   .upbo-promise-grid{grid-template-columns:88px minmax(0,1fr) 76px}
-  .upbo-reward-grid{grid-template-columns:100px minmax(0,1fr)}
+  .upbo-reward-grid{grid-template-columns:88px minmax(0,1fr) 76px}
   .upbo-viewer-head{display:none}
   .upbo-viewer-row,.upbo-viewer-table.is-manage .upbo-viewer-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:0;padding:4px 8px;border-top:1px solid #ffffff15}
   .upbo-viewer-row>*{display:grid;grid-template-columns:82px minmax(0,1fr);align-items:start;gap:7px;padding:7px 4px;border:0!important;font-size:12px;text-align:left}
@@ -430,7 +433,7 @@
   .upbo-empty-copy strong{font-size:14px}.upbo-empty-copy p{font-size:12px}
   .upbo-topic-actions{gap:6px}.upbo-topic-actions .button{padding:7px 8px;font-size:11px}
   .upbo-subsection-heading h4{font-size:14px}
-  .upbo-promise-grid{grid-template-columns:72px minmax(0,1fr) 64px}
+  .upbo-promise-grid,.upbo-reward-grid{grid-template-columns:72px minmax(0,1fr) 76px}
   .upbo-range-head strong,.upbo-range-row>*{padding:7px 6px;font-size:11px}
   .upbo-viewer-row>*{grid-template-columns:76px minmax(0,1fr);gap:5px;padding:6px 3px;font-size:11px}
   .upbo-viewer-editor-grid{grid-template-columns:1fr}.upbo-viewer-editor-grid .profile-editor-field:nth-child(n+4){grid-column:auto}

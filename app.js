@@ -533,28 +533,83 @@ function formatUpboCount(value) {
   return `${Math.max(0, Math.floor(Number(value) || 0)).toLocaleString('ko-KR')}개`;
 }
 
-function renderUpboRangeTable(rows, kind) {
+function renderUpboRangeTable(rows, kind, page, topic, state) {
   const wrapper = document.createElement('div'); wrapper.className = `upbo-range-table upbo-${kind}-table`;
   const header = document.createElement('div'); header.className = `upbo-range-head upbo-${kind}-grid`;
   const countHeading = document.createElement('strong'); countHeading.textContent = '누적 후원';
   const rewardHeading = document.createElement('strong'); rewardHeading.textContent = kind === 'promise' ? '공약' : '보상';
   header.append(countHeading, rewardHeading);
-  if (kind === 'promise') {
-    const statusHeading = document.createElement('strong'); statusHeading.textContent = '달성'; header.append(statusHeading);
-  }
+  const statusHeading = document.createElement('strong'); statusHeading.textContent = '달성'; header.append(statusHeading);
   wrapper.append(header);
   rows.forEach((row) => {
     const line = document.createElement('div'); line.className = `upbo-range-row upbo-${kind}-grid`;
     const count = document.createElement('strong'); count.className = 'upbo-range-count'; count.textContent = formatUpboCount(row.donationCount);
     const reward = document.createElement('span'); reward.className = 'upbo-range-reward'; reward.textContent = row.reward;
     line.append(count, reward);
-    if (kind === 'promise') {
-      const status = document.createElement('span'); status.className = `upbo-achievement${row.achieved ? ' is-achieved' : ''}`;
-      status.textContent = row.achieved ? '✓ 달성' : '진행 중'; line.append(status);
+    const status = document.createElement('span'); status.className = `upbo-achievement${row.achieved ? ' is-achieved' : ''}`;
+    if (state.canManage) {
+      const label = document.createElement('label'); label.className = 'upbo-achievement-control';
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = row.achieved === true;
+      checkbox.disabled = state.saving;
+      checkbox.setAttribute('aria-label', `${row.reward} 달성 여부`);
+      checkbox.addEventListener('change', () => {
+        checkbox.disabled = true;
+        updateUpboRowAchievement(page, topic, kind, row.id, checkbox.checked);
+      });
+      const text = document.createElement('span'); text.textContent = row.achieved ? '달성' : '진행 중';
+      label.append(checkbox, text); status.append(label);
+    } else {
+      status.textContent = row.achieved ? '✓ 달성' : '진행 중';
     }
+    line.append(status);
     wrapper.append(line);
   });
   return wrapper;
+}
+
+async function updateUpboRowAchievement(page, topic, kind, rowId, achieved) {
+  const state = upboStateFor(page.streamer.id);
+  if (!state.canManage || state.saving) return;
+  const sourceTopic = state.topic && state.topic.id === topic.id ? state.topic : topic;
+  const updateRows = (rows, targetKind) => rows.map((row) => ({
+    ...row,
+    achieved: targetKind === kind && row.id === rowId ? achieved : row.achieved === true,
+  }));
+  const previousTopic = state.topic;
+  const topicIndex = state.topics.findIndex((item) => item.id === sourceTopic.id);
+  const previousListTopic = topicIndex >= 0 ? state.topics[topicIndex] : null;
+  const optimisticTopic = {
+    ...sourceTopic,
+    promises: updateRows(sourceTopic.promises || [], 'promise'),
+    rewardTiers: updateRows(sourceTopic.rewardTiers || [], 'reward'),
+  };
+  state.topic = optimisticTopic;
+  if (topicIndex >= 0) state.topics[topicIndex] = { ...state.topics[topicIndex], ...optimisticTopic };
+  state.saving = true;
+  refreshUpboSection(page.streamer.id);
+  try {
+    const result = (await callUpbo({
+      action: 'saveTopic', streamerId: page.streamer.id, topicId: sourceTopic.id,
+      topic: {
+        id: sourceTopic.id,
+        title: sourceTopic.title,
+        description: sourceTopic.description || '',
+        promises: optimisticTopic.promises,
+        rewardTiers: optimisticTopic.rewardTiers,
+      },
+    })).data;
+    const savedTopic = { ...result.topic, viewerCount: sourceTopic.viewerCount || state.viewerCount || 0 };
+    state.topic = savedTopic;
+    if (topicIndex >= 0) state.topics[topicIndex] = { ...state.topics[topicIndex], ...savedTopic };
+    showToast(achieved ? '항목을 달성 완료로 표시했어요.' : '달성 표시를 해제했어요.');
+  } catch (error) {
+    state.topic = previousTopic;
+    if (topicIndex >= 0 && previousListTopic) state.topics[topicIndex] = previousListTopic;
+    showToast(error.message || '달성 상태를 저장하지 못했어요.');
+  } finally {
+    state.saving = false;
+    refreshUpboSection(page.streamer.id);
+  }
 }
 
 function renderUpboSection(page) {
@@ -645,7 +700,7 @@ function renderUpboSection(page) {
     const subTitle = document.createElement('h4'); subTitle.textContent = '후원 총 누적 공약'; subheading.append(subTitle);
     if (!topic.promises.length) {
       const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 등록된 공약이 없어요.'; promises.append(subheading, empty);
-    } else promises.append(subheading, renderUpboRangeTable(topic.promises, 'promise'));
+    } else promises.append(subheading, renderUpboRangeTable(topic.promises, 'promise', page, topic, state));
     rangeGrid.append(promises);
   }
   if (topic.rewardTiers.length || state.canManage) {
@@ -654,7 +709,7 @@ function renderUpboSection(page) {
     const subTitle = document.createElement('h4'); subTitle.textContent = '개인 누적 후원 보상'; subheading.append(subTitle);
     if (!topic.rewardTiers.length) {
       const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 등록된 보상 구간이 없어요.'; rewards.append(subheading, empty);
-    } else rewards.append(subheading, renderUpboRangeTable(topic.rewardTiers, 'reward'));
+    } else rewards.append(subheading, renderUpboRangeTable(topic.rewardTiers, 'reward', page, topic, state));
     rangeGrid.append(rewards);
   }
   if (rangeGrid.childElementCount) section.append(rangeGrid);
@@ -794,11 +849,9 @@ function appendUpboRangeEditorRow(container, kind, value = {}) {
   const reward = upboEditorField(kind === 'promise' ? '공약 내용' : '보상 내용', 'input', { type: 'text', maxlength: 300, required: true, value: value.reward || '', placeholder: kind === 'promise' ? '예: 공포게임 2시간' : '예: 체키 방셀' });
   reward.field.className = 'upbo-editor-reward';
   row.append(count.label, reward.label);
-  if (kind === 'promise') {
-    const achieved = document.createElement('label'); achieved.className = 'upbo-editor-check';
-    const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = value.achieved === true;
-    const text = document.createElement('span'); text.textContent = '달성'; achieved.append(checkbox, text); row.append(achieved);
-  }
+  const achieved = document.createElement('label'); achieved.className = 'upbo-editor-check';
+  const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = value.achieved === true;
+  const text = document.createElement('span'); text.textContent = '달성'; achieved.append(checkbox, text); row.append(achieved);
   const remove = upboButton('삭제', 'upbo-small-button upbo-danger-button', () => row.remove());
   row.append(remove); container.append(row);
 }
@@ -808,7 +861,7 @@ function collectUpboRangeEditorRows(container, kind) {
     id: row.dataset.id,
     donationCount: Number(row.querySelector('.upbo-editor-count').value),
     reward: row.querySelector('.upbo-editor-reward').value.trim(),
-    ...(kind === 'promise' ? { achieved: row.querySelector('input[type="checkbox"]').checked } : {}),
+    achieved: row.querySelector('input[type="checkbox"]').checked,
   }));
 }
 

@@ -223,7 +223,7 @@ function upboCount(value) {
   return count;
 }
 
-function normalizeUpboRows(value, rowType) {
+function normalizeUpboRows(value) {
   if (!Array.isArray(value) || value.length > FANPAGE_UPBO_MAX_ROWS) {
     throw new HttpsError('invalid-argument', '주제별 공약과 보상은 각각 50개까지 등록할 수 있습니다.');
   }
@@ -240,7 +240,7 @@ function normalizeUpboRows(value, rowType) {
       donationCount: upboCount(row.donationCount),
       reward: upboText(row.reward, 300, true),
     };
-    if (rowType === 'promise') normalized.achieved = row.achieved === true;
+    normalized.achieved = row.achieved === true;
     return normalized;
   });
 }
@@ -255,8 +255,8 @@ function validateUpboTopic(value, existingMeta = {}) {
     id,
     title: upboText(value.title, 60, true),
     description: upboText(value.description || '', 300),
-    promises: normalizeUpboRows(value.promises || [], 'promise'),
-    rewardTiers: normalizeUpboRows(value.rewardTiers || [], 'reward'),
+    promises: normalizeUpboRows(value.promises || []),
+    rewardTiers: normalizeUpboRows(value.rewardTiers || []),
     createdAt: Number(existingMeta.createdAt) || Date.now(),
     updatedAt: Date.now(),
   };
@@ -264,22 +264,22 @@ function validateUpboTopic(value, existingMeta = {}) {
 
 function normalizeStoredUpboTopic(id, value) {
   if (!validUpboId(id) || !value || typeof value !== 'object' || typeof value.title !== 'string') return null;
-  const rows = (source, rowType) => Object.values(source && typeof source === 'object' ? source : {})
+  const rows = (source) => Object.values(source && typeof source === 'object' ? source : {})
     .filter((row) => row && typeof row === 'object' && validUpboId(row.id))
     .slice(0, FANPAGE_UPBO_MAX_ROWS)
     .map((row) => ({
       id: row.id,
       donationCount: metricCount(row.donationCount),
       reward: typeof row.reward === 'string' ? row.reward.slice(0, 300) : '',
-      ...(rowType === 'promise' ? { achieved: row.achieved === true } : {}),
+      achieved: row.achieved === true,
     }))
     .filter((row) => row.reward);
   return {
     id,
     title: value.title.slice(0, 60),
     description: typeof value.description === 'string' ? value.description.slice(0, 300) : '',
-    promises: rows(value.promises, 'promise'),
-    rewardTiers: rows(value.rewardTiers, 'reward'),
+    promises: rows(value.promises),
+    rewardTiers: rows(value.rewardTiers),
     createdAt: Number(value.createdAt) || 0,
     updatedAt: Number(value.updatedAt) || 0,
   };
