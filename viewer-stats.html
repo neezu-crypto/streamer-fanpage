@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151320">
+  <meta name="description" content="SOOP 다시보기별 최고·최저 시청자 순간을 찾아 바로 재생합니다.">
+  <title>스트리머 시청 통계</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20261013-viewer-stats">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261013-viewer-stats">
+</head>
+<body>
+  <div class="site-shell is-ready viewer-stats-shell">
+    <header class="topbar">
+      <a class="brand" href="index.html" aria-label="스트리머 팬페이지로 이동">
+        <span class="brand-symbol">✳</span>
+        <span><small>STREAMER SERIES</small><strong>스트리머 시청 통계</strong></span>
+      </a>
+      <div class="topbar-right">
+        <span class="topbar-caption"><i></i>SOOP 다시보기 별별통계</span>
+        <a class="auth-button" href="index.html">팬페이지로</a>
+      </div>
+    </header>
+
+    <main class="main-content viewer-stats-main">
+      <section class="viewer-stats-hero">
+        <p class="eyebrow">SOOP VIEWER MOMENTS</p>
+        <h1>다시보기마다<br><span>시청자가 가장 많고 적었던 순간</span></h1>
+        <p>등록된 스트리머는 이름으로 찾고, 그 외에는 SOOP 아이디나 방송국 주소를 입력하세요. 다시보기 카드와 최고·최저 링크는 해당 시점부터 재생됩니다.</p>
+      </section>
+
+      <section class="viewer-search-panel" aria-labelledby="viewerSearchTitle">
+        <form id="viewerSearchForm" class="viewer-search-form">
+          <label id="viewerSearchTitle" for="viewerSearchInput">스트리머 검색</label>
+          <div class="viewer-search-row">
+            <input id="viewerSearchInput" type="search" maxlength="100" placeholder="닉네임, SOOP 아이디 또는 방송국 주소" autocomplete="off">
+            <button class="button button-primary" id="viewerSearchButton" type="submit">검색</button>
+          </div>
+        </form>
+        <p class="viewer-search-hint" id="viewerSearchHint" role="status" aria-live="polite">이름을 검색하거나 SOOP 방송국 아이디·주소를 입력해 주세요.</p>
+        <div class="viewer-search-results" id="viewerSearchResults" aria-label="스트리머 검색 결과"></div>
+      </section>
+
+      <section class="viewer-results hidden" id="viewerResults" aria-live="polite">
+        <div class="viewer-results-heading">
+          <div class="viewer-streamer-identity">
+            <img id="viewerStreamerAvatar" class="avatar" alt="" hidden>
+            <div>
+              <p class="eyebrow">STREAMER</p>
+              <h2 id="viewerStreamerName"></h2>
+              <p id="viewerStreamerId" class="viewer-streamer-id"></p>
+            </div>
+          </div>
+          <a class="button" id="viewerStationLink" href="https://www.sooplive.com/" target="_blank" rel="noopener noreferrer">SOOP 방송국 ↗</a>
+        </div>
+        <div class="viewer-list-heading">
+          <div><h3>방송 다시보기</h3><span id="viewerVodCount"></span></div>
+          <span class="viewer-list-note">시청자 수는 1분 단위 그래프 기준이에요.</span>
+        </div>
+        <p class="viewer-vod-status" id="viewerVodStatus" role="status" aria-live="polite">다시보기를 불러오고 있어요.</p>
+        <div class="viewer-vod-grid" id="viewerVodGrid"></div>
+        <button class="button viewer-load-more hidden" id="viewerLoadMore" type="button">더 많은 다시보기 불러오기</button>
+      </section>
+
+      <section class="viewer-empty" id="viewerEmpty" aria-live="polite">
+        <span aria-hidden="true">⌕</span>
+        <strong>스트리머를 검색해 주세요</strong>
+        <p>각 다시보기의 최고·최저 시청자 시점으로 바로 이동할 수 있어요.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>STREAMER SERIES</span>
+      <nav class="footer-policy-links" aria-label="서비스 정책"><a href="privacy.html">개인정보 처리방침</a><a href="terms.html">이용약관</a></nav>
+      <a href="index.html">스트리머 팬페이지</a>
+    </footer>
+  </div>
+  <script type="module" src="viewer-stats.js?v=20261013-viewer-stats"></script>
+</body>
+</html>
