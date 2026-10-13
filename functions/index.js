@@ -21,6 +21,8 @@ const FANPAGE_VOD_COMMENT_PAGE_SIZE = 50;
 const FANPAGE_VOD_COMMENT_MAX_LENGTH = 500;
 const VOD_REFRESH_LOCK_TTL_MS = 2 * 60 * 1000;
 const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
+const SOOP_VOD_INFO_API = 'https://api.m.sooplive.com/station/video/a/view';
+const SOOP_VOD_STAR2_STATS_API = 'https://apisabana.sooplive.com/service/vod_star2_stats.php';
 const SOOP_STATION_API = 'https://chapi.sooplive.com/api';
 const SOOP_CALENDAR_API = 'https://api-channel.sooplive.com/v1.1/channel';
 const CALENDAR_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -60,6 +62,10 @@ const fanpageGalleryMemoryCache = new Map();
 const youtubeFetchInProgress = new Map();
 const cafeFetchInProgress = new Map();
 const weflabRouletteFetchInProgress = new Map();
+const fanpageViewerStatsMemoryCache = new Map();
+const fanpageViewerStatsInProgress = new Map();
+const FANPAGE_VIEWER_STATS_CACHE_TTL_MS = 10 * 60 * 1000;
+const FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS = 200;
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -829,6 +835,132 @@ async function fetchSoopVodPage(soopId, page) {
     throw new HttpsError('unavailable', 'SOOP 다시보기 응답 형식이 바뀌어 목록을 갱신하지 못했습니다.');
   }
   return { rows: payload.data, total: Math.max(0, Math.floor(Number(payload.meta.total))) };
+}
+
+async function postSoopVodStar2Stats(values, titleNo) {
+  let response;
+  try {
+    response = await fetch(SOOP_VOD_STAR2_STATS_API, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/plain, */*',
+        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        origin: 'https://vod.sooplive.com',
+        referer: 'https://vod.sooplive.com/player/' + encodeURIComponent(titleNo),
+        'user-agent': 'Mozilla/5.0',
+      },
+      body: new URLSearchParams(values),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (error) {
+    console.error('SOOP VOD viewer statistics request failed:', error);
+    throw new HttpsError('unavailable', 'SOOP 방송 별별통계를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!response.ok) {
+    console.error('SOOP VOD viewer statistics returned HTTP ' + response.status);
+    throw new HttpsError('unavailable', 'SOOP 방송 별별통계 서버가 요청을 처리하지 못했습니다.');
+  }
+  let payload;
+  try {
+    payload = JSON.parse(await response.text());
+  } catch (_) {
+    throw new HttpsError('unavailable', 'SOOP 방송 별별통계 응답을 읽지 못했습니다.');
+  }
+  return payload;
+}
+
+async function fetchSoopVodViewerCountStats(soopId, titleNo) {
+  let response;
+  try {
+    response = await fetch(SOOP_VOD_INFO_API, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/plain, */*',
+        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        origin: 'https://vod.sooplive.com',
+        referer: 'https://vod.sooplive.com/player/' + encodeURIComponent(titleNo),
+        'user-agent': 'Mozilla/5.0',
+      },
+      body: new URLSearchParams({ nTitleNo: titleNo, nApiLevel: '11', nPlaylistIdx: '0' }),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (error) {
+    console.error('SOOP VOD information request failed:', error);
+    throw new HttpsError('unavailable', 'SOOP 다시보기 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!response.ok) {
+    throw new HttpsError('unavailable', 'SOOP 다시보기 정보 서버가 요청을 처리하지 못했습니다.');
+  }
+  let infoPayload;
+  try {
+    infoPayload = JSON.parse(await response.text());
+  } catch (_) {
+    throw new HttpsError('unavailable', 'SOOP 다시보기 정보 응답을 읽지 못했습니다.');
+  }
+  const info = infoPayload && Number(infoPayload.result) === 1 && infoPayload.data && typeof infoPayload.data === 'object'
+    ? infoPayload.data
+    : null;
+  if (!info) throw new HttpsError('not-found', 'SOOP 다시보기를 찾을 수 없습니다.');
+  const ownerId = String(info.writer_id || info.bj_id || '').trim().toLowerCase();
+  if (ownerId !== soopId) throw new HttpsError('not-found', '해당 방송국의 다시보기를 찾을 수 없습니다.');
+
+  const stationNo = String(info.station_no || '').trim();
+  const bbsNo = String(info.bbs_no || '').trim();
+  if (!/^\d{1,20}$/.test(stationNo) || !/^\d{1,20}$/.test(bbsNo)) {
+    throw new HttpsError('unavailable', 'SOOP 다시보기 통계 정보를 확인하지 못했습니다.');
+  }
+  const common = {
+    nDeviceType: '1',
+    nTitleNo: titleNo,
+    szLang: 'ko_KR',
+    szSysType: 'html5',
+    szLoginId: '',
+  };
+  const listPayload = await postSoopVodStar2Stats({ ...common, szAction: 'list' }, titleNo);
+  const statList = listPayload && Number(listPayload.result) === 1 && Array.isArray(listPayload.data)
+    ? listPayload.data
+    : null;
+  if (!statList) throw new HttpsError('failed-precondition', '이 다시보기의 시청자 통계를 확인할 수 없습니다.');
+  const viewCountStat = statList.find((entry) => entry && entry.module_name === 'BjViewCnt');
+  if (!viewCountStat || !/^\d+$/.test(String(viewCountStat.idx || ''))) {
+    throw new HttpsError('failed-precondition', '이 다시보기에는 유저 수 그래프가 없습니다.');
+  }
+
+  const graphPayload = await postSoopVodStar2Stats({
+    ...common,
+    szAction: 'view',
+    nStationNo: stationNo,
+    nBbsNo: bbsNo,
+    szType: String(viewCountStat.data_type) === '0' ? 'bj' : 'user',
+    szModule: viewCountStat.module_name,
+    nIdx: String(viewCountStat.idx),
+  }, titleNo);
+  const graph = graphPayload && Number(graphPayload.result) === 1 && graphPayload.data
+    && Array.isArray(graphPayload.data.cnt)
+    ? graphPayload.data.cnt
+    : null;
+  if (!graph) throw new HttpsError('failed-precondition', '이 다시보기의 유저 수 그래프를 불러오지 못했습니다.');
+
+  const points = graph.map((point) => ({ minute: Number(point && point[0]), viewers: Number(point && point[1]) }))
+    .filter((point) => Number.isFinite(point.minute) && Number.isFinite(point.viewers) && point.minute >= 0 && point.viewers >= 0);
+  if (!points.length) throw new HttpsError('failed-precondition', '이 다시보기에는 표시할 시청자 통계가 없습니다.');
+  const maxViewers = Math.max(...points.map((point) => point.viewers));
+  const minViewers = Math.min(...points.map((point) => point.viewers));
+  const durationSeconds = Math.max(0, Math.floor(Number(info.total_file_duration) / 1000));
+  const toPlaybackSecond = (minute) => {
+    // SOOP 그래프의 x축 표본은 방송 시작 기준 분 단위다.
+    const second = Math.max(0, Math.round(minute * 60));
+    return durationSeconds > 0 ? Math.min(second, durationSeconds) : second;
+  };
+  const highest = points.find((point) => point.viewers === maxViewers);
+  const lowest = points.find((point) => point.viewers === minViewers);
+  return {
+    vodId: titleNo,
+    streamerId: soopId,
+    highest: { second: toPlaybackSecond(highest.minute), viewers: maxViewers },
+    lowest: { second: toPlaybackSecond(lowest.minute), viewers: minViewers },
+    checkedAt: Date.now(),
+  };
 }
 
 function normalizeFetchedVodPage(rows, total, page, seenIds) {
@@ -2197,6 +2329,108 @@ exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => 
     .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'))
     .slice(0, 30);
   return { streamers };
+});
+
+exports.streamerFanPageViewerStats = onCall({ maxInstances: 20 }, async (request) => {
+  requireAuth(request);
+  const data = request.data || {};
+  const action = String(data.action || '');
+
+  if (action === 'search') {
+    const query = String(data.query || '').trim().toLocaleLowerCase();
+    if (query.length > 40) throw new HttpsError('invalid-argument', '검색어가 너무 깁니다.');
+    if (!query) return { streamers: [] };
+    const [verifiedSnapshot, namesSnapshot] = await Promise.all([
+      db.ref('streamerVerifications').get(),
+      db.ref('streamerNames').get(),
+    ]);
+    const byId = new Map();
+    Object.entries(verifiedSnapshot.val() || {}).forEach(([key, record]) => {
+      const streamer = publicStreamer(key, record);
+      if (!streamer) return;
+      if (streamer.nickname.toLocaleLowerCase().includes(query) || streamer.soopId.toLocaleLowerCase().includes(query)) {
+        byId.set(streamer.id, streamer);
+      }
+    });
+    Object.entries(namesSnapshot.val() || {}).forEach(([key, rawName]) => {
+      const soopId = String(key || '').trim();
+      const nickname = typeof rawName === 'string' ? rawName.trim().slice(0, 40) : '';
+      if (!SOOP_ID_PATTERN.test(soopId) || !nickname) return;
+      if (!nickname.toLocaleLowerCase().includes(query) && !soopId.toLocaleLowerCase().includes(query)) return;
+      const id = soopId.toLowerCase();
+      if (byId.has(id)) return;
+      byId.set(id, {
+        id,
+        nickname,
+        soopId,
+        avatarUrl: 'https://stimg.sooplive.com/LOGO/' + soopId.slice(0, 2) + '/' + soopId + '/' + soopId + '.jpg',
+        soopUrl: 'https://www.sooplive.com/station/' + encodeURIComponent(soopId),
+      });
+    });
+    const rank = (streamer) => {
+      if (streamer.soopId.toLocaleLowerCase() === query) return 0;
+      if (streamer.nickname.toLocaleLowerCase().startsWith(query)) return 1;
+      if (streamer.soopId.toLocaleLowerCase().startsWith(query)) return 2;
+      return 3;
+    };
+    const streamers = [...byId.values()]
+      .sort((a, b) => rank(a) - rank(b) || a.nickname.localeCompare(b.nickname, 'ko'))
+      .slice(0, 30);
+    return { streamers };
+  }
+
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(streamerId)) {
+    throw new HttpsError('invalid-argument', 'SOOP 방송국 아이디를 확인해 주세요.');
+  }
+
+  if (action === 'vods') {
+    const page = Number(data.page || 1);
+    if (!Number.isSafeInteger(page) || page < 1 || page > 200) {
+      throw new HttpsError('invalid-argument', '다시보기 페이지 요청을 확인해 주세요.');
+    }
+    const result = await fetchSoopVodPage(streamerId, page);
+    const vods = result.rows.map((row) => normalizeSoopVod(row)).filter(Boolean);
+    if (vods.length !== result.rows.length) {
+      throw new HttpsError('unavailable', 'SOOP 다시보기 응답 일부를 읽지 못했습니다.');
+    }
+    return {
+      streamerId,
+      nickname: result.rows[0] && typeof result.rows[0].user_nick === 'string' ? result.rows[0].user_nick.trim().slice(0, 40) : '',
+      vods,
+      total: result.total,
+      page,
+      hasMore: page * SOOP_VOD_PAGE_SIZE < result.total,
+    };
+  }
+
+  if (action === 'stats') {
+    const vodId = String(data.vodId || '').trim();
+    if (!/^\d{1,20}$/.test(vodId)) throw new HttpsError('invalid-argument', '다시보기 번호를 확인해 주세요.');
+    const cacheKey = streamerId + ':' + vodId;
+    const cached = fanpageViewerStatsMemoryCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return { stats: cached.value };
+    const inProgress = fanpageViewerStatsInProgress.get(cacheKey);
+    if (inProgress) return { stats: await inProgress };
+
+    const task = fetchSoopVodViewerCountStats(streamerId, vodId);
+    fanpageViewerStatsInProgress.set(cacheKey, task);
+    try {
+      const stats = await task;
+      fanpageViewerStatsMemoryCache.set(cacheKey, {
+        value: stats,
+        expiresAt: Date.now() + FANPAGE_VIEWER_STATS_CACHE_TTL_MS,
+      });
+      while (fanpageViewerStatsMemoryCache.size > FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS) {
+        fanpageViewerStatsMemoryCache.delete(fanpageViewerStatsMemoryCache.keys().next().value);
+      }
+      return { stats };
+    } finally {
+      if (fanpageViewerStatsInProgress.get(cacheKey) === task) fanpageViewerStatsInProgress.delete(cacheKey);
+    }
+  }
+
+  throw new HttpsError('invalid-argument', '시청 통계 요청을 확인해 주세요.');
 });
 
 exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => {
