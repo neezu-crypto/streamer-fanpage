@@ -67,3 +67,24 @@
 @media(max-width:800px){.viewer-vod-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.viewer-stats-main{padding:44px 0 54px}.viewer-stats-hero{margin-bottom:25px}.viewer-stats-hero h1{font-size:36px}.viewer-stats-hero>p:last-child{font-size:12px}.viewer-search-panel{padding:17px;border-radius:15px}.viewer-search-row{gap:7px}.viewer-search-row .button{min-width:68px;padding:9px 11px}.viewer-search-results{grid-template-columns:1fr}.viewer-results{margin-top:26px}.viewer-results-heading{align-items:flex-start;padding:16px;flex-direction:column}.viewer-streamer-identity .avatar{width:48px;height:48px;flex-basis:48px}.viewer-streamer-identity h2{font-size:21px}.viewer-results-heading>.button{align-self:flex-end}.viewer-list-heading{align-items:flex-start;flex-direction:column;margin-top:24px}.viewer-list-heading>div{align-items:baseline}.viewer-list-note{white-space:normal}.viewer-vod-grid{grid-template-columns:1fr;gap:9px}.viewer-vod-card{display:grid;grid-template-columns:minmax(0,36%) minmax(0,1fr);align-items:start}.viewer-vod-open{display:contents}.viewer-vod-thumb{grid-column:1;grid-row:1/span 3;align-self:stretch;aspect-ratio:auto;min-height:100%;border-radius:12px 0 0 12px}.viewer-vod-thumb img{position:absolute;inset:0}.viewer-vod-copy{grid-column:2;grid-row:1;min-width:0;padding:8px}.viewer-vod-title{min-height:34px;font-size:11px;line-height:1.45}.viewer-vod-meta{display:block;margin-top:5px;font-size:10px;line-height:1.5}.viewer-vod-meta span{display:block}.viewer-vod-meta span+span{margin-top:2px}.viewer-vod-duration{right:4px;bottom:4px;padding:3px 4px;font-size:8px}.viewer-vod-main-action{grid-column:2;grid-row:2;margin:0 8px 6px;font-size:10px;line-height:1.45}.viewer-stat-actions{grid-column:2;grid-row:3;gap:4px;padding:0 6px 7px}.viewer-stat-link,.viewer-stat-state{font-size:10px;min-height:44px;padding:4px}.viewer-stat-retry{font-size:10px}.viewer-stats-shell .topbar{padding:0 13px}.viewer-stats-shell .brand strong{font-size:16px}.viewer-stats-shell .brand small{font-size:7px}.viewer-stats-shell .topbar-right{gap:7px}.viewer-stats-shell .topbar-caption{display:none}.viewer-stats-shell .auth-button{padding:7px 9px;font-size:9px}.viewer-stats-shell .footer{gap:10px;align-items:center}.viewer-stats-shell .footer-policy-links{display:flex;gap:9px}}
 @media(max-width:360px){.viewer-vod-grid{grid-template-columns:1fr}.viewer-vod-card{grid-template-columns:minmax(100px,30%) minmax(0,1fr)}}
+
+/* Keep replay metadata and peak/low labels readable at normal viewing scale. */
+.viewer-search-hint{font-size:11px}
+.viewer-streamer-id{font-size:12px}
+.viewer-list-heading span{color:#beb7c5;font-size:12px}
+.viewer-vod-status{color:#b4acbb;font-size:12px}
+.viewer-vod-duration{font-size:11px}
+.viewer-vod-title{min-height:42px;font-size:14px;line-height:1.45}
+.viewer-vod-meta{color:#bdb6c4;font-size:12px}
+.viewer-vod-main-action{font-size:12px}
+.viewer-stat-link,.viewer-stat-state{min-height:48px;padding:8px;font-size:12px;line-height:1.4}
+.viewer-stat-retry{font-size:12px}
+@media(max-width:620px){
+  .viewer-vod-title{min-height:40px;font-size:14px}
+  .viewer-vod-meta{font-size:12px}
+  .viewer-vod-main-action{font-size:12px}
+  .viewer-stat-link,.viewer-stat-state{min-height:56px;padding:6px;font-size:12px}
+  .viewer-stats-shell .brand small{font-size:9px}
+  .viewer-stats-shell .auth-button{font-size:11px}
+}
+@media(max-width:360px){.viewer-stat-link,.viewer-stat-state{min-height:60px}}
