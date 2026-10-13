@@ -6,11 +6,12 @@
   <meta name="theme-color" content="#151320">
   <meta name="description" content="SOOP 다시보기별 최고·최저 시청자 순간을 찾아 바로 재생합니다.">
   <title>스트리머 시청 통계</title>
+  <link rel="icon" type="image/svg+xml" href="viewer-stats-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261013-viewer-stats">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261013-viewer-stats">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261013-viewer-stats-5m">
 </head>
 <body>
   <div class="site-shell is-ready viewer-stats-shell">
@@ -58,7 +59,7 @@
         </div>
         <div class="viewer-list-heading">
           <div><h3>방송 다시보기</h3><span id="viewerVodCount"></span></div>
-          <span class="viewer-list-note">시청자 수는 1분 단위 그래프 기준이에요.</span>
+          <span class="viewer-list-note">1분 단위 · 시작/종료 5분 제외</span>
         </div>
         <p class="viewer-vod-status" id="viewerVodStatus" role="status" aria-live="polite">다시보기를 불러오고 있어요.</p>
         <div class="viewer-vod-grid" id="viewerVodGrid"></div>
@@ -78,6 +79,6 @@
       <a href="index.html">스트리머 팬페이지</a>
     </footer>
   </div>
-  <script type="module" src="viewer-stats.js?v=20261013-viewer-stats"></script>
+  <script type="module" src="viewer-stats.js?v=20261013-viewer-stats-5m"></script>
 </body>
 </html>

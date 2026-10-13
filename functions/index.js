@@ -941,24 +941,42 @@ async function fetchSoopVodViewerCountStats(soopId, titleNo) {
     : null;
   if (!graph) throw new HttpsError('failed-precondition', '이 다시보기의 유저 수 그래프를 불러오지 못했습니다.');
 
-  const points = graph.map((point) => ({ minute: Number(point && point[0]), viewers: Number(point && point[1]) }))
-    .filter((point) => Number.isFinite(point.minute) && Number.isFinite(point.viewers) && point.minute >= 0 && point.viewers >= 0);
-  if (!points.length) throw new HttpsError('failed-precondition', '이 다시보기에는 표시할 시청자 통계가 없습니다.');
-  const maxViewers = Math.max(...points.map((point) => point.viewers));
-  const minViewers = Math.min(...points.map((point) => point.viewers));
-  const durationSeconds = Math.max(0, Math.floor(Number(info.total_file_duration) / 1000));
-  const toPlaybackSecond = (minute) => {
-    // SOOP 그래프의 x축 표본은 방송 시작 기준 분 단위다.
-    const second = Math.max(0, Math.round(minute * 60));
-    return durationSeconds > 0 ? Math.min(second, durationSeconds) : second;
-  };
-  const highest = points.find((point) => point.viewers === maxViewers);
-  const lowest = points.find((point) => point.viewers === minViewers);
+  const durationMs = Number(info.total_file_duration);
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    throw new HttpsError('failed-precondition', '다시보기 재생 시간을 확인하지 못했습니다.');
+  }
+  const durationSeconds = Math.floor(durationMs / 1000);
+  const includedStartSecond = 5 * 60;
+  const includedEndSecond = durationSeconds - (5 * 60);
+  if (includedEndSecond <= includedStartSecond) {
+    throw new HttpsError('failed-precondition', '시작과 종료 구간을 제외하면 분석할 시간이 부족합니다.');
+  }
+
+  // SOOP 유저 수 그래프는 방송 시작 기준 분 단위 표본이다. 시작 5분 경계부터 분석하고,
+  // 종료 5분이 시작되는 경계 시점부터 제외해 중간 구간에서만 최고·최저를 계산한다.
+  let highest = null;
+  let lowest = null;
+  for (const point of graph) {
+    const minute = Number(point && point[0]);
+    const viewers = Number(point && point[1]);
+    if (!Number.isFinite(minute) || !Number.isFinite(viewers) || minute < 0 || viewers < 0) continue;
+    const second = Math.round(minute * 60);
+    if (second < includedStartSecond || second >= includedEndSecond) continue;
+    if (!highest || viewers > highest.viewers || (viewers === highest.viewers && second < highest.second)) {
+      highest = { second, viewers };
+    }
+    if (!lowest || viewers < lowest.viewers || (viewers === lowest.viewers && second < lowest.second)) {
+      lowest = { second, viewers };
+    }
+  }
+  if (!highest || !lowest) {
+    throw new HttpsError('failed-precondition', '시작·종료 5분을 제외한 구간에 시청자 통계가 없습니다.');
+  }
   return {
     vodId: titleNo,
     streamerId: soopId,
-    highest: { second: toPlaybackSecond(highest.minute), viewers: maxViewers },
-    lowest: { second: toPlaybackSecond(lowest.minute), viewers: minViewers },
+    highest,
+    lowest,
     checkedAt: Date.now(),
   };
 }
