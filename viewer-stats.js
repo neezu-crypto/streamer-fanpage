@@ -166,6 +166,11 @@ function createVodCard(vod, loadToken) {
   open.target = '_blank';
   open.rel = 'noopener noreferrer';
   open.setAttribute('aria-label', (vod.title || '다시보기') + ' 재생');
+  open.setAttribute('aria-disabled', 'true');
+  open.tabIndex = -1;
+  open.addEventListener('click', (event) => {
+    if (card.dataset.statsState !== 'ready' && card.dataset.statsState !== 'error') event.preventDefault();
+  });
 
   const thumbnail = document.createElement('span');
   thumbnail.className = 'viewer-vod-thumb' + (vod.thumbnailUrl ? '' : ' is-missing');
@@ -208,6 +213,11 @@ function createVodCard(vod, loadToken) {
   mainAction.target = '_blank';
   mainAction.rel = 'noopener noreferrer';
   mainAction.textContent = '시청자 통계 계산 중…';
+  mainAction.setAttribute('aria-disabled', 'true');
+  mainAction.tabIndex = -1;
+  mainAction.addEventListener('click', (event) => {
+    if (card.dataset.statsState !== 'ready' && card.dataset.statsState !== 'error') event.preventDefault();
+  });
   const statsActions = document.createElement('div');
   statsActions.className = 'viewer-stat-actions';
   const loading = document.createElement('span');
@@ -228,8 +238,12 @@ function showStatsLinks(card, stats) {
   const lowestUrl = playbackUrl(card._vod.id, stats.lowest.second);
   card._openLink.href = highestUrl;
   card._openLink.setAttribute('aria-label', (card._vod.title || '다시보기') + ' 최고 시청 순간 재생');
+  card._openLink.removeAttribute('aria-disabled');
+  card._openLink.tabIndex = 0;
   card._mainAction.href = highestUrl;
   card._mainAction.textContent = '최고 시청 순간 보기 · ' + formatClock(stats.highest.second) + ' ↗';
+  card._mainAction.removeAttribute('aria-disabled');
+  card._mainAction.tabIndex = 0;
   card._statsActions.replaceChildren();
   const highest = document.createElement('a');
   highest.className = 'viewer-stat-link';
@@ -252,24 +266,36 @@ function showStatsError(card, error, loadToken) {
   card.dataset.statsState = 'error';
   card._mainAction.href = playbackUrl(card._vod.id, null);
   card._mainAction.textContent = 'SOOP에서 다시보기 열기 ↗';
+  card._openLink.removeAttribute('aria-disabled');
+  card._openLink.tabIndex = 0;
+  card._mainAction.removeAttribute('aria-disabled');
+  card._mainAction.tabIndex = 0;
   card._statsActions.replaceChildren();
   const message = document.createElement('span');
   message.className = 'viewer-stat-state';
   message.textContent = error && error.message ? error.message : '유저 수 그래프를 불러오지 못했어요.';
-  const retry = document.createElement('button');
-  retry.type = 'button';
-  retry.className = 'viewer-stat-retry';
-  retry.textContent = '다시 시도';
-  retry.addEventListener('click', () => {
-    card.dataset.statsState = 'idle';
-    card._statsActions.replaceChildren();
-    const loading = document.createElement('span');
-    loading.className = 'viewer-stat-state';
-    loading.textContent = '그래프를 다시 불러오고 있어요.';
-    card._statsActions.append(loading);
-    enqueueStats(card, card._vod, loadToken);
-  }, { once: true });
-  card._statsActions.append(message, retry);
+  card._statsActions.append(message);
+  const retryableCodes = new Set(['functions/failed-precondition', 'functions/not-found']);
+  if (!retryableCodes.has(error && error.code)) {
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'viewer-stat-retry';
+    retry.textContent = '다시 시도';
+    retry.addEventListener('click', () => {
+      card.dataset.statsState = 'idle';
+      card._openLink.setAttribute('aria-disabled', 'true');
+      card._openLink.tabIndex = -1;
+      card._mainAction.setAttribute('aria-disabled', 'true');
+      card._mainAction.tabIndex = -1;
+      card._statsActions.replaceChildren();
+      const loading = document.createElement('span');
+      loading.className = 'viewer-stat-state';
+      loading.textContent = '그래프를 다시 불러오고 있어요.';
+      card._statsActions.append(loading);
+      enqueueStats(card, card._vod, loadToken);
+    }, { once: true });
+    card._statsActions.append(retry);
+  }
 }
 
 function pumpStatsQueue() {
