@@ -24,6 +24,8 @@ const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
 const SOOP_VOD_INFO_API = 'https://api.m.sooplive.com/station/video/a/view';
 const SOOP_VOD_STAR2_STATS_API = 'https://apisabana.sooplive.com/service/vod_star2_stats.php';
 const SOOP_STATION_API = 'https://chapi.sooplive.com/api';
+const SOOP_RANK_SEARCH_API = 'https://afevent2.sooplive.com/app/rank/api.php';
+const SOOP_STREAMER_SEARCH_CACHE_TTL_MS = 60 * 1000;
 const SOOP_CALENDAR_API = 'https://api-channel.sooplive.com/v1.1/channel';
 const CALENDAR_CACHE_TTL_MS = 10 * 60 * 1000;
 const CALENDAR_CACHE_FORCE_REFRESH_COOLDOWN_MS = 60 * 1000;
@@ -64,6 +66,7 @@ const cafeFetchInProgress = new Map();
 const weflabRouletteFetchInProgress = new Map();
 const fanpageViewerStatsMemoryCache = new Map();
 const fanpageViewerStatsInProgress = new Map();
+const soopStreamerSearchCache = new Map();
 const FANPAGE_VIEWER_STATS_CACHE_TTL_MS = 10 * 60 * 1000;
 const FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS = 200;
 
@@ -106,6 +109,55 @@ function publicStreamer(key, record) {
     avatarUrl: `https://stimg.sooplive.com/LOGO/${soopId.slice(0, 2)}/${soopId}/${soopId}.jpg`,
     soopUrl: `https://www.sooplive.com/station/${encodeURIComponent(soopId)}`,
   };
+}
+
+async function searchSoopStreamers(query) {
+  const normalizedQuery = String(query || '').trim().toLocaleLowerCase();
+  const cached = soopStreamerSearchCache.get(normalizedQuery);
+  if (cached && cached.expiresAt > Date.now()) return cached.streamers;
+
+  try {
+    const response = await fetch(SOOP_RANK_SEARCH_API, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/plain, */*',
+        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        origin: 'https://afevent2.sooplive.com',
+        referer: 'https://afevent2.sooplive.com/app/rank/index.php?szWhich=game',
+        'user-agent': 'Mozilla/5.0',
+      },
+      body: new URLSearchParams({
+        szWhich: 'game',
+        nPage: '1',
+        szSearch: normalizedQuery,
+        szGender: 'A',
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return [];
+
+    const payload = await response.json();
+    if (Number(payload && payload.RESULT) !== 1 || !Array.isArray(payload.ALL_RANK)) return [];
+    const streamers = payload.ALL_RANK.map((row) => {
+      const soopId = String((row && row.bj_id) || '').trim();
+      const nickname = typeof (row && row.bj_nick) === 'string' ? row.bj_nick.trim() : '';
+      if (!nickname || !nickname.toLocaleLowerCase().includes(normalizedQuery)
+        && !soopId.toLocaleLowerCase().includes(normalizedQuery)) return null;
+      return publicStreamer(soopId, { nickname, soopId });
+    }).filter(Boolean);
+
+    soopStreamerSearchCache.set(normalizedQuery, {
+      streamers,
+      expiresAt: Date.now() + SOOP_STREAMER_SEARCH_CACHE_TTL_MS,
+    });
+    while (soopStreamerSearchCache.size > 100) {
+      soopStreamerSearchCache.delete(soopStreamerSearchCache.keys().next().value);
+    }
+    return streamers;
+  } catch (error) {
+    console.warn('SOOP broadcaster search failed:', error.message || error);
+    return [];
+  }
 }
 
 async function findVerifiedByUid(uid) {
@@ -2358,9 +2410,10 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20 }, async (request
     const query = String(data.query || '').trim().toLocaleLowerCase();
     if (query.length > 40) throw new HttpsError('invalid-argument', '검색어가 너무 깁니다.');
     if (!query) return { streamers: [] };
-    const [verifiedSnapshot, namesSnapshot] = await Promise.all([
+    const [verifiedSnapshot, namesSnapshot, soopResults] = await Promise.all([
       db.ref('streamerVerifications').get(),
       db.ref('streamerNames').get(),
+      searchSoopStreamers(query),
     ]);
     const byId = new Map();
     Object.entries(verifiedSnapshot.val() || {}).forEach(([key, record]) => {
@@ -2385,10 +2438,15 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20 }, async (request
         soopUrl: 'https://www.sooplive.com/station/' + encodeURIComponent(soopId),
       });
     });
+    soopResults.forEach((streamer) => {
+      if (!byId.has(streamer.id)) byId.set(streamer.id, streamer);
+    });
     const rank = (streamer) => {
-      if (streamer.soopId.toLocaleLowerCase() === query) return 0;
-      if (streamer.nickname.toLocaleLowerCase().startsWith(query)) return 1;
-      if (streamer.soopId.toLocaleLowerCase().startsWith(query)) return 2;
+      const nickname = streamer.nickname.toLocaleLowerCase();
+      const soopId = streamer.soopId.toLocaleLowerCase();
+      if (soopId === query || nickname === query) return 0;
+      if (nickname.startsWith(query)) return 1;
+      if (soopId.startsWith(query)) return 2;
       return 3;
     };
     const streamers = [...byId.values()]

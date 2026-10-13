@@ -435,7 +435,9 @@ async function runSearch(query) {
     if (requestId !== searchRequestId) return;
     const streamers = Array.isArray(response.data && response.data.streamers) ? response.data.streamers : [];
     const candidates = streamers.slice();
-    if (idFromInput && !candidates.some((item) => String(item.soopId).toLowerCase() === idFromInput)) {
+    const isStationUrl = /^https?:\/\//i.test(cleanQuery) && Boolean(idFromInput);
+    if (idFromInput && !candidates.some((item) => String(item.soopId).toLowerCase() === idFromInput)
+      && (isStationUrl || candidates.length === 0)) {
       candidates.unshift(streamerForId(idFromInput));
     }
     const exactMatches = candidates.filter((item) => String(item.soopId).toLowerCase() === searchQuery.toLowerCase()
