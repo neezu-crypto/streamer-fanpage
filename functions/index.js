@@ -69,12 +69,81 @@ const fanpageViewerStatsInProgress = new Map();
 const soopStreamerSearchCache = new Map();
 const FANPAGE_VIEWER_STATS_CACHE_TTL_MS = 10 * 60 * 1000;
 const FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS = 200;
+const VIEWER_STATS_RATE_LIMITS = Object.freeze({
+  search: {
+    perMinute: 10,
+    perDay: 100,
+    minuteMessage: '검색 요청이 너무 많아요. 1분 뒤 다시 시도해 주세요.',
+    dayMessage: '오늘 검색 횟수를 모두 사용했어요. 내일 다시 이용해 주세요.',
+  },
+  vods: {
+    perMinute: 20,
+    perDay: 80,
+    minuteMessage: '다시보기 목록 요청이 너무 많아요. 1분 뒤 다시 시도해 주세요.',
+    dayMessage: '오늘 다시보기 목록 요청 한도에 도달했어요. 내일 다시 이용해 주세요.',
+  },
+  stats: {
+    perMinute: 240,
+    perDay: 1500,
+    minuteMessage: '통계 요청이 잠시 많아요. 1분 뒤 다시 시도해 주세요.',
+    dayMessage: '오늘 통계 분석 한도에 도달했어요. 내일 다시 이용해 주세요.',
+  },
+});
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
     throw new HttpsError('unauthenticated', '로그인이 필요합니다.');
   }
   return request.auth.uid;
+}
+
+async function enforceViewerStatsRateLimit(uid, action) {
+  const limits = VIEWER_STATS_RATE_LIMITS[action];
+  if (!limits) return;
+
+  const now = Date.now();
+  const minuteWindow = Math.floor(now / 60000);
+  const dayKey = new Date(now + (9 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+  const uidKey = createHash('sha256').update(uid).digest('hex').slice(0, 32);
+  const reference = db.ref(`streamerFanPageViewerStatsLimits/${uidKey}`);
+  const result = await reference.transaction((current) => {
+    const previous = current && typeof current === 'object' ? current : {};
+    const minuteCounts = Number(previous.minuteWindow) === minuteWindow
+      && previous.minuteCounts && typeof previous.minuteCounts === 'object'
+      ? previous.minuteCounts
+      : {};
+    const dayCounts = previous.dayKey === dayKey
+      && previous.dayCounts && typeof previous.dayCounts === 'object'
+      ? previous.dayCounts
+      : {};
+    const minuteCount = Math.max(0, Number(minuteCounts[action]) || 0);
+    const dayCount = Math.max(0, Number(dayCounts[action]) || 0);
+
+    if (minuteCount >= limits.perMinute || dayCount >= limits.perDay) return;
+
+    return {
+      minuteWindow,
+      minuteCounts: { ...minuteCounts, [action]: minuteCount + 1 },
+      dayKey,
+      dayCounts: { ...dayCounts, [action]: dayCount + 1 },
+      updatedAt: now,
+    };
+  });
+
+  if (result.committed) return;
+
+  const current = result.snapshot.val() || {};
+  const currentMinuteCounts = Number(current.minuteWindow) === minuteWindow && current.minuteCounts
+    ? current.minuteCounts
+    : {};
+  const currentDayCounts = current.dayKey === dayKey && current.dayCounts ? current.dayCounts : {};
+  if ((Number(currentMinuteCounts[action]) || 0) >= limits.perMinute) {
+    throw new HttpsError('resource-exhausted', limits.minuteMessage);
+  }
+  if ((Number(currentDayCounts[action]) || 0) >= limits.perDay) {
+    throw new HttpsError('resource-exhausted', limits.dayMessage);
+  }
+  throw new HttpsError('aborted', '요청 한도를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 }
 
 async function hasProtectedAccount(request, uid = requireAuth(request)) {
@@ -2402,7 +2471,7 @@ exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => 
 });
 
 exports.streamerFanPageViewerStats = onCall({ maxInstances: 20 }, async (request) => {
-  requireAuth(request);
+  const uid = requireAuth(request);
   const data = request.data || {};
   const action = String(data.action || '');
 
@@ -2410,6 +2479,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20 }, async (request
     const query = String(data.query || '').trim().toLocaleLowerCase();
     if (query.length > 40) throw new HttpsError('invalid-argument', '검색어가 너무 깁니다.');
     if (!query) return { streamers: [] };
+    await enforceViewerStatsRateLimit(uid, action);
     const [verifiedSnapshot, namesSnapshot, soopResults] = await Promise.all([
       db.ref('streamerVerifications').get(),
       db.ref('streamerNames').get(),
@@ -2465,6 +2535,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20 }, async (request
     if (!Number.isSafeInteger(page) || page < 1 || page > 200) {
       throw new HttpsError('invalid-argument', '다시보기 페이지 요청을 확인해 주세요.');
     }
+    await enforceViewerStatsRateLimit(uid, action);
     const result = await fetchSoopVodPage(streamerId, page);
     const vods = result.rows.map((row) => normalizeSoopVod(row)).filter(Boolean);
     if (vods.length !== result.rows.length) {
@@ -2483,6 +2554,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20 }, async (request
   if (action === 'stats') {
     const vodId = String(data.vodId || '').trim();
     if (!/^\d{1,20}$/.test(vodId)) throw new HttpsError('invalid-argument', '다시보기 번호를 확인해 주세요.');
+    await enforceViewerStatsRateLimit(uid, action);
     const cacheKey = streamerId + ':' + vodId;
     const cached = fanpageViewerStatsMemoryCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return { stats: cached.value };

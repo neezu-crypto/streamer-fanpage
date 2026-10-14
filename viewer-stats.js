@@ -579,9 +579,10 @@ async function runPeriodPeakScan() {
     let completed = 0;
     let failed = 0;
     let succeeded = 0;
+    let rateLimitMessage = '';
     let hasUnrenderedPeak = false;
     const worker = async () => {
-      while (isCurrentPeriodScan(scanToken, loadToken) && cursor < vods.length) {
+      while (isCurrentPeriodScan(scanToken, loadToken) && !rateLimitMessage && cursor < vods.length) {
         const item = vods[cursor];
         cursor += 1;
         try {
@@ -609,7 +610,12 @@ async function runPeriodPeakScan() {
           }
         } catch (error) {
           if (!isCurrentPeriodScan(scanToken, loadToken)) return;
-          failed += 1;
+          if (error && error.code === 'functions/resource-exhausted') {
+            rateLimitMessage = error.message || '요청 한도에 도달했어요.';
+            cursor = vods.length;
+          } else {
+            failed += 1;
+          }
         }
         completed += 1;
         $('viewerPeriodStatus').textContent = '최근 1년 다시보기 분석 중 · ' + completed.toLocaleString('ko-KR') + '/' + vods.length.toLocaleString('ko-KR') + '개 완료';
@@ -625,7 +631,10 @@ async function runPeriodPeakScan() {
     renderPeriodPeakCards(peaks, vodCounts, false);
     const suffix = failed ? ' · 통계 미제공/오류 ' + failed.toLocaleString('ko-KR') + '개 제외' : '';
     const limitMessage = pageLimitReached ? ' · 다시보기 페이지 상한까지 확인해 일부가 빠질 수 있어요.' : '';
-    $('viewerPeriodStatus').textContent = '최근 1년 다시보기 ' + vods.length.toLocaleString('ko-KR') + '개 중 ' + succeeded.toLocaleString('ko-KR') + '개 분석 완료' + suffix + limitMessage;
+    const quotaMessage = rateLimitMessage
+      ? ' · ' + rateLimitMessage + ' 미분석 ' + Math.max(0, vods.length - completed).toLocaleString('ko-KR') + '개'
+      : '';
+    $('viewerPeriodStatus').textContent = '최근 1년 다시보기 ' + vods.length.toLocaleString('ko-KR') + '개 중 ' + succeeded.toLocaleString('ko-KR') + '개 분석 완료' + suffix + limitMessage + quotaMessage;
   } catch (error) {
     if (!isCurrentPeriodScan(scanToken, loadToken)) return;
     $('viewerPeriodStatus').classList.add('is-error');
