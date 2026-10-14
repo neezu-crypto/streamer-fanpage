@@ -88,3 +88,21 @@
   .viewer-stats-shell .auth-button{font-size:11px}
 }
 @media(max-width:360px){.viewer-stat-link,.viewer-stat-state{min-height:60px}}
+
+.viewer-period-peaks{margin-top:22px;padding:18px;border:1px solid #ffffff16;border-radius:16px;background:linear-gradient(125deg,#211b29,#191720)}
+.viewer-period-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.viewer-period-heading .eyebrow{margin:0 0 4px;color:var(--pink);font-size:9px;letter-spacing:.14em}
+.viewer-period-heading h3{margin:0;font:21px var(--display)}
+.viewer-period-heading .button{flex:0 0 auto;min-height:42px}
+.viewer-period-status{min-height:18px;margin:12px 0;color:#b4acbb;font-size:13px;line-height:1.5}
+.viewer-period-status.is-error{color:#ff9cad}
+.viewer-period-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.viewer-period-card{display:flex;min-width:0;min-height:124px;flex-direction:column;align-items:flex-start;gap:7px;padding:13px;border:1px solid #ffffff15;border-radius:12px;background:#ffffff05}
+.viewer-period-card>strong{color:#c5bdca;font-size:14px}
+.viewer-period-peak-count{color:#ffc7d7;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.viewer-period-peak-meta,.viewer-period-empty{color:#aaa2b0;font-size:13px;line-height:1.4}
+.viewer-period-peak-link{display:-webkit-box;overflow:hidden;margin-top:auto;color:#f0eaf2;font-size:13px;line-height:1.45;text-decoration:none;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.viewer-period-peak-link:hover{color:#ffc7d7;text-decoration:underline}
+@media(max-width:800px){.viewer-period-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.viewer-period-peaks{margin-top:17px;padding:14px}.viewer-period-heading{align-items:flex-start}.viewer-period-heading h3{font-size:18px}.viewer-period-heading .button{min-height:44px;padding:8px 10px;font-size:12px}.viewer-period-status{font-size:12px}.viewer-period-card{min-height:116px;padding:11px}.viewer-period-card>strong{font-size:13px}.viewer-period-peak-count{font-size:20px}.viewer-period-peak-meta,.viewer-period-empty,.viewer-period-peak-link{font-size:12px}}
+@media(max-width:360px){.viewer-period-grid{grid-template-columns:1fr}.viewer-period-card{min-height:90px}}

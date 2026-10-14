@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261013-viewer-stats">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261013-viewer-stats-font-size">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261015-period-peaks">
 </head>
 <body>
   <div class="site-shell is-ready viewer-stats-shell">
@@ -57,6 +57,17 @@
           </div>
           <a class="button" id="viewerStationLink" href="https://www.sooplive.com/" target="_blank" rel="noopener noreferrer">SOOP 방송국 ↗</a>
         </div>
+        <section class="viewer-period-peaks" aria-labelledby="viewerPeriodTitle">
+          <div class="viewer-period-heading">
+            <div>
+              <p class="eyebrow">PERIOD HIGHS</p>
+              <h3 id="viewerPeriodTitle">기간별 최고 시청 순간</h3>
+            </div>
+            <button class="button" id="viewerPeriodScanButton" type="button">최근 1년 분석</button>
+          </div>
+          <p class="viewer-period-status" id="viewerPeriodStatus" role="status" aria-live="polite">버튼을 누르면 최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 순간을 찾습니다.</p>
+          <div class="viewer-period-grid" id="viewerPeriodGrid"></div>
+        </section>
         <div class="viewer-list-heading">
           <div><h3>방송 다시보기</h3><span id="viewerVodCount"></span></div>
           <span class="viewer-list-note">1분 단위 · 시작/종료 5분 제외</span>
@@ -79,6 +90,6 @@
       <a href="index.html">스트리머 팬페이지</a>
     </footer>
   </div>
-  <script type="module" src="viewer-stats.js?v=20261013-viewer-stats-search"></script>
+  <script type="module" src="viewer-stats.js?v=20261015-period-peaks"></script>
 </body>
 </html>
