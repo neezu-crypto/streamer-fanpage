@@ -17,7 +17,15 @@ const functions = getFunctions(app, 'us-central1');
 const callViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats');
 const $ = (id) => document.getElementById(id);
 const MAX_CONCURRENT_STATS_REQUESTS = 3;
+const MAX_PERIOD_SCAN_PAGES = 200;
+const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
+const VIEWER_PEAK_PERIODS = [
+  { days: 7, label: '최근 7일' },
+  { days: 30, label: '최근 30일' },
+  { days: 90, label: '최근 90일' },
+  { days: 365, label: '최근 1년' },
+];
 
 let searchRequestId = 0;
 let activeLoadToken = 0;
@@ -29,6 +37,10 @@ let vodTotal = 0;
 let activeStatsRequests = 0;
 let statsQueue = [];
 let statsObserver = null;
+let periodScanToken = 0;
+let vodPagesByNumber = new Map();
+const viewerStatsMemoryCache = new Map();
+const viewerStatsInProgress = new Map();
 
 function waitForAuthRestore() {
   return new Promise((resolve) => {
@@ -93,6 +105,15 @@ function formatClock(value) {
 function formatVodDate(value) {
   const date = String(value || '').trim().slice(0, 10);
   return date ? date.replaceAll('-', '.') : '날짜 정보 없음';
+}
+
+function parseVodTimestamp(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 0;
+  const normalized = raw.replace(' ', 'T');
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+  const timestamp = Date.parse(hasTimezone ? normalized : normalized + '+09:00');
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 function formatVodDuration(durationMs) {
@@ -301,29 +322,81 @@ function showStatsError(card, error, loadToken) {
 function pumpStatsQueue() {
   while (activeStatsRequests < MAX_CONCURRENT_STATS_REQUESTS && statsQueue.length) {
     const job = statsQueue.shift();
-    if (!job.card.isConnected || job.loadToken !== activeLoadToken || job.card.dataset.statsState !== 'queued') continue;
+    if (!job.shouldStart()) {
+      if (viewerStatsInProgress.get(job.key) === job.promise) viewerStatsInProgress.delete(job.key);
+      job.reject(new Error('분석 대상이 변경되었습니다.'));
+      continue;
+    }
     activeStatsRequests += 1;
-    job.card.dataset.statsState = 'loading';
     callViewerStats({ action: 'stats', streamerId: job.streamerId, vodId: job.vod.id })
       .then((result) => {
-        if (!job.card.isConnected || job.loadToken !== activeLoadToken) return;
         const stats = result.data && result.data.stats;
         if (!stats || !stats.highest || !stats.lowest) throw new Error('시청자 그래프 응답을 확인하지 못했어요.');
-        showStatsLinks(job.card, stats);
+        viewerStatsMemoryCache.set(job.key, stats);
+        while (viewerStatsMemoryCache.size > MAX_BROWSER_STATS_CACHE_ITEMS) {
+          viewerStatsMemoryCache.delete(viewerStatsMemoryCache.keys().next().value);
+        }
+        job.resolve(stats);
       })
-      .catch((error) => showStatsError(job.card, error, job.loadToken))
+      .catch((error) => job.reject(error))
       .finally(() => {
+        if (viewerStatsInProgress.get(job.key) === job.promise) viewerStatsInProgress.delete(job.key);
         activeStatsRequests = Math.max(0, activeStatsRequests - 1);
         pumpStatsQueue();
       });
   }
 }
 
+function loadVodStats(vod, streamerId, shouldStart = () => true) {
+  const key = String(streamerId).toLowerCase() + ':' + String(vod.id);
+  if (viewerStatsMemoryCache.has(key)) {
+    const cached = viewerStatsMemoryCache.get(key);
+    viewerStatsMemoryCache.delete(key);
+    viewerStatsMemoryCache.set(key, cached);
+    return Promise.resolve(cached);
+  }
+  const inProgress = viewerStatsInProgress.get(key);
+  if (inProgress) return inProgress;
+
+  let resolveRequest;
+  let rejectRequest;
+  const promise = new Promise((resolve, reject) => {
+    resolveRequest = resolve;
+    rejectRequest = reject;
+  });
+  viewerStatsInProgress.set(key, promise);
+  statsQueue.push({
+    key,
+    vod,
+    streamerId,
+    promise,
+    shouldStart,
+    resolve: resolveRequest,
+    reject: rejectRequest,
+  });
+  pumpStatsQueue();
+  return promise;
+}
+
+function cancelQueuedStatsRequests() {
+  const queued = statsQueue;
+  statsQueue = [];
+  queued.forEach((job) => {
+    if (viewerStatsInProgress.get(job.key) === job.promise) viewerStatsInProgress.delete(job.key);
+    job.reject(new Error('분석 대상이 변경되었습니다.'));
+  });
+}
+
 function enqueueStats(card, vod, loadToken) {
   if (!selectedStreamer || card.dataset.statsState !== 'idle') return;
   card.dataset.statsState = 'queued';
-  statsQueue.push({ card, vod, loadToken, streamerId: selectedStreamer.soopId });
-  pumpStatsQueue();
+  const streamerId = selectedStreamer.soopId;
+  loadVodStats(vod, streamerId, () => card.isConnected && loadToken === activeLoadToken)
+    .then((stats) => {
+      if (!card.isConnected || loadToken !== activeLoadToken) return;
+      showStatsLinks(card, stats);
+    })
+    .catch((error) => showStatsError(card, error, loadToken));
 }
 
 function observeVodCard(card) {
@@ -351,6 +424,7 @@ async function loadVodPage(loadToken, page) {
     vodTotal = Math.max(0, Number(payload.total) || 0);
     nextPage = Number(payload.page) + 1;
     hasMoreVods = payload.hasMore === true;
+    vodPagesByNumber.set(page, { vods, total: vodTotal, hasMore: hasMoreVods });
     if (page === 1 && !vods.length) {
       $('viewerVodStatus').textContent = '이 방송국에 등록된 다시보기가 없어요.';
     } else {
@@ -377,17 +451,211 @@ async function loadVodPage(loadToken, page) {
   }
 }
 
+function renderPeriodPeakCards(peaks, vodCounts, isScanning) {
+  const grid = $('viewerPeriodGrid');
+  grid.replaceChildren();
+  VIEWER_PEAK_PERIODS.forEach((period) => {
+    const card = document.createElement('article');
+    card.className = 'viewer-period-card';
+    const label = document.createElement('strong');
+    label.textContent = period.label;
+    card.append(label);
+
+    const peak = peaks.get(period.days);
+    if (peak) {
+      const count = document.createElement('span');
+      count.className = 'viewer-period-peak-count';
+      count.textContent = Number(peak.viewers).toLocaleString('ko-KR') + '명';
+      const meta = document.createElement('span');
+      meta.className = 'viewer-period-peak-meta';
+      meta.textContent = formatVodDate(peak.vod.regDate) + ' · ' + formatClock(peak.second);
+      const link = document.createElement('a');
+      link.className = 'viewer-period-peak-link';
+      link.href = playbackUrl(peak.vod.id, peak.second);
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = peak.vod.title || '다시보기에서 재생';
+      link.setAttribute('aria-label', period.label + ' 최고 ' + count.textContent + ' · ' + meta.textContent + ' · ' + link.textContent + ' 재생');
+      card.append(count, meta, link);
+    } else {
+      const empty = document.createElement('span');
+      empty.className = 'viewer-period-empty';
+      const vodCount = Number(vodCounts.get(period.days)) || 0;
+      empty.textContent = isScanning
+        ? '분석 중…'
+        : !vodCounts.has(period.days) ? '분석 전'
+          : vodCount > 0 ? '통계 확인 가능한 순간 없음' : '기간 내 다시보기 없음';
+      card.append(empty);
+    }
+    grid.append(card);
+  });
+}
+
+function isCurrentPeriodScan(scanToken, loadToken) {
+  return scanToken === periodScanToken && loadToken === activeLoadToken && !!selectedStreamer;
+}
+
+async function fetchRecentYearVods(scanToken, loadToken, yearCutoff) {
+  const streamerId = selectedStreamer.soopId;
+  const vods = [];
+  const seenIds = new Set();
+  let reachedYearCutoff = false;
+  let pageLimitReached = false;
+
+  for (let page = 1; page <= MAX_PERIOD_SCAN_PAGES; page += 1) {
+    if (!isCurrentPeriodScan(scanToken, loadToken)) return null;
+    let pageData = vodPagesByNumber.get(page);
+    if (!pageData) {
+      const result = await callViewerStats({ action: 'vods', streamerId, page });
+      if (!isCurrentPeriodScan(scanToken, loadToken)) return null;
+      const payload = result.data || {};
+      const rows = Array.isArray(payload.vods) ? payload.vods : [];
+      pageData = {
+        vods: rows,
+        total: Math.max(0, Number(payload.total) || 0),
+        hasMore: payload.hasMore === true,
+      };
+      vodPagesByNumber.set(page, pageData);
+    }
+
+    let oldestTimestamp = 0;
+    pageData.vods.forEach((vod) => {
+      const timestamp = parseVodTimestamp(vod && vod.regDate);
+      if (!timestamp) return;
+      if (!oldestTimestamp || timestamp < oldestTimestamp) oldestTimestamp = timestamp;
+      if (timestamp >= yearCutoff && vod && /^\d{1,20}$/.test(String(vod.id || '')) && !seenIds.has(String(vod.id))) {
+        seenIds.add(String(vod.id));
+        vods.push({ vod, timestamp });
+      }
+    });
+
+    $('viewerPeriodStatus').textContent = '최근 1년 다시보기 목록 확인 중 · ' + Math.min(page * 60, pageData.total).toLocaleString('ko-KR') + '개 확인';
+    if (oldestTimestamp && oldestTimestamp < yearCutoff) {
+      reachedYearCutoff = true;
+      break;
+    }
+    if (!pageData.hasMore) break;
+    if (page === MAX_PERIOD_SCAN_PAGES) pageLimitReached = true;
+  }
+
+  return { vods, pageLimitReached, reachedYearCutoff };
+}
+
+async function runPeriodPeakScan() {
+  if (!selectedStreamer) return;
+  const streamerId = selectedStreamer.soopId;
+  const loadToken = activeLoadToken;
+  const scanToken = ++periodScanToken;
+  const scanStartedAt = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const cutoffByDays = new Map(VIEWER_PEAK_PERIODS.map((period) => [period.days, scanStartedAt - period.days * dayMs]));
+  const yearCutoff = cutoffByDays.get(365);
+  const peaks = new Map(VIEWER_PEAK_PERIODS.map((period) => [period.days, null]));
+  const vodCounts = new Map(VIEWER_PEAK_PERIODS.map((period) => [period.days, 0]));
+
+  $('viewerPeriodScanButton').disabled = true;
+  $('viewerPeriodScanButton').textContent = '분석 중…';
+  $('viewerPeriodStatus').classList.remove('is-error');
+  $('viewerPeriodStatus').textContent = '최근 1년 다시보기 목록을 확인하고 있어요.';
+  renderPeriodPeakCards(peaks, vodCounts, true);
+
+  try {
+    const scanData = await fetchRecentYearVods(scanToken, loadToken, yearCutoff);
+    if (!scanData || !isCurrentPeriodScan(scanToken, loadToken)) return;
+    const { vods, pageLimitReached } = scanData;
+    VIEWER_PEAK_PERIODS.forEach((period) => {
+      const cutoff = cutoffByDays.get(period.days);
+      vodCounts.set(period.days, vods.filter((item) => item.timestamp >= cutoff).length);
+    });
+    renderPeriodPeakCards(peaks, vodCounts, true);
+
+    if (!vods.length) {
+      $('viewerPeriodStatus').textContent = '최근 1년 안에 분석할 다시보기가 없습니다.';
+      renderPeriodPeakCards(peaks, vodCounts, false);
+      return;
+    }
+
+    let cursor = 0;
+    let completed = 0;
+    let failed = 0;
+    let succeeded = 0;
+    let hasUnrenderedPeak = false;
+    const worker = async () => {
+      while (isCurrentPeriodScan(scanToken, loadToken) && cursor < vods.length) {
+        const item = vods[cursor];
+        cursor += 1;
+        try {
+          const stats = await loadVodStats(item.vod, streamerId, () => isCurrentPeriodScan(scanToken, loadToken));
+          if (!isCurrentPeriodScan(scanToken, loadToken)) return;
+          const peakViewers = Number(stats.highest.viewers);
+          const peakSecond = Number(stats.highest.second);
+          if (Number.isFinite(peakViewers) && peakViewers >= 0 && Number.isFinite(peakSecond) && peakSecond >= 0) {
+            succeeded += 1;
+            VIEWER_PEAK_PERIODS.forEach((period) => {
+              if (item.timestamp < cutoffByDays.get(period.days)) return;
+              const currentPeak = peaks.get(period.days);
+              if (!currentPeak || peakViewers > currentPeak.viewers) {
+                peaks.set(period.days, {
+                  vod: item.vod,
+                  viewers: peakViewers,
+                  second: peakSecond,
+                  timestamp: item.timestamp,
+                });
+                hasUnrenderedPeak = true;
+              }
+            });
+          } else {
+            failed += 1;
+          }
+        } catch (error) {
+          if (!isCurrentPeriodScan(scanToken, loadToken)) return;
+          failed += 1;
+        }
+        completed += 1;
+        $('viewerPeriodStatus').textContent = '최근 1년 다시보기 분석 중 · ' + completed.toLocaleString('ko-KR') + '/' + vods.length.toLocaleString('ko-KR') + '개 완료';
+        if (hasUnrenderedPeak) {
+          renderPeriodPeakCards(peaks, vodCounts, true);
+          hasUnrenderedPeak = false;
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(2, vods.length) }, () => worker()));
+    if (!isCurrentPeriodScan(scanToken, loadToken)) return;
+    renderPeriodPeakCards(peaks, vodCounts, false);
+    const suffix = failed ? ' · 통계 미제공/오류 ' + failed.toLocaleString('ko-KR') + '개 제외' : '';
+    const limitMessage = pageLimitReached ? ' · 다시보기 페이지 상한까지 확인해 일부가 빠질 수 있어요.' : '';
+    $('viewerPeriodStatus').textContent = '최근 1년 다시보기 ' + vods.length.toLocaleString('ko-KR') + '개 중 ' + succeeded.toLocaleString('ko-KR') + '개 분석 완료' + suffix + limitMessage;
+  } catch (error) {
+    if (!isCurrentPeriodScan(scanToken, loadToken)) return;
+    $('viewerPeriodStatus').classList.add('is-error');
+    $('viewerPeriodStatus').textContent = error && error.message ? error.message : '기간별 다시보기를 불러오지 못했어요. 다시 시도해 주세요.';
+  } finally {
+    if (isCurrentPeriodScan(scanToken, loadToken)) {
+      $('viewerPeriodScanButton').disabled = false;
+      $('viewerPeriodScanButton').textContent = '다시 분석';
+    }
+  }
+}
+
 async function selectStreamer(streamer) {
   activeLoadToken += 1;
   const loadToken = activeLoadToken;
+  periodScanToken += 1;
+  cancelQueuedStatsRequests();
+  vodPagesByNumber = new Map();
   selectedStreamer = streamer;
   nextPage = 1;
   hasMoreVods = false;
   vodTotal = 0;
-  statsQueue = [];
   if (statsObserver) statsObserver.disconnect();
   $('viewerVodGrid').replaceChildren();
   $('viewerLoadMore').classList.add('hidden');
+  $('viewerPeriodScanButton').disabled = false;
+  $('viewerPeriodScanButton').textContent = '최근 1년 분석';
+  $('viewerPeriodStatus').textContent = '버튼을 누르면 최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 순간을 찾습니다.';
+  $('viewerPeriodStatus').classList.remove('is-error');
+  renderPeriodPeakCards(new Map(), new Map(), false);
   $('viewerResults').classList.remove('hidden');
   $('viewerEmpty').classList.add('hidden');
   $('viewerStreamerName').textContent = streamer.nickname || streamer.soopId;
@@ -481,5 +749,7 @@ $('viewerSearchResults').addEventListener('click', (event) => {
 $('viewerLoadMore').addEventListener('click', () => {
   if (hasMoreVods && selectedStreamer) loadVodPage(activeLoadToken, nextPage);
 });
+
+$('viewerPeriodScanButton').addEventListener('click', runPeriodPeakScan);
 
 getAuthReady().catch((error) => setSearchHint(error.message || '통계 연결을 시작하지 못했어요.', true));
