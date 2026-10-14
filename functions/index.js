@@ -77,13 +77,13 @@ const VIEWER_STATS_RATE_LIMITS = Object.freeze({
     dayMessage: '오늘 검색 횟수를 모두 사용했어요. 내일 다시 이용해 주세요.',
   },
   vods: {
-    perMinute: 20,
+    perMinute: 30,
     perDay: 80,
     minuteMessage: '다시보기 목록 요청이 너무 많아요. 1분 뒤 다시 시도해 주세요.',
     dayMessage: '오늘 다시보기 목록 요청 한도에 도달했어요. 내일 다시 이용해 주세요.',
   },
   stats: {
-    perMinute: 240,
+    perMinute: 1500,
     perDay: 1500,
     minuteMessage: '통계 요청이 잠시 많아요. 1분 뒤 다시 시도해 주세요.',
     dayMessage: '오늘 통계 분석 한도에 도달했어요. 내일 다시 이용해 주세요.',
