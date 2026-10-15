@@ -491,6 +491,36 @@ function renderViewerStatsUsage(usage) {
     const count = document.createElement('strong'); count.textContent = `${formatStatCount(value)}회`;
     row.append(title, count); actionContainer.append(row);
   });
+
+  const streamerList = $('viewerStatsAdminStreamerList');
+  streamerList.replaceChildren();
+  const topStreamers = Array.isArray(safeUsage.topSearchedStreamers) ? safeUsage.topSearchedStreamers : [];
+  if (!topStreamers.length) {
+    const empty = document.createElement('p');
+    empty.className = 'admin-viewer-usage-streamers-empty';
+    empty.textContent = '아직 집계된 스트리머 선택이 없어요.';
+    streamerList.append(empty);
+    return;
+  }
+  topStreamers.forEach((streamer, index) => {
+    const row = document.createElement('div'); row.className = 'admin-viewer-usage-streamer';
+    const rank = document.createElement('span'); rank.className = 'admin-viewer-usage-streamer-rank';
+    rank.textContent = String(index + 1);
+    const identity = document.createElement('span'); identity.className = 'admin-viewer-usage-streamer-identity';
+    const soopId = String(streamer.soopId || streamer.id || '').trim();
+    const nickname = String(streamer.nickname || soopId).trim();
+    const name = document.createElement('strong'); name.textContent = nickname || soopId;
+    identity.append(name);
+    if (soopId && nickname.toLocaleLowerCase() !== soopId.toLocaleLowerCase()
+      && nickname !== `@${soopId}`) {
+      const id = document.createElement('small'); id.textContent = `@${soopId}`;
+      identity.append(id);
+    }
+    const count = document.createElement('strong');
+    count.className = 'admin-viewer-usage-streamer-count';
+    count.textContent = `${formatStatCount(streamer.count)}회`;
+    row.append(rank, identity, count); streamerList.append(row);
+  });
 }
 async function loadAdminStats() {
   if (!isAdminUser || adminStatsLoading) return;

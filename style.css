@@ -202,8 +202,19 @@
 .admin-viewer-usage-chart{display:grid;height:58px;grid-template-columns:repeat(30,minmax(1px,1fr));align-items:end;gap:3px;margin-top:12px;padding:0 1px}
 .admin-viewer-usage-chart span{min-height:3px;border-radius:3px 3px 1px 1px;background:linear-gradient(180deg,#f58cac,#b76b88);opacity:.88}
 .admin-viewer-usage-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px}
-.admin-viewer-usage-action{display:flex;justify-content:space-between;gap:8px;padding:8px 9px;border-radius:8px;background:#00000020;color:#cfc7d3;font-size:10px}
+.admin-viewer-usage-action{display:flex;justify-content:space-between;gap:8px;padding:8px 9px;border-radius:8px;background:#00000020;color:#cfc7d3;font-size:11px}
 .admin-viewer-usage-action strong{color:#f6d5e1;white-space:nowrap}
+.admin-viewer-usage-streamers-heading{display:flex;justify-content:space-between;gap:10px;margin:15px 0 8px;color:#e9e2ed;font-size:11px}
+.admin-viewer-usage-streamers-heading span{color:#a69cab;font-size:10px}
+.admin-viewer-usage-streamers{display:grid;max-height:260px;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;overflow:auto;padding:1px 3px 2px 0;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
+.admin-viewer-usage-streamer{display:flex;min-width:0;align-items:center;gap:8px;padding:8px 9px;border-radius:8px;background:#00000020}
+.admin-viewer-usage-streamer-rank{width:21px;flex:none;color:#f58cac;font:12px var(--display);text-align:center}
+.admin-viewer-usage-streamer-identity{display:block;min-width:0;flex:1}
+.admin-viewer-usage-streamer-identity strong,.admin-viewer-usage-streamer-identity small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-viewer-usage-streamer-identity strong{color:#e9e2ed;font-size:12px}
+.admin-viewer-usage-streamer-identity small{margin-top:2px;color:#a69cab;font-size:10px}
+.admin-viewer-usage-streamer-count{flex:none;color:#f6d5e1;font-size:11px}
+.admin-viewer-usage-streamers-empty{grid-column:1/-1;margin:0;padding:12px;color:#a69cab;font-size:10px;text-align:center}
 .admin-viewer-usage-note{margin:10px 0 0;line-height:1.55}
 .admin-stat-card{display:grid;min-width:0;gap:10px;padding:12px;border:1px solid #ffffff14;border-radius:12px;background:#ffffff05;color:var(--text);text-align:left;transition:border-color .15s,background .15s}
 .admin-stat-card:hover,.admin-stat-card:focus-visible{border-color:#f58cac70;background:#f58cac0b}
@@ -221,7 +232,7 @@
 .admin-stat-sparkline span{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#f58cac,#b76b88);opacity:.85}
 .admin-stats-empty{grid-column:1/-1}
 @media(max-width:720px){.admin-stats-dialog-card{padding:17px}.admin-stats-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-stats-list{grid-template-columns:1fr}}
-@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage{padding:11px}.admin-viewer-usage-actions{grid-template-columns:1fr}.admin-viewer-usage-action{font-size:11px}}
+@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage{padding:11px}.admin-viewer-usage-actions,.admin-viewer-usage-streamers{grid-template-columns:1fr}.admin-viewer-usage-action{font-size:11px}}
 
 /* Scrollable replay area and SOOP schedule calendar */
 .vod-scrollbox{max-height:min(72vh,680px);overflow-y:auto;overscroll-behavior:contain;padding:0 8px 4px 0;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
