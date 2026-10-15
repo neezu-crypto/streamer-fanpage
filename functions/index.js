@@ -89,6 +89,7 @@ const VIEWER_STATS_RATE_LIMITS = Object.freeze({
     dayMessage: '오늘 통계 분석 한도에 도달했어요.',
   },
 });
+const VIEWER_STATS_USAGE_ACTIONS = Object.freeze(['search', 'vods', 'stats']);
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -116,16 +117,32 @@ async function enforceViewerStatsRateLimit(uid, action) {
       && previous.dayCounts && typeof previous.dayCounts === 'object'
       ? previous.dayCounts
       : {};
+    const cutoffDate = new Date(`${dayKey}T00:00:00Z`);
+    cutoffDate.setUTCDate(cutoffDate.getUTCDate() - (FANPAGE_STATS_DAYS - 1));
+    const cutoffKey = cutoffDate.toISOString().slice(0, 10);
+    const recentUsageByDay = Object.fromEntries(Object.entries(
+      previous.recentUsageByDay && typeof previous.recentUsageByDay === 'object'
+        ? previous.recentUsageByDay
+        : {},
+    ).filter(([date]) => date >= cutoffKey && date <= dayKey));
+    const usageDayCounts = recentUsageByDay[dayKey] && typeof recentUsageByDay[dayKey] === 'object'
+      ? recentUsageByDay[dayKey]
+      : {};
     const minuteCount = Math.max(0, Number(minuteCounts[action]) || 0);
     const dayCount = Math.max(0, Number(dayCounts[action]) || 0);
 
     if (minuteCount >= limits.perMinute || dayCount >= limits.perDay) return;
 
+    recentUsageByDay[dayKey] = {
+      ...usageDayCounts,
+      [action]: Math.max(0, Number(usageDayCounts[action]) || 0) + 1,
+    };
     return {
       minuteWindow,
       minuteCounts: { ...minuteCounts, [action]: minuteCount + 1 },
       dayKey,
       dayCounts: { ...dayCounts, [action]: dayCount + 1 },
+      recentUsageByDay,
       updatedAt: now,
     };
   });
@@ -2605,9 +2622,13 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     throw new HttpsError('permission-denied', '관리자만 팬페이지 통계를 볼 수 있습니다.');
   }
 
-  const [verifiedSnap, statsSnap] = await Promise.all([
+  const today = new Date(`${fanPageStatsDateKey()}T00:00:00Z`);
+  const dateKeys = Array.from({ length: FANPAGE_STATS_DAYS }, (_, index) =>
+    fanPageStatsDateKey(today.getTime() - (FANPAGE_STATS_DAYS - index - 1) * 24 * 60 * 60 * 1000));
+  const [verifiedSnap, statsSnap, viewerLimitsSnap] = await Promise.all([
     db.ref('streamerVerifications').get(),
     db.ref('streamerFanPageStats').get(),
+    db.ref('streamerFanPageViewerStatsLimits').get(),
   ]);
   const verifiedById = new Map();
   Object.entries(verifiedSnap.val() || {}).forEach(([key, record]) => {
@@ -2615,9 +2636,6 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     if (streamer) verifiedById.set(streamer.id, streamer);
   });
 
-  const today = new Date(`${fanPageStatsDateKey()}T00:00:00Z`);
-  const dateKeys = Array.from({ length: FANPAGE_STATS_DAYS }, (_, index) =>
-    fanPageStatsDateKey(today.getTime() - (FANPAGE_STATS_DAYS - index - 1) * 24 * 60 * 60 * 1000));
   const statsById = statsSnap.val() || {};
   const streamers = [...verifiedById.values()].map((streamer) => {
     const record = statsById[streamer.id] && typeof statsById[streamer.id] === 'object'
@@ -2645,6 +2663,34 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     || b.totalViews - a.totalViews
     || a.nickname.localeCompare(b.nickname, 'ko'));
 
+  const viewerUsageByDate = {};
+  const includedDates = new Set(dateKeys);
+  Object.values(viewerLimitsSnap.val() || {}).forEach((record) => {
+    const recentUsageByDay = record && typeof record.recentUsageByDay === 'object'
+      ? record.recentUsageByDay
+      : {};
+    Object.entries(recentUsageByDay).forEach(([date, actions]) => {
+      if (!includedDates.has(date) || !actions || typeof actions !== 'object') return;
+      const day = viewerUsageByDate[date] || (viewerUsageByDate[date] = { search: 0, vods: 0, stats: 0 });
+      VIEWER_STATS_USAGE_ACTIONS.forEach((action) => { day[action] += metricCount(actions[action]); });
+    });
+  });
+  const viewerUsageDaily = dateKeys.map((date) => {
+    const day = viewerUsageByDate[date] && typeof viewerUsageByDate[date] === 'object'
+      ? viewerUsageByDate[date]
+      : {};
+    const search = metricCount(day.search);
+    const vods = metricCount(day.vods);
+    const stats = metricCount(day.stats);
+    return { date, search, vods, stats, total: search + vods + stats };
+  });
+  const last7ViewerUsage = viewerUsageDaily.slice(-7);
+  const viewerUsageActions = viewerUsageDaily.reduce((totals, day) => ({
+    search: totals.search + day.search,
+    vods: totals.vods + day.vods,
+    stats: totals.stats + day.stats,
+  }), { search: 0, vods: 0, stats: 0 });
+
   return {
     generatedAt: Date.now(),
     totals: {
@@ -2652,6 +2698,15 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
       totalViews: streamers.reduce((total, streamer) => total + streamer.totalViews, 0),
       last7Views: streamers.reduce((total, streamer) => total + streamer.last7Views, 0),
       last30Views: streamers.reduce((total, streamer) => total + streamer.last30Views, 0),
+    },
+    viewerStatsUsage: {
+      totals: {
+        today: viewerUsageDaily[viewerUsageDaily.length - 1]?.total || 0,
+        last7: last7ViewerUsage.reduce((total, day) => total + day.total, 0),
+        last30: viewerUsageDaily.reduce((total, day) => total + day.total, 0),
+      },
+      actions30: viewerUsageActions,
+      daily: viewerUsageDaily,
     },
     streamers,
   };

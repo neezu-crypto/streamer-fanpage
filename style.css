@@ -190,6 +190,21 @@
 .admin-stats-list-heading span{color:#968e9c;font-size:10px}
 .admin-stats-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-height:100px;padding:1px 1px 2px}
 .admin-stats-note{margin:0 0 12px!important;color:#938b9a!important;font-size:10px!important;line-height:1.6}
+.admin-viewer-usage{margin:0 0 22px;padding:14px;border:1px solid #f58cac30;border-radius:13px;background:linear-gradient(135deg,#f58cac0b,#ffffff03)}
+.admin-viewer-usage-heading{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:11px}
+.admin-viewer-usage-heading h3{margin:0;font:17px var(--display)}
+.admin-viewer-usage-heading>span,.admin-viewer-usage-note{color:#a69cab;font-size:10px}
+.admin-viewer-usage-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.admin-viewer-usage-tile{padding:10px 11px;border:1px solid #ffffff12;border-radius:9px;background:#09080d55}
+.admin-viewer-usage-tile span,.admin-viewer-usage-tile strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-viewer-usage-tile span{color:#aaa3b1;font-size:10px}
+.admin-viewer-usage-tile strong{margin-top:4px;font:18px var(--display)}
+.admin-viewer-usage-chart{display:grid;height:58px;grid-template-columns:repeat(30,minmax(1px,1fr));align-items:end;gap:3px;margin-top:12px;padding:0 1px}
+.admin-viewer-usage-chart span{min-height:3px;border-radius:3px 3px 1px 1px;background:linear-gradient(180deg,#f58cac,#b76b88);opacity:.88}
+.admin-viewer-usage-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px}
+.admin-viewer-usage-action{display:flex;justify-content:space-between;gap:8px;padding:8px 9px;border-radius:8px;background:#00000020;color:#cfc7d3;font-size:10px}
+.admin-viewer-usage-action strong{color:#f6d5e1;white-space:nowrap}
+.admin-viewer-usage-note{margin:10px 0 0;line-height:1.55}
 .admin-stat-card{display:grid;min-width:0;gap:10px;padding:12px;border:1px solid #ffffff14;border-radius:12px;background:#ffffff05;color:var(--text);text-align:left;transition:border-color .15s,background .15s}
 .admin-stat-card:hover,.admin-stat-card:focus-visible{border-color:#f58cac70;background:#f58cac0b}
 .admin-stat-identity{display:flex;align-items:center;gap:9px;min-width:0}
@@ -206,7 +221,7 @@
 .admin-stat-sparkline span{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#f58cac,#b76b88);opacity:.85}
 .admin-stats-empty{grid-column:1/-1}
 @media(max-width:720px){.admin-stats-dialog-card{padding:17px}.admin-stats-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-stats-list{grid-template-columns:1fr}}
-@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}}
+@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage{padding:11px}.admin-viewer-usage-actions{grid-template-columns:1fr}.admin-viewer-usage-action{font-size:11px}}
 
 /* Scrollable replay area and SOOP schedule calendar */
 .vod-scrollbox{max-height:min(72vh,680px);overflow-y:auto;overscroll-behavior:contain;padding:0 8px 4px 0;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
