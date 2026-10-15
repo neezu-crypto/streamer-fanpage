@@ -446,14 +446,58 @@ function renderAdminStats(data) {
     const count = document.createElement('strong'); count.textContent = value;
     tile.append(title, count); $('adminStatsSummary').append(tile);
   });
+  renderViewerStatsUsage(data && data.viewerStatsUsage);
   renderAdminStatsList(data && data.streamers);
+}
+function renderViewerStatsUsage(usage) {
+  const safeUsage = usage && typeof usage === 'object' ? usage : {};
+  const totals = safeUsage.totals && typeof safeUsage.totals === 'object' ? safeUsage.totals : {};
+  const summary = $('viewerStatsAdminSummary');
+  summary.replaceChildren();
+  [
+    ['오늘 요청', totals.today],
+    ['최근 7일', totals.last7],
+    ['최근 30일', totals.last30],
+  ].forEach(([label, value]) => {
+    const tile = document.createElement('div'); tile.className = 'admin-viewer-usage-tile';
+    const title = document.createElement('span'); title.textContent = label;
+    const count = document.createElement('strong'); count.textContent = `${formatStatCount(value)}회`;
+    tile.append(title, count); summary.append(tile);
+  });
+
+  const chart = $('viewerStatsAdminChart');
+  chart.replaceChildren();
+  const daily = Array.isArray(safeUsage.daily) ? safeUsage.daily : [];
+  const maxRequests = Math.max(0, ...daily.map((day) => Number(day && day.total) || 0));
+  daily.forEach((day) => {
+    const total = Math.max(0, Number(day && day.total) || 0);
+    const bar = document.createElement('span');
+    bar.setAttribute('aria-hidden', 'true');
+    bar.title = `${day.date} · 요청 ${formatStatCount(total)}회`;
+    bar.style.height = `${maxRequests ? Math.max(5, total / maxRequests * 100) : 3}%`;
+    chart.append(bar);
+  });
+
+  const actions = safeUsage.actions30 && typeof safeUsage.actions30 === 'object' ? safeUsage.actions30 : {};
+  const actionContainer = $('viewerStatsAdminActions');
+  actionContainer.replaceChildren();
+  [
+    ['스트리머 검색', actions.search],
+    ['다시보기 목록', actions.vods],
+    ['시청자 그래프 분석', actions.stats],
+  ].forEach(([label, value]) => {
+    const row = document.createElement('div'); row.className = 'admin-viewer-usage-action';
+    const title = document.createElement('span'); title.textContent = label;
+    const count = document.createElement('strong'); count.textContent = `${formatStatCount(value)}회`;
+    row.append(title, count); actionContainer.append(row);
+  });
 }
 async function loadAdminStats() {
   if (!isAdminUser || adminStatsLoading) return;
   adminStatsLoading = true;
   $('refreshAdminStats').disabled = true;
   $('refreshAdminStats').textContent = '불러오는 중…';
-  $('adminStatsStatus').textContent = '스트리머별 집계를 불러오고 있어요.';
+  $('adminStatsStatus').textContent = '관리자 통계를 불러오고 있어요.';
   try {
     const result = await callAdminStats();
     if (!isAdminUser) return;

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261010-upbo-achievement">
+  <link rel="stylesheet" href="style.css?v=20261015-viewer-stats-admin">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -47,7 +47,7 @@
         <a class="auth-button" href="viewer-stats.html">스트리머 고점찾기</a>
         <div class="auth-actions" id="authActions">
           <span class="account-status" id="accountStatus">로그인 확인 중</span>
-          <button class="auth-button hidden" id="openAdminStats" type="button">팬페이지 통계</button>
+          <button class="auth-button hidden" id="openAdminStats" type="button">사이트 통계</button>
           <button class="auth-button login-options-button" id="openLoginOptions" type="button">로그인</button>
           <button class="auth-button logout-button hidden" id="logoutButton" type="button">로그아웃</button>
         </div>
@@ -129,7 +129,7 @@
   <dialog id="adminStatsDialog" class="account-dialog admin-stats-dialog" aria-labelledby="adminStatsTitle">
     <section class="account-dialog-card admin-stats-dialog-card">
       <div class="admin-stats-heading">
-        <div><p class="eyebrow">FANPAGE ADMIN</p><h2 id="adminStatsTitle">팬페이지 통계</h2></div>
+        <div><p class="eyebrow">SITE ADMIN</p><h2 id="adminStatsTitle">사이트 통계</h2></div>
         <button class="button profile-settings-close" id="closeAdminStats" type="button" aria-label="통계 닫기">×</button>
       </div>
       <div class="admin-stats-toolbar">
@@ -140,11 +140,21 @@
       <p class="admin-stats-status" id="adminStatsStatus" role="status" aria-live="polite">관리자 통계를 불러옵니다.</p>
       <p class="admin-stats-note">집계는 기능 적용 후부터 시작하며 관리자와 해당 스트리머 본인의 열람은 제외합니다. 일별 순방문은 한국 날짜별 계정 중복을 제외한 합계예요.</p>
       <div class="admin-stats-summary" id="adminStatsSummary"></div>
+      <section class="admin-viewer-usage" aria-labelledby="viewerStatsAdminTitle">
+        <div class="admin-viewer-usage-heading">
+          <h3 id="viewerStatsAdminTitle">고점찾기 사용 통계</h3>
+          <span>한국 시간 · 최근 30일</span>
+        </div>
+        <div class="admin-viewer-usage-summary" id="viewerStatsAdminSummary"></div>
+        <div class="admin-viewer-usage-chart" id="viewerStatsAdminChart" role="img" aria-label="최근 30일 고점찾기 일별 요청 추이"></div>
+        <div class="admin-viewer-usage-actions" id="viewerStatsAdminActions"></div>
+        <p class="admin-viewer-usage-note">한도 검사를 통과한 요청 수예요. 검색어는 저장하지 않고 서버 전용 한도 카운터에 해시 키별 날짜 합계를 기록하며, 이 화면에는 전체 합계만 보여요. 그래프 요청은 서버 캐시로 처리될 수 있어 SOOP API 실제 호출 수와 다를 수 있습니다.</p>
+      </section>
       <div class="admin-stats-list-heading"><strong>스트리머별 집계</strong><span id="adminStatsStreamerCount"></span></div>
       <div class="admin-stats-list" id="adminStatsList"></div>
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261010-upbo-achievement"></script>
+  <script type="module" src="app.js?v=20261015-viewer-stats-admin"></script>
 </body>
 </html>
