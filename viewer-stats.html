@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#151320">
+  <meta name="theme-color" content="#f4f6fa">
   <meta name="description" content="스트리머 고점체크: SOOP 다시보기별 최고·최저 시청자 순간을 찾아 바로 재생합니다.">
   <title>스트리머 고점체크</title>
   <link rel="icon" type="image/svg+xml" href="viewer-stats-icon.svg">
@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-queue">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261016-queue">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261016-dashboard">
 </head>
-<body>
+<body class="viewer-stats-page">
   <div class="site-shell is-ready viewer-stats-shell">
     <header class="topbar">
       <a class="brand" href="index.html" aria-label="스트리머 팬페이지로 이동">
@@ -27,10 +27,11 @@
     </header>
 
     <main class="main-content viewer-stats-main">
+      <section class="viewer-workspace" aria-label="스트리머 통계 검색">
       <section class="viewer-stats-hero">
-        <p class="eyebrow">SOOP VIEWER MOMENTS</p>
-        <h1>다시보기마다<br><span>시청자가 가장 많고 적었던 순간</span></h1>
-        <p>등록된 스트리머는 이름으로 찾고, 그 외에는 SOOP 아이디나 방송국 주소를 입력하세요. 다시보기 카드와 최고·최저 링크는 해당 시점부터 재생됩니다.</p>
+        <p class="eyebrow">SOOP VIEWER ANALYTICS</p>
+        <h1>방송의 흐름을<br><span>숫자로 확인하세요</span></h1>
+        <p>다시보기별 최고·최저 시청 순간부터 기간별 최고 기록까지, 필요한 통계를 한곳에서 확인할 수 있습니다.</p>
       </section>
 
       <section class="viewer-search-panel" aria-labelledby="viewerSearchTitle">
@@ -41,9 +42,10 @@
             <button class="button button-primary" id="viewerSearchButton" type="submit">검색</button>
           </div>
         </form>
-        <p class="viewer-search-hint" id="viewerSearchHint" role="status" aria-live="polite">이름을 검색하거나 SOOP 방송국 아이디·주소를 입력해 주세요.</p>
+        <p class="viewer-search-hint" id="viewerSearchHint" role="status" aria-live="polite">닉네임 또는 SOOP 방송국 아이디·주소로 검색하세요.</p>
         <p class="viewer-queue-note">익명도 이용할 수 있어요. 혼잡하면 로그인·구독 요청이 먼저 처리될 수 있고, 이용 등급별 한도가 적용됩니다.</p>
         <div class="viewer-search-results" id="viewerSearchResults" aria-label="스트리머 검색 결과"></div>
+      </section>
       </section>
 
       <section class="viewer-results hidden" id="viewerResults" aria-live="polite">
