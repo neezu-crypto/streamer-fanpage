@@ -11,10 +11,50 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-queue">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261016-dashboard">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261016-branding">
 </head>
 <body class="viewer-stats-page">
+  <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
+    <div class="sig-noise" aria-hidden="true"></div>
+    <div class="sig-series" aria-hidden="true">
+      <p class="sig-series-tag">스트리머 게임시리즈</p>
+      <div class="sig-reel">
+        <div class="sig-reel-track">
+          <p class="sig-reel-item">스트리머 주식시장</p>
+          <p class="sig-reel-item">스트리머 배팅시장</p>
+          <p class="sig-reel-item">스트리머 배경시장</p>
+          <p class="sig-reel-item">스트리머 인생게임</p>
+          <p class="sig-reel-item">스트리머 갤러리</p>
+          <p class="sig-reel-item is-current">스트리머 고점체크</p>
+        </div>
+      </div>
+      <div class="sig-series-under"></div>
+    </div>
+    <div class="sig-title-frame" aria-hidden="true">
+      <p class="sig-title-kicker">제작</p>
+      <p class="sig-title-word">오목지면시그</p>
+    </div>
+  </div>
+  <script src="viewer-stats-signature.js?v=20261016-branding"></script>
+
   <div class="site-shell is-ready viewer-stats-shell">
+    <div class="devbar" id="devbar">
+      <div class="devbar-inner">
+        <div class="devbar-viewport" id="devbar-viewport">
+          <div class="devbar-track" id="devbar-track">
+            <span class="devbar-label">스트리머 고점체크 · BY 오목지면시그</span>
+            <a class="dev-game-link" data-game-id="stockMarket" href="https://neezu-crypto.github.io/soop-stock-market/index.html" target="_blank" rel="noopener noreferrer">스트리머 주식시장</a>
+            <a class="dev-game-link" data-game-id="bettingMarket" href="https://neezu-crypto.github.io/StreamBet-Market/" target="_blank" rel="noopener noreferrer">스트리머 배팅시장</a>
+            <a class="dev-game-link" data-game-id="backgroundMarket" href="https://neezu-crypto.github.io/interior-3d-viewer/" target="_blank" rel="noopener noreferrer">스트리머 배경시장</a>
+            <a class="dev-game-link" data-game-id="dontClickAds" href="https://neezu-crypto.github.io/dont-click-ads/" target="_blank" rel="noopener noreferrer">절대 광고를 클릭하지 마</a>
+            <a class="dev-game-link" data-game-id="EarlyBird" href="https://www.sooplive.com/station/skftodwocks2/board/128562829" target="_blank" rel="noopener noreferrer">뻐꾸기 모음</a>
+            <a class="dev-game-link" data-game-id="gallery" href="https://neezu-crypto.github.io/streamer-gallery/" target="_blank" rel="noopener noreferrer">스트리머 갤러리</a>
+            <a class="dev-game-link" data-game-id="lifeGame" href="https://neezu-crypto.github.io/streamer-life-game/" target="_blank" rel="noopener noreferrer">스트리머 인생게임</a>
+            <a class="dev-game-link" data-game-id="onyuVn" href="https://neezu-crypto.github.io/onyu-vn/" target="_blank" rel="noopener noreferrer">당신이 여기에 온 이유</a>
+          </div>
+        </div>
+      </div>
+    </div>
     <header class="topbar">
       <a class="brand" href="index.html" aria-label="스트리머 팬페이지로 이동">
         <span class="brand-symbol">✳</span>
@@ -129,6 +169,6 @@
       <p class="viewer-subscription-login-note hidden" id="viewerSubscriptionLoginNote">구독 신청에는 Google·Kakao 계정 연결 또는 스트리머 인증이 필요합니다. <a href="index.html?login=1" target="_blank" rel="noopener noreferrer">팬페이지에서 로그인하기 ↗</a> 로그인 후 이 페이지에서 상태를 새로고침해 주세요.</p>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261016-queue"></script>
+  <script type="module" src="viewer-stats.js?v=20261016-branding"></script>
 </body>
 </html>
