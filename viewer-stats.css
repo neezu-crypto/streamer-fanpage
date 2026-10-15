@@ -13,6 +13,7 @@
 .viewer-search-row input::placeholder{color:#77717f}
 .viewer-search-row .button{min-width:78px}
 .viewer-search-hint{min-height:16px;margin:9px 0 0;color:#918a99;font-size:10px;line-height:1.6}
+.viewer-queue-note{margin:6px 0 0;color:#b8aab9;font-size:11px;line-height:1.5}
 .viewer-search-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
 .viewer-search-result{display:flex;align-items:center;gap:11px;min-width:0;width:100%;padding:10px;border:1px solid #ffffff16;border-radius:12px;background:#ffffff05;color:var(--text);text-align:left;transition:border-color .18s,background .18s,transform .18s}
 .viewer-search-result:hover{transform:translateY(-1px);border-color:#f58cac70;background:#f58cac0d}

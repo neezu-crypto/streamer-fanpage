@@ -494,6 +494,41 @@ function renderViewerStatsUsage(usage) {
     row.append(title, count); actionContainer.append(row);
   });
 
+  const tierContainer = $('viewerStatsAdminTiers');
+  tierContainer.replaceChildren();
+  const tiers = safeUsage.tiers30 && typeof safeUsage.tiers30 === 'object' ? safeUsage.tiers30 : {};
+  [
+    ['익명', tiers.anonymous],
+    ['로그인', tiers.account],
+    ['구독', tiers.subscriber],
+    ['관리자', tiers.admin],
+  ].forEach(([label, counts]) => {
+    const tile = document.createElement('div'); tile.className = 'admin-viewer-usage-tier';
+    const title = document.createElement('span'); title.textContent = label;
+    const count = document.createElement('strong'); count.textContent = `${formatStatCount(counts && counts.total)}회`;
+    tile.append(title, count); tierContainer.append(tile);
+  });
+
+  const queueContainer = $('viewerStatsAdminQueue');
+  queueContainer.replaceChildren();
+  const queue = safeUsage.queue30 && typeof safeUsage.queue30 === 'object' ? safeUsage.queue30 : {};
+  const queuedByTier = queue.queuedByTier && typeof queue.queuedByTier === 'object' ? queue.queuedByTier : {};
+  [
+    ['현재 대기', `${formatStatCount(queue.queuedNow)}건`],
+    ['등급별 대기', `익명 ${formatStatCount(queuedByTier.anonymous)} · 로그인 ${formatStatCount(queuedByTier.account)} · 구독 ${formatStatCount(queuedByTier.subscriber)} · 관리자 ${formatStatCount(queuedByTier.admin)}`],
+    ['대기열 등록', `${formatStatCount(queue.enqueued)}건`],
+    ['완료', `${formatStatCount(queue.completed)}건`],
+    ['평균 대기', queue.averageWaitMs ? `${(Number(queue.averageWaitMs) / 1000).toFixed(1)}초` : '0초'],
+    ['실패', `${formatStatCount(queue.failed)}건`],
+    ['취소', `${formatStatCount(queue.cancelled)}건`],
+    ['캐시 적중', `${formatStatCount(queue.cacheHits)}회`],
+  ].forEach(([label, value]) => {
+    const row = document.createElement('div'); row.className = 'admin-viewer-usage-action';
+    const title = document.createElement('span'); title.textContent = label;
+    const count = document.createElement('strong'); count.textContent = value;
+    row.append(title, count); queueContainer.append(row);
+  });
+
   const streamerList = $('viewerStatsAdminStreamerList');
   streamerList.replaceChildren();
   const topStreamers = Array.isArray(safeUsage.topSearchedStreamers) ? safeUsage.topSearchedStreamers : [];
