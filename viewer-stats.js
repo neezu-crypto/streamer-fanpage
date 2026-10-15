@@ -50,6 +50,7 @@ let subscriptionRefreshTimer = 0;
 let subscriptionState = {
   loaded: false,
   accountProtected: false,
+  isAdmin: false,
   subscribed: false,
   expiresAt: 0,
   pending: false,
@@ -166,7 +167,12 @@ function renderSubscriptionControls() {
     return;
   }
   action.disabled = false;
-  if (state.subscribed) {
+  if (state.isAdmin) {
+    status.textContent = '관리자 권한 · 구독 여부와 관계없이 모든 분석 기능을 이용할 수 있어요.';
+    action.textContent = '관리자 전체 권한';
+    action.disabled = true;
+    scan.textContent = '최근 1년 분석';
+  } else if (state.subscribed) {
     status.textContent = '구독 중 · ' + formatSubscriptionDate(state.expiresAt) + '까지 이용할 수 있어요.'
       + (state.pending ? ' 갱신 신청도 확인 중입니다.' : '');
     action.textContent = state.pending ? '신청 상태 보기' : '구독 연장하기';
@@ -205,6 +211,10 @@ function scheduleSubscriptionStatusRefresh() {
     subscriptionRefreshTimer = window.setTimeout(() => refreshSubscriptionStatus(), 60 * 1000);
     return;
   }
+  if (subscriptionState.isAdmin) {
+    subscriptionRefreshTimer = window.setTimeout(() => refreshSubscriptionStatus(), 6 * 60 * 60 * 1000);
+    return;
+  }
   if (!subscriptionState.subscribed || !subscriptionState.expiresAt) return;
   const untilExpiry = Math.max(1000, subscriptionState.expiresAt - Date.now() + 1000);
   subscriptionRefreshTimer = window.setTimeout(
@@ -224,6 +234,7 @@ async function refreshSubscriptionStatus() {
     subscriptionState = {
       loaded: true,
       accountProtected: data.accountProtected === true,
+      isAdmin: data.isAdmin === true,
       subscribed: data.subscribed === true,
       expiresAt: Number(data.expiresAt) || 0,
       pending: data.pending === true,
@@ -257,12 +268,16 @@ function renderSubscriptionDialogStatus(message = '') {
   const submit = $('viewerSubscriptionSubmit');
   const cancel = $('viewerSubscriptionCancel');
   const loginNote = $('viewerSubscriptionLoginNote');
+  const purchaseInfo = $('viewerSubscriptionPurchaseInfo');
   const hasPending = subscriptionState.pending && subscriptionState.pendingRequestId;
+  purchaseInfo.classList.toggle('hidden', subscriptionState.isAdmin);
   loginNote.classList.toggle('hidden', subscriptionState.accountProtected);
-  submit.classList.toggle('hidden', !subscriptionState.accountProtected || !!hasPending);
-  cancel.classList.toggle('hidden', !hasPending);
+  submit.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
+  cancel.classList.toggle('hidden', subscriptionState.isAdmin || !hasPending);
   submit.textContent = subscriptionState.subscribed ? '후원 후 30일 연장 신청' : '후원 신청하기';
-  if (message) {
+  if (subscriptionState.isAdmin) {
+    status.textContent = '관리자 권한으로 기간별 최고 순간과 평균 대비 상승폭을 포함한 모든 구독 기능을 이용할 수 있어요.';
+  } else if (message) {
     status.textContent = message;
   } else if (!subscriptionState.accountProtected) {
     status.textContent = '익명 계정은 구독 권한을 구매할 수 없어요. Google·Kakao 계정 연결 또는 스트리머 인증 후 이용해 주세요.';
@@ -782,6 +797,8 @@ async function runPeriodPeakScan() {
     const access = await callViewerSubscription({ action: 'periodAccess' });
     if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
     const previouslySubscribed = subscriptionState.subscribed;
+    subscriptionState.isAdmin = access.data && access.data.isAdmin === true;
+    if (subscriptionState.isAdmin) subscriptionState.accountProtected = true;
     subscriptionState.subscribed = true;
     subscriptionState.expiresAt = Number(access.data && access.data.expiresAt) || subscriptionState.expiresAt;
     subscriptionState.loaded = true;
@@ -1028,6 +1045,10 @@ $('viewerSubscriptionDialog').addEventListener('click', (event) => {
 });
 $('viewerSubscriptionForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (subscriptionState.isAdmin) {
+    renderSubscriptionDialogStatus();
+    return;
+  }
   if (!subscriptionState.accountProtected) {
     renderSubscriptionDialogStatus('로그인 후 구독 신청을 할 수 있어요. 새 탭에서 로그인한 뒤 상태를 새로고침해 주세요.');
     return;

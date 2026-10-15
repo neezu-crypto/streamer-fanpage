@@ -107,14 +107,16 @@
       <button class="viewer-subscription-close" id="viewerSubscriptionClose" type="button" aria-label="닫기">×</button>
       <p class="eyebrow">30-DAY PASS</p>
       <h2 id="viewerSubscriptionDialogTitle">고점체크 구독</h2>
-      <p class="viewer-subscription-dialog-intro">구독 권한은 현재 로그인한 개인 계정에 적용되며, 모든 스트리머에 사용할 수 있어요. 별풍선 10개 후원 1회당 30일 이용권이 부여되고, 남은 기간이 있으면 이어서 연장됩니다. 무료 체험과 자동 갱신은 없습니다.</p>
-      <ol class="viewer-subscription-steps">
-        <li><a href="https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&amp;szWork=BJ_STATION&amp;sys_type=web&amp;location=station" target="_blank" rel="noopener noreferrer">운영자 방송국에 별풍선 10개 후원 ↗</a></li>
-        <li>후원에 사용한 SOOP 닉네임을 입력하고 신청해 주세요.</li>
-        <li>운영자가 방송에서 직접 확인한 뒤 구독을 승인합니다.</li>
-      </ol>
-      <label for="viewerSubscriptionNickname">후원자 SOOP 닉네임</label>
-      <input id="viewerSubscriptionNickname" name="nickname" maxlength="20" autocomplete="nickname" placeholder="별풍선을 보낸 닉네임" required>
+      <div id="viewerSubscriptionPurchaseInfo">
+        <p class="viewer-subscription-dialog-intro">구독 권한은 현재 로그인한 개인 계정에 적용되며, 모든 스트리머에 사용할 수 있어요. 별풍선 10개 후원 1회당 30일 이용권이 부여되고, 남은 기간이 있으면 이어서 연장됩니다. 무료 체험과 자동 갱신은 없습니다.</p>
+        <ol class="viewer-subscription-steps">
+          <li><a href="https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&amp;szWork=BJ_STATION&amp;sys_type=web&amp;location=station" target="_blank" rel="noopener noreferrer">운영자 방송국에 별풍선 10개 후원 ↗</a></li>
+          <li>후원에 사용한 SOOP 닉네임을 입력하고 신청해 주세요.</li>
+          <li>운영자가 방송에서 직접 확인한 뒤 구독을 승인합니다.</li>
+        </ol>
+        <label for="viewerSubscriptionNickname">후원자 SOOP 닉네임</label>
+        <input id="viewerSubscriptionNickname" name="nickname" maxlength="20" autocomplete="nickname" placeholder="별풍선을 보낸 닉네임" required>
+      </div>
       <p class="viewer-subscription-dialog-status" id="viewerSubscriptionDialogStatus" role="status" aria-live="polite"></p>
       <div class="viewer-subscription-dialog-actions">
         <button class="button hidden" id="viewerSubscriptionCancel" type="button">대기 신청 취소</button>
