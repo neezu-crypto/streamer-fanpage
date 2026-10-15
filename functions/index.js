@@ -2474,7 +2474,7 @@ exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => 
   return { streamers };
 });
 
-exports.streamerFanPageViewerStats = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck: true }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const action = String(data.action || '');
