@@ -2606,8 +2606,12 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     if (!/^\d{1,20}$/.test(vodId)) throw new HttpsError('invalid-argument', '다시보기 번호를 확인해 주세요.');
     const includePremiumMetrics = data.includePremiumMetrics === true;
     if (includePremiumMetrics) {
-      const subscription = (await db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get()).val() || {};
-      if ((Number(subscription.expiresAt) || 0) <= Date.now()) {
+      const [subscriptionSnapshot, admin] = await Promise.all([
+        db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+        isAdminUid(uid),
+      ]);
+      const subscription = subscriptionSnapshot.val() || {};
+      if (!admin && (Number(subscription.expiresAt) || 0) <= Date.now()) {
         throw new HttpsError('permission-denied', '평균 대비 상승폭은 구독 계정에서 이용할 수 있습니다.');
       }
     }

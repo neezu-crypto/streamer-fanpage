@@ -24,14 +24,21 @@ async function isAdmin(uid) {
   return adminSnapshot.val() === true;
 }
 
-async function accountProtection(uid) {
+async function accountAccess(uid) {
   const db = getDatabase();
   const [userSnapshot, admin] = await Promise.all([
     db.ref(`users/${uid}`).get(),
     isAdmin(uid),
   ]);
   const user = userSnapshot.val() || {};
-  return admin || user.googleLinked === true || user.kakaoLinked === true || user.streamerVerified === true;
+  return {
+    isAdmin: admin,
+    accountProtected: admin || user.googleLinked === true || user.kakaoLinked === true || user.streamerVerified === true,
+  };
+}
+
+async function accountProtection(uid) {
+  return (await accountAccess(uid)).accountProtected;
 }
 
 async function requireProtectedAccount(request) {
@@ -75,9 +82,9 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
   const subscriptionRef = db.ref(`${SUBSCRIPTIONS_PATH}/${uid}`);
 
   if (action === 'status') {
-    const [subscriptionSnapshot, protectedAccount] = await Promise.all([
+    const [subscriptionSnapshot, access] = await Promise.all([
       subscriptionRef.get(),
-      accountProtection(uid),
+      accountAccess(uid),
     ]);
     const now = Date.now();
     const subscription = subscriptionSnapshot.val() || {};
@@ -90,8 +97,9 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
         .transaction((current) => current === info.pendingRequestId ? null : current);
     }
     return {
-      accountProtected: protectedAccount,
-      subscribed: info.subscribed,
+      accountProtected: access.accountProtected,
+      isAdmin: access.isAdmin,
+      subscribed: access.isAdmin || info.subscribed,
       expiresAt: info.expiresAt,
       pending: isPending,
       pendingRequestId: isPending ? info.pendingRequestId : '',
@@ -173,12 +181,15 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
   }
 
   if (action === 'periodAccess') {
-    const subscriptionSnapshot = await subscriptionRef.get();
+    const [subscriptionSnapshot, admin] = await Promise.all([
+      subscriptionRef.get(),
+      isAdmin(uid),
+    ]);
     const info = subscriptionInfo(subscriptionSnapshot.val(), Date.now());
-    if (!info.subscribed) {
+    if (!admin && !info.subscribed) {
       throw new HttpsError('permission-denied', '기간별 최고 시청 순간은 구독 계정에서 이용할 수 있습니다.');
     }
-    return { subscribed: true, expiresAt: info.expiresAt };
+    return { subscribed: true, isAdmin: admin, expiresAt: info.expiresAt };
   }
 
   throw new HttpsError('invalid-argument', '구독 요청을 확인해 주세요.');
