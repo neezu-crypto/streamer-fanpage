@@ -204,6 +204,10 @@
 .admin-viewer-usage-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px}
 .admin-viewer-usage-action{display:flex;justify-content:space-between;gap:8px;padding:8px 9px;border-radius:8px;background:#00000020;color:#cfc7d3;font-size:11px}
 .admin-viewer-usage-action strong{color:#f6d5e1;white-space:nowrap}
+.admin-viewer-usage-tier-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.admin-viewer-usage-tier{display:flex;justify-content:space-between;gap:8px;padding:9px 10px;border:1px solid #ffffff10;border-radius:8px;background:#00000020;color:#cfc7d3;font-size:11px}
+.admin-viewer-usage-tier strong{color:#f6d5e1;white-space:nowrap}
+.admin-viewer-usage-queue-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 .admin-viewer-usage-streamers-heading{display:flex;justify-content:space-between;gap:10px;margin:15px 0 8px;color:#e9e2ed;font-size:11px}
 .admin-viewer-usage-streamers-heading span{color:#a69cab;font-size:10px}
 .admin-viewer-usage-streamers{display:grid;max-height:min(28vh,260px);grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;overflow:auto;overscroll-behavior:contain;padding:1px 3px 2px 0;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
@@ -244,7 +248,7 @@
 .admin-stat-sparkline span{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#f58cac,#b76b88);opacity:.85}
 .admin-stats-empty{grid-column:1/-1}
 @media(max-width:720px){.admin-stats-dialog-card{padding:17px}.admin-stats-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-stats-list{max-height:38vh;grid-template-columns:1fr}}
-@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage,.admin-viewer-subscriptions{padding:11px}.admin-viewer-usage-actions,.admin-viewer-usage-streamers{grid-template-columns:1fr}.admin-viewer-usage-streamers{max-height:25vh}.admin-viewer-usage-action{font-size:11px}.admin-viewer-subscription-row{align-items:stretch;flex-direction:column}.admin-viewer-subscription-actions{display:grid;grid-template-columns:1fr 1fr}.admin-viewer-subscription-actions .button{width:100%}}
+@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage,.admin-viewer-subscriptions{padding:11px}.admin-viewer-usage-actions,.admin-viewer-usage-streamers{grid-template-columns:1fr}.admin-viewer-usage-tier-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-viewer-usage-queue-grid{grid-template-columns:1fr}.admin-viewer-usage-streamers{max-height:25vh}.admin-viewer-usage-action{font-size:11px}.admin-viewer-subscription-row{align-items:stretch;flex-direction:column}.admin-viewer-subscription-actions{display:grid;grid-template-columns:1fr 1fr}.admin-viewer-subscription-actions .button{width:100%}}
 
 /* Scrollable replay area and SOOP schedule calendar */
 .vod-scrollbox{max-height:min(72vh,680px);overflow-y:auto;overscroll-behavior:contain;padding:0 8px 4px 0;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}

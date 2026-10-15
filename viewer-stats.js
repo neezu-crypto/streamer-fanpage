@@ -134,6 +134,10 @@ function formatRetryDuration(value) {
   return seconds + '초';
 }
 
+function waitMilliseconds(duration) {
+  return new Promise((resolve) => window.setTimeout(resolve, duration));
+}
+
 function viewerStatsErrorMessage(error, fallback) {
   const message = error && error.message ? error.message : fallback;
   const retryAfterSeconds = Number(error && error.details && error.details.retryAfterSeconds);
@@ -507,6 +511,66 @@ function showStatsLinks(card, stats) {
   card.dataset.statsState = 'ready';
 }
 
+function showQueueWaitMessage(card, loadToken) {
+  if (!card.isConnected || loadToken !== activeLoadToken) return;
+  card._mainAction.textContent = '집계 대기 중…';
+  card._statsActions.replaceChildren();
+  const status = document.createElement('span');
+  status.className = 'viewer-stat-state';
+  status.setAttribute('role', 'status');
+  status.textContent = '현재 이용자가 많아 집계 시간이 길어지고 있습니다. 잠시만 기다려 주세요.';
+  card._statsActions.append(status);
+}
+
+async function waitForViewerStatsJob(jobId, job) {
+  const startedAt = Date.now();
+  const timeoutMs = 10 * 60 * 1000;
+  let delay = 600;
+  let waitMessageShown = false;
+  while (Date.now() - startedAt < timeoutMs) {
+    if (!job.shouldStart()) {
+      callViewerStats({ action: 'cancelStatsJob', jobId }).catch(() => {});
+      const error = new Error('분석 대상이 변경되었습니다.');
+      error.code = 'viewer-stats/cancelled';
+      throw error;
+    }
+    if (!waitMessageShown && Date.now() - startedAt >= 1500) {
+      waitMessageShown = true;
+      if (typeof job.onWaiting === 'function') job.onWaiting();
+    }
+    await waitMilliseconds(delay);
+    if (!job.shouldStart()) {
+      callViewerStats({ action: 'cancelStatsJob', jobId }).catch(() => {});
+      const error = new Error('분석 대상이 변경되었습니다.');
+      error.code = 'viewer-stats/cancelled';
+      throw error;
+    }
+    const result = await callViewerStats({ action: 'statsResult', jobId });
+    const data = result.data || {};
+    if (data.status === 'completed') {
+      if (!data.stats || !data.stats.highest || !data.stats.lowest) {
+        throw new Error('시청자 그래프 응답을 확인하지 못했어요.');
+      }
+      return data.stats;
+    }
+    if (data.status === 'failed' || data.status === 'expired') {
+      const error = new Error(data.errorMessage || '시청자 그래프를 계산하지 못했어요. 다시 시도해 주세요.');
+      error.code = 'functions/unavailable';
+      throw error;
+    }
+    if (data.status === 'cancelled') {
+      const error = new Error('분석 대상이 변경되었습니다.');
+      error.code = 'viewer-stats/cancelled';
+      throw error;
+    }
+    delay = Math.min(8000, Math.ceil(delay * 1.7));
+  }
+  callViewerStats({ action: 'cancelStatsJob', jobId }).catch(() => {});
+  const error = new Error('집계가 지연되고 있어요. 잠시 후 다시 시도해 주세요.');
+  error.code = 'functions/deadline-exceeded';
+  throw error;
+}
+
 function showStatsError(card, error, loadToken) {
   if (!card.isConnected || loadToken !== activeLoadToken) return;
   card.dataset.statsState = 'error';
@@ -559,8 +623,11 @@ function pumpStatsQueue() {
       vodId: job.vod.id,
       includePremiumMetrics: job.includePremiumMetrics,
     })
-      .then((result) => {
-        const stats = result.data && result.data.stats;
+      .then(async (result) => {
+        const response = result.data || {};
+        const stats = response.stats || (response.jobId
+          ? await waitForViewerStatsJob(response.jobId, job)
+          : null);
         if (!stats || !stats.highest || !stats.lowest) throw new Error('시청자 그래프 응답을 확인하지 못했어요.');
         viewerStatsMemoryCache.set(job.key, stats);
         while (viewerStatsMemoryCache.size > MAX_BROWSER_STATS_CACHE_ITEMS) {
@@ -577,7 +644,13 @@ function pumpStatsQueue() {
   }
 }
 
-function loadVodStats(vod, streamerId, shouldStart = () => true, includePremiumMetrics = subscriptionState.subscribed) {
+function loadVodStats(
+  vod,
+  streamerId,
+  shouldStart = () => true,
+  includePremiumMetrics = subscriptionState.subscribed,
+  onWaiting = null,
+) {
   const key = String(streamerId).toLowerCase() + ':' + String(vod.id) + (includePremiumMetrics ? ':premium' : '');
   if (viewerStatsMemoryCache.has(key)) {
     const cached = viewerStatsMemoryCache.get(key);
@@ -600,6 +673,7 @@ function loadVodStats(vod, streamerId, shouldStart = () => true, includePremiumM
     vod,
     streamerId,
     includePremiumMetrics,
+    onWaiting,
     promise,
     shouldStart,
     resolve: resolveRequest,
@@ -623,7 +697,13 @@ function enqueueStats(card, vod, loadToken) {
   card.dataset.statsState = 'queued';
   const streamerId = selectedStreamer.soopId;
   const includePremiumMetrics = subscriptionState.subscribed;
-  loadVodStats(vod, streamerId, () => card.isConnected && loadToken === activeLoadToken, includePremiumMetrics)
+  loadVodStats(
+    vod,
+    streamerId,
+    () => card.isConnected && loadToken === activeLoadToken,
+    includePremiumMetrics,
+    () => showQueueWaitMessage(card, loadToken),
+  )
     .then((stats) => {
       if (!card.isConnected || loadToken !== activeLoadToken) return;
       if (includePremiumMetrics !== subscriptionState.subscribed) {
@@ -855,7 +935,15 @@ async function runPeriodPeakScan() {
         const item = vods[cursor];
         cursor += 1;
         try {
-          const stats = await loadVodStats(item.vod, streamerId, () => isCurrentPeriodScan(scanToken, loadToken));
+          const stats = await loadVodStats(
+            item.vod,
+            streamerId,
+            () => isCurrentPeriodScan(scanToken, loadToken),
+            true,
+            () => {
+              $('viewerPeriodStatus').textContent = '현재 이용자가 많아 집계 시간이 길어지고 있습니다. 분석을 계속 진행하고 있어요.';
+            },
+          );
           if (!isCurrentPeriodScan(scanToken, loadToken)) return;
           const peakViewers = Number(stats.highest.viewers);
           const peakSecond = Number(stats.highest.second);

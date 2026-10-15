@@ -2,10 +2,23 @@
 
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
+const { getFunctions: getAdminFunctions } = require('firebase-admin/functions');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onTaskDispatched } = require('firebase-functions/v2/tasks');
 const { defineSecret } = require('firebase-functions/params');
 const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
+const {
+  VIEWER_STATS_QUEUE_MAX_CONCURRENT,
+  VIEWER_STATS_QUEUE_MAX_INSTANCES,
+  VIEWER_STATS_QUEUE_MAX_PER_SECOND,
+  VIEWER_STATS_QUEUE_PATH,
+  VIEWER_STATS_WORKER_FUNCTION,
+  selectNextViewerStatsCandidate,
+  viewerStatsRateLimit,
+  viewerStatsTier,
+} = require('./viewer-stats-policy');
 const {
   streamerFanPageViewerSubscription,
   streamerFanPageAdminViewerSubscriptionRequests,
@@ -13,6 +26,7 @@ const {
 
 initializeApp();
 const db = getDatabase();
+const adminFunctions = getAdminFunctions();
 exports.streamerFanPageViewerSubscription = streamerFanPageViewerSubscription;
 exports.streamerFanPageAdminViewerSubscriptionRequests = streamerFanPageAdminViewerSubscriptionRequests;
 const MAX_INTRO_LENGTH = 700;
@@ -75,26 +89,13 @@ const fanpageViewerStatsInProgress = new Map();
 const soopStreamerSearchCache = new Map();
 const FANPAGE_VIEWER_STATS_CACHE_TTL_MS = 10 * 60 * 1000;
 const FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS = 200;
-const VIEWER_STATS_RATE_LIMITS = Object.freeze({
-  search: {
-    perMinute: 10,
-    perDay: 100,
-    minuteMessage: '검색 요청 한도에 도달했어요.',
-    dayMessage: '오늘 검색 한도에 도달했어요.',
-  },
-  vods: {
-    perMinute: 30,
-    perDay: 80,
-    minuteMessage: '다시보기 목록 요청 한도에 도달했어요.',
-    dayMessage: '오늘 다시보기 목록 요청 한도에 도달했어요.',
-  },
-  stats: {
-    perMinute: 1500,
-    perDay: 1500,
-    minuteMessage: '통계 요청 한도에 도달했어요.',
-    dayMessage: '오늘 통계 분석 한도에 도달했어요.',
-  },
-});
+const VIEWER_STATS_JOBS_PATH = 'streamerFanPageViewerStatsJobs';
+const VIEWER_STATS_WORKER_CLAIMS_PATH = 'streamerFanPageViewerStatsWorkerClaims';
+const VIEWER_STATS_JOB_TTL_MS = 2 * 60 * 60 * 1000;
+const VIEWER_STATS_JOB_PROCESSING_LEASE_MS = 3 * 60 * 1000;
+const VIEWER_STATS_JOB_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
+let lastViewerStatsJobCleanupAt = 0;
+let viewerStatsJobCleanupPromise = null;
 const VIEWER_STATS_USAGE_ACTIONS = Object.freeze(['search', 'vods', 'stats']);
 
 function requireAuth(request) {
@@ -104,14 +105,145 @@ function requireAuth(request) {
   return request.auth.uid;
 }
 
+async function resolveViewerStatsBaseTier(uid, auth) {
+  const signInProvider = auth && auth.token && auth.token.firebase
+    ? String(auth.token.firebase.sign_in_provider || '')
+    : '';
+  if (signInProvider !== 'anonymous') return 'account';
+  const userSnapshot = await db.ref(`users/${uid}`).get();
+  const user = userSnapshot.val() || {};
+  return viewerStatsTier(auth, {
+    isProtectedAccount: user.googleLinked === true || user.kakaoLinked === true || user.streamerVerified === true,
+  });
+}
+
+async function resolveViewerStatsTier(uid, auth) {
+  const [baseTier, subscriptionSnapshot, isAdmin] = await Promise.all([
+    resolveViewerStatsBaseTier(uid, auth),
+    db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+    isAdminUid(uid),
+  ]);
+  const subscription = subscriptionSnapshot.val() || {};
+  return viewerStatsTier(auth, {
+    isAdmin,
+    isSubscribed: (Number(subscription.expiresAt) || 0) > Date.now(),
+    isProtectedAccount: baseTier === 'account',
+  });
+}
+
+function viewerStatsDayKey(timestamp = Date.now()) {
+  return new Date(Number(timestamp) + (9 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+}
+
+function viewerStatsLimitMessage(action, isDayLimit) {
+  const labels = {
+    search: '검색',
+    vods: '다시보기 목록 요청',
+    stats: '통계 분석 요청',
+  };
+  return (isDayLimit ? '오늘 ' : '') + labels[action] + ' 한도에 도달했어요.';
+}
+
+function viewerStatsUidKey(uid) {
+  return createHash('sha256').update(uid).digest('hex').slice(0, 32);
+}
+
+function viewerStatsJobRef(jobId) {
+  const match = String(jobId || '').match(/^(\d{4})(\d{2})(\d{2})_([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+  if (!match) throw new HttpsError('invalid-argument', '시청 통계 요청 번호를 확인해 주세요.');
+  const dateKey = `${match[1]}-${match[2]}-${match[3]}`;
+  return db.ref(`${VIEWER_STATS_JOBS_PATH}/${dateKey}/${match[4]}`);
+}
+
+function viewerStatsQueueRef(tier, queueKey) {
+  if (!['anonymous', 'account', 'subscriber', 'admin'].includes(tier)
+    || !/^\d{13}_\d{8}_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(queueKey || ''))) {
+    throw new HttpsError('invalid-argument', '시청 통계 대기열 요청을 확인해 주세요.');
+  }
+  return db.ref(`${VIEWER_STATS_QUEUE_PATH}/${tier}/${queueKey}`);
+}
+
+function viewerStatsWorkerClaimRef(taskId) {
+  const claimKey = createHash('sha256').update(String(taskId || '')).digest('hex').slice(0, 40);
+  return db.ref(`${VIEWER_STATS_WORKER_CLAIMS_PATH}/${claimKey}`);
+}
+
+function makeViewerStatsQueueKey(createdAt, jobId) {
+  return String(Math.floor(Number(createdAt) || Date.now())).padStart(13, '0') + '_' + jobId;
+}
+
+async function updateViewerStatsQueueMetrics(uidKey, dateKey, updates) {
+  const reference = db.ref(`streamerFanPageViewerStatsLimits/${uidKey}`);
+  await reference.transaction((current) => {
+    const previous = current && typeof current === 'object' ? current : {};
+    const recentUsageByDay = previous.recentUsageByDay && typeof previous.recentUsageByDay === 'object'
+      ? { ...previous.recentUsageByDay }
+      : {};
+    const usageDay = recentUsageByDay[dateKey] && typeof recentUsageByDay[dateKey] === 'object'
+      ? { ...recentUsageByDay[dateKey] }
+      : {};
+    const queueMetrics = usageDay.queueMetrics && typeof usageDay.queueMetrics === 'object'
+      ? { ...usageDay.queueMetrics }
+      : {};
+    Object.entries(updates || {}).forEach(([key, value]) => {
+      queueMetrics[key] = Math.max(0, Number(queueMetrics[key]) || 0) + Math.max(0, Number(value) || 0);
+    });
+    usageDay.queueMetrics = queueMetrics;
+    recentUsageByDay[dateKey] = usageDay;
+    return { ...previous, recentUsageByDay, updatedAt: Date.now() };
+  });
+}
+
+async function cleanupOldViewerStatsJobs(now = Date.now()) {
+  if (now - lastViewerStatsJobCleanupAt < VIEWER_STATS_JOB_CLEANUP_INTERVAL_MS) return;
+  if (viewerStatsJobCleanupPromise) return viewerStatsJobCleanupPromise;
+  viewerStatsJobCleanupPromise = (async () => {
+    try {
+      const cutoffTimestamp = now - (3 * 24 * 60 * 60 * 1000);
+      const cutoffDateKey = viewerStatsDayKey(cutoffTimestamp);
+      const oldJobsSnapshot = await db.ref(VIEWER_STATS_JOBS_PATH)
+        .orderByKey()
+        .endAt(cutoffDateKey)
+        .get();
+      const oldJobDays = Object.keys(oldJobsSnapshot.val() || {}).filter((dateKey) => dateKey < cutoffDateKey);
+      await Promise.all(oldJobDays.map((dateKey) => db.ref(`${VIEWER_STATS_JOBS_PATH}/${dateKey}`).remove()));
+
+      const expiredQueueBefore = now - VIEWER_STATS_JOB_TTL_MS;
+      const oldestQueueKey = String(Math.floor(expiredQueueBefore)).padStart(13, '0') + '_\uf8ff';
+      await Promise.all(['anonymous', 'account', 'subscriber', 'admin'].map(async (tier) => {
+        const oldQueueSnapshot = await db.ref(`${VIEWER_STATS_QUEUE_PATH}/${tier}`)
+          .orderByKey()
+          .endAt(oldestQueueKey)
+          .get();
+        const oldQueue = oldQueueSnapshot.val() || {};
+        await Promise.all(Object.keys(oldQueue).map((queueKey) => viewerStatsQueueRef(tier, queueKey).remove()));
+      }));
+
+      const claimsSnapshot = await db.ref(VIEWER_STATS_WORKER_CLAIMS_PATH).get();
+      const staleClaims = Object.entries(claimsSnapshot.val() || {})
+        .filter(([, claim]) => !claim || Number(claim.claimedAt) < cutoffTimestamp)
+        .map(([key]) => key);
+      await Promise.all(staleClaims.map((key) => db.ref(`${VIEWER_STATS_WORKER_CLAIMS_PATH}/${key}`).remove()));
+      lastViewerStatsJobCleanupAt = now;
+    } catch (error) {
+      lastViewerStatsJobCleanupAt = now - VIEWER_STATS_JOB_CLEANUP_INTERVAL_MS + 60 * 1000;
+      console.warn('Could not clean up old viewer stats jobs:', error);
+    } finally {
+      viewerStatsJobCleanupPromise = null;
+    }
+  })();
+  return viewerStatsJobCleanupPromise;
+}
+
 async function enforceViewerStatsRateLimit(uid, action, usageContext = {}) {
-  const limits = VIEWER_STATS_RATE_LIMITS[action];
-  if (!limits) return;
+  const tier = String(usageContext.tier || 'account');
+  const limits = viewerStatsRateLimit(tier, action);
+  if (!limits && tier !== 'admin') return;
 
   const now = Date.now();
   const minuteWindow = Math.floor(now / 60000);
-  const dayKey = new Date(now + (9 * 60 * 60 * 1000)).toISOString().slice(0, 10);
-  const uidKey = createHash('sha256').update(uid).digest('hex').slice(0, 32);
+  const dayKey = viewerStatsDayKey(now);
+  const uidKey = viewerStatsUidKey(uid);
   const selectedStreamerId = action === 'vods' && Number(usageContext.page) === 1
     ? String(usageContext.streamerId || '').trim().toLowerCase()
     : '';
@@ -141,12 +273,28 @@ async function enforceViewerStatsRateLimit(uid, action, usageContext = {}) {
     const minuteCount = Math.max(0, Number(minuteCounts[action]) || 0);
     const dayCount = Math.max(0, Number(dayCounts[action]) || 0);
 
-    if (minuteCount >= limits.perMinute || dayCount >= limits.perDay) return;
+    if (limits && (minuteCount >= limits.perMinute || dayCount >= limits.perDay)) return;
 
     const updatedUsageDay = {
       ...usageDayCounts,
       [action]: Math.max(0, Number(usageDayCounts[action]) || 0) + 1,
     };
+    const tierCounts = usageDayCounts.tiers && typeof usageDayCounts.tiers === 'object'
+      ? { ...usageDayCounts.tiers }
+      : {};
+    const actionCountsForTier = tierCounts[tier] && typeof tierCounts[tier] === 'object'
+      ? { ...tierCounts[tier] }
+      : {};
+    actionCountsForTier[action] = Math.max(0, Number(actionCountsForTier[action]) || 0) + 1;
+    tierCounts[tier] = actionCountsForTier;
+    updatedUsageDay.tiers = tierCounts;
+    if (usageContext.cacheHit === true) {
+      const metrics = usageDayCounts.queueMetrics && typeof usageDayCounts.queueMetrics === 'object'
+        ? { ...usageDayCounts.queueMetrics }
+        : {};
+      metrics.cacheHits = Math.max(0, Number(metrics.cacheHits) || 0) + 1;
+      updatedUsageDay.queueMetrics = metrics;
+    }
     if (trackStreamerSelection) {
       const selectedStreamers = usageDayCounts.streamers && typeof usageDayCounts.streamers === 'object'
         ? { ...usageDayCounts.streamers }
@@ -172,15 +320,15 @@ async function enforceViewerStatsRateLimit(uid, action, usageContext = {}) {
     ? current.minuteCounts
     : {};
   const currentDayCounts = current.dayKey === dayKey && current.dayCounts ? current.dayCounts : {};
-  if ((Number(currentDayCounts[action]) || 0) >= limits.perDay) {
+  if (limits && (Number(currentDayCounts[action]) || 0) >= limits.perDay) {
     const seoulMidnight = Date.parse(`${dayKey}T00:00:00+09:00`);
     const retryAfterSeconds = Math.max(1, Math.ceil((seoulMidnight + (24 * 60 * 60 * 1000) - now) / 1000));
-    throw new HttpsError('resource-exhausted', limits.dayMessage, { retryAfterSeconds });
+    throw new HttpsError('resource-exhausted', viewerStatsLimitMessage(action, true), { retryAfterSeconds });
   }
-  if ((Number(currentMinuteCounts[action]) || 0) >= limits.perMinute) {
+  if (limits && (Number(currentMinuteCounts[action]) || 0) >= limits.perMinute) {
     const nextMinute = (minuteWindow + 1) * 60 * 1000;
     const retryAfterSeconds = Math.max(1, Math.ceil((nextMinute - now) / 1000));
-    throw new HttpsError('resource-exhausted', limits.minuteMessage, { retryAfterSeconds });
+    throw new HttpsError('resource-exhausted', viewerStatsLimitMessage(action, false), { retryAfterSeconds });
   }
   throw new HttpsError('aborted', '요청 한도를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 }
@@ -1150,6 +1298,335 @@ function viewerStatsForResponse(stats, includePremiumMetrics) {
   if (includePremiumMetrics) return stats;
   const { averageViewers, ...publicStats } = stats || {};
   return publicStats;
+}
+
+async function enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiumMetrics) {
+  const now = Date.now();
+  await cleanupOldViewerStatsJobs(now);
+  const dayKey = viewerStatsDayKey(now);
+  const jobId = dayKey.replace(/-/g, '') + '_' + randomUUID();
+  const jobRef = viewerStatsJobRef(jobId);
+  const uidKey = viewerStatsUidKey(uid);
+  const queueKey = makeViewerStatsQueueKey(now, jobId);
+  const queueRef = viewerStatsQueueRef(tier, queueKey);
+  try {
+    await jobRef.set({
+      requesterKey: uidKey,
+      tier,
+      streamerId,
+      vodId,
+      includePremiumMetrics: includePremiumMetrics === true,
+      queueKey,
+      status: 'queued',
+      createdAt: now,
+      expiresAt: now + VIEWER_STATS_JOB_TTL_MS,
+    });
+    await queueRef.set(jobId);
+    await adminFunctions.taskQueue(VIEWER_STATS_WORKER_FUNCTION)
+      .enqueue({ wakeJobId: jobId }, { dispatchDeadlineSeconds: 120 });
+    await updateViewerStatsQueueMetrics(uidKey, dayKey, { enqueued: 1 }).catch((error) => {
+      console.warn('Could not record viewer stats queue submission metric:', error);
+    });
+    return { jobId, status: 'queued', tier };
+  } catch (error) {
+    await queueRef.remove().catch(() => {});
+    await jobRef.remove().catch(() => {});
+    console.error('Could not enqueue viewer stats job:', error);
+    throw new HttpsError('unavailable', '집계 대기열을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+}
+
+async function getOrFetchViewerStats(streamerId, vodId) {
+  const cacheKey = streamerId + ':' + vodId;
+  const cached = fanpageViewerStatsMemoryCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return { stats: cached.value, cacheHit: true };
+  const inProgress = fanpageViewerStatsInProgress.get(cacheKey);
+  if (inProgress) return { stats: await inProgress, cacheHit: true };
+
+  const task = fetchSoopVodViewerCountStats(streamerId, vodId);
+  fanpageViewerStatsInProgress.set(cacheKey, task);
+  try {
+    const stats = await task;
+    fanpageViewerStatsMemoryCache.set(cacheKey, {
+      value: stats,
+      expiresAt: Date.now() + FANPAGE_VIEWER_STATS_CACHE_TTL_MS,
+    });
+    while (fanpageViewerStatsMemoryCache.size > FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS) {
+      fanpageViewerStatsMemoryCache.delete(fanpageViewerStatsMemoryCache.keys().next().value);
+    }
+    return { stats, cacheHit: false };
+  } finally {
+    if (fanpageViewerStatsInProgress.get(cacheKey) === task) fanpageViewerStatsInProgress.delete(cacheKey);
+  }
+}
+
+async function readOldestViewerStatsCandidateForTier(tier, now = Date.now()) {
+  const queueRoot = db.ref(`${VIEWER_STATS_QUEUE_PATH}/${tier}`);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const snapshot = await queueRoot.orderByKey().limitToFirst(1).get();
+    if (!snapshot.exists()) return null;
+    const [queueKey, rawJobId] = Object.entries(snapshot.val())[0];
+    const jobId = String(rawJobId || '');
+    let jobRef;
+    try {
+      jobRef = viewerStatsJobRef(jobId);
+      viewerStatsQueueRef(tier, queueKey);
+    } catch {
+      await queueRoot.child(queueKey).remove();
+      continue;
+    }
+    const jobSnapshot = await jobRef.get();
+    const job = jobSnapshot.val();
+    if (!job || job.status !== 'queued' || job.tier !== tier || job.queueKey !== queueKey) {
+      await queueRoot.child(queueKey).remove();
+      continue;
+    }
+    if (Number(job.expiresAt) <= now) {
+      await jobRef.transaction((current) => {
+        if (!current || current.status !== 'queued' || Number(current.expiresAt) > now) return;
+        return { ...current, status: 'expired', finishedAt: now, errorMessage: '집계 요청이 만료됐어요. 다시 요청해 주세요.' };
+      });
+      await queueRoot.child(queueKey).remove();
+      continue;
+    }
+    return { jobId, queueKey, tier, createdAt: Number(job.createdAt) || now };
+  }
+  return null;
+}
+
+async function claimViewerStatsJob(candidate, taskId) {
+  const jobRef = viewerStatsJobRef(candidate.jobId);
+  const now = Date.now();
+  const result = await jobRef.transaction((current) => {
+    if (!current || ['completed', 'failed', 'cancelled', 'expired'].includes(current.status)) return;
+    if (Number(current.expiresAt) <= now) {
+      return {
+        ...current,
+        status: 'expired',
+        finishedAt: now,
+        processingLeaseUntil: null,
+        errorMessage: '집계 요청이 만료됐어요. 다시 요청해 주세요.',
+      };
+    }
+    const leaseIsActive = current.status === 'processing' && Number(current.processingLeaseUntil) > now;
+    if (leaseIsActive && current.claimedBy !== taskId) return;
+    if (leaseIsActive && current.claimedBy === taskId) return;
+    return {
+      ...current,
+      status: 'processing',
+      startedAt: current.status === 'processing' ? Number(current.startedAt) || now : now,
+      claimedBy: taskId,
+      processingLeaseUntil: now + VIEWER_STATS_JOB_PROCESSING_LEASE_MS,
+      attemptCount: Math.max(0, Number(current.attemptCount) || 0) + 1,
+    };
+  });
+  if (!result.committed) return null;
+  const job = result.snapshot.val();
+  if (!job || job.status !== 'processing' || job.claimedBy !== taskId) return null;
+  await viewerStatsQueueRef(candidate.tier, candidate.queueKey).remove();
+  return { ...candidate, job };
+}
+
+async function claimNextViewerStatsJob(taskId) {
+  const claimRef = viewerStatsWorkerClaimRef(taskId);
+  const previousClaim = await claimRef.get();
+  if (previousClaim.exists()) {
+    const assigned = previousClaim.val() || {};
+    const candidate = {
+      jobId: String(assigned.jobId || ''),
+      tier: String(assigned.tier || ''),
+      queueKey: String(assigned.queueKey || ''),
+    };
+    let assignedClaimIsValid = true;
+    try {
+      viewerStatsJobRef(candidate.jobId);
+      viewerStatsQueueRef(candidate.tier, candidate.queueKey);
+    } catch {
+      assignedClaimIsValid = false;
+    }
+    if (assignedClaimIsValid) {
+      const claimed = await claimViewerStatsJob(candidate, taskId);
+      if (claimed) return claimed;
+      const current = await viewerStatsJobRef(candidate.jobId).get();
+      const job = current.val();
+      if (job && job.status === 'processing' && Number(job.processingLeaseUntil) > Date.now()) {
+        throw new Error('Viewer stats job is already being processed; retry after its lease expires.');
+      }
+    }
+    await claimRef.remove();
+  }
+
+  const tiers = ['anonymous', 'account', 'subscriber', 'admin'];
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const candidates = (await Promise.all(tiers.map((tier) => readOldestViewerStatsCandidateForTier(tier))))
+      .filter(Boolean);
+    const candidate = selectNextViewerStatsCandidate(candidates);
+    if (!candidate) return null;
+
+    const claim = await claimRef.transaction((current) => {
+      if (current) return;
+      return { ...candidate, claimedAt: Date.now() };
+    });
+    if (!claim.committed) {
+      const currentClaim = claim.snapshot.val() || {};
+      if (currentClaim.jobId !== candidate.jobId) continue;
+    }
+
+    const claimed = await claimViewerStatsJob(candidate, taskId);
+    if (claimed) return claimed;
+    const latest = await viewerStatsJobRef(candidate.jobId).get();
+    const latestJob = latest.val();
+    if (latestJob && latestJob.status === 'processing'
+      && Number(latestJob.processingLeaseUntil) > Date.now()
+      && latestJob.claimedBy === taskId) {
+      throw new Error('Viewer stats job is already being processed by this task; retry after its lease expires.');
+    }
+    if (latestJob && latestJob.status === 'processing' && Number(latestJob.processingLeaseUntil) > Date.now()) {
+      await claimRef.remove();
+      continue;
+    }
+    await claimRef.remove();
+    await viewerStatsQueueRef(candidate.tier, candidate.queueKey).remove().catch(() => {});
+  }
+  return null;
+}
+
+async function processViewerStatsJob(claimed) {
+  const { jobId, job } = claimed;
+  const jobRef = viewerStatsJobRef(jobId);
+  let fetched;
+  try {
+    fetched = await getOrFetchViewerStats(job.streamerId, job.vodId);
+  } catch (error) {
+    await jobRef.update({
+      status: 'failed',
+      finishedAt: Date.now(),
+      processingLeaseUntil: null,
+      claimedBy: null,
+      errorMessage: '시청자 그래프를 계산하지 못했어요. 다시 시도해 주세요.',
+    });
+    await updateViewerStatsQueueMetrics(job.requesterKey, viewerStatsDayKey(job.createdAt), { failed: 1 }).catch((metricError) => {
+      console.warn(`Could not record viewer stats failure metric for ${jobId}:`, metricError);
+    });
+    console.warn(`Viewer stats job ${jobId} failed:`, error);
+    return;
+  }
+
+  const finishedAt = Date.now();
+  const latest = await jobRef.get();
+  if (latest.val() && latest.val().cancelRequested === true) {
+    await jobRef.update({
+      status: 'cancelled',
+      finishedAt,
+      stats: null,
+      processingLeaseUntil: null,
+      claimedBy: null,
+    });
+    await updateViewerStatsQueueMetrics(job.requesterKey, viewerStatsDayKey(job.createdAt), { cancelled: 1 })
+      .catch((error) => console.warn(`Could not record viewer stats cancellation metric for ${jobId}:`, error));
+    return;
+  }
+
+  const queueWaitMs = Math.max(0, Number(job.startedAt) - Number(job.createdAt));
+  await jobRef.update({
+    status: 'completed',
+    stats: fetched.stats,
+    finishedAt,
+    queueWaitMs,
+    processingLeaseUntil: null,
+    claimedBy: null,
+  });
+  const metrics = { completed: 1, queueWaitMs };
+  if (fetched.cacheHit) metrics.cacheHits = 1;
+  await updateViewerStatsQueueMetrics(job.requesterKey, viewerStatsDayKey(job.createdAt), metrics).catch((error) => {
+    console.warn(`Could not record viewer stats completion metric for ${jobId}:`, error);
+  });
+}
+
+exports.streamerFanPageViewerStatsWorker = onTaskDispatched({
+  region: 'us-central1',
+  memory: '256MiB',
+  timeoutSeconds: 120,
+  maxInstances: VIEWER_STATS_QUEUE_MAX_INSTANCES,
+  concurrency: 1,
+  rateLimits: {
+    maxConcurrentDispatches: VIEWER_STATS_QUEUE_MAX_CONCURRENT,
+    maxDispatchesPerSecond: VIEWER_STATS_QUEUE_MAX_PER_SECOND,
+  },
+  retryConfig: {
+    maxAttempts: 10,
+    maxRetrySeconds: 600,
+    minBackoffSeconds: 5,
+    maxBackoffSeconds: 60,
+    maxDoublings: 3,
+  },
+}, async (request) => {
+  const wakeJobId = String(request.data && request.data.wakeJobId || '');
+  viewerStatsJobRef(wakeJobId);
+  const taskId = String(request.id || '');
+  if (!taskId) throw new Error('Cloud Tasks did not provide a task id.');
+  await cleanupOldViewerStatsJobs();
+  const claimed = await claimNextViewerStatsJob(taskId);
+  if (!claimed) return;
+  await processViewerStatsJob(claimed);
+  await viewerStatsWorkerClaimRef(taskId).remove();
+});
+
+async function getViewerStatsJobResult(uid, jobId) {
+  const jobRef = viewerStatsJobRef(jobId);
+  const snapshot = await jobRef.get();
+  if (!snapshot.exists()) return { status: 'expired', errorMessage: '집계 요청이 만료됐어요. 다시 요청해 주세요.' };
+  const job = snapshot.val() || {};
+  if (job.requesterKey !== viewerStatsUidKey(uid)) {
+    throw new HttpsError('permission-denied', '이 집계 요청을 확인할 권한이 없습니다.');
+  }
+  if (Number(job.expiresAt) <= Date.now() && !['completed', 'failed', 'cancelled'].includes(job.status)) {
+    return { status: 'expired', errorMessage: '집계 요청이 만료됐어요. 다시 요청해 주세요.' };
+  }
+  if (job.status === 'completed') {
+    return {
+      status: 'completed',
+      stats: viewerStatsForResponse(job.stats, job.includePremiumMetrics === true),
+    };
+  }
+  if (job.status === 'failed' || job.status === 'expired') {
+    return { status: job.status, errorMessage: String(job.errorMessage || '시청자 그래프를 계산하지 못했어요.') };
+  }
+  if (job.status === 'cancelled') return { status: 'cancelled' };
+  return { status: job.status === 'processing' ? 'processing' : 'queued' };
+}
+
+async function cancelViewerStatsJob(uid, jobId) {
+  const jobRef = viewerStatsJobRef(jobId);
+  const uidKey = viewerStatsUidKey(uid);
+  const now = Date.now();
+  const result = await jobRef.transaction((current) => {
+    if (!current || current.requesterKey !== uidKey) return;
+    if (current.status === 'queued') {
+      return { ...current, status: 'cancelled', finishedAt: now, cancelMetricRecorded: true };
+    }
+    if (current.status === 'processing') return { ...current, cancelRequested: true };
+    return current;
+  });
+  if (!result.snapshot.exists()) throw new HttpsError('not-found', '집계 요청을 찾을 수 없습니다.');
+  if (result.snapshot.val().requesterKey !== uidKey) {
+    throw new HttpsError('permission-denied', '이 집계 요청을 취소할 권한이 없습니다.');
+  }
+  const job = result.snapshot.val();
+  if (job.status === 'cancelled' && job.queueKey && job.tier) {
+    await viewerStatsQueueRef(job.tier, job.queueKey).remove().catch((error) => {
+      console.warn(`Could not remove cancelled viewer stats queue entry ${jobId}:`, error);
+    });
+    if (job.cancelMetricRecorded === true) {
+      try {
+        await updateViewerStatsQueueMetrics(uidKey, viewerStatsDayKey(job.createdAt), { cancelled: 1 });
+        await jobRef.child('cancelMetricRecorded').remove();
+      } catch (error) {
+        console.warn(`Could not record viewer stats cancellation metric for ${jobId}:`, error);
+      }
+    }
+  }
+  return { cancelled: ['cancelled', 'queued'].includes(job.status) };
 }
 
 function normalizeFetchedVodPage(rows, total, page, seenIds) {
@@ -2529,7 +3006,8 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     const query = String(data.query || '').trim().toLocaleLowerCase();
     if (query.length > 40) throw new HttpsError('invalid-argument', '검색어가 너무 깁니다.');
     if (!query) return { streamers: [] };
-    await enforceViewerStatsRateLimit(uid, action);
+    const tier = await resolveViewerStatsTier(uid, request.auth);
+    await enforceViewerStatsRateLimit(uid, action, { tier });
     const [verifiedSnapshot, namesSnapshot, soopResults] = await Promise.all([
       db.ref('streamerVerifications').get(),
       db.ref('streamerNames').get(),
@@ -2575,6 +3053,16 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     return { streamers };
   }
 
+  if (action === 'statsResult') {
+    const jobId = String(data.jobId || '');
+    return getViewerStatsJobResult(uid, jobId);
+  }
+
+  if (action === 'cancelStatsJob') {
+    const jobId = String(data.jobId || '');
+    return cancelViewerStatsJob(uid, jobId);
+  }
+
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
   if (!SOOP_ID_PATTERN.test(streamerId)) {
     throw new HttpsError('invalid-argument', 'SOOP 방송국 아이디를 확인해 주세요.');
@@ -2585,7 +3073,8 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     if (!Number.isSafeInteger(page) || page < 1 || page > 200) {
       throw new HttpsError('invalid-argument', '다시보기 페이지 요청을 확인해 주세요.');
     }
-    await enforceViewerStatsRateLimit(uid, action, { streamerId, page });
+    const tier = await resolveViewerStatsTier(uid, request.auth);
+    await enforceViewerStatsRateLimit(uid, action, { streamerId, page, tier });
     const result = await fetchSoopVodPage(streamerId, page);
     const vods = result.rows.map((row) => normalizeSoopVod(row)).filter(Boolean);
     if (vods.length !== result.rows.length) {
@@ -2605,43 +3094,42 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     const vodId = String(data.vodId || '').trim();
     if (!/^\d{1,20}$/.test(vodId)) throw new HttpsError('invalid-argument', '다시보기 번호를 확인해 주세요.');
     const includePremiumMetrics = data.includePremiumMetrics === true;
-    if (includePremiumMetrics) {
-      const [subscriptionSnapshot, admin] = await Promise.all([
-        db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get(),
-        isAdminUid(uid),
-      ]);
-      const subscription = subscriptionSnapshot.val() || {};
-      if (!admin && (Number(subscription.expiresAt) || 0) <= Date.now()) {
-        throw new HttpsError('permission-denied', '평균 대비 상승폭은 구독 계정에서 이용할 수 있습니다.');
-      }
+    const [subscriptionSnapshot, admin, baseTier] = await Promise.all([
+      db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+      isAdminUid(uid),
+      resolveViewerStatsBaseTier(uid, request.auth),
+    ]);
+    const subscription = subscriptionSnapshot.val() || {};
+    const isSubscribed = (Number(subscription.expiresAt) || 0) > Date.now();
+    if (includePremiumMetrics && !admin && !isSubscribed) {
+      throw new HttpsError('permission-denied', '평균 대비 상승폭은 구독 계정에서 이용할 수 있습니다.');
     }
-    await enforceViewerStatsRateLimit(uid, action);
+    const tier = viewerStatsTier(request.auth, {
+      isAdmin: admin,
+      isSubscribed,
+      isProtectedAccount: baseTier === 'account',
+    });
     const cacheKey = streamerId + ':' + vodId;
     const cached = fanpageViewerStatsMemoryCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
+      await enforceViewerStatsRateLimit(uid, action, { tier, cacheHit: true });
       return { stats: viewerStatsForResponse(cached.value, includePremiumMetrics) };
     }
-    const inProgress = fanpageViewerStatsInProgress.get(cacheKey);
-    if (inProgress) return { stats: viewerStatsForResponse(await inProgress, includePremiumMetrics) };
-
-    const task = fetchSoopVodViewerCountStats(streamerId, vodId);
-    fanpageViewerStatsInProgress.set(cacheKey, task);
-    try {
-      const stats = await task;
-      fanpageViewerStatsMemoryCache.set(cacheKey, {
-        value: stats,
-        expiresAt: Date.now() + FANPAGE_VIEWER_STATS_CACHE_TTL_MS,
-      });
-      while (fanpageViewerStatsMemoryCache.size > FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS) {
-        fanpageViewerStatsMemoryCache.delete(fanpageViewerStatsMemoryCache.keys().next().value);
-      }
-      return { stats: viewerStatsForResponse(stats, includePremiumMetrics) };
-    } finally {
-      if (fanpageViewerStatsInProgress.get(cacheKey) === task) fanpageViewerStatsInProgress.delete(cacheKey);
-    }
+    await enforceViewerStatsRateLimit(uid, action, { tier });
+    return enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiumMetrics);
   }
 
   throw new HttpsError('invalid-argument', '시청 통계 요청을 확인해 주세요.');
+});
+
+exports.streamerFanPageViewerStatsJobCleanup = onSchedule({
+  schedule: 'every day 03:15',
+  timeZone: 'Asia/Seoul',
+  region: 'us-central1',
+  maxInstances: 1,
+}, async () => {
+  lastViewerStatsJobCleanupAt = 0;
+  await cleanupOldViewerStatsJobs();
 });
 
 exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => {
@@ -2667,11 +3155,12 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
   const today = new Date(`${fanPageStatsDateKey()}T00:00:00Z`);
   const dateKeys = Array.from({ length: FANPAGE_STATS_DAYS }, (_, index) =>
     fanPageStatsDateKey(today.getTime() - (FANPAGE_STATS_DAYS - index - 1) * 24 * 60 * 60 * 1000));
-  const [verifiedSnap, statsSnap, viewerLimitsSnap, streamerNamesSnap] = await Promise.all([
+  const [verifiedSnap, statsSnap, viewerLimitsSnap, streamerNamesSnap, viewerQueueSnap] = await Promise.all([
     db.ref('streamerVerifications').get(),
     db.ref('streamerFanPageStats').get(),
     db.ref('streamerFanPageViewerStatsLimits').get(),
     db.ref('streamerNames').get(),
+    db.ref(VIEWER_STATS_QUEUE_PATH).get(),
   ]);
   const verifiedById = new Map();
   Object.entries(verifiedSnap.val() || {}).forEach(([key, record]) => {
@@ -2716,6 +3205,9 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
 
   const viewerUsageByDate = {};
   const searchedStreamerCounts = {};
+  const viewerTierUsage = Object.fromEntries(['anonymous', 'account', 'subscriber', 'admin']
+    .map((tier) => [tier, { search: 0, vods: 0, stats: 0, total: 0 }]));
+  const viewerQueueMetrics = { enqueued: 0, completed: 0, failed: 0, cancelled: 0, queueWaitMs: 0, cacheHits: 0 };
   const includedDates = new Set(dateKeys);
   Object.values(viewerLimitsSnap.val() || {}).forEach((record) => {
     const recentUsageByDay = record && typeof record.recentUsageByDay === 'object'
@@ -2725,6 +3217,21 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
       if (!includedDates.has(date) || !actions || typeof actions !== 'object') return;
       const day = viewerUsageByDate[date] || (viewerUsageByDate[date] = { search: 0, vods: 0, stats: 0 });
       VIEWER_STATS_USAGE_ACTIONS.forEach((action) => { day[action] += metricCount(actions[action]); });
+      const tiers = actions.tiers && typeof actions.tiers === 'object' ? actions.tiers : {};
+      Object.entries(tiers).forEach(([tier, counts]) => {
+        if (!viewerTierUsage[tier] || !counts || typeof counts !== 'object') return;
+        VIEWER_STATS_USAGE_ACTIONS.forEach((action) => {
+          const count = metricCount(counts[action]);
+          viewerTierUsage[tier][action] += count;
+          viewerTierUsage[tier].total += count;
+        });
+      });
+      const queueMetrics = actions.queueMetrics && typeof actions.queueMetrics === 'object'
+        ? actions.queueMetrics
+        : {};
+      ['enqueued', 'completed', 'failed', 'cancelled', 'queueWaitMs', 'cacheHits'].forEach((key) => {
+        viewerQueueMetrics[key] += metricCount(queueMetrics[key]);
+      });
       const streamers = actions.streamers && typeof actions.streamers === 'object' ? actions.streamers : {};
       Object.entries(streamers).forEach(([rawStreamerId, count]) => {
         const streamerId = String(rawStreamerId || '').trim().toLowerCase();
@@ -2748,6 +3255,10 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     vods: totals.vods + day.vods,
     stats: totals.stats + day.stats,
   }), { search: 0, vods: 0, stats: 0 });
+  const queuedByTier = Object.fromEntries(['anonymous', 'account', 'subscriber', 'admin']
+    .map((tier) => [tier, Object.keys(viewerQueueSnap.val() && viewerQueueSnap.val()[tier] || {}).length]));
+  viewerQueueMetrics.queuedNow = Object.values(queuedByTier).reduce((total, count) => total + count, 0);
+  viewerQueueMetrics.queuedByTier = queuedByTier;
   const topSearchedStreamers = Object.entries(searchedStreamerCounts)
     .map(([id, count]) => ({ id, soopId: id, nickname: streamerNameById.get(id) || `@${id}`, count }))
     .sort((a, b) => b.count - a.count || a.nickname.localeCompare(b.nickname, 'ko'))
@@ -2768,6 +3279,13 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
         last30: viewerUsageDaily.reduce((total, day) => total + day.total, 0),
       },
       actions30: viewerUsageActions,
+      tiers30: viewerTierUsage,
+      queue30: {
+        ...viewerQueueMetrics,
+        averageWaitMs: viewerQueueMetrics.completed
+          ? Math.round(viewerQueueMetrics.queueWaitMs / viewerQueueMetrics.completed)
+          : 0,
+      },
       daily: viewerUsageDaily,
       topSearchedStreamers,
     },
