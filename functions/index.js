@@ -98,7 +98,7 @@ function requireAuth(request) {
   return request.auth.uid;
 }
 
-async function enforceViewerStatsRateLimit(uid, action) {
+async function enforceViewerStatsRateLimit(uid, action, usageContext = {}) {
   const limits = VIEWER_STATS_RATE_LIMITS[action];
   if (!limits) return;
 
@@ -106,6 +106,10 @@ async function enforceViewerStatsRateLimit(uid, action) {
   const minuteWindow = Math.floor(now / 60000);
   const dayKey = new Date(now + (9 * 60 * 60 * 1000)).toISOString().slice(0, 10);
   const uidKey = createHash('sha256').update(uid).digest('hex').slice(0, 32);
+  const selectedStreamerId = action === 'vods' && Number(usageContext.page) === 1
+    ? String(usageContext.streamerId || '').trim().toLowerCase()
+    : '';
+  const trackStreamerSelection = SOOP_ID_PATTERN.test(selectedStreamerId);
   const reference = db.ref(`streamerFanPageViewerStatsLimits/${uidKey}`);
   const result = await reference.transaction((current) => {
     const previous = current && typeof current === 'object' ? current : {};
@@ -133,10 +137,18 @@ async function enforceViewerStatsRateLimit(uid, action) {
 
     if (minuteCount >= limits.perMinute || dayCount >= limits.perDay) return;
 
-    recentUsageByDay[dayKey] = {
+    const updatedUsageDay = {
       ...usageDayCounts,
       [action]: Math.max(0, Number(usageDayCounts[action]) || 0) + 1,
     };
+    if (trackStreamerSelection) {
+      const selectedStreamers = usageDayCounts.streamers && typeof usageDayCounts.streamers === 'object'
+        ? { ...usageDayCounts.streamers }
+        : {};
+      selectedStreamers[selectedStreamerId] = Math.max(0, Number(selectedStreamers[selectedStreamerId]) || 0) + 1;
+      updatedUsageDay.streamers = selectedStreamers;
+    }
+    recentUsageByDay[dayKey] = updatedUsageDay;
     return {
       minuteWindow,
       minuteCounts: { ...minuteCounts, [action]: minuteCount + 1 },
@@ -2556,7 +2568,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     if (!Number.isSafeInteger(page) || page < 1 || page > 200) {
       throw new HttpsError('invalid-argument', '다시보기 페이지 요청을 확인해 주세요.');
     }
-    await enforceViewerStatsRateLimit(uid, action);
+    await enforceViewerStatsRateLimit(uid, action, { streamerId, page });
     const result = await fetchSoopVodPage(streamerId, page);
     const vods = result.rows.map((row) => normalizeSoopVod(row)).filter(Boolean);
     if (vods.length !== result.rows.length) {
@@ -2625,15 +2637,24 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
   const today = new Date(`${fanPageStatsDateKey()}T00:00:00Z`);
   const dateKeys = Array.from({ length: FANPAGE_STATS_DAYS }, (_, index) =>
     fanPageStatsDateKey(today.getTime() - (FANPAGE_STATS_DAYS - index - 1) * 24 * 60 * 60 * 1000));
-  const [verifiedSnap, statsSnap, viewerLimitsSnap] = await Promise.all([
+  const [verifiedSnap, statsSnap, viewerLimitsSnap, streamerNamesSnap] = await Promise.all([
     db.ref('streamerVerifications').get(),
     db.ref('streamerFanPageStats').get(),
     db.ref('streamerFanPageViewerStatsLimits').get(),
+    db.ref('streamerNames').get(),
   ]);
   const verifiedById = new Map();
   Object.entries(verifiedSnap.val() || {}).forEach(([key, record]) => {
     const streamer = publicStreamer(key, record);
     if (streamer) verifiedById.set(streamer.id, streamer);
+  });
+  const streamerNameById = new Map([...verifiedById.values()].map((streamer) => [streamer.id, streamer.nickname]));
+  Object.entries(streamerNamesSnap.val() || {}).forEach(([soopId, nickname]) => {
+    const normalizedId = String(soopId || '').trim().toLowerCase();
+    const normalizedNickname = typeof nickname === 'string' ? nickname.trim().slice(0, 40) : '';
+    if (SOOP_ID_PATTERN.test(normalizedId) && normalizedNickname && !streamerNameById.has(normalizedId)) {
+      streamerNameById.set(normalizedId, normalizedNickname);
+    }
   });
 
   const statsById = statsSnap.val() || {};
@@ -2664,6 +2685,7 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     || a.nickname.localeCompare(b.nickname, 'ko'));
 
   const viewerUsageByDate = {};
+  const searchedStreamerCounts = {};
   const includedDates = new Set(dateKeys);
   Object.values(viewerLimitsSnap.val() || {}).forEach((record) => {
     const recentUsageByDay = record && typeof record.recentUsageByDay === 'object'
@@ -2673,6 +2695,12 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
       if (!includedDates.has(date) || !actions || typeof actions !== 'object') return;
       const day = viewerUsageByDate[date] || (viewerUsageByDate[date] = { search: 0, vods: 0, stats: 0 });
       VIEWER_STATS_USAGE_ACTIONS.forEach((action) => { day[action] += metricCount(actions[action]); });
+      const streamers = actions.streamers && typeof actions.streamers === 'object' ? actions.streamers : {};
+      Object.entries(streamers).forEach(([rawStreamerId, count]) => {
+        const streamerId = String(rawStreamerId || '').trim().toLowerCase();
+        if (!SOOP_ID_PATTERN.test(streamerId)) return;
+        searchedStreamerCounts[streamerId] = (searchedStreamerCounts[streamerId] || 0) + metricCount(count);
+      });
     });
   });
   const viewerUsageDaily = dateKeys.map((date) => {
@@ -2690,6 +2718,10 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     vods: totals.vods + day.vods,
     stats: totals.stats + day.stats,
   }), { search: 0, vods: 0, stats: 0 });
+  const topSearchedStreamers = Object.entries(searchedStreamerCounts)
+    .map(([id, count]) => ({ id, soopId: id, nickname: streamerNameById.get(id) || `@${id}`, count }))
+    .sort((a, b) => b.count - a.count || a.nickname.localeCompare(b.nickname, 'ko'))
+    .slice(0, 30);
 
   return {
     generatedAt: Date.now(),
@@ -2707,6 +2739,7 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
       },
       actions30: viewerUsageActions,
       daily: viewerUsageDaily,
+      topSearchedStreamers,
     },
     streamers,
   };
