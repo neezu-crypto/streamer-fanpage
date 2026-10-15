@@ -102,6 +102,30 @@ function formatClock(value) {
   return [hours, minutes, remainder].map((part) => String(part).padStart(2, '0')).join(':');
 }
 
+function formatRetryDuration(value) {
+  let seconds = Math.max(1, Math.ceil(Number(value) || 0));
+  const days = Math.floor(seconds / 86400);
+  seconds %= 86400;
+  const hours = Math.floor(seconds / 3600);
+  seconds %= 3600;
+  const minutes = Math.floor(seconds / 60);
+  seconds %= 60;
+  if (days) return [days + '일', hours ? hours + '시간' : '', minutes ? minutes + '분' : ''].filter(Boolean).join(' ');
+  if (hours) return [hours + '시간', minutes ? minutes + '분' : ''].filter(Boolean).join(' ');
+  if (minutes) return [minutes + '분', seconds ? seconds + '초' : ''].filter(Boolean).join(' ');
+  return seconds + '초';
+}
+
+function viewerStatsErrorMessage(error, fallback) {
+  const message = error && error.message ? error.message : fallback;
+  const retryAfterSeconds = Number(error && error.details && error.details.retryAfterSeconds);
+  if (error && error.code === 'functions/resource-exhausted'
+    && Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return message + ' 다시 시도할 수 있을 때까지 약 ' + formatRetryDuration(retryAfterSeconds) + ' 남았어요.';
+  }
+  return message;
+}
+
 function formatVodDate(value) {
   const date = String(value || '').trim().slice(0, 10);
   return date ? date.replaceAll('-', '.') : '날짜 정보 없음';
@@ -294,7 +318,7 @@ function showStatsError(card, error, loadToken) {
   card._statsActions.replaceChildren();
   const message = document.createElement('span');
   message.className = 'viewer-stat-state';
-  message.textContent = error && error.message ? error.message : '유저 수 그래프를 불러오지 못했어요.';
+  message.textContent = viewerStatsErrorMessage(error, '유저 수 그래프를 불러오지 못했어요.');
   card._statsActions.append(message);
   const retryableCodes = new Set(['functions/failed-precondition', 'functions/not-found']);
   if (!retryableCodes.has(error && error.code)) {
@@ -442,7 +466,7 @@ async function loadVodPage(loadToken, page) {
     $('viewerLoadMore').classList.toggle('hidden', !hasMoreVods);
   } catch (error) {
     if (loadToken !== activeLoadToken) return;
-    $('viewerVodStatus').textContent = error.message || '다시보기 목록을 불러오지 못했어요.';
+    $('viewerVodStatus').textContent = viewerStatsErrorMessage(error, '다시보기 목록을 불러오지 못했어요.');
   } finally {
     if (loadToken === activeLoadToken) {
       $('viewerLoadMore').disabled = false;
@@ -611,7 +635,7 @@ async function runPeriodPeakScan() {
         } catch (error) {
           if (!isCurrentPeriodScan(scanToken, loadToken)) return;
           if (error && error.code === 'functions/resource-exhausted') {
-            rateLimitMessage = error.message || '요청 한도에 도달했어요.';
+            rateLimitMessage = viewerStatsErrorMessage(error, '요청 한도에 도달했어요.');
             cursor = vods.length;
           } else {
             failed += 1;
@@ -638,7 +662,7 @@ async function runPeriodPeakScan() {
   } catch (error) {
     if (!isCurrentPeriodScan(scanToken, loadToken)) return;
     $('viewerPeriodStatus').classList.add('is-error');
-    $('viewerPeriodStatus').textContent = error && error.message ? error.message : '기간별 다시보기를 불러오지 못했어요. 다시 시도해 주세요.';
+    $('viewerPeriodStatus').textContent = viewerStatsErrorMessage(error, '기간별 다시보기를 불러오지 못했어요. 다시 시도해 주세요.');
   } finally {
     if (isCurrentPeriodScan(scanToken, loadToken)) {
       $('viewerPeriodScanButton').disabled = false;
@@ -736,7 +760,7 @@ async function runSearch(query) {
       setSearchHint('검색 결과가 없어요. 다른 이름을 입력하거나 SOOP 방송국 아이디·주소를 사용해 주세요.', true);
     }
   } catch (error) {
-    if (requestId === searchRequestId) setSearchHint(error.message || '스트리머 검색에 실패했어요.', true);
+    if (requestId === searchRequestId) setSearchHint(viewerStatsErrorMessage(error, '스트리머 검색에 실패했어요.'), true);
   } finally {
     if (requestId === searchRequestId) $('viewerSearchButton').disabled = false;
   }
@@ -761,4 +785,4 @@ $('viewerLoadMore').addEventListener('click', () => {
 
 $('viewerPeriodScanButton').addEventListener('click', runPeriodPeakScan);
 
-getAuthReady().catch((error) => setSearchHint(error.message || '통계 연결을 시작하지 못했어요.', true));
+getAuthReady().catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));

@@ -73,20 +73,20 @@ const VIEWER_STATS_RATE_LIMITS = Object.freeze({
   search: {
     perMinute: 10,
     perDay: 100,
-    minuteMessage: '검색 요청이 너무 많아요. 1분 뒤 다시 시도해 주세요.',
-    dayMessage: '오늘 검색 횟수를 모두 사용했어요. 내일 다시 이용해 주세요.',
+    minuteMessage: '검색 요청 한도에 도달했어요.',
+    dayMessage: '오늘 검색 한도에 도달했어요.',
   },
   vods: {
     perMinute: 30,
     perDay: 80,
-    minuteMessage: '다시보기 목록 요청이 너무 많아요. 1분 뒤 다시 시도해 주세요.',
-    dayMessage: '오늘 다시보기 목록 요청 한도에 도달했어요. 내일 다시 이용해 주세요.',
+    minuteMessage: '다시보기 목록 요청 한도에 도달했어요.',
+    dayMessage: '오늘 다시보기 목록 요청 한도에 도달했어요.',
   },
   stats: {
     perMinute: 1500,
     perDay: 1500,
-    minuteMessage: '통계 요청이 잠시 많아요. 1분 뒤 다시 시도해 주세요.',
-    dayMessage: '오늘 통계 분석 한도에 도달했어요. 내일 다시 이용해 주세요.',
+    minuteMessage: '통계 요청 한도에 도달했어요.',
+    dayMessage: '오늘 통계 분석 한도에 도달했어요.',
   },
 });
 
@@ -137,11 +137,15 @@ async function enforceViewerStatsRateLimit(uid, action) {
     ? current.minuteCounts
     : {};
   const currentDayCounts = current.dayKey === dayKey && current.dayCounts ? current.dayCounts : {};
-  if ((Number(currentMinuteCounts[action]) || 0) >= limits.perMinute) {
-    throw new HttpsError('resource-exhausted', limits.minuteMessage);
-  }
   if ((Number(currentDayCounts[action]) || 0) >= limits.perDay) {
-    throw new HttpsError('resource-exhausted', limits.dayMessage);
+    const seoulMidnight = Date.parse(`${dayKey}T00:00:00+09:00`);
+    const retryAfterSeconds = Math.max(1, Math.ceil((seoulMidnight + (24 * 60 * 60 * 1000) - now) / 1000));
+    throw new HttpsError('resource-exhausted', limits.dayMessage, { retryAfterSeconds });
+  }
+  if ((Number(currentMinuteCounts[action]) || 0) >= limits.perMinute) {
+    const nextMinute = (minuteWindow + 1) * 60 * 1000;
+    const retryAfterSeconds = Math.max(1, Math.ceil((nextMinute - now) / 1000));
+    throw new HttpsError('resource-exhausted', limits.minuteMessage, { retryAfterSeconds });
   }
   throw new HttpsError('aborted', '요청 한도를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 }
