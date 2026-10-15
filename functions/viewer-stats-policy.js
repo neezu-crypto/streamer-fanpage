@@ -63,6 +63,43 @@ function selectNextViewerStatsCandidate(candidates, now = Date.now()) {
       || Number(a.createdAt) - Number(b.createdAt))[0] || null;
 }
 
+function viewerStatsWakeCandidate(jobId, job) {
+  if (!job || job.status !== 'queued'
+    || !['anonymous', 'account', 'subscriber', 'admin'].includes(job.tier)
+    || !/^\d{13}_\d{8}_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(job.queueKey || ''))) {
+    return null;
+  }
+  const createdAt = Number(job.createdAt);
+  if (!Number.isFinite(createdAt)) return null;
+  return { jobId: String(jobId || ''), queueKey: job.queueKey, tier: job.tier, createdAt };
+}
+
+function viewerStatsClaimUpdate(current, fallback, taskId, now, leaseMs) {
+  const job = current && typeof current === 'object' ? current : fallback;
+  if (!job || typeof job !== 'object' || ['completed', 'failed', 'cancelled', 'expired'].includes(job.status)) {
+    return undefined;
+  }
+  if (Number(job.expiresAt) <= now) {
+    return {
+      ...job,
+      status: 'expired',
+      finishedAt: now,
+      processingLeaseUntil: null,
+      errorMessage: '집계 요청이 만료됐어요. 다시 요청해 주세요.',
+    };
+  }
+  const leaseIsActive = job.status === 'processing' && Number(job.processingLeaseUntil) > now;
+  if (leaseIsActive) return undefined;
+  return {
+    ...job,
+    status: 'processing',
+    startedAt: job.status === 'processing' ? Number(job.startedAt) || now : now,
+    claimedBy: taskId,
+    processingLeaseUntil: now + leaseMs,
+    attemptCount: Math.max(0, Number(job.attemptCount) || 0) + 1,
+  };
+}
+
 module.exports = {
   VIEWER_STATS_PRIORITY_AGE_STEP_MS,
   VIEWER_STATS_QUEUE_MAX_CONCURRENT,
@@ -72,7 +109,9 @@ module.exports = {
   VIEWER_STATS_TIER_PRIORITY,
   VIEWER_STATS_WORKER_FUNCTION,
   selectNextViewerStatsCandidate,
+  viewerStatsClaimUpdate,
   viewerStatsPriorityScore,
   viewerStatsRateLimit,
   viewerStatsTier,
+  viewerStatsWakeCandidate,
 };

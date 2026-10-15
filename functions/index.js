@@ -16,8 +16,10 @@ const {
   VIEWER_STATS_QUEUE_PATH,
   VIEWER_STATS_WORKER_FUNCTION,
   selectNextViewerStatsCandidate,
+  viewerStatsClaimUpdate,
   viewerStatsRateLimit,
   viewerStatsTier,
+  viewerStatsWakeCandidate,
 } = require('./viewer-stats-policy');
 const {
   streamerFanPageViewerSubscription,
@@ -1397,33 +1399,21 @@ async function readOldestViewerStatsCandidateForTier(tier, now = Date.now()) {
 async function claimViewerStatsJob(candidate, taskId) {
   const jobRef = viewerStatsJobRef(candidate.jobId);
   const now = Date.now();
+  const knownSnapshot = await jobRef.get();
+  const knownJob = knownSnapshot.val();
+  if (!knownJob) return null;
   const result = await jobRef.transaction((current) => {
-    if (!current || ['completed', 'failed', 'cancelled', 'expired'].includes(current.status)) return;
-    if (Number(current.expiresAt) <= now) {
-      return {
-        ...current,
-        status: 'expired',
-        finishedAt: now,
-        processingLeaseUntil: null,
-        errorMessage: '집계 요청이 만료됐어요. 다시 요청해 주세요.',
-      };
-    }
-    const leaseIsActive = current.status === 'processing' && Number(current.processingLeaseUntil) > now;
-    if (leaseIsActive && current.claimedBy !== taskId) return;
-    if (leaseIsActive && current.claimedBy === taskId) return;
-    return {
-      ...current,
-      status: 'processing',
-      startedAt: current.status === 'processing' ? Number(current.startedAt) || now : now,
-      claimedBy: taskId,
-      processingLeaseUntil: now + VIEWER_STATS_JOB_PROCESSING_LEASE_MS,
-      attemptCount: Math.max(0, Number(current.attemptCount) || 0) + 1,
-    };
+    return viewerStatsClaimUpdate(current, knownJob, taskId, now, VIEWER_STATS_JOB_PROCESSING_LEASE_MS);
   });
-  if (!result.committed) return null;
+  if (!result.committed) {
+    return null;
+  }
   const job = result.snapshot.val();
-  if (!job || job.status !== 'processing' || job.claimedBy !== taskId) return null;
+  if (!job || job.status !== 'processing' || job.claimedBy !== taskId) {
+    return null;
+  }
   await viewerStatsQueueRef(candidate.tier, candidate.queueKey).remove();
+  console.info('Viewer stats job claim succeeded.', { tier: candidate.tier });
   return { ...candidate, job };
 }
 
@@ -1566,7 +1556,23 @@ exports.streamerFanPageViewerStatsWorker = onTaskDispatched({
   const taskId = String(request.id || '');
   if (!taskId) throw new Error('Cloud Tasks did not provide a task id.');
   await cleanupOldViewerStatsJobs();
-  const claimed = await claimNextViewerStatsJob(taskId);
+  let claimed = await claimNextViewerStatsJob(taskId);
+  if (!claimed) {
+    const wakeSnapshot = await viewerStatsJobRef(wakeJobId).get();
+    const wakeJob = wakeSnapshot.val();
+    const wakeCandidate = viewerStatsWakeCandidate(wakeJobId, wakeJob);
+    if (wakeCandidate && Number(wakeSnapshot.val().expiresAt) > Date.now()) {
+      const queueRef = viewerStatsQueueRef(wakeCandidate.tier, wakeCandidate.queueKey);
+      const restoredQueueEntry = await queueRef.transaction((current) => current || wakeJobId);
+      if (restoredQueueEntry.committed) {
+        console.warn('Recovered a queued viewer stats job with a missing queue index.');
+      }
+      claimed = await claimNextViewerStatsJob(taskId);
+      if (!claimed) {
+        claimed = await claimViewerStatsJob(wakeCandidate, taskId);
+      }
+    }
+  }
   if (!claimed) return;
   await processViewerStatsJob(claimed);
   await viewerStatsWorkerClaimRef(taskId).remove();
