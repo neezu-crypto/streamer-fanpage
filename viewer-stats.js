@@ -20,6 +20,7 @@ initializeAppCheck(app, {
 const auth = getAuth(app);
 const functions = getFunctions(app, 'us-central1');
 const callViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats');
+const callViewerSubscription = httpsCallable(functions, 'streamerFanPageViewerSubscription');
 const $ = (id) => document.getElementById(id);
 const MAX_CONCURRENT_STATS_REQUESTS = 3;
 const MAX_PERIOD_SCAN_PAGES = 200;
@@ -44,6 +45,17 @@ let statsQueue = [];
 let statsObserver = null;
 let periodScanToken = 0;
 let vodPagesByNumber = new Map();
+let subscriptionRefreshToken = 0;
+let subscriptionRefreshTimer = 0;
+let subscriptionState = {
+  loaded: false,
+  accountProtected: false,
+  subscribed: false,
+  expiresAt: 0,
+  pending: false,
+  pendingRequestId: '',
+  lastRequestStatus: '',
+};
 const viewerStatsMemoryCache = new Map();
 const viewerStatsInProgress = new Map();
 
@@ -129,6 +141,144 @@ function viewerStatsErrorMessage(error, fallback) {
     return message + ' 다시 시도할 수 있을 때까지 약 ' + formatRetryDuration(retryAfterSeconds) + ' 남았어요.';
   }
   return message;
+}
+
+function formatSubscriptionDate(value) {
+  const timestamp = Number(value) || 0;
+  if (!timestamp) return '';
+  return new Intl.DateTimeFormat('ko-KR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'Asia/Seoul',
+  }).format(new Date(timestamp));
+}
+
+function renderSubscriptionControls() {
+  const state = subscriptionState;
+  const status = $('viewerSubscriptionStatus');
+  const action = $('viewerSubscriptionAction');
+  const scan = $('viewerPeriodScanButton');
+  if (!state.loaded) {
+    status.textContent = '구독 상태를 확인하고 있어요.';
+    action.textContent = '구독 상태 확인 중…';
+    action.disabled = true;
+    scan.textContent = '구독 전용 분석';
+    return;
+  }
+  action.disabled = false;
+  if (state.subscribed) {
+    status.textContent = '구독 중 · ' + formatSubscriptionDate(state.expiresAt) + '까지 이용할 수 있어요.'
+      + (state.pending ? ' 갱신 신청도 확인 중입니다.' : '');
+    action.textContent = state.pending ? '신청 상태 보기' : '구독 연장하기';
+    scan.textContent = '최근 1년 분석';
+  } else if (state.pending) {
+    status.textContent = '별풍선 후원 신청을 운영자가 확인하고 있어요.';
+    action.textContent = '신청 상태 보기';
+    scan.textContent = '구독 전용 분석';
+  } else if (!state.accountProtected) {
+    status.textContent = '구독 신청은 Google·Kakao 계정 연결 또는 스트리머 인증이 필요해요.';
+    action.textContent = '로그인하고 구독하기';
+    scan.textContent = '구독 전용 분석';
+  } else if (state.lastRequestStatus === 'rejected') {
+    status.textContent = '최근 구독 신청이 승인되지 않았어요. 후원자 닉네임을 확인한 뒤 다시 신청할 수 있어요.';
+    action.textContent = '다시 구독 신청하기';
+    scan.textContent = '구독 전용 분석';
+  } else {
+    status.textContent = '무료 기능을 이용 중이에요. 구독하면 기간별 최고 순간과 평균 대비 상승폭을 볼 수 있어요.';
+    action.textContent = '별풍선 10개로 구독';
+    scan.textContent = '구독 전용 분석';
+  }
+}
+
+function refreshExistingVodCardAccess() {
+  const cards = $('viewerVodGrid').querySelectorAll('.viewer-vod-card');
+  cards.forEach((card) => {
+    if (card.dataset.statsState !== 'ready' && card.dataset.statsState !== 'error') return;
+    card.dataset.statsState = 'idle';
+    enqueueStats(card, card._vod, card._loadToken);
+  });
+}
+
+function scheduleSubscriptionStatusRefresh() {
+  window.clearTimeout(subscriptionRefreshTimer);
+  if (subscriptionState.pending) {
+    subscriptionRefreshTimer = window.setTimeout(() => refreshSubscriptionStatus(), 60 * 1000);
+    return;
+  }
+  if (!subscriptionState.subscribed || !subscriptionState.expiresAt) return;
+  const untilExpiry = Math.max(1000, subscriptionState.expiresAt - Date.now() + 1000);
+  subscriptionRefreshTimer = window.setTimeout(
+    () => refreshSubscriptionStatus(),
+    Math.min(untilExpiry, 6 * 60 * 60 * 1000),
+  );
+}
+
+async function refreshSubscriptionStatus() {
+  const token = ++subscriptionRefreshToken;
+  try {
+    await getAuthReady();
+    const response = await callViewerSubscription({ action: 'status' });
+    if (token !== subscriptionRefreshToken) return;
+    const previousAccess = subscriptionState.subscribed;
+    const data = response.data || {};
+    subscriptionState = {
+      loaded: true,
+      accountProtected: data.accountProtected === true,
+      subscribed: data.subscribed === true,
+      expiresAt: Number(data.expiresAt) || 0,
+      pending: data.pending === true,
+      pendingRequestId: typeof data.pendingRequestId === 'string' ? data.pendingRequestId : '',
+      lastRequestStatus: typeof data.lastRequestStatus === 'string' ? data.lastRequestStatus : '',
+    };
+    renderSubscriptionControls();
+    scheduleSubscriptionStatusRefresh();
+    if (previousAccess !== subscriptionState.subscribed) {
+      refreshExistingVodCardAccess();
+      if (selectedStreamer) {
+        periodScanToken += 1;
+        $('viewerPeriodScanButton').disabled = false;
+        $('viewerPeriodStatus').textContent = subscriptionState.subscribed
+          ? '구독이 확인됐어요. 최근 1년 분석을 시작하면 7일·30일·90일·1년 최고 순간을 찾습니다.'
+          : '구독이 만료됐어요. 기간별 최고 시청 순간은 구독 계정에서 이용할 수 있습니다.';
+        renderPeriodPeakCards(new Map(), new Map(), false, !subscriptionState.subscribed);
+      }
+    }
+    if ($('viewerSubscriptionDialog').open) renderSubscriptionDialogStatus();
+  } catch (error) {
+    if (token !== subscriptionRefreshToken) return;
+    $('viewerSubscriptionStatus').textContent = viewerStatsErrorMessage(error, '구독 상태를 확인하지 못했어요.');
+    $('viewerSubscriptionAction').disabled = false;
+    $('viewerSubscriptionAction').textContent = '구독 상태 다시 확인';
+  }
+}
+
+function renderSubscriptionDialogStatus(message = '') {
+  const status = $('viewerSubscriptionDialogStatus');
+  const submit = $('viewerSubscriptionSubmit');
+  const cancel = $('viewerSubscriptionCancel');
+  const loginNote = $('viewerSubscriptionLoginNote');
+  const hasPending = subscriptionState.pending && subscriptionState.pendingRequestId;
+  loginNote.classList.toggle('hidden', subscriptionState.accountProtected);
+  submit.classList.toggle('hidden', !subscriptionState.accountProtected || !!hasPending);
+  cancel.classList.toggle('hidden', !hasPending);
+  submit.textContent = subscriptionState.subscribed ? '후원 후 30일 연장 신청' : '후원 신청하기';
+  if (message) {
+    status.textContent = message;
+  } else if (!subscriptionState.accountProtected) {
+    status.textContent = '익명 계정은 구독 권한을 구매할 수 없어요. Google·Kakao 계정 연결 또는 스트리머 인증 후 이용해 주세요.';
+  } else if (hasPending) {
+    status.textContent = '신청이 접수되어 운영자가 후원을 확인하고 있어요. 확인이 끝나면 이 계정에 30일 이용권이 적용됩니다.';
+  } else if (subscriptionState.subscribed) {
+    status.textContent = formatSubscriptionDate(subscriptionState.expiresAt) + '까지 구독 중이에요. 미리 갱신해도 남은 기간에 30일이 더해집니다.';
+  } else {
+    status.textContent = '후원자 닉네임을 확인해 운영자가 수동 승인합니다. 승인 전까지 구독 기능은 잠겨 있어요.';
+  }
+}
+
+function openSubscriptionDialog() {
+  renderSubscriptionDialogStatus();
+  const dialog = $('viewerSubscriptionDialog');
+  if (!dialog.open) dialog.showModal();
 }
 
 function formatVodDate(value) {
@@ -308,6 +458,37 @@ function showStatsLinks(card, stats) {
   lowest.rel = 'noopener noreferrer';
   lowest.textContent = '최저 ' + Number(stats.lowest.viewers).toLocaleString('ko-KR') + '명 · ' + formatClock(stats.lowest.second);
   card._statsActions.append(highest, lowest);
+  const uplift = document.createElement('div');
+  uplift.className = 'viewer-premium-uplift';
+  if (subscriptionState.subscribed && Number.isFinite(Number(stats.averageViewers))) {
+    const average = Math.max(0, Number(stats.averageViewers));
+    const increase = Math.max(0, Number(stats.highest.viewers) - average);
+    const rate = average > 0 ? Math.round((increase / average) * 100) : null;
+    const viewersMetric = document.createElement('span');
+    const viewersLabel = document.createElement('small');
+    viewersLabel.textContent = '평균 대비 순증';
+    const viewersValue = document.createElement('strong');
+    viewersValue.textContent = '+' + Math.round(increase).toLocaleString('ko-KR') + '명';
+    viewersMetric.append(viewersLabel, viewersValue);
+    const rateMetric = document.createElement('span');
+    const rateLabel = document.createElement('small');
+    rateLabel.textContent = '평균 대비 상승률';
+    const rateValue = document.createElement('strong');
+    rateValue.textContent = rate === null ? '계산 불가' : '+' + rate.toLocaleString('ko-KR') + '%';
+    rateMetric.append(rateLabel, rateValue);
+    const baseline = document.createElement('small');
+    baseline.className = 'viewer-premium-baseline';
+    baseline.textContent = '방송 중간 구간 평균 ' + average.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '명 기준';
+    uplift.append(viewersMetric, rateMetric, baseline);
+  } else {
+    const locked = document.createElement('button');
+    locked.type = 'button';
+    locked.className = 'viewer-premium-locked';
+    locked.textContent = '구독 전용 · 평균 대비 상승폭 2종 보기';
+    locked.addEventListener('click', openSubscriptionDialog);
+    uplift.append(locked);
+  }
+  card._statsActions.append(uplift);
   card.dataset.statsState = 'ready';
 }
 
@@ -357,7 +538,12 @@ function pumpStatsQueue() {
       continue;
     }
     activeStatsRequests += 1;
-    callViewerStats({ action: 'stats', streamerId: job.streamerId, vodId: job.vod.id })
+    callViewerStats({
+      action: 'stats',
+      streamerId: job.streamerId,
+      vodId: job.vod.id,
+      includePremiumMetrics: job.includePremiumMetrics,
+    })
       .then((result) => {
         const stats = result.data && result.data.stats;
         if (!stats || !stats.highest || !stats.lowest) throw new Error('시청자 그래프 응답을 확인하지 못했어요.');
@@ -376,8 +562,8 @@ function pumpStatsQueue() {
   }
 }
 
-function loadVodStats(vod, streamerId, shouldStart = () => true) {
-  const key = String(streamerId).toLowerCase() + ':' + String(vod.id);
+function loadVodStats(vod, streamerId, shouldStart = () => true, includePremiumMetrics = subscriptionState.subscribed) {
+  const key = String(streamerId).toLowerCase() + ':' + String(vod.id) + (includePremiumMetrics ? ':premium' : '');
   if (viewerStatsMemoryCache.has(key)) {
     const cached = viewerStatsMemoryCache.get(key);
     viewerStatsMemoryCache.delete(key);
@@ -398,6 +584,7 @@ function loadVodStats(vod, streamerId, shouldStart = () => true) {
     key,
     vod,
     streamerId,
+    includePremiumMetrics,
     promise,
     shouldStart,
     resolve: resolveRequest,
@@ -420,12 +607,28 @@ function enqueueStats(card, vod, loadToken) {
   if (!selectedStreamer || card.dataset.statsState !== 'idle') return;
   card.dataset.statsState = 'queued';
   const streamerId = selectedStreamer.soopId;
-  loadVodStats(vod, streamerId, () => card.isConnected && loadToken === activeLoadToken)
+  const includePremiumMetrics = subscriptionState.subscribed;
+  loadVodStats(vod, streamerId, () => card.isConnected && loadToken === activeLoadToken, includePremiumMetrics)
     .then((stats) => {
       if (!card.isConnected || loadToken !== activeLoadToken) return;
+      if (includePremiumMetrics !== subscriptionState.subscribed) {
+        card.dataset.statsState = 'idle';
+        enqueueStats(card, vod, loadToken);
+        return;
+      }
       showStatsLinks(card, stats);
     })
-    .catch((error) => showStatsError(card, error, loadToken));
+    .catch(async (error) => {
+      if (!card.isConnected || loadToken !== activeLoadToken) return;
+      if (includePremiumMetrics && error && error.code === 'functions/permission-denied') {
+        await refreshSubscriptionStatus();
+        if (subscriptionState.subscribed) return showStatsError(card, error, loadToken);
+        card.dataset.statsState = 'idle';
+        enqueueStats(card, vod, loadToken);
+        return;
+      }
+      showStatsError(card, error, loadToken);
+    });
 }
 
 function observeVodCard(card) {
@@ -480,7 +683,7 @@ async function loadVodPage(loadToken, page) {
   }
 }
 
-function renderPeriodPeakCards(peaks, vodCounts, isScanning) {
+function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !subscriptionState.subscribed) {
   const grid = $('viewerPeriodGrid');
   grid.replaceChildren();
   VIEWER_PEAK_PERIODS.forEach((period) => {
@@ -512,6 +715,7 @@ function renderPeriodPeakCards(peaks, vodCounts, isScanning) {
       const vodCount = Number(vodCounts.get(period.days)) || 0;
       empty.textContent = isScanning
         ? '분석 중…'
+        : isLocked ? '구독 후 확인 가능'
         : !vodCounts.has(period.days) ? '분석 전'
           : vodCount > 0 ? '통계 확인 가능한 순간 없음' : '기간 내 다시보기 없음';
       card.append(empty);
@@ -521,7 +725,7 @@ function renderPeriodPeakCards(peaks, vodCounts, isScanning) {
 }
 
 function isCurrentPeriodScan(scanToken, loadToken) {
-  return scanToken === periodScanToken && loadToken === activeLoadToken && !!selectedStreamer;
+  return scanToken === periodScanToken && loadToken === activeLoadToken && !!selectedStreamer && subscriptionState.subscribed;
 }
 
 async function fetchRecentYearVods(scanToken, loadToken, yearCutoff) {
@@ -574,6 +778,25 @@ async function runPeriodPeakScan() {
   if (!selectedStreamer) return;
   const streamerId = selectedStreamer.soopId;
   const loadToken = activeLoadToken;
+  try {
+    const access = await callViewerSubscription({ action: 'periodAccess' });
+    if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
+    const previouslySubscribed = subscriptionState.subscribed;
+    subscriptionState.subscribed = true;
+    subscriptionState.expiresAt = Number(access.data && access.data.expiresAt) || subscriptionState.expiresAt;
+    subscriptionState.loaded = true;
+    renderSubscriptionControls();
+    scheduleSubscriptionStatusRefresh();
+    if (!previouslySubscribed) refreshExistingVodCardAccess();
+  } catch (error) {
+    await refreshSubscriptionStatus();
+    if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
+    $('viewerPeriodStatus').textContent = '기간별 최고 시청 순간은 구독 계정에서 이용할 수 있어요.';
+    $('viewerPeriodStatus').classList.remove('is-error');
+    renderPeriodPeakCards(new Map(), new Map(), false, true);
+    openSubscriptionDialog();
+    return;
+  }
   const scanToken = ++periodScanToken;
   const scanStartedAt = Date.now();
   const dayMs = 24 * 60 * 60 * 1000;
@@ -690,8 +913,10 @@ async function selectStreamer(streamer) {
   $('viewerVodGrid').replaceChildren();
   $('viewerLoadMore').classList.add('hidden');
   $('viewerPeriodScanButton').disabled = false;
-  $('viewerPeriodScanButton').textContent = '최근 1년 분석';
-  $('viewerPeriodStatus').textContent = '버튼을 누르면 최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 순간을 찾습니다.';
+  $('viewerPeriodScanButton').textContent = subscriptionState.subscribed ? '최근 1년 분석' : '구독 전용 분석';
+  $('viewerPeriodStatus').textContent = subscriptionState.subscribed
+    ? '최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 순간을 찾습니다.'
+    : '기간별 최고 시청 순간은 구독 기능이에요. 별풍선 10개로 30일 동안 이용할 수 있습니다.';
   $('viewerPeriodStatus').classList.remove('is-error');
   renderPeriodPeakCards(new Map(), new Map(), false);
   $('viewerResults').classList.remove('hidden');
@@ -789,5 +1014,73 @@ $('viewerLoadMore').addEventListener('click', () => {
 });
 
 $('viewerPeriodScanButton').addEventListener('click', runPeriodPeakScan);
+
+$('viewerSubscriptionAction').addEventListener('click', async () => {
+  if (!subscriptionState.loaded) await refreshSubscriptionStatus();
+  openSubscriptionDialog();
+});
+
+$('viewerSubscriptionRefresh').addEventListener('click', refreshSubscriptionStatus);
+$('viewerSubscriptionClose').addEventListener('click', () => $('viewerSubscriptionDialog').close());
+$('viewerSubscriptionCloseBottom').addEventListener('click', () => $('viewerSubscriptionDialog').close());
+$('viewerSubscriptionDialog').addEventListener('click', (event) => {
+  if (event.target === $('viewerSubscriptionDialog')) $('viewerSubscriptionDialog').close();
+});
+$('viewerSubscriptionForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!subscriptionState.accountProtected) {
+    renderSubscriptionDialogStatus('로그인 후 구독 신청을 할 수 있어요. 새 탭에서 로그인한 뒤 상태를 새로고침해 주세요.');
+    return;
+  }
+  const nickname = $('viewerSubscriptionNickname').value.trim();
+  if (!nickname || !$('viewerSubscriptionNickname').reportValidity()) return;
+  const submit = $('viewerSubscriptionSubmit');
+  submit.disabled = true;
+  renderSubscriptionDialogStatus('신청을 접수하고 있어요.');
+  try {
+    const response = await callViewerSubscription({ action: 'request', nickname });
+    const result = response.data || {};
+    await refreshSubscriptionStatus();
+    renderSubscriptionDialogStatus(result.action === 'already-pending'
+      ? '이미 확인 대기 중인 신청이 있어요. 별풍선 10개 후원 여부를 운영자가 확인 중입니다.'
+      : '신청이 접수됐어요. 별풍선 후원을 확인한 뒤 이 계정에 30일 이용권을 적용합니다.');
+    if (result.action === 'pending' || result.action === 'already-pending') {
+      $('viewerSubscriptionNickname').value = '';
+    }
+  } catch (error) {
+    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '구독 신청을 접수하지 못했어요.'));
+  } finally {
+    submit.disabled = false;
+    renderSubscriptionDialogStatus();
+  }
+});
+
+$('viewerSubscriptionCancel').addEventListener('click', async () => {
+  if (!subscriptionState.pendingRequestId || !confirm('구독 신청을 취소할까요?')) return;
+  const cancel = $('viewerSubscriptionCancel');
+  cancel.disabled = true;
+  try {
+    await callViewerSubscription({ action: 'cancel', requestId: subscriptionState.pendingRequestId });
+    await refreshSubscriptionStatus();
+    renderSubscriptionDialogStatus('신청을 취소했어요. 후원 후 다시 신청할 수 있습니다.');
+  } catch (error) {
+    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '신청을 취소하지 못했어요.'));
+  } finally {
+    cancel.disabled = false;
+    renderSubscriptionDialogStatus();
+  }
+});
+
+let observedAuthIdentity = '';
+onAuthStateChanged(auth, (user) => {
+  if (!user) return;
+  const identity = user.uid + ':' + String(user.isAnonymous);
+  if (identity === observedAuthIdentity) return;
+  observedAuthIdentity = identity;
+  refreshSubscriptionStatus();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshSubscriptionStatus();
+});
 
 getAuthReady().catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));

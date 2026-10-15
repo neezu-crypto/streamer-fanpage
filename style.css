@@ -216,6 +216,18 @@
 .admin-viewer-usage-streamer-count{flex:none;color:#f6d5e1;font-size:11px}
 .admin-viewer-usage-streamers-empty{grid-column:1/-1;margin:0;padding:12px;color:#a69cab;font-size:10px;text-align:center}
 .admin-viewer-usage-note{margin:10px 0 0;line-height:1.55}
+.admin-viewer-subscriptions{margin:0 0 22px;padding:14px;border:1px solid #f58cac30;border-radius:13px;background:linear-gradient(135deg,#f58cac0b,#ffffff03)}
+.admin-viewer-subscriptions .admin-viewer-usage-heading h3{margin:0;font:17px var(--display)}
+.admin-viewer-subscriptions .admin-viewer-usage-heading .button{min-height:34px;padding:6px 9px;font-size:10px}
+.admin-viewer-subscription-status{margin:0 0 9px;color:#a69cab;font-size:11px;line-height:1.5}
+.admin-viewer-subscription-list{display:grid;max-height:min(34vh,320px);gap:7px;overflow-y:auto;overscroll-behavior:contain;padding:1px 5px 3px 1px;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
+.admin-viewer-subscription-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid #ffffff12;border-radius:9px;background:#00000020}
+.admin-viewer-subscription-identity{display:grid;min-width:0;gap:3px}
+.admin-viewer-subscription-identity strong{overflow:hidden;color:#f3eaf1;font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+.admin-viewer-subscription-identity small{color:#a69cab;font-size:10px}
+.admin-viewer-subscription-actions{display:flex;flex:none;gap:6px}
+.admin-viewer-subscription-actions .button{min-height:34px;padding:6px 8px;font-size:10px}
+.admin-viewer-subscription-empty{margin:0;padding:13px;border:1px dashed #ffffff16;border-radius:8px;color:#aaa3b1;font-size:11px;text-align:center}
 .admin-stat-card{display:grid;min-width:0;gap:10px;padding:12px;border:1px solid #ffffff14;border-radius:12px;background:#ffffff05;color:var(--text);text-align:left;transition:border-color .15s,background .15s}
 .admin-stat-card:hover,.admin-stat-card:focus-visible{border-color:#f58cac70;background:#f58cac0b}
 .admin-stat-identity{display:flex;align-items:center;gap:9px;min-width:0}
@@ -232,7 +244,7 @@
 .admin-stat-sparkline span{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#f58cac,#b76b88);opacity:.85}
 .admin-stats-empty{grid-column:1/-1}
 @media(max-width:720px){.admin-stats-dialog-card{padding:17px}.admin-stats-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-stats-list{max-height:38vh;grid-template-columns:1fr}}
-@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage{padding:11px}.admin-viewer-usage-actions,.admin-viewer-usage-streamers{grid-template-columns:1fr}.admin-viewer-usage-streamers{max-height:25vh}.admin-viewer-usage-action{font-size:11px}}
+@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage,.admin-viewer-subscriptions{padding:11px}.admin-viewer-usage-actions,.admin-viewer-usage-streamers{grid-template-columns:1fr}.admin-viewer-usage-streamers{max-height:25vh}.admin-viewer-usage-action{font-size:11px}.admin-viewer-subscription-row{align-items:stretch;flex-direction:column}.admin-viewer-subscription-actions{display:grid;grid-template-columns:1fr 1fr}.admin-viewer-subscription-actions .button{width:100%}}
 
 /* Scrollable replay area and SOOP schedule calendar */
 .vod-scrollbox{max-height:min(72vh,680px);overflow-y:auto;overscroll-behavior:contain;padding:0 8px 4px 0;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}

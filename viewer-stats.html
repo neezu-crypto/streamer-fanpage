@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261013-viewer-stats">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261015-period-peaks">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261015-subscription">
 </head>
 <body>
   <div class="site-shell is-ready viewer-stats-shell">
@@ -63,9 +63,21 @@
               <p class="eyebrow">PERIOD HIGHS</p>
               <h3 id="viewerPeriodTitle">기간별 최고 시청 순간</h3>
             </div>
-            <button class="button" id="viewerPeriodScanButton" type="button">최근 1년 분석</button>
+            <button class="button" id="viewerPeriodScanButton" type="button">구독 전용 분석</button>
           </div>
-          <p class="viewer-period-status" id="viewerPeriodStatus" role="status" aria-live="polite">버튼을 누르면 최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 순간을 찾습니다.</p>
+          <div class="viewer-subscription-panel" aria-labelledby="viewerSubscriptionTitle">
+            <div class="viewer-subscription-copy">
+              <p class="eyebrow">STREAMER PEAK CHECK PASS</p>
+              <h4 id="viewerSubscriptionTitle">고점체크 구독</h4>
+              <p>별풍선 10개로 30일 이용 · 무료 체험과 자동 결제 없이, 모든 스트리머의 기간별 최고 순간과 평균 대비 상승폭을 확인하세요.</p>
+              <p class="viewer-subscription-status" id="viewerSubscriptionStatus" role="status" aria-live="polite">구독 상태를 확인하고 있어요.</p>
+            </div>
+            <div class="viewer-subscription-actions">
+              <button class="button button-primary" id="viewerSubscriptionAction" type="button">구독 상태 확인 중…</button>
+              <button class="button viewer-subscription-refresh" id="viewerSubscriptionRefresh" type="button">상태 새로고침</button>
+            </div>
+          </div>
+          <p class="viewer-period-status" id="viewerPeriodStatus" role="status" aria-live="polite">구독하면 최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 시청 순간을 찾을 수 있습니다.</p>
           <div class="viewer-period-grid" id="viewerPeriodGrid"></div>
         </section>
         <div class="viewer-list-heading">
@@ -90,6 +102,28 @@
       <a href="index.html">스트리머 팬페이지</a>
     </footer>
   </div>
-  <script type="module" src="viewer-stats.js?v=20261015-app-check"></script>
+  <dialog class="viewer-subscription-dialog" id="viewerSubscriptionDialog" aria-labelledby="viewerSubscriptionDialogTitle">
+    <form class="viewer-subscription-dialog-card" id="viewerSubscriptionForm">
+      <button class="viewer-subscription-close" id="viewerSubscriptionClose" type="button" aria-label="닫기">×</button>
+      <p class="eyebrow">30-DAY PASS</p>
+      <h2 id="viewerSubscriptionDialogTitle">고점체크 구독</h2>
+      <p class="viewer-subscription-dialog-intro">구독 권한은 현재 로그인한 개인 계정에 적용되며, 모든 스트리머에 사용할 수 있어요. 별풍선 10개 후원 1회당 30일 이용권이 부여되고, 남은 기간이 있으면 이어서 연장됩니다. 무료 체험과 자동 갱신은 없습니다.</p>
+      <ol class="viewer-subscription-steps">
+        <li><a href="https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&amp;szWork=BJ_STATION&amp;sys_type=web&amp;location=station" target="_blank" rel="noopener noreferrer">운영자 방송국에 별풍선 10개 후원 ↗</a></li>
+        <li>후원에 사용한 SOOP 닉네임을 입력하고 신청해 주세요.</li>
+        <li>운영자가 방송에서 직접 확인한 뒤 구독을 승인합니다.</li>
+      </ol>
+      <label for="viewerSubscriptionNickname">후원자 SOOP 닉네임</label>
+      <input id="viewerSubscriptionNickname" name="nickname" maxlength="20" autocomplete="nickname" placeholder="별풍선을 보낸 닉네임" required>
+      <p class="viewer-subscription-dialog-status" id="viewerSubscriptionDialogStatus" role="status" aria-live="polite"></p>
+      <div class="viewer-subscription-dialog-actions">
+        <button class="button hidden" id="viewerSubscriptionCancel" type="button">대기 신청 취소</button>
+        <button class="button" id="viewerSubscriptionCloseBottom" type="button">닫기</button>
+        <button class="button button-primary" id="viewerSubscriptionSubmit" type="submit">후원 신청하기</button>
+      </div>
+      <p class="viewer-subscription-login-note hidden" id="viewerSubscriptionLoginNote">구독 신청에는 Google·Kakao 계정 연결 또는 스트리머 인증이 필요합니다. <a href="index.html?login=1" target="_blank" rel="noopener noreferrer">팬페이지에서 로그인하기 ↗</a> 로그인 후 이 페이지에서 상태를 새로고침해 주세요.</p>
+    </form>
+  </dialog>
+  <script type="module" src="viewer-stats.js?v=20261015-subscription"></script>
 </body>
 </html>
