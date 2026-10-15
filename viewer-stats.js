@@ -1,4 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
+import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
@@ -18,10 +19,78 @@ initializeAppCheck(app, {
   isTokenAutoRefreshEnabled: true,
 });
 const auth = getAuth(app);
+const database = getDatabase(app);
 const functions = getFunctions(app, 'us-central1');
 const callViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats');
 const callViewerSubscription = httpsCallable(functions, 'streamerFanPageViewerSubscription');
 const $ = (id) => document.getElementById(id);
+
+function setupDevbarMarquee() {
+  const viewport = $('devbar-viewport');
+  const track = $('devbar-track');
+  if (!viewport || !track) return;
+
+  function setup() {
+    track.classList.remove('auto-scroll');
+    track.querySelectorAll('[data-clone]').forEach((element) => element.remove());
+    track.style.removeProperty('--viewer-devbar-duration');
+    if (track.scrollWidth <= viewport.clientWidth + 4) return;
+
+    const originalWidth = track.scrollWidth;
+    Array.from(track.children).forEach((element) => {
+      const clone = element.cloneNode(true);
+      clone.setAttribute('data-clone', '');
+      clone.setAttribute('aria-hidden', 'true');
+      clone.setAttribute('tabindex', '-1');
+      clone.querySelectorAll('a, button').forEach((child) => child.setAttribute('tabindex', '-1'));
+      track.appendChild(clone);
+    });
+    track.style.setProperty('--viewer-devbar-duration', Math.max(originalWidth / 40, 8) + 's');
+    track.classList.add('auto-scroll');
+  }
+
+  setup();
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => {
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(setup, 200);
+  });
+}
+
+async function loadDevbarLinks() {
+  const selfGameId = 'streamerFanPage';
+  try {
+    const snapshot = await get(ref(database, 'devbarLinks'));
+    const data = snapshot.val();
+    if (!data) return;
+    const links = Object.keys(data)
+      .filter((id) => id !== selfGameId && data[id] && data[id].url)
+      .map((id) => ({ id, ...data[id] }))
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+    if (!links.length) return;
+
+    const nav = $('devbar-track');
+    if (!nav) return;
+    nav.querySelectorAll('a[data-game-id]').forEach((link) => link.remove());
+    links.forEach((item) => {
+      let url;
+      try { url = new URL(item.url, location.href); } catch (_) { return; }
+      if (url.protocol !== 'https:') return;
+      const link = document.createElement('a');
+      link.className = 'dev-game-link';
+      link.dataset.gameId = item.id;
+      link.href = url.href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = item.label || item.name || item.id;
+      nav.appendChild(link);
+    });
+    window.dispatchEvent(new Event('resize'));
+  } catch (error) {
+    console.error('자매 서비스 링크를 불러오지 못했습니다. 기본 링크를 유지합니다.', error);
+  }
+}
+
 const MAX_CONCURRENT_STATS_REQUESTS = 3;
 const MAX_PERIOD_SCAN_PAGES = 200;
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
@@ -1192,4 +1261,6 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') refreshSubscriptionStatus();
 });
 
+setupDevbarMarquee();
+loadDevbarLinks();
 getAuthReady().catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));
