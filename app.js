@@ -21,6 +21,7 @@ const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
 const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
 const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
 const callAdminStats = httpsCallable(functions, 'streamerFanPageAdminStats');
+const callAdminViewerSubscriptionRequests = httpsCallable(functions, 'streamerFanPageAdminViewerSubscriptionRequests');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
 const callSongbook = httpsCallable(functions, 'streamerFanPageSongbook');
 const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
@@ -58,6 +59,7 @@ let verifiedStreamerUid = '';
 let isAdminUser = false;
 let adminStatsLoading = false;
 let adminStatsData = null;
+let adminViewerSubscriptionsLoading = false;
 let verifiedStatusUnsubscribe = null;
 let switchApprovalUnsubscribe = null;
 let switchHandoffInProgress = false;
@@ -522,6 +524,73 @@ function renderViewerStatsUsage(usage) {
     row.append(rank, identity, count); streamerList.append(row);
   });
 }
+function renderAdminViewerSubscriptionRequests(requests, truncated = false) {
+  const container = $('viewerSubscriptionAdminList');
+  container.replaceChildren();
+  const rows = Array.isArray(requests) ? requests : [];
+  if (!rows.length) {
+    const empty = document.createElement('p');
+    empty.className = 'admin-viewer-subscription-empty';
+    empty.textContent = '확인 대기 중인 구독 신청이 없습니다.';
+    container.append(empty);
+  }
+  rows.forEach((request) => {
+    const row = document.createElement('article');
+    row.className = 'admin-viewer-subscription-row';
+    const identity = document.createElement('div');
+    identity.className = 'admin-viewer-subscription-identity';
+    const nickname = document.createElement('strong');
+    nickname.textContent = request.nickname || '닉네임 없음';
+    const account = document.createElement('small');
+    const uid = String(request.requesterUid || '');
+    account.textContent = '계정 UID · ' + (uid.length > 8 ? '…' + uid.slice(-8) : uid);
+    const requestedAt = document.createElement('small');
+    requestedAt.textContent = request.requestedAt
+      ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(request.requestedAt))
+      : '신청 시각 없음';
+    identity.append(nickname, account, requestedAt);
+
+    const actions = document.createElement('div');
+    actions.className = 'admin-viewer-subscription-actions';
+    const approve = document.createElement('button');
+    approve.type = 'button';
+    approve.className = 'button button-primary';
+    approve.dataset.subscriptionAction = 'approve';
+    approve.dataset.requestId = request.requestId;
+    approve.textContent = request.status === 'processing' ? '승인 계속' : '후원 확인 · 30일 승인';
+    actions.append(approve);
+    if (request.status === 'pending') {
+      const reject = document.createElement('button');
+      reject.type = 'button';
+      reject.className = 'button';
+      reject.dataset.subscriptionAction = 'reject';
+      reject.dataset.requestId = request.requestId;
+      reject.textContent = '거절';
+      actions.append(reject);
+    }
+    row.append(identity, actions);
+    container.append(row);
+  });
+  $('viewerSubscriptionAdminStatus').textContent = rows.length
+    ? `${formatStatCount(rows.length)}건 대기 중${truncated ? ' · 200건까지만 표시' : ''}. 후원자 SOOP 닉네임과 방송 후원 내역을 확인한 뒤 승인해 주세요.`
+    : '현재 확인 대기 중인 신청이 없습니다.';
+}
+async function loadAdminViewerSubscriptionRequests() {
+  if (!isAdminUser || adminViewerSubscriptionsLoading) return;
+  adminViewerSubscriptionsLoading = true;
+  $('refreshViewerSubscriptionRequests').disabled = true;
+  $('viewerSubscriptionAdminStatus').textContent = '구독 신청을 불러오고 있어요.';
+  try {
+    const result = await callAdminViewerSubscriptionRequests({ action: 'list' });
+    if (!isAdminUser) return;
+    renderAdminViewerSubscriptionRequests(result.data && result.data.requests, result.data && result.data.truncated);
+  } catch (error) {
+    $('viewerSubscriptionAdminStatus').textContent = error.message || '구독 신청을 불러오지 못했어요.';
+  } finally {
+    adminViewerSubscriptionsLoading = false;
+    $('refreshViewerSubscriptionRequests').disabled = false;
+  }
+}
 async function loadAdminStats() {
   if (!isAdminUser || adminStatsLoading) return;
   adminStatsLoading = true;
@@ -533,6 +602,7 @@ async function loadAdminStats() {
     if (!isAdminUser) return;
     adminStatsData = result.data;
     renderAdminStats(adminStatsData);
+    await loadAdminViewerSubscriptionRequests();
     const generatedAt = Number(adminStatsData.generatedAt);
     $('adminStatsStatus').textContent = Number.isFinite(generatedAt)
       ? `최근 집계 ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(generatedAt))} · 최근 30일 기준`
@@ -3775,6 +3845,16 @@ async function loadApp() {
     $('startupCover').classList.add('hidden');
     $('siteShell').setAttribute('aria-hidden', 'false');
     $('siteShell').classList.add('is-ready');
+    if (new URLSearchParams(location.search).get('login') === '1') {
+      const loginUrl = new URL(location.href);
+      loginUrl.searchParams.delete('login');
+      history.replaceState(null, '', loginUrl.href);
+      if (auth.currentUser && auth.currentUser.isAnonymous
+        && localStorage.getItem(KAKAO_LINKED_UID_KEY) !== auth.currentUser.uid
+        && verifiedStreamerUid !== auth.currentUser.uid) {
+        window.setTimeout(() => $('loginChoiceDialog').showModal(), 120);
+      }
+    }
   } catch (error) { showStartupError(error); }
 }
 $('retryButton').addEventListener('click', () => {
@@ -3811,6 +3891,25 @@ $('adminStatsDialog').addEventListener('click', (event) => {
   if (event.target === $('adminStatsDialog')) $('adminStatsDialog').close();
 });
 $('refreshAdminStats').addEventListener('click', loadAdminStats);
+$('refreshViewerSubscriptionRequests').addEventListener('click', loadAdminViewerSubscriptionRequests);
+$('viewerSubscriptionAdminList').addEventListener('click', async (event) => {
+  const button = event.target.closest('button[data-subscription-action][data-request-id]');
+  if (!button || !isAdminUser) return;
+  const action = button.dataset.subscriptionAction;
+  const requestId = button.dataset.requestId;
+  if (action === 'reject' && !confirm('이 구독 신청을 거절할까요?')) return;
+  button.disabled = true;
+  $('viewerSubscriptionAdminStatus').textContent = action === 'approve'
+    ? '승인 처리 중이에요.'
+    : '신청을 거절하고 있어요.';
+  try {
+    await callAdminViewerSubscriptionRequests({ action, requestId });
+    await loadAdminViewerSubscriptionRequests();
+  } catch (error) {
+    $('viewerSubscriptionAdminStatus').textContent = error.message || '신청을 처리하지 못했어요.';
+    button.disabled = false;
+  }
+});
 $('adminStatsSearch').addEventListener('input', () => {
   if (adminStatsData) renderAdminStatsList(adminStatsData.streamers);
 });

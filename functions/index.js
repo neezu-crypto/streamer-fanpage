@@ -6,9 +6,15 @@ const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
+const {
+  streamerFanPageViewerSubscription,
+  streamerFanPageAdminViewerSubscriptionRequests,
+} = require('./viewer-subscriptions');
 
 initializeApp();
 const db = getDatabase();
+exports.streamerFanPageViewerSubscription = streamerFanPageViewerSubscription;
+exports.streamerFanPageAdminViewerSubscriptionRequests = streamerFanPageAdminViewerSubscriptionRequests;
 const MAX_INTRO_LENGTH = 700;
 const MAX_BANNER_IMAGE_ITEMS = 20;
 const RECENT_PAGE_LIMIT = 8;
@@ -1110,12 +1116,16 @@ async function fetchSoopVodViewerCountStats(soopId, titleNo) {
   // 종료 5분이 시작되는 경계 시점부터 제외해 중간 구간에서만 최고·최저를 계산한다.
   let highest = null;
   let lowest = null;
+  let includedViewerTotal = 0;
+  let includedPointCount = 0;
   for (const point of graph) {
     const minute = Number(point && point[0]);
     const viewers = Number(point && point[1]);
     if (!Number.isFinite(minute) || !Number.isFinite(viewers) || minute < 0 || viewers < 0) continue;
     const second = Math.round(minute * 60);
     if (second < includedStartSecond || second >= includedEndSecond) continue;
+    includedViewerTotal += viewers;
+    includedPointCount += 1;
     if (!highest || viewers > highest.viewers || (viewers === highest.viewers && second < highest.second)) {
       highest = { second, viewers };
     }
@@ -1131,8 +1141,15 @@ async function fetchSoopVodViewerCountStats(soopId, titleNo) {
     streamerId: soopId,
     highest,
     lowest,
+    averageViewers: includedPointCount ? includedViewerTotal / includedPointCount : 0,
     checkedAt: Date.now(),
   };
+}
+
+function viewerStatsForResponse(stats, includePremiumMetrics) {
+  if (includePremiumMetrics) return stats;
+  const { averageViewers, ...publicStats } = stats || {};
+  return publicStats;
 }
 
 function normalizeFetchedVodPage(rows, total, page, seenIds) {
@@ -2587,12 +2604,21 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
   if (action === 'stats') {
     const vodId = String(data.vodId || '').trim();
     if (!/^\d{1,20}$/.test(vodId)) throw new HttpsError('invalid-argument', '다시보기 번호를 확인해 주세요.');
+    const includePremiumMetrics = data.includePremiumMetrics === true;
+    if (includePremiumMetrics) {
+      const subscription = (await db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get()).val() || {};
+      if ((Number(subscription.expiresAt) || 0) <= Date.now()) {
+        throw new HttpsError('permission-denied', '평균 대비 상승폭은 구독 계정에서 이용할 수 있습니다.');
+      }
+    }
     await enforceViewerStatsRateLimit(uid, action);
     const cacheKey = streamerId + ':' + vodId;
     const cached = fanpageViewerStatsMemoryCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return { stats: cached.value };
+    if (cached && cached.expiresAt > Date.now()) {
+      return { stats: viewerStatsForResponse(cached.value, includePremiumMetrics) };
+    }
     const inProgress = fanpageViewerStatsInProgress.get(cacheKey);
-    if (inProgress) return { stats: await inProgress };
+    if (inProgress) return { stats: viewerStatsForResponse(await inProgress, includePremiumMetrics) };
 
     const task = fetchSoopVodViewerCountStats(streamerId, vodId);
     fanpageViewerStatsInProgress.set(cacheKey, task);
@@ -2605,7 +2631,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
       while (fanpageViewerStatsMemoryCache.size > FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS) {
         fanpageViewerStatsMemoryCache.delete(fanpageViewerStatsMemoryCache.keys().next().value);
       }
-      return { stats };
+      return { stats: viewerStatsForResponse(stats, includePremiumMetrics) };
     } finally {
       if (fanpageViewerStatsInProgress.get(cacheKey) === task) fanpageViewerStatsInProgress.delete(cacheKey);
     }

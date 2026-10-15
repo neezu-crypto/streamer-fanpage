@@ -106,3 +106,39 @@
 @media(max-width:800px){.viewer-period-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.viewer-period-peaks{margin-top:17px;padding:14px}.viewer-period-heading{align-items:flex-start}.viewer-period-heading h3{font-size:18px}.viewer-period-heading .button{min-height:44px;padding:8px 10px;font-size:12px}.viewer-period-status{font-size:12px}.viewer-period-card{min-height:116px;padding:11px}.viewer-period-card>strong{font-size:13px}.viewer-period-peak-count{font-size:20px}.viewer-period-peak-meta,.viewer-period-empty,.viewer-period-peak-link{font-size:12px}}
 @media(max-width:360px){.viewer-period-grid{grid-template-columns:1fr}.viewer-period-card{min-height:90px}}
+
+.viewer-subscription-panel{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:15px 0 8px;padding:15px 16px;border:1px solid #f58cac45;border-radius:13px;background:linear-gradient(110deg,#f58cac12,#ffffff04)}
+.viewer-subscription-copy{min-width:0}
+.viewer-subscription-copy .eyebrow{margin:0 0 4px;color:#f4aac2;font-size:9px;letter-spacing:.13em}
+.viewer-subscription-copy h4{margin:0;color:#f8eff5;font:18px var(--display)}
+.viewer-subscription-copy>p:not(.eyebrow){margin:5px 0 0;color:#c5bdca;font-size:12px;line-height:1.55}
+.viewer-subscription-copy .viewer-subscription-status{color:#f5c6d6;font-weight:700}
+.viewer-subscription-actions{display:flex;flex:0 0 auto;flex-direction:column;gap:7px}
+.viewer-subscription-actions .button{min-height:40px;white-space:nowrap}
+.viewer-subscription-refresh{background:#ffffff07}
+.viewer-premium-uplift{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px;border:1px solid #f58cac33;border-radius:9px;background:#f58cac0c}
+.viewer-premium-uplift>span{min-width:0;text-align:center}
+.viewer-premium-uplift>span small,.viewer-premium-uplift>span strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.viewer-premium-uplift>span small{color:#c8b9c6;font-size:10px}
+.viewer-premium-uplift>span strong{margin-top:3px;color:#ffd1df;font-size:15px;font-variant-numeric:tabular-nums}
+.viewer-premium-baseline{grid-column:1/-1;color:#aaa0ad;font-size:10px;text-align:center}
+.viewer-premium-locked{grid-column:1/-1;min-height:40px;border:1px solid #f58cac30;border-radius:8px;background:#f58cac0a;color:#eec2d1;font:inherit;font-size:11px;cursor:pointer}
+.viewer-premium-locked:hover{border-color:#f58cac80;background:#f58cac16}
+.viewer-subscription-dialog{width:min(490px,calc(100% - 24px));max-width:none;max-height:calc(100dvh - 24px);overflow:visible;border:1px solid #f58cac50;border-radius:17px;padding:0;background:#191620;color:#eee8f0;box-shadow:0 24px 90px #0009}
+.viewer-subscription-dialog::backdrop{background:#08070cc9;backdrop-filter:blur(5px)}
+.viewer-subscription-dialog-card{position:relative;max-height:calc(100dvh - 24px);overflow:auto;padding:24px;border-radius:17px;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
+.viewer-subscription-close{position:absolute;top:14px;right:14px;width:34px;height:34px;border:1px solid #ffffff1a;border-radius:9px;background:#ffffff08;color:#e9e2ed;font-size:23px;line-height:1;cursor:pointer}
+.viewer-subscription-dialog-card>.eyebrow{margin:0 0 5px;color:#f3a9c1;font-size:9px;letter-spacing:.14em}
+.viewer-subscription-dialog-card h2{margin:0;font:25px var(--display)}
+.viewer-subscription-dialog-intro{margin:12px 0 16px;color:#c0b8c5;font-size:13px;line-height:1.65}
+.viewer-subscription-steps{margin:0 0 16px;padding:14px 14px 14px 34px;border:1px solid #ffffff15;border-radius:11px;background:#ffffff05;color:#ddd4e1;font-size:12px;line-height:1.8}
+.viewer-subscription-steps a{color:#ffc2d5;font-weight:700}
+.viewer-subscription-dialog-card label{display:block;margin:12px 0 7px;color:#e9e2ed;font-size:12px;font-weight:700}
+.viewer-subscription-dialog-card input{width:100%;height:44px;border:1px solid #ffffff24;border-radius:9px;padding:0 12px;background:#100f16;color:#fff;font-size:14px}
+.viewer-subscription-dialog-card input:focus{outline:2px solid #f58cac60;border-color:#f58cac}
+.viewer-subscription-dialog-status{min-height:38px;margin:10px 0;color:#f2bfd0;font-size:12px;line-height:1.55}
+.viewer-subscription-dialog-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.viewer-subscription-dialog-actions .button{min-height:42px}
+.viewer-subscription-login-note{margin:13px 0 0;color:#c3bbc8;font-size:12px;line-height:1.6}
+.viewer-subscription-login-note a{color:#ffc2d5;font-weight:700}
+@media(max-width:620px){.viewer-subscription-panel{align-items:stretch;flex-direction:column;padding:13px}.viewer-subscription-actions{display:grid;grid-template-columns:1fr 1fr}.viewer-subscription-actions .button{padding:8px 7px;font-size:11px}.viewer-premium-uplift>span small{font-size:9px}.viewer-premium-uplift>span strong{font-size:14px}.viewer-premium-baseline{font-size:9px}.viewer-subscription-dialog-card{padding:20px 16px}.viewer-subscription-dialog-card h2{font-size:22px}.viewer-subscription-dialog-actions{display:grid;grid-template-columns:1fr 1fr}.viewer-subscription-dialog-actions .button{width:100%;padding:9px 8px;font-size:11px}.viewer-subscription-dialog-actions #viewerSubscriptionSubmit{grid-column:1/-1;grid-row:1}}

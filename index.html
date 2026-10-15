@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261015-admin-scrollboxes">
+  <link rel="stylesheet" href="style.css?v=20261015-subscription">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -152,11 +152,19 @@
         <div class="admin-viewer-usage-streamers" id="viewerStatsAdminStreamerList"></div>
         <p class="admin-viewer-usage-note">요청 수는 한도 검사를 통과한 횟수입니다. 스트리머별 집계는 이 기능 적용 후 검색 결과에서 자동 선택되거나 직접 선택해 다시보기 첫 페이지를 요청한 횟수이며, 검색어는 저장하지 않습니다. 그래프 요청은 서버 캐시로 처리될 수 있어 SOOP API 실제 호출 수와 다를 수 있습니다.</p>
       </section>
+      <section class="admin-viewer-subscriptions" aria-labelledby="viewerSubscriptionAdminTitle">
+        <div class="admin-viewer-usage-heading">
+          <h3 id="viewerSubscriptionAdminTitle">고점체크 구독 신청</h3>
+          <button class="button" id="refreshViewerSubscriptionRequests" type="button">↻ 신청 새로고침</button>
+        </div>
+        <p class="admin-viewer-subscription-status" id="viewerSubscriptionAdminStatus" role="status" aria-live="polite">구독 신청을 불러옵니다.</p>
+        <div class="admin-viewer-subscription-list" id="viewerSubscriptionAdminList"></div>
+      </section>
       <div class="admin-stats-list-heading"><strong>스트리머별 집계</strong><span id="adminStatsStreamerCount"></span></div>
       <div class="admin-stats-list" id="adminStatsList"></div>
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261015-streamer-search-counts"></script>
+  <script type="module" src="app.js?v=20261015-subscription"></script>
 </body>
 </html>
