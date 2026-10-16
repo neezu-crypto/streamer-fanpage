@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261016-profile-quick-edit">
+  <link rel="stylesheet" href="style.css?v=20261016-design-feedback">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -76,8 +76,36 @@
 
       <section id="fanPageView" class="fanpage-view hidden" aria-live="polite"></section>
     </main>
-    <footer class="footer"><span>STREAMER SERIES</span><nav class="footer-policy-links" aria-label="서비스 정책"><a href="privacy.html">개인정보 처리방침</a><a href="terms.html">이용약관</a></nav><span>좋아하는 마음이 머무는 곳</span></footer>
+    <footer class="footer"><span>STREAMER SERIES</span><nav class="footer-policy-links" aria-label="서비스 안내"><a href="privacy.html">개인정보 처리방침</a><a href="terms.html">이용약관</a><button id="openDesignFeedback" class="footer-feedback-link" type="button">디자인 변경 문의 / 건의 보내기</button></nav><span>좋아하는 마음이 머무는 곳</span></footer>
   </div>
+  <dialog id="designFeedbackDialog" class="account-dialog design-feedback-dialog" aria-labelledby="designFeedbackTitle">
+    <section class="account-dialog-card design-feedback-card">
+      <div class="design-feedback-heading">
+        <div><p class="eyebrow">FANPAGE FEEDBACK</p><h2 id="designFeedbackTitle">디자인 변경 문의 / 건의 보내기</h2></div>
+        <button class="button profile-settings-close" id="closeDesignFeedback" type="button" aria-label="건의 창 닫기">×</button>
+      </div>
+      <p class="design-feedback-intro">팬페이지 디자인이나 기능에 대한 의견을 보내 주세요. 접수 내용은 관리자만 확인하며, 하루 최대 5건까지 보낼 수 있어요. 답변 연락처는 수집하지 않습니다.</p>
+      <form id="designFeedbackForm" autocomplete="off">
+        <label for="designFeedbackCategory">문의 유형</label>
+        <select id="designFeedbackCategory" name="category" required>
+          <option value="design">디자인 변경 문의</option>
+          <option value="suggestion">기능 건의</option>
+          <option value="bug">오류 제보</option>
+          <option value="other">기타</option>
+        </select>
+        <label for="designFeedbackTitleInput">제목</label>
+        <input id="designFeedbackTitleInput" name="title" type="text" maxlength="80" required placeholder="의견을 간단히 적어 주세요." autocomplete="off">
+        <label for="designFeedbackMessage">내용</label>
+        <textarea id="designFeedbackMessage" name="content" maxlength="2000" required placeholder="원하는 변경 내용이나 불편한 점을 알려 주세요." autocomplete="off"></textarea>
+        <p class="design-feedback-context" id="designFeedbackContext">접수 내용은 이 사이트 관리자에게 전달됩니다.</p>
+        <p class="design-feedback-status" id="designFeedbackStatus" role="status" aria-live="polite"></p>
+        <div class="design-feedback-actions">
+          <button class="button" id="cancelDesignFeedback" type="button">취소</button>
+          <button class="button button-primary" id="submitDesignFeedback" type="submit">건의 보내기</button>
+        </div>
+      </form>
+    </section>
+  </dialog>
   <dialog id="loginChoiceDialog" class="account-dialog">
     <div class="account-dialog-card">
       <p class="eyebrow">WELCOME TO STREAMER SERIES</p>
@@ -165,11 +193,19 @@
         <p class="admin-viewer-subscription-status" id="viewerSubscriptionAdminStatus" role="status" aria-live="polite">구독 신청을 불러옵니다.</p>
         <div class="admin-viewer-subscription-list" id="viewerSubscriptionAdminList"></div>
       </section>
+      <section class="admin-design-feedback" aria-labelledby="adminDesignFeedbackTitle">
+        <div class="admin-viewer-usage-heading">
+          <h3 id="adminDesignFeedbackTitle">디자인 문의 / 건의</h3>
+          <button class="button" id="refreshDesignFeedback" type="button">↻ 건의 새로고침</button>
+        </div>
+        <p class="admin-design-feedback-status" id="adminDesignFeedbackStatus" role="status" aria-live="polite">접수된 건의를 불러오세요.</p>
+        <div class="admin-design-feedback-list" id="adminDesignFeedbackList"></div>
+      </section>
       <div class="admin-stats-list-heading"><strong>스트리머별 집계</strong><span id="adminStatsStreamerCount"></span></div>
       <div class="admin-stats-list" id="adminStatsList"></div>
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261016-profile-quick-edit"></script>
+  <script type="module" src="app.js?v=20261016-design-feedback"></script>
 </body>
 </html>
