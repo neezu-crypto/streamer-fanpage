@@ -811,6 +811,7 @@ function setVisibleView(page) {
     stockPriceUnsubscribe = null;
   }
   if (!page) stockPriceSparklineRequest += 1;
+  $('mainContent').classList.toggle('has-fanpage-view', !!page);
   $('homeView').classList.toggle('hidden', !!page);
   $('fanPageView').classList.toggle('hidden', !page);
   $('devbar').classList.toggle('hidden', !!page);
@@ -1709,6 +1710,7 @@ function renderFanPage(page) {
   stockPriceSparklineRequest += 1;
   currentPage = page;
   const view = $('fanPageView');
+  view.classList.remove('has-top-banner', 'has-bottom-banner');
   view.classList.toggle('fanpage-theme-sora', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   view.replaceChildren();
   const back = document.createElement('a');
@@ -1795,9 +1797,12 @@ function renderFanPage(page) {
   section.append(label, identity, facts);
   if (about) section.append(about);
   section.append(details, stockCard, actions);
-  if (!page.isOwner) view.append(back);
   const topBanner = renderBannerSection(page, 'top');
-  if (topBanner) view.append(topBanner);
+  if (topBanner) {
+    view.classList.add('has-top-banner');
+    view.append(topBanner);
+  }
+  if (!page.isOwner) view.append(back);
   view.append(section);
   let fanCharacterCard = null;
   if (String(page.streamer.id || '').toLowerCase() === 'yuhatty') {
@@ -1844,7 +1849,10 @@ function renderFanPage(page) {
   const gallerySection = renderGallerySection(page);
   view.append(gallerySection);
   const bottomBanner = renderBannerSection(page, 'bottom');
-  if (bottomBanner) view.append(bottomBanner);
+  if (bottomBanner) {
+    view.classList.add('has-bottom-banner');
+    view.append(bottomBanner);
+  }
   if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   if (youtubeSection) view.append(renderYouTubePlayerDialog());

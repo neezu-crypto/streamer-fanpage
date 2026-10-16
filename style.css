@@ -812,6 +812,11 @@
 /* Banner artwork spans the viewport edge to edge while keeping its intrinsic ratio. */
 .fan-banner-section{position:relative;left:50%;width:100vw;max-width:none;margin:18px 0 0 -50vw;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
 .fan-banner-top{margin-top:0;margin-bottom:18px}
+.main-content.has-fanpage-view{display:flex;flex-direction:column}
+.fanpage-view{flex:1}
+.fanpage-view.has-top-banner{padding-top:0}
+.fanpage-view.has-bottom-banner{padding-bottom:0}
+.fan-banner-bottom{margin-top:0}
 .fan-banner-list{display:grid;gap:0}
 .fan-banner-image{display:block;width:100%;height:auto;max-width:none;object-fit:contain}
 .banner-settings-editor{padding:13px;border:1px solid #ffffff16;border-radius:11px;background:#ffffff04}
