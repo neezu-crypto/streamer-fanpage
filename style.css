@@ -325,6 +325,7 @@
 .calendar-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
 .calendar-heading .eyebrow{margin:0 0 5px;font-size:9px}
 .calendar-heading h2{margin:0;font:23px var(--display)}
+.calendar-owner-hint{margin:5px 0 0;color:#9b93a2;font-size:10px;line-height:1.5}
 .calendar-controls{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}
 .calendar-mode-switch{display:flex;padding:3px;border:1px solid #ffffff18;border-radius:10px;background:#111018}
 .calendar-mode-button,.calendar-nav-button,.calendar-today-button,.calendar-refresh-button{min-height:34px;border:1px solid transparent;border-radius:8px;background:transparent;color:#c8c0ce;font:600 11px var(--font)}
