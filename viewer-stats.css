@@ -769,3 +769,25 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
     font-size: 11px;
   }
 }
+
+/* Square off remaining shell controls and the no-search state. */
+.viewer-stats-page .dev-game-link,
+.viewer-stats-shell .auth-button,
+.viewer-recent-item {
+  border-radius: 2px;
+}
+.viewer-empty {
+  border: 1px solid var(--viewer-line);
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 2px 7px #17243a08;
+}
+.viewer-empty>span {
+  color: var(--viewer-blue);
+}
+.viewer-empty strong {
+  color: var(--viewer-ink);
+}
+.viewer-empty p {
+  color: var(--viewer-muted);
+}
