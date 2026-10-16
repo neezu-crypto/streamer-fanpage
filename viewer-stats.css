@@ -782,3 +782,197 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 .viewer-empty p {
   color: var(--viewer-muted);
 }
+
+/* Keep the VOD library first and premium tools compact until opened. */
+.viewer-list-heading {
+  align-items: center;
+  margin-top: 27px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--viewer-blue);
+}
+.viewer-list-heading > div {
+  align-items: baseline;
+  gap: 10px;
+}
+.viewer-list-heading .eyebrow {
+  margin: 0;
+  color: var(--viewer-blue);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+.viewer-list-heading h3 {
+  color: var(--viewer-ink);
+  font-size: 25px;
+}
+.viewer-list-heading > div > span:first-child {
+  color: var(--viewer-muted);
+  font-size: 12px;
+}
+.viewer-collapsible-panel {
+  margin: 8px 0 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--viewer-line) !important;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 1px 4px #17243a08 !important;
+}
+.viewer-collapsible-panel[open] {
+  margin-top: 11px !important;
+}
+.viewer-collapsible-summary {
+  display: flex;
+  min-height: 45px;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 12px;
+  color: var(--viewer-ink);
+  cursor: pointer;
+  list-style: none;
+}
+.viewer-collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+.viewer-collapsible-summary::after {
+  flex: none;
+  color: var(--viewer-blue);
+  content: "+";
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1;
+}
+.viewer-collapsible-panel[open] > .viewer-collapsible-summary::after {
+  content: "−";
+}
+.viewer-collapsible-title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 9px;
+}
+.viewer-collapsible-title .eyebrow {
+  flex: none;
+  margin: 0;
+  color: var(--viewer-blue);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+.viewer-collapsible-title strong {
+  overflow: hidden;
+  color: #40516a;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewer-collapsible-hint {
+  margin-left: auto;
+  color: var(--viewer-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.viewer-collapsible-content {
+  padding: 0 13px 13px;
+  border-top: 1px solid #e6ebf2;
+}
+.viewer-period-heading {
+  min-height: 43px;
+  justify-content: flex-end;
+}
+.viewer-period-heading h3 {
+  margin: 0;
+  color: var(--viewer-ink);
+  font: 700 16px/1.35 'DM Sans', system-ui, -apple-system, 'Segoe UI', 'Gowun Dodum', sans-serif;
+}
+.viewer-period-status {
+  margin-top: 8px;
+}
+.viewer-comparison-count {
+  margin-left: auto;
+  padding: 4px 7px;
+  border-radius: 2px;
+  font-size: 10px;
+}
+.viewer-comparison-intro {
+  margin: 12px 0 0;
+  color: var(--viewer-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.viewer-collapsible-content .viewer-comparison-controls {
+  margin-top: 12px;
+}
+@media(max-width:620px) {
+  .viewer-list-heading {
+    align-items: flex-start;
+    margin-top: 22px;
+    padding-bottom: 10px;
+  }
+  .viewer-list-heading > div {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+  .viewer-list-heading .eyebrow {
+    width: 100%;
+  }
+  .viewer-list-heading h3 {
+    font-size: 21px;
+  }
+  .viewer-list-heading > div > span:first-child {
+    font-size: 11px;
+  }
+  .viewer-collapsible-summary {
+    min-height: 44px;
+    gap: 7px;
+    padding: 6px 9px;
+  }
+  .viewer-collapsible-title {
+    gap: 6px;
+  }
+  .viewer-collapsible-title .eyebrow {
+    font-size: 7px;
+  }
+  .viewer-collapsible-title strong {
+    font-size: 12px;
+  }
+  .viewer-collapsible-hint {
+    font-size: 9px;
+  }
+  .viewer-collapsible-content {
+    padding: 0 9px 10px;
+  }
+  .viewer-period-heading {
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+  }
+  .viewer-period-heading h3 {
+    font-size: 14px;
+  }
+  .viewer-period-heading .button {
+    min-height: 38px;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .viewer-comparison-intro {
+    font-size: 11px;
+  }
+}
+@media(max-width:380px) {
+  .viewer-collapsible-summary {
+    gap: 5px;
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+  .viewer-collapsible-title {
+    gap: 5px;
+  }
+  .viewer-collapsible-title .eyebrow {
+    display: none;
+  }
+  .viewer-collapsible-hint {
+    font-size: 8px;
+  }
+}
