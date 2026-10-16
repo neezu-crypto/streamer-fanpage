@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-queue">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261016-compare">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261016-subscription">
 </head>
 <body class="viewer-stats-page">
   <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
@@ -171,12 +171,19 @@
       <div id="viewerSubscriptionPurchaseInfo">
         <p class="viewer-subscription-dialog-intro">구독 권한은 현재 로그인한 개인 계정에 적용되며, 모든 스트리머에 사용할 수 있어요. 별풍선 10개 후원 1회당 30일 이용권이 부여되고, 남은 기간이 있으면 이어서 연장됩니다. 무료 체험과 자동 갱신은 없습니다.</p>
         <ol class="viewer-subscription-steps">
-          <li><strong>2단계 · 별풍선 후원</strong> <a href="https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&amp;szWork=BJ_STATION&amp;sys_type=web&amp;location=station" target="_blank" rel="noopener noreferrer">운영자 방송국에 10개 후원 ↗</a></li>
-          <li><strong>3단계 · 신청</strong> 후원에 사용한 SOOP 닉네임을 입력하고 신청해 주세요.</li>
-          <li><strong>4단계 · 승인</strong> 운영자가 방송에서 직접 확인한 뒤 구독을 승인합니다.</li>
+          <li><strong>1단계 · 후원자 정보</strong> 후원할 SOOP 계정의 닉네임과 방송국 아이디를 입력해 주세요.</li>
+          <li><strong>2단계 · 신청 등록</strong> 먼저 신청을 등록한 뒤 운영자 방송국에 별풍선 10개를 후원해 주세요.</li>
+          <li><strong>3단계 · 자동 확인</strong> 후원 후 돌아와 완료를 누르면 관리자 SOOP 알림과 대조해, 한 신청만 조건에 맞을 때 자동 승인합니다.</li>
         </ol>
         <label for="viewerSubscriptionNickname">후원자 SOOP 닉네임</label>
         <input id="viewerSubscriptionNickname" name="nickname" maxlength="20" autocomplete="nickname" placeholder="별풍선을 보낸 닉네임" required>
+        <label for="viewerSubscriptionSoopId">후원자 SOOP 아이디</label>
+        <input id="viewerSubscriptionSoopId" name="donorSoopId" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" pattern="[A-Za-z0-9]{2,20}" title="SOOP 방송국 주소의 아이디를 입력해 주세요." placeholder="SOOP 방송국 주소의 아이디" required>
+      </div>
+      <div class="viewer-subscription-donation-step hidden" id="viewerSubscriptionDonationStep">
+        <p id="viewerSubscriptionDonationHelp">신청에 입력한 SOOP 계정으로 별풍선 10개를 후원한 뒤 자동 확인을 시작해 주세요.</p>
+        <a class="button button-primary" id="viewerSubscriptionDonationLink" href="https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&amp;szWork=BJ_STATION&amp;sys_type=web&amp;location=station" target="_blank" rel="noopener noreferrer">운영자 방송국에 10개 후원 ↗</a>
+        <button class="button" id="viewerSubscriptionDonationComplete" type="button">후원 완료 · 자동 확인 시작</button>
       </div>
       <p class="viewer-subscription-dialog-status" id="viewerSubscriptionDialogStatus" role="status" aria-live="polite"></p>
       <div class="viewer-subscription-dialog-actions">
@@ -194,6 +201,6 @@
       </div>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261016-compare"></script>
+  <script type="module" src="viewer-stats.js?v=20261016-subscription"></script>
 </body>
 </html>
