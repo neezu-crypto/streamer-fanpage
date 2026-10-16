@@ -68,6 +68,8 @@ let liveStatusTimer = 0;
 let stockPriceUnsubscribe = null;
 let stockPriceSparklineRequest = 0;
 let verifiedStreamerUid = '';
+let verifiedStreamerProfile = null;
+let verifiedStreamerProfileUid = '';
 let isAdminUser = false;
 let adminStatsLoading = false;
 let adminStatsData = null;
@@ -150,13 +152,36 @@ function renderAuthControls() {
 function updateDesignFeedbackEligibility() {
   const submit = $('submitDesignFeedback');
   if (!submit) return;
-  const verified = !!(auth.currentUser && verifiedStreamerUid === auth.currentUser.uid);
-  submit.disabled = !verified;
+  const user = auth.currentUser;
+  const verified = !!(user && verifiedStreamerUid === user.uid);
+  const profile = verified && verifiedStreamerProfileUid === user.uid ? verifiedStreamerProfile : null;
+  const eligible = verified && !!profile;
+  submit.disabled = !eligible;
+  const profileCard = $('designFeedbackSenderProfile');
+  profileCard.classList.toggle('hidden', !eligible);
+  if (eligible) {
+    const avatar = $('designFeedbackSenderAvatar');
+    const avatarUrl = String(profile.avatarUrl || '');
+    if (avatar.dataset.profileUrl !== avatarUrl) {
+      avatar.dataset.profileUrl = avatarUrl;
+      avatar.classList.remove('avatar-fallback');
+      setImage(avatar, avatarUrl, profile.nickname || profile.soopId || '스트리머');
+    }
+    $('designFeedbackSenderName').textContent = profile.nickname || '이름 없음';
+    $('designFeedbackSenderSoopId').textContent = `@${profile.soopId || profile.id || ''}`;
+  }
   const status = $('designFeedbackStatus');
-  if (status && !verified && $('designFeedbackDialog').open) {
-    status.textContent = '스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요.';
-  } else if (status && verified && status.textContent === '스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요.') {
-    status.textContent = '';
+  if (status && $('designFeedbackDialog').open) {
+    if (!verified) {
+      status.textContent = '스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요.';
+    } else if (!profile) {
+      status.textContent = '인증 프로필을 불러오고 있어요. 잠시 후 다시 시도해 주세요.';
+    } else if (
+      status.textContent === '스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요.'
+      || status.textContent === '인증 프로필을 불러오고 있어요. 잠시 후 다시 시도해 주세요.'
+    ) {
+      status.textContent = '';
+    }
   }
 }
 
@@ -197,6 +222,8 @@ onAuthStateChanged(auth, (user) => {
   if (verifiedStatusUnsubscribe) { verifiedStatusUnsubscribe(); verifiedStatusUnsubscribe = null; }
   if (switchApprovalUnsubscribe) { switchApprovalUnsubscribe(); switchApprovalUnsubscribe = null; }
   verifiedStreamerUid = '';
+  verifiedStreamerProfile = null;
+  verifiedStreamerProfileUid = '';
   switchHandoffInProgress = false;
   renderAuthControls();
   if (!user) return;
@@ -207,6 +234,10 @@ onAuthStateChanged(auth, (user) => {
     if (auth.currentUser?.uid !== user.uid) return;
     const verified = snapshot.val() === true;
     verifiedStreamerUid = verified ? user.uid : '';
+    if (!verified) {
+      verifiedStreamerProfile = null;
+      verifiedStreamerProfileUid = '';
+    }
     renderAuthControls();
     if (vodCommentState) renderVodCommentsContents();
     if (hasInitialVerifiedValue && previousVerifiedValue !== verified) {
@@ -3973,6 +4004,8 @@ async function loadApp() {
     }
     isAdminUser = result.isAdmin === true;
     verifiedStreamerUid = result.verifiedStreamer ? auth.currentUser.uid : '';
+    verifiedStreamerProfile = result.verifiedStreamer || null;
+    verifiedStreamerProfileUid = result.verifiedStreamer ? auth.currentUser.uid : '';
     renderAuthControls();
     if (requestedId && !result.page) {
       throw Object.assign(new Error('팬페이지를 찾을 수 없습니다.'), { code: 'not-found' });
@@ -4069,8 +4102,16 @@ $('designFeedbackForm').addEventListener('submit', async (event) => {
   if (!form.reportValidity()) return;
   const submit = $('submitDesignFeedback');
   const status = $('designFeedbackStatus');
-  if (!auth.currentUser || verifiedStreamerUid !== auth.currentUser.uid) {
-    status.textContent = '스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요.';
+  const profileReady = !!(
+    auth.currentUser
+    && verifiedStreamerUid === auth.currentUser.uid
+    && verifiedStreamerProfileUid === auth.currentUser.uid
+    && verifiedStreamerProfile
+  );
+  if (!profileReady) {
+    status.textContent = auth.currentUser && verifiedStreamerUid === auth.currentUser.uid
+      ? '인증 프로필을 불러오고 있어요. 잠시 후 다시 시도해 주세요.'
+      : '스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요.';
     return;
   }
   submit.disabled = true;
@@ -4095,7 +4136,7 @@ $('designFeedbackForm').addEventListener('submit', async (event) => {
     status.classList.add('is-error');
     status.textContent = error.message || '건의를 접수하지 못했어요. 잠시 후 다시 시도해 주세요.';
   } finally {
-    submit.disabled = !(auth.currentUser && verifiedStreamerUid === auth.currentUser.uid);
+    updateDesignFeedbackEligibility();
   }
 });
 $('adminDesignFeedbackList').addEventListener('click', async (event) => {
