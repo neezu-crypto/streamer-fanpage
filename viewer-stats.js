@@ -93,6 +93,7 @@ async function loadDevbarLinks() {
 
 const MAX_CONCURRENT_STATS_REQUESTS = 3;
 const MAX_PERIOD_SCAN_PAGES = 200;
+const VIEWER_VOD_PAGE_SIZE = 60;
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
 const MAX_RECENT_STREAMERS = 3;
 const RECENT_STREAMERS_STORAGE_KEY = 'streamerFanPage.viewerStats.recentStreamers.v1';
@@ -117,14 +118,16 @@ let statsQueue = [];
 let statsObserver = null;
 let periodScanToken = 0;
 let vodPagesByNumber = new Map();
+let vodPagesStreamerId = '';
 let subscriptionRefreshToken = 0;
 let subscriptionRefreshTimer = 0;
-let comparisonSelection = [];
+let comparisonSelection = [null, null];
+let comparisonSearchRequestSequence = [0, 0];
 let pendingComparisonRequest = null;
 let comparisonRequestSequence = 0;
 let comparisonRunning = false;
 let comparisonGateWaiting = false;
-let comparisonStatusMessage = '스트리머를 검색한 뒤 각 다시보기 카드에서 ‘비교에 담기’를 선택해 주세요.';
+let comparisonStatusMessage = '스트리머 2명과 날짜를 선택해 주세요.';
 let comparisonStatusIsError = false;
 let subscriptionState = {
   loaded: false,
@@ -349,9 +352,9 @@ async function refreshSubscriptionStatus({ resumeComparison = true } = {}) {
       comparisonGateWaiting = true;
       setComparisonStatus(subscriptionState.accountProtected
         ? subscriptionState.pending
-          ? '구독 신청 승인 대기 중이에요. 승인되면 선택한 두 다시보기의 결과가 자동으로 열립니다.'
+          ? '구독 신청 승인 대기 중이에요. 승인되면 선택한 스트리머와 날짜의 비교 결과가 자동으로 열립니다.'
           : '로그인이 확인됐어요. 별풍선 10개 구독을 신청하면 승인 후 비교 결과가 자동으로 열립니다.'
-        : '선택한 두 다시보기는 유지돼요. 새 탭에서 로그인한 뒤 이 화면으로 돌아와 주세요.');
+        : '선택한 스트리머와 날짜는 유지돼요. 새 탭에서 로그인한 뒤 이 화면으로 돌아와 주세요.');
       renderComparisonSelection();
     }
     if ($('viewerSubscriptionDialog').open) renderSubscriptionDialogStatus();
@@ -412,7 +415,7 @@ function renderSubscriptionDialogStatus(message = '') {
       status.textContent = '이전 방식으로 접수된 신청입니다. 관리자가 후원 내역을 수동 확인하며, 자동 확인을 원하면 신청을 취소하고 다시 등록해 주세요.';
     } else if (donationCompleted) {
       status.textContent = comparisonContext
-        ? '후원 알림 자동 확인 중이에요. 일치하면 두 다시보기의 비교 결과가 자동으로 열립니다.'
+        ? '후원 알림 자동 확인 중이에요. 일치하면 선택한 날짜의 비교 결과가 자동으로 열립니다.'
         : '후원 알림을 자동 대조하고 있어요. 확인되면 이 계정에 30일 이용권이 적용됩니다.';
     } else {
       status.textContent = '신청이 등록됐어요. 운영자 방송국에 10개 후원한 뒤 ‘후원 완료 · 자동 확인 시작’을 눌러 주세요.';
@@ -451,87 +454,78 @@ function setComparisonStatus(message, isError = false) {
   status.classList.toggle('is-error', isError);
 }
 
-function selectedComparisonItem(streamer, vod) {
-  return {
-    streamerId: String(streamer.soopId || '').trim().toLowerCase(),
-    streamerName: String(streamer.nickname || streamer.soopId || '').trim(),
-    vod: {
-      id: String(vod.id || ''),
-      title: String(vod.title || '제목 없음'),
-      regDate: String(vod.regDate || ''),
-      readCount: Math.max(0, Number(vod.readCount) || 0),
-      durationMs: Math.max(0, Number(vod.durationMs) || 0),
-    },
-  };
+function comparisonSelectionKey() {
+  return comparisonSelection.map((streamer) => String(streamer && streamer.soopId || '').toLowerCase()).join('|')
+    + ':' + String($('viewerComparisonDate').value || '');
 }
 
-function comparisonItemKey(item) {
-  return item.streamerId + ':' + item.vod.id;
+function setComparisonPickerStatus(index, message, isError = false) {
+  const status = $('viewerComparisonPickerStatus' + index);
+  status.textContent = message;
+  status.classList.toggle('is-error', isError);
 }
 
-function updateComparisonCardButtons() {
-  $('viewerVodGrid').querySelectorAll('.viewer-vod-card').forEach((card) => {
-    const button = card._compareButton;
-    const item = card._compareItem;
-    if (!button || !item) return;
-    const key = comparisonItemKey(item);
-    const selected = comparisonSelection.some((entry) => comparisonItemKey(entry) === key);
-    const selectedDate = comparisonSelection[0] ? vodCalendarDate(comparisonSelection[0].vod.regDate) : '';
-    const itemDate = vodCalendarDate(item.vod.regDate);
-    const dateMismatch = comparisonSelection.length === 1 && itemDate && selectedDate && itemDate !== selectedDate;
-    const sameStreamer = comparisonSelection.length === 1 && item.streamerId === comparisonSelection[0].streamerId;
-    const full = comparisonSelection.length >= 2 && !selected;
-    button.disabled = !selected && (!itemDate || dateMismatch || sameStreamer || full);
-    button.classList.toggle('is-selected', selected);
-    button.setAttribute('aria-pressed', String(selected));
-    if (selected) button.textContent = '비교에서 빼기';
-    else if (!itemDate) button.textContent = '날짜 확인 불가';
-    else if (dateMismatch) button.textContent = '같은 날짜만 선택 가능';
-    else if (sameStreamer) button.textContent = '다른 스트리머를 선택해 주세요';
-    else if (full) button.textContent = '최대 2개 선택';
-    else button.textContent = '비교에 담기';
-    button.title = dateMismatch
-      ? '선택한 날짜 ' + formatVodDate(comparisonSelection[0].vod.regDate) + '의 다시보기만 비교할 수 있어요.'
-      : sameStreamer
-        ? '서로 다른 스트리머의 다시보기 두 개를 비교해요.'
-        : '';
+function renderComparisonSearchResults(index, streamers) {
+  const results = $('viewerComparisonSearchResults' + index);
+  results.replaceChildren();
+  streamers.forEach((streamer, streamerIndex) => {
+    const button = document.createElement('button');
+    button.className = 'viewer-comparison-search-result';
+    button.type = 'button';
+    button.setAttribute('role', 'option');
+    button.dataset.comparisonSlot = String(index);
+    button.dataset.comparisonStreamerIndex = String(streamerIndex);
+    const avatar = document.createElement('img');
+    avatar.alt = '';
+    avatar.loading = 'lazy';
+    avatar.src = streamer.avatarUrl || '';
+    avatar.addEventListener('error', () => { avatar.hidden = true; }, { once: true });
+    const copy = document.createElement('span');
+    copy.className = 'viewer-comparison-search-copy';
+    const name = document.createElement('strong');
+    name.textContent = streamer.nickname || streamer.soopId;
+    const id = document.createElement('span');
+    id.textContent = 'SOOP ID · ' + streamer.soopId;
+    copy.append(name, id);
+    const select = document.createElement('span');
+    select.className = 'viewer-comparison-search-select';
+    select.textContent = '선택';
+    button.append(avatar, copy, select);
+    results.append(button);
   });
+  results._streamers = streamers;
 }
 
 function renderComparisonSelection() {
-  const container = $('viewerComparisonSelection');
-  container.replaceChildren();
-  for (let index = 0; index < 2; index += 1) {
-    const item = comparisonSelection[index];
-    const slot = document.createElement('div');
-    slot.className = 'viewer-comparison-slot' + (item ? '' : ' is-empty');
-    const number = document.createElement('span');
-    number.className = 'viewer-comparison-slot-number';
-    number.textContent = String(index + 1);
+  comparisonSelection.forEach((streamer, index) => {
+    const selected = $('viewerComparisonSelected' + index);
+    selected.replaceChildren();
+    selected.classList.toggle('hidden', !streamer);
+    if (!streamer) return;
+    const avatar = document.createElement('img');
+    avatar.alt = '';
+    avatar.src = streamer.avatarUrl || '';
+    avatar.addEventListener('error', () => { avatar.hidden = true; }, { once: true });
     const copy = document.createElement('span');
-    copy.className = 'viewer-comparison-slot-copy';
-    const title = document.createElement('strong');
-    title.textContent = item ? item.streamerName + ' · ' + (item.vod.title || '제목 없음') : '다시보기 선택 대기';
-    const meta = document.createElement('span');
-    meta.textContent = item
-      ? formatVodDate(item.vod.regDate) + ' · 조회 ' + item.vod.readCount.toLocaleString('ko-KR')
-      : '방송 날짜가 같은 VOD만 담을 수 있어요.';
-    copy.append(title, meta);
-    slot.append(number, copy);
-    if (item) {
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'viewer-comparison-remove';
-      remove.dataset.comparisonIndex = String(index);
-      remove.setAttribute('aria-label', (index + 1) + '번 비교 다시보기 빼기');
-      remove.textContent = '×';
-      slot.append(remove);
-    }
-    container.append(slot);
-  }
-  $('viewerComparisonCount').textContent = comparisonSelection.length + ' / 2 선택';
-  $('viewerComparisonClear').disabled = comparisonSelection.length === 0 || comparisonRunning;
-  $('viewerComparisonRun').disabled = comparisonSelection.length !== 2 || comparisonRunning || comparisonGateWaiting;
+    copy.className = 'viewer-comparison-selected-copy';
+    const name = document.createElement('strong');
+    name.textContent = streamer.nickname || streamer.soopId;
+    const id = document.createElement('span');
+    id.textContent = 'SOOP ID · ' + streamer.soopId;
+    copy.append(name, id);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'viewer-comparison-remove';
+    remove.dataset.comparisonRemove = String(index);
+    remove.setAttribute('aria-label', (index + 1) + '번 스트리머 선택 변경');
+    remove.textContent = '변경';
+    selected.append(avatar, copy, remove);
+  });
+  const selectedCount = comparisonSelection.filter(Boolean).length;
+  const hasDate = Boolean($('viewerComparisonDate').value);
+  $('viewerComparisonCount').textContent = selectedCount + ' / 2명 선택';
+  $('viewerComparisonClear').disabled = (selectedCount === 0 && !hasDate) || comparisonRunning;
+  $('viewerComparisonRun').disabled = selectedCount !== 2 || !hasDate || comparisonRunning || comparisonGateWaiting;
   $('viewerComparisonRun').textContent = comparisonRunning
     ? '비교 결과 불러오는 중…'
     : comparisonGateWaiting
@@ -539,7 +533,6 @@ function renderComparisonSelection() {
       : '비교 결과 확인';
   $('viewerComparisonStatus').textContent = comparisonStatusMessage;
   $('viewerComparisonStatus').classList.toggle('is-error', comparisonStatusIsError);
-  updateComparisonCardButtons();
 }
 
 function invalidateComparisonResult() {
@@ -551,45 +544,86 @@ function invalidateComparisonResult() {
   $('viewerComparisonResults').classList.add('hidden');
 }
 
-function toggleComparisonVod(streamer, vod) {
-  const item = selectedComparisonItem(streamer, vod);
-  const key = comparisonItemKey(item);
-  const selectedIndex = comparisonSelection.findIndex((entry) => comparisonItemKey(entry) === key);
-  if (selectedIndex >= 0) {
-    comparisonSelection.splice(selectedIndex, 1);
-    invalidateComparisonResult();
-    setComparisonStatus(comparisonSelection.length
-      ? '다시보기 한 개가 선택되어 있어요. 같은 날짜의 다른 스트리머 VOD를 담아 주세요.'
-      : '스트리머를 검색한 뒤 각 다시보기 카드에서 ‘비교에 담기’를 선택해 주세요.');
-    renderComparisonSelection();
+function selectComparisonStreamer(index, streamer) {
+  const soopId = String(streamer && streamer.soopId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(soopId)) {
+    setComparisonPickerStatus(index, 'SOOP ID를 확인하지 못했어요. 다른 검색어를 입력해 주세요.', true);
     return;
   }
-  if (comparisonSelection.length >= 2) return;
-  const itemDate = vodCalendarDate(item.vod.regDate);
-  if (!itemDate) {
-    setComparisonStatus('이 다시보기의 방송 날짜를 확인할 수 없어 비교에 담지 못했어요.', true);
-    renderComparisonSelection();
+  const other = comparisonSelection[index === 0 ? 1 : 0];
+  if (other && String(other.soopId).toLowerCase() === soopId) {
+    setComparisonPickerStatus(index, '같은 스트리머는 두 번 선택할 수 없어요.', true);
     return;
   }
-  if (comparisonSelection.length === 1) {
-    const selectedDate = vodCalendarDate(comparisonSelection[0].vod.regDate);
-    if (item.streamerId === comparisonSelection[0].streamerId) {
-      setComparisonStatus('두 번째는 다른 스트리머의 다시보기를 선택해 주세요.', true);
-      renderComparisonSelection();
-      return;
-    }
-    if (itemDate !== selectedDate) {
-      setComparisonStatus('선택한 날짜는 ' + formatVodDate(comparisonSelection[0].vod.regDate) + '예요. 같은 날짜의 다시보기를 골라 주세요.', true);
-      renderComparisonSelection();
-      return;
-    }
-  }
-  comparisonSelection.push(item);
+  comparisonSelection[index] = { ...streamer, soopId };
+  $('viewerComparisonSearch' + index).value = '';
+  $('viewerComparisonSearchResults' + index).replaceChildren();
+  $('viewerComparisonSearchResults' + index)._streamers = [];
+  saveRecentStreamer(streamer);
   invalidateComparisonResult();
-  setComparisonStatus(comparisonSelection.length === 2
-    ? '같은 날짜의 다시보기 두 개를 담았어요. 결과 확인을 누르면 로그인·구독 상태를 확인합니다.'
-    : formatVodDate(item.vod.regDate) + ' 다시보기를 담았어요. 다른 스트리머의 같은 날짜 VOD를 하나 더 선택해 주세요.');
+  setComparisonPickerStatus(index, '선택됐어요.');
+  setComparisonStatus(comparisonSelection.every(Boolean) && $('viewerComparisonDate').value
+    ? '비교할 준비가 됐어요. 선택한 날짜의 다시보기를 자동으로 찾아요.'
+    : '스트리머 2명과 날짜를 선택해 주세요.');
   renderComparisonSelection();
+}
+
+function clearComparisonStreamer(index) {
+  comparisonSearchRequestSequence[index] += 1;
+  comparisonSelection[index] = null;
+  $('viewerComparisonSearchResults' + index).replaceChildren();
+  $('viewerComparisonSearchResults' + index)._streamers = [];
+  invalidateComparisonResult();
+  setComparisonPickerStatus(index, '닉네임이나 SOOP ID를 검색하세요.');
+  setComparisonStatus('스트리머 2명과 날짜를 선택해 주세요.');
+  renderComparisonSelection();
+}
+
+async function searchComparisonStreamer(index, query) {
+  const cleanQuery = String(query || '').trim();
+  if (!cleanQuery) {
+    setComparisonPickerStatus(index, '닉네임, SOOP 아이디 또는 방송국 주소를 입력해 주세요.', true);
+    return;
+  }
+  const requestId = ++comparisonSearchRequestSequence[index];
+  const button = $('viewerComparisonSearchButton' + index);
+  const idFromInput = parseSoopId(cleanQuery);
+  const searchQuery = idFromInput || cleanQuery;
+  button.disabled = true;
+  setComparisonPickerStatus(index, '스트리머를 찾고 있어요…');
+  renderComparisonSearchResults(index, []);
+  try {
+    await getAuthReady();
+    const response = await callViewerStats({ action: 'search', query: searchQuery });
+    if (requestId !== comparisonSearchRequestSequence[index]) return;
+    const candidates = Array.isArray(response.data && response.data.streamers) ? response.data.streamers.slice() : [];
+    const isStationUrl = /^https?:\/\//i.test(cleanQuery) && Boolean(idFromInput);
+    if (idFromInput && !candidates.some((item) => String(item.soopId).toLowerCase() === idFromInput)
+      && (isStationUrl || candidates.length === 0)) {
+      candidates.unshift(streamerForId(idFromInput));
+    }
+    const normalizedQuery = searchQuery.toLocaleLowerCase();
+    const exactMatches = candidates.filter((item) => String(item.soopId).toLocaleLowerCase() === normalizedQuery
+      || String(item.nickname).toLocaleLowerCase() === normalizedQuery);
+    if (exactMatches.length === 1) {
+      selectComparisonStreamer(index, exactMatches[0]);
+      return;
+    }
+    if (candidates.length === 1) {
+      selectComparisonStreamer(index, candidates[0]);
+      return;
+    }
+    renderComparisonSearchResults(index, candidates);
+    setComparisonPickerStatus(index, candidates.length
+      ? '검색 결과 ' + candidates.length.toLocaleString('ko-KR') + '명 · 비교할 스트리머를 선택해 주세요.'
+      : '검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.', !candidates.length);
+  } catch (error) {
+    if (requestId === comparisonSearchRequestSequence[index]) {
+      setComparisonPickerStatus(index, viewerStatsErrorMessage(error, '스트리머 검색에 실패했어요.'), true);
+    }
+  } finally {
+    if (requestId === comparisonSearchRequestSequence[index]) button.disabled = false;
+  }
 }
 
 function parseVodTimestamp(value) {
@@ -788,21 +822,12 @@ function createVodCard(vod, loadToken) {
   loading.className = 'viewer-stat-state';
   loading.textContent = '그래프를 불러오고 있어요.';
   statsActions.append(loading);
-  const streamer = selectedStreamer;
-  const compareItem = streamer ? selectedComparisonItem(streamer, vod) : null;
-  const compareButton = document.createElement('button');
-  compareButton.type = 'button';
-  compareButton.className = 'viewer-vod-compare-toggle';
-  compareButton.addEventListener('click', () => toggleComparisonVod(streamer, vod));
-  card.append(open, mainAction, compareButton, statsActions);
+  card.append(open, mainAction, statsActions);
   card._vod = vod;
   card._loadToken = loadToken;
   card._openLink = open;
   card._mainAction = mainAction;
   card._statsActions = statsActions;
-  card._compareItem = compareItem;
-  card._compareButton = compareButton;
-  updateComparisonCardButtons();
   return card;
 }
 
@@ -1041,7 +1066,8 @@ function isCurrentComparisonRequest(request) {
   return !!request
     && request.id === comparisonRequestSequence
     && comparisonSelection.length === 2
-    && comparisonSelection.map(comparisonItemKey).join('|') === request.selectionKey;
+    && comparisonSelection.every(Boolean)
+    && request.selectionKey === comparisonSelectionKey();
 }
 
 function comparisonMetric(label, value, isPeak = false) {
@@ -1055,20 +1081,164 @@ function comparisonMetric(label, value, isPeak = false) {
   return metric;
 }
 
-function renderComparisonResults(request, statsList) {
+async function findComparisonVodsOnDate(streamer, date, request, index) {
+  const streamerId = String(streamer.soopId || '').trim().toLowerCase();
+  const pageCache = new Map();
+  const getPage = async (page) => {
+    if (pageCache.has(page)) return pageCache.get(page);
+    if (streamerId === vodPagesStreamerId && vodPagesByNumber.has(page)) {
+      const cached = vodPagesByNumber.get(page);
+      const normalized = { vods: cached.vods, total: cached.total, hasMore: cached.hasMore };
+      pageCache.set(page, normalized);
+      return normalized;
+    }
+    if (!isCurrentComparisonRequest(request)) return null;
+    const response = await callViewerStats({ action: 'vods', streamerId, page });
+    if (!isCurrentComparisonRequest(request)) return null;
+    const payload = response.data || {};
+    const pageData = {
+      vods: Array.isArray(payload.vods) ? payload.vods : [],
+      total: Math.max(0, Number(payload.total) || 0),
+      hasMore: payload.hasMore === true,
+    };
+    pageCache.set(page, pageData);
+    return pageData;
+  };
+  const dateRange = (vods) => {
+    const dates = vods.map((vod) => vodCalendarDate(vod && vod.regDate)).filter(Boolean).sort();
+    return dates.length ? { oldest: dates[0], newest: dates[dates.length - 1] } : { oldest: '', newest: '' };
+  };
+  const firstPage = await getPage(1);
+  if (!firstPage || !isCurrentComparisonRequest(request)) return null;
+  if (!firstPage.total || !firstPage.vods.length) return [];
+  const pageCount = Math.ceil(firstPage.total / VIEWER_VOD_PAGE_SIZE);
+  const searchablePageCount = Math.min(MAX_PERIOD_SCAN_PAGES, pageCount);
+  let low = 1;
+  let high = searchablePageCount;
+  let targetPage = 0;
+
+  while (low <= high) {
+    if (!isCurrentComparisonRequest(request)) return null;
+    const page = Math.floor((low + high) / 2);
+    setComparisonPickerStatus(index, (streamer.nickname || streamerId) + ' · 날짜가 같은 다시보기 찾는 중… ' + page + '페이지');
+    const pageData = await getPage(page);
+    if (!pageData || !isCurrentComparisonRequest(request)) return null;
+    const range = dateRange(pageData.vods);
+    if (!range.oldest || !range.newest) {
+      targetPage = page;
+      break;
+    }
+    if (date > range.newest) {
+      high = page - 1;
+    } else if (date < range.oldest) {
+      low = page + 1;
+    } else {
+      targetPage = page;
+      break;
+    }
+  }
+
+  if (!targetPage) {
+    if (pageCount > searchablePageCount && low > searchablePageCount) {
+      throw new Error((streamer.nickname || streamerId) + '의 다시보기가 너무 많아 최근 12,000개까지만 날짜를 찾을 수 있어요.');
+    }
+    return [];
+  }
+
+  const matches = [];
+  const seen = new Set();
+  const addMatches = (pageData) => {
+    pageData.vods.forEach((vod) => {
+      const vodId = String(vod && vod.id || '');
+      if (vodCalendarDate(vod && vod.regDate) === date && /^\d{1,20}$/.test(vodId) && !seen.has(vodId)) {
+        seen.add(vodId);
+        matches.push(vod);
+      }
+    });
+  };
+  const centerPage = await getPage(targetPage);
+  if (!centerPage || !isCurrentComparisonRequest(request)) return null;
+  addMatches(centerPage);
+
+  for (let page = targetPage - 1; page >= 1; page -= 1) {
+    if (!isCurrentComparisonRequest(request)) return null;
+    const pageData = await getPage(page);
+    if (!pageData || !isCurrentComparisonRequest(request)) return null;
+    const range = dateRange(pageData.vods);
+    if (!range.oldest || range.oldest > date) break;
+    addMatches(pageData);
+    if (range.newest > date) break;
+  }
+  for (let page = targetPage + 1; page <= searchablePageCount; page += 1) {
+    if (!isCurrentComparisonRequest(request)) return null;
+    const pageData = await getPage(page);
+    if (!pageData || !isCurrentComparisonRequest(request)) return null;
+    const range = dateRange(pageData.vods);
+    if (!range.newest || range.newest < date) break;
+    addMatches(pageData);
+    if (range.newest > date) break;
+  }
+  return matches;
+}
+
+async function analyzeComparisonStreamer(streamer, vods, request, index) {
+  if (!vods.length) {
+    throw new Error((streamer.nickname || streamer.soopId) + '의 ' + formatVodDate(request.date) + ' 다시보기를 찾지 못했어요.');
+  }
+  let cursor = 0;
+  let completed = 0;
+  let best = null;
+  let failure = null;
+  const worker = async () => {
+    while (isCurrentComparisonRequest(request) && !failure && cursor < vods.length) {
+      const vod = vods[cursor++];
+      try {
+        const stats = await loadVodStats(
+          vod,
+          streamer.soopId,
+          () => isCurrentComparisonRequest(request),
+          true,
+          () => setComparisonStatus('현재 이용자가 많아 집계 시간이 길어지고 있습니다. 날짜별 다시보기를 계속 확인하고 있어요.'),
+        );
+        if (!isCurrentComparisonRequest(request)) return;
+        const peak = Number(stats.highest && stats.highest.viewers);
+        const second = Number(stats.highest && stats.highest.second);
+        const average = Number(stats.averageViewers);
+        if (!Number.isFinite(peak) || !Number.isFinite(second) || !Number.isFinite(average)) {
+          throw new Error((vod.title || '다시보기') + '의 비교 통계를 확인할 수 없어요.');
+        }
+        if (!best || peak > Number(best.stats.highest.viewers)) best = { vod, stats };
+        completed += 1;
+        setComparisonPickerStatus(index, (streamer.nickname || streamer.soopId) + ' · ' + completed.toLocaleString('ko-KR') + ' / ' + vods.length.toLocaleString('ko-KR') + '개 분석 완료');
+      } catch (error) {
+        if (!isCurrentComparisonRequest(request)) return;
+        failure = error;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT_STATS_REQUESTS, vods.length) }, () => worker()));
+  if (!isCurrentComparisonRequest(request)) return null;
+  if (failure) {
+    throw new Error((streamer.nickname || streamer.soopId) + '의 당일 다시보기 ' + vods.length.toLocaleString('ko-KR') + '개 중 일부 통계를 불러오지 못해 비교를 완료하지 못했어요. ' + (failure.message || '잠시 후 다시 시도해 주세요.'));
+  }
+  if (!best) throw new Error((streamer.nickname || streamer.soopId) + '의 당일 다시보기 통계가 없어요.');
+  return { streamer, vod: best.vod, stats: best.stats, vodCount: vods.length };
+}
+
+function renderComparisonResults(request, comparisons) {
   const results = $('viewerComparisonResults');
   results.replaceChildren();
-  const peaks = statsList.map((stats) => Math.max(0, Number(stats.highest.viewers) || 0));
+  const peaks = comparisons.map((result) => Math.max(0, Number(result.stats.highest.viewers) || 0));
   const maxPeak = Math.max(1, ...peaks);
   const difference = Math.abs(peaks[0] - peaks[1]);
   const summary = document.createElement('div');
   summary.className = 'viewer-comparison-summary';
   const summaryText = document.createElement('span');
   if (peaks[0] === peaks[1]) {
-    summaryText.textContent = '두 다시보기의 최고 시청자 수가 같아요.';
+    summaryText.textContent = '두 스트리머의 당일 최고 시청자 수가 같아요.';
   } else {
-    const leader = peaks[0] > peaks[1] ? request.items[0] : request.items[1];
-    summaryText.textContent = leader.streamerName + ' 다시보기의 고점이 더 높아요.';
+    const leader = comparisons[peaks[0] > peaks[1] ? 0 : 1];
+    summaryText.textContent = leader.streamer.nickname + '의 당일 고점이 더 높아요.';
   }
   const summaryValue = document.createElement('strong');
   summaryValue.textContent = (peaks[0] === peaks[1] ? '' : '+') + difference.toLocaleString('ko-KR') + '명';
@@ -1079,24 +1249,27 @@ function renderComparisonResults(request, statsList) {
   const title = document.createElement('h3');
   title.textContent = '같은 날짜 고점 비교';
   const date = document.createElement('span');
-  date.textContent = formatVodDate(request.items[0].vod.regDate) + ' · 방송 시작/종료 전 5분 제외';
+  date.textContent = formatVodDate(request.date) + ' · 방송 시작/종료 전 5분 제외';
   heading.append(title, date);
 
   const grid = document.createElement('div');
   grid.className = 'viewer-comparison-result-grid';
-  request.items.forEach((item, index) => {
-    const stats = statsList[index];
+  comparisons.forEach((result, index) => {
+    const { streamer, vod, stats, vodCount } = result;
     const peak = peaks[index];
     const average = Math.max(0, Number(stats.averageViewers) || 0);
     const uplift = Math.round(peak - average);
     const upliftRate = average > 0 ? Math.round((uplift / average) * 100) : null;
     const card = document.createElement('article');
     card.className = 'viewer-comparison-result-card';
-    const streamer = document.createElement('h4');
-    streamer.textContent = item.streamerName;
+    const name = document.createElement('h4');
+    name.textContent = streamer.nickname || streamer.soopId;
     const vodTitle = document.createElement('p');
     vodTitle.className = 'viewer-comparison-result-vod';
-    vodTitle.textContent = item.vod.title || '제목 없음';
+    vodTitle.textContent = vod.title || '제목 없음';
+    const vodMeta = document.createElement('p');
+    vodMeta.className = 'viewer-comparison-result-vod-meta';
+    vodMeta.textContent = '당일 다시보기 ' + vodCount.toLocaleString('ko-KR') + '개 중 최고 고점';
     const metrics = document.createElement('div');
     metrics.className = 'viewer-comparison-result-metrics';
     metrics.append(
@@ -1108,17 +1281,17 @@ function renderComparisonResults(request, statsList) {
     const bar = document.createElement('div');
     bar.className = 'viewer-comparison-bar';
     bar.setAttribute('role', 'img');
-    bar.setAttribute('aria-label', '두 다시보기 중 최고 시청자 수 비율 ' + Math.round((peak / maxPeak) * 100) + '%');
+    bar.setAttribute('aria-label', '두 스트리머 중 최고 시청자 수 비율 ' + Math.round((peak / maxPeak) * 100) + '%');
     const fill = document.createElement('span');
     fill.style.setProperty('--comparison-bar', Math.max(3, Math.round((peak / maxPeak) * 100)) + '%');
     bar.append(fill);
     const play = document.createElement('a');
     play.className = 'viewer-comparison-play';
-    play.href = playbackUrl(item.vod.id, stats.highest.second);
+    play.href = playbackUrl(vod.id, stats.highest.second);
     play.target = '_blank';
     play.rel = 'noopener noreferrer';
     play.textContent = '고점 ' + formatClock(stats.highest.second) + ' · ' + peak.toLocaleString('ko-KR') + '명부터 재생 ↗';
-    card.append(streamer, vodTitle, metrics, bar, play);
+    card.append(name, vodTitle, vodMeta, metrics, bar, play);
     grid.append(card);
   });
   results.append(heading, summary, grid);
@@ -1133,7 +1306,7 @@ function showComparisonError(error, request) {
   message.textContent = viewerStatsErrorMessage(error, '비교 통계를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
   results.append(message);
   results.classList.remove('hidden');
-  setComparisonStatus('비교 통계를 모두 불러오지 못했어요. 선택한 다시보기는 유지되어 다시 시도할 수 있습니다.', true);
+  setComparisonStatus('비교 통계를 모두 불러오지 못했어요. 선택한 스트리머와 날짜는 유지되어 다시 시도할 수 있습니다.', true);
   if (request) pendingComparisonRequest = null;
 }
 
@@ -1141,30 +1314,31 @@ async function loadComparisonResults(request) {
   if (!isCurrentComparisonRequest(request)) return;
   comparisonRunning = true;
   comparisonGateWaiting = false;
-  setComparisonStatus('선택한 두 다시보기의 프리미엄 통계를 불러오고 있어요. 혼잡하면 집계 시간이 길어질 수 있습니다.');
+  setComparisonStatus('선택한 날짜의 두 스트리머 다시보기와 프리미엄 통계를 확인하고 있어요. 혼잡하면 집계 시간이 길어질 수 있습니다.');
   renderComparisonSelection();
   if ($('viewerSubscriptionDialog').open) $('viewerSubscriptionDialog').close();
   const results = $('viewerComparisonResults');
   results.replaceChildren();
   const loading = document.createElement('p');
   loading.className = 'viewer-comparison-status';
-  loading.textContent = '두 영상의 최고 순간과 평균 시청자를 확인하는 중…';
+  loading.textContent = '날짜가 같은 다시보기를 찾고 최고 순간과 평균 시청자를 확인하는 중…';
   results.append(loading);
   results.classList.remove('hidden');
   try {
-    const statsList = await Promise.all(request.items.map((item) => loadVodStats(
-      item.vod,
-      item.streamerId,
-      () => isCurrentComparisonRequest(request),
-      true,
-    )));
+    const vodLists = await Promise.all(request.streamers.map((streamer, index) => findComparisonVodsOnDate(streamer, request.date, request, index)));
     if (!isCurrentComparisonRequest(request)) return;
-    if (statsList.some((stats) => !Number.isFinite(Number(stats.averageViewers)))) {
-      throw new Error('비교용 평균 시청자 통계를 확인할 수 없어요. 다시 시도해 주세요.');
+    if (vodLists.some((vods) => !vods || !vods.length)) {
+      const emptyIndex = vodLists.findIndex((vods) => !vods || !vods.length);
+      const streamer = request.streamers[emptyIndex];
+      throw new Error((streamer.nickname || streamer.soopId) + '의 ' + formatVodDate(request.date) + ' 다시보기를 찾지 못했어요.');
     }
-    renderComparisonResults(request, statsList);
+    setComparisonStatus('날짜별 다시보기를 찾았어요. 각 스트리머의 당일 최고 고점을 비교합니다.');
+    const comparisons = await Promise.all(request.streamers.map((streamer, index) =>
+      analyzeComparisonStreamer(streamer, vodLists[index], request, index)));
+    if (!isCurrentComparisonRequest(request)) return;
+    renderComparisonResults(request, comparisons);
     pendingComparisonRequest = null;
-    setComparisonStatus('비교 결과를 불러왔어요. 최고 시청자 수와 평균 대비 상승폭을 확인할 수 있습니다.');
+    setComparisonStatus('비교 결과를 불러왔어요. 각 스트리머의 당일 최고 시청자 수와 평균 대비 상승폭을 확인할 수 있습니다.');
   } catch (error) {
     if (!isCurrentComparisonRequest(request)) return;
     if (error && error.code === 'functions/permission-denied') {
@@ -1174,7 +1348,7 @@ async function loadComparisonResults(request) {
       await refreshSubscriptionStatus({ resumeComparison: false });
       if (!isCurrentComparisonRequest(request)) return;
       if (!subscriptionState.isAdmin && !subscriptionState.subscribed) {
-        setComparisonStatus('구독 승인이 만료되었거나 확인이 필요해요. 선택한 비교는 유지됩니다.');
+        setComparisonStatus('구독 승인이 만료되었거나 확인이 필요해요. 선택한 스트리머와 날짜는 유지됩니다.');
         renderComparisonSelection();
         renderSubscriptionDialogStatus();
         openSubscriptionDialog();
@@ -1207,19 +1381,23 @@ function resumePendingComparisonIfReady() {
 }
 
 async function runComparison() {
-  if (comparisonSelection.length !== 2 || comparisonRunning || comparisonGateWaiting) return;
-  const date1 = vodCalendarDate(comparisonSelection[0].vod.regDate);
-  const date2 = vodCalendarDate(comparisonSelection[1].vod.regDate);
-  if (!date1 || date1 !== date2 || comparisonSelection[0].streamerId === comparisonSelection[1].streamerId) {
-    setComparisonStatus('서로 다른 스트리머의 같은 날짜 다시보기 두 개를 선택해 주세요.', true);
+  if (!comparisonSelection.every(Boolean) || comparisonRunning || comparisonGateWaiting) return;
+  if (! $('viewerComparisonDate').value) {
+    setComparisonStatus('비교할 날짜를 선택해 주세요.', true);
+    renderComparisonSelection();
+    return;
+  }
+  if (comparisonSelection[0].soopId.toLowerCase() === comparisonSelection[1].soopId.toLowerCase()) {
+    setComparisonStatus('서로 다른 스트리머 두 명을 선택해 주세요.', true);
     renderComparisonSelection();
     return;
   }
   invalidateComparisonResult();
   const request = {
     id: comparisonRequestSequence,
-    items: comparisonSelection.slice(),
-    selectionKey: comparisonSelection.map(comparisonItemKey).join('|'),
+    streamers: comparisonSelection.slice(),
+    date: $('viewerComparisonDate').value,
+    selectionKey: comparisonSelectionKey(),
   };
   pendingComparisonRequest = request;
   comparisonRunning = true;
@@ -1268,9 +1446,9 @@ async function runComparison() {
     comparisonGateWaiting = true;
     setComparisonStatus(subscriptionState.accountProtected
       ? subscriptionState.pending
-        ? '구독 신청 승인 대기 중이에요. 승인되면 선택한 두 다시보기의 결과가 자동으로 열립니다.'
-        : '비교 대상은 유지됩니다. 로그인 계정에 구독을 신청하고 승인을 기다려 주세요.'
-      : '비교 대상은 유지됩니다. 로그인한 뒤 구독 신청을 진행해 주세요.');
+        ? '구독 신청 승인 대기 중이에요. 승인되면 선택한 스트리머와 날짜의 비교 결과가 자동으로 열립니다.'
+        : '선택한 스트리머와 날짜는 유지됩니다. 로그인 계정에 구독을 신청하고 승인을 기다려 주세요.'
+      : '선택한 스트리머와 날짜는 유지됩니다. 로그인한 뒤 구독 신청을 진행해 주세요.');
     renderComparisonSelection();
     renderSubscriptionDialogStatus();
     openSubscriptionDialog();
@@ -1357,7 +1535,6 @@ async function loadVodPage(loadToken, page) {
       knownIds.add(String(vod.id));
       const card = createVodCard(vod, loadToken);
       $('viewerVodGrid').append(card);
-      updateComparisonCardButtons();
       observeVodCard(card);
     });
     updateVodHeading();
@@ -1656,6 +1833,7 @@ async function selectStreamer(streamer) {
   periodScanToken += 1;
   cancelQueuedStatsRequests();
   vodPagesByNumber = new Map();
+  vodPagesStreamerId = String(streamer.soopId || '').toLowerCase();
   selectedStreamer = streamer;
   $('viewerPeriodScanButton').dataset.hasResult = 'false';
   nextPage = 1;
@@ -1775,26 +1953,63 @@ $('viewerLoadMore').addEventListener('click', () => {
   if (hasMoreVods && selectedStreamer) loadVodPage(activeLoadToken, nextPage);
 });
 
+[0, 1].forEach((index) => {
+  $('viewerComparisonSearchForm' + index).addEventListener('submit', (event) => {
+    event.preventDefault();
+    searchComparisonStreamer(index, $('viewerComparisonSearch' + index).value);
+  });
+  $('viewerComparisonSearch' + index).addEventListener('input', () => {
+    comparisonSearchRequestSequence[index] += 1;
+    $('viewerComparisonSearchButton' + index).disabled = false;
+    $('viewerComparisonSearchResults' + index).replaceChildren();
+    $('viewerComparisonSearchResults' + index)._streamers = [];
+    if (comparisonSelection[index]) clearComparisonStreamer(index);
+  });
+  $('viewerComparisonSearchResults' + index).addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-comparison-streamer-index]');
+    if (!button) return;
+    const streamers = $('viewerComparisonSearchResults' + index)._streamers || [];
+    const streamer = streamers[Number(button.dataset.comparisonStreamerIndex)];
+    if (streamer) selectComparisonStreamer(index, streamer);
+  });
+  $('viewerComparisonSelected' + index).addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-comparison-remove]');
+    if (button) clearComparisonStreamer(Number(button.dataset.comparisonRemove));
+  });
+});
+
+$('viewerComparisonDate').addEventListener('change', () => {
+  invalidateComparisonResult();
+  setComparisonStatus(comparisonSelection.every(Boolean)
+    ? '날짜가 바뀌었어요. 이 날짜의 다시보기를 찾아 비교할 수 있습니다.'
+    : '스트리머 2명과 날짜를 선택해 주세요.');
+  renderComparisonSelection();
+});
+
 $('viewerComparisonRun').addEventListener('click', runComparison);
 $('viewerComparisonClear').addEventListener('click', () => {
   if (comparisonRunning) return;
-  comparisonSelection = [];
+  comparisonSelection = [null, null];
+  comparisonSearchRequestSequence = [comparisonSearchRequestSequence[0] + 1, comparisonSearchRequestSequence[1] + 1];
+  [0, 1].forEach((index) => {
+    $('viewerComparisonSearch' + index).value = '';
+    $('viewerComparisonSearchButton' + index).disabled = false;
+    $('viewerComparisonSearchResults' + index).replaceChildren();
+    $('viewerComparisonSearchResults' + index)._streamers = [];
+    setComparisonPickerStatus(index, '닉네임이나 SOOP ID를 검색하세요.');
+  });
+  $('viewerComparisonDate').value = '';
   invalidateComparisonResult();
-  setComparisonStatus('스트리머를 검색한 뒤 각 다시보기 카드에서 ‘비교에 담기’를 선택해 주세요.');
+  setComparisonStatus('스트리머 2명과 날짜를 선택해 주세요.');
   renderComparisonSelection();
 });
-$('viewerComparisonSelection').addEventListener('click', (event) => {
-  const button = event.target.closest('button[data-comparison-index]');
-  if (!button || comparisonRunning) return;
-  const index = Number(button.dataset.comparisonIndex);
-  if (!Number.isInteger(index) || !comparisonSelection[index]) return;
-  comparisonSelection.splice(index, 1);
-  invalidateComparisonResult();
-  setComparisonStatus(comparisonSelection.length
-    ? '다시보기 한 개가 선택되어 있어요. 다른 스트리머의 같은 날짜 VOD를 담아 주세요.'
-    : '스트리머를 검색한 뒤 각 다시보기 카드에서 ‘비교에 담기’를 선택해 주세요.');
-  renderComparisonSelection();
-});
+
+const comparisonTodayParts = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+}).formatToParts(new Date());
+const comparisonToday = Object.fromEntries(comparisonTodayParts.map((part) => [part.type, part.value]));
+$('viewerComparisonDate').max = comparisonToday.year + '-' + comparisonToday.month + '-' + comparisonToday.day;
+renderComparisonSelection();
 
 $('viewerPeriodScanButton').addEventListener('click', () => {
   runPeriodPeakScan({ forceRefresh: $('viewerPeriodScanButton').dataset.hasResult === 'true' });

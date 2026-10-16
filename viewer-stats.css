@@ -397,3 +397,375 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
   .viewer-subscription-login-actions{display:grid;grid-template-columns:1fr}
   .viewer-subscription-login-actions .button{width:100%;min-height:44px}
 }
+
+/* Angular analytics dashboard treatment and streamer/date comparison controls. */
+.viewer-search-panel,
+.viewer-results-heading,
+.viewer-period-peaks,
+.viewer-comparison-panel,
+.viewer-vod-card,
+.viewer-period-card,
+.viewer-subscription-panel,
+.viewer-comparison-picker,
+.viewer-comparison-date-field,
+.viewer-comparison-result-card,
+.viewer-subscription-dialog,
+.viewer-subscription-dialog-card,
+.viewer-subscription-steps,
+.viewer-subscription-donation-step {
+  border-radius: 3px;
+  box-shadow: none;
+}
+.viewer-search-panel,
+.viewer-results-heading,
+.viewer-period-peaks,
+.viewer-vod-card,
+.viewer-period-card,
+.viewer-subscription-panel,
+.viewer-comparison-picker,
+.viewer-comparison-date-field,
+.viewer-comparison-result-card {
+  border-color: #d3dce8;
+}
+.viewer-search-row input,
+.viewer-stats-shell .button,
+.viewer-search-result,
+.viewer-vod-duration,
+.viewer-stat-link,
+.viewer-stat-state,
+.viewer-period-card,
+.viewer-comparison-count,
+.viewer-comparison-search-form input,
+.viewer-comparison-picker-status,
+.viewer-comparison-selected,
+.viewer-comparison-date-field input,
+.viewer-comparison-search-result,
+.viewer-comparison-result-metric,
+.viewer-comparison-summary,
+.viewer-comparison-play,
+.viewer-comparison-error,
+.viewer-premium-uplift,
+.viewer-premium-locked,
+.viewer-subscription-dialog-card input,
+.viewer-subscription-close {
+  border-radius: 2px;
+}
+.viewer-search-panel,
+.viewer-results-heading,
+.viewer-period-peaks,
+.viewer-comparison-panel,
+.viewer-subscription-panel {
+  box-shadow: 0 2px 7px #17243a08;
+}
+.viewer-search-row input,
+.viewer-comparison-search-form input,
+.viewer-comparison-date-field input {
+  background: #fff;
+}
+.viewer-stats-shell .button:hover,
+.viewer-search-result:hover,
+.viewer-recent-item:hover,
+.viewer-comparison-search-result:hover {
+  transform: none;
+}
+.viewer-vod-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px #17243a10;
+}
+.viewer-vod-thumb,
+.viewer-vod-thumb img,
+.viewer-vod-duration {
+  border-radius: 0;
+}
+.viewer-vod-card .viewer-vod-thumb img {
+  image-rendering: auto;
+}
+.viewer-comparison-panel {
+  margin: 30px 0 34px;
+  padding: 22px;
+  border: 1px solid #cfd8e5;
+  border-top: 3px solid var(--viewer-blue);
+  background: #fff;
+}
+.viewer-comparison-heading h2 {
+  font-size: 22px;
+}
+.viewer-comparison-count {
+  border-color: #cbd5e3;
+  background: #f3f6fa;
+  font-variant-numeric: tabular-nums;
+}
+.viewer-comparison-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(210px, .82fr);
+  gap: 11px;
+  margin-top: 19px;
+}
+.viewer-comparison-picker,
+.viewer-comparison-date-field {
+  position: relative;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #dbe2ec;
+  background: #f8fafc;
+}
+.viewer-comparison-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+  color: #33435b;
+  font-size: 12px;
+  font-weight: 800;
+}
+.viewer-comparison-label>span {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border: 1px solid #cbd5e3;
+  background: #fff;
+  color: #4d6382;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.viewer-comparison-search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+.viewer-comparison-search-form input,
+.viewer-comparison-date-field input {
+  width: 100%;
+  min-width: 0;
+  height: 43px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e3;
+  background: #fff;
+  color: #17243a;
+  font: inherit;
+  font-size: 13px;
+}
+.viewer-comparison-search-form input:focus,
+.viewer-comparison-date-field input:focus {
+  outline: 2px solid #486bd633;
+  border-color: #7188d1;
+}
+.viewer-comparison-search-form .button {
+  min-width: 58px;
+  min-height: 43px;
+  padding: 8px 11px;
+  font-size: 12px;
+}
+.viewer-comparison-search-results {
+  display: grid;
+  gap: 4px;
+  max-height: 210px;
+  overflow-y: auto;
+  margin-top: 7px;
+  border: 0 solid #d5deea;
+  background: #fff;
+}
+.viewer-comparison-search-results:empty {
+  display: none;
+}
+.viewer-comparison-search-results:not(:empty) {
+  border-width: 1px;
+}
+.viewer-comparison-search-result {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 53px;
+  padding: 7px 9px;
+  border: 0;
+  border-bottom: 1px solid #e8edf3;
+  background: #fff;
+  color: #26364f;
+  text-align: left;
+  cursor: pointer;
+}
+.viewer-comparison-search-result:last-child {
+  border-bottom: 0;
+}
+.viewer-comparison-search-result:hover {
+  background: #f1f5fb;
+}
+.viewer-comparison-search-result img,
+.viewer-comparison-selected img {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: 1px solid #d9e1ec;
+  border-radius: 2px;
+  background: #e9eef5;
+  object-fit: cover;
+}
+.viewer-comparison-search-copy,
+.viewer-comparison-selected-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+.viewer-comparison-search-copy strong,
+.viewer-comparison-search-copy span,
+.viewer-comparison-selected-copy strong,
+.viewer-comparison-selected-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewer-comparison-search-copy strong,
+.viewer-comparison-selected-copy strong {
+  color: #26364f;
+  font-size: 12px;
+}
+.viewer-comparison-search-copy span,
+.viewer-comparison-selected-copy span {
+  color: #738097;
+  font-size: 10px;
+}
+.viewer-comparison-search-select {
+  flex: none;
+  color: var(--viewer-blue);
+  font-size: 11px;
+  font-weight: 800;
+}
+.viewer-comparison-selected {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  margin-top: 7px;
+  padding: 7px 9px;
+  border: 1px solid #cbd7e7;
+  background: #fff;
+}
+.viewer-comparison-selected.hidden {
+  display: none;
+}
+.viewer-comparison-remove {
+  width: auto;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid #cbd5e3;
+  border-radius: 2px;
+  background: #fff;
+  color: #53637a;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.viewer-comparison-remove:hover {
+  border-color: #a34166;
+  color: #a34166;
+}
+.viewer-comparison-picker-status {
+  min-height: 17px;
+  margin: 8px 0 0;
+  color: #69778d;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.viewer-comparison-picker-status.is-error {
+  color: #ad3154;
+}
+.viewer-comparison-date-field input {
+  color-scheme: light;
+}
+.viewer-comparison-date-field>p {
+  margin: 8px 0 0;
+  color: #69778d;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.viewer-comparison-status {
+  margin: 13px 0;
+  color: #52627a;
+  font-size: 12px;
+}
+.viewer-comparison-actions .button {
+  min-width: 150px;
+}
+.viewer-comparison-results {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #dce3ed;
+}
+.viewer-comparison-result-card {
+  border-top: 2px solid #cfd8e5;
+  background: #fbfcfe;
+}
+.viewer-comparison-result-card h4 {
+  color: #192942;
+  font-size: 16px;
+}
+.viewer-comparison-result-vod {
+  min-height: 0;
+  margin-bottom: 3px;
+  color: #45556d;
+  font-size: 12px;
+}
+.viewer-comparison-result-vod-meta {
+  margin: 0 0 12px;
+  color: #78859a;
+  font-size: 11px;
+}
+.viewer-comparison-bar,
+.viewer-comparison-bar span {
+  border-radius: 0;
+}
+.viewer-comparison-play {
+  border-color: #d6b3c0;
+  background: #fff;
+}
+.viewer-comparison-error {
+  border: 1px solid #f0cbd5;
+}
+@media(max-width:800px) {
+  .viewer-comparison-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .viewer-comparison-date-field {
+    grid-column: 1 / -1;
+  }
+}
+@media(max-width:620px) {
+  .viewer-comparison-panel {
+    margin: 28px 0 30px;
+    padding: 15px;
+  }
+  .viewer-comparison-heading h2 {
+    font-size: 19px;
+  }
+  .viewer-comparison-controls {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 15px;
+  }
+  .viewer-comparison-picker,
+  .viewer-comparison-date-field {
+    grid-column: auto;
+    padding: 12px;
+  }
+  .viewer-comparison-search-form input,
+  .viewer-comparison-date-field input {
+    height: 46px;
+    font-size: 14px;
+  }
+  .viewer-comparison-search-form .button {
+    min-height: 46px;
+  }
+  .viewer-comparison-actions .button {
+    min-width: 0;
+  }
+  .viewer-comparison-result-card {
+    padding: 12px;
+  }
+  .viewer-comparison-result-vod-meta {
+    font-size: 11px;
+  }
+}
