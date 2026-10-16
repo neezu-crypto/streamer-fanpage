@@ -1046,9 +1046,13 @@ function renderUpboItemManager(page, state) {
     const row = document.createElement('article'); row.className = 'upbo-item-row';
     const imageUrl = normalizeUpboImageUrl(item.imageUrl);
     if (imageUrl) {
+      const imageTrigger = document.createElement('button'); imageTrigger.type = 'button';
+      imageTrigger.className = 'upbo-item-image-trigger'; imageTrigger.setAttribute('aria-label', `${item.name} 이미지 크게 보기`);
       const image = document.createElement('img'); image.className = 'upbo-item-image';
       image.src = imageUrl; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
-      row.append(image);
+      imageTrigger.append(image);
+      imageTrigger.addEventListener('click', () => openUpboImagePreview(imageUrl, `${item.name} 이미지`));
+      row.append(imageTrigger);
     }
     const copy = document.createElement('div'); copy.className = 'upbo-item-copy';
     const name = document.createElement('strong'); name.textContent = item.name;
@@ -1071,6 +1075,38 @@ function normalizeUpboImageUrl(value) {
     const url = new URL(raw);
     return url.protocol === 'https:' && url.hostname && !url.username && !url.password ? url.href : '';
   } catch (_) { return ''; }
+}
+
+function openUpboImagePreview(imageUrl, titleText) {
+  const normalizedUrl = normalizeUpboImageUrl(imageUrl);
+  if (!normalizedUrl) return;
+  const dialog = document.createElement('dialog'); dialog.className = 'account-dialog upbo-image-preview-dialog';
+  const card = document.createElement('div'); card.className = 'account-dialog-card upbo-image-preview-card';
+  const heading = document.createElement('div'); heading.className = 'profile-editor-heading upbo-image-preview-heading';
+  const title = document.createElement('h2'); title.textContent = titleText || '업보 항목 이미지';
+  const close = upboButton('×', 'profile-settings-close', () => dialog.close());
+  close.setAttribute('aria-label', '이미지 미리보기 닫기');
+  heading.append(title, close);
+  const stage = document.createElement('div'); stage.className = 'upbo-image-preview-stage';
+  const image = document.createElement('img'); image.src = normalizedUrl; image.alt = titleText || '업보 항목 이미지';
+  image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
+  stage.append(image); card.append(heading, stage); dialog.append(card);
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  document.body.append(dialog); dialog.showModal(); close.focus();
+}
+
+function bindUpboPreviewZoom(image, getUrl, getTitle) {
+  image.classList.add('upbo-image-zoomable');
+  image.setAttribute('role', 'button'); image.tabIndex = 0;
+  image.setAttribute('aria-label', `${getTitle()} 크게 보기`);
+  const open = () => {
+    if (!image.hidden) openUpboImagePreview(getUrl(), getTitle());
+  };
+  image.addEventListener('click', open);
+  image.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault(); open();
+  });
 }
 
 function renderUpboPendingQueue(page, state) {
@@ -1278,6 +1314,7 @@ function openUpboItemEditor(page, existingItem = null) {
       if (previewImage.dataset.previewUrl !== normalizeUpboImageUrl(imageUrl.field.value)) return;
       previewImage.hidden = true; previewStatus.textContent = '이미지를 불러오지 못했어요. 주소와 공개 설정을 확인해 주세요.';
     });
+    bindUpboPreviewZoom(previewImage, () => imageUrl.field.value, () => `${name.field.value.trim() || existingItem.name} 이미지`);
     const updatePreview = () => {
       const raw = imageUrl.field.value.trim();
       if (!raw) { preview.hidden = true; previewImage.removeAttribute('src'); previewImage.dataset.previewUrl = 'none'; previewStatus.textContent = ''; return; }
@@ -1343,6 +1380,7 @@ function openUpboItemEditor(page, existingItem = null) {
         itemImage.hidden = true; placeholder.hidden = false; placeholder.textContent = '불러오기 실패';
         itemPreviewStatus.textContent = '주소를 확인해 주세요.';
       });
+      bindUpboPreviewZoom(itemImage, () => imageField.field.value, () => `${draft.name} 이미지`);
       imageField.field.addEventListener('input', () => {
         draft.imageUrl = imageField.field.value.trim();
         setPreview(draft.imageUrl, itemImage, itemPreviewStatus, placeholder);
