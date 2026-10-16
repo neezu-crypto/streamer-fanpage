@@ -640,6 +640,7 @@ function normalizeStoredUpboItem(id, value) {
     id,
     name,
     description: typeof value.description === 'string' ? value.description.slice(0, 160) : '',
+    imageUrl: cleanHttpsImageUrl(value.imageUrl),
     active: value.active !== false,
     createdAt: Number(value.createdAt) || 0,
     updatedAt: Number(value.updatedAt) || 0,
@@ -4016,9 +4017,13 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
     if (!previous.createdAt && Object.keys((await itemsRef.get()).val() || {}).length >= FANPAGE_UPBO_MAX_ITEMS) {
       throw new HttpsError('resource-exhausted', `업보 신청 항목은 ${FANPAGE_UPBO_MAX_ITEMS}개까지 등록할 수 있습니다.`);
     }
+    const rawImageUrl = typeof data.imageUrl === 'string' ? data.imageUrl.trim() : '';
+    const imageUrl = cleanHttpsImageUrl(rawImageUrl);
+    if (rawImageUrl && !imageUrl) throw new HttpsError('invalid-argument', 'HTTPS 이미지 주소를 입력해 주세요.');
     const item = {
       name: upboText(data.name, 60, true),
       description: upboText(data.description || '', 160),
+      imageUrl,
       active: previous.active !== false,
       createdAt: Number(previous.createdAt) || Date.now(),
       updatedAt: Date.now(),

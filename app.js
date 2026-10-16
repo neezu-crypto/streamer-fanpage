@@ -1037,6 +1037,12 @@ function renderUpboItemManager(page, state) {
   const list = document.createElement('div'); list.className = 'upbo-item-list';
   state.items.forEach((item) => {
     const row = document.createElement('article'); row.className = 'upbo-item-row';
+    const imageUrl = normalizeUpboImageUrl(item.imageUrl);
+    if (imageUrl) {
+      const image = document.createElement('img'); image.className = 'upbo-item-image';
+      image.src = imageUrl; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
+      row.append(image);
+    }
     const copy = document.createElement('div'); copy.className = 'upbo-item-copy';
     const name = document.createElement('strong'); name.textContent = item.name;
     const description = document.createElement('span'); description.textContent = item.description || '설명 없음';
@@ -1049,6 +1055,15 @@ function renderUpboItemManager(page, state) {
     row.append(copy, actions); list.append(row);
   });
   panel.append(list); return panel;
+}
+
+function normalizeUpboImageUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw || raw.length > 2048) return '';
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'https:' && url.hostname && !url.username && !url.password ? url.href : '';
+  } catch (_) { return ''; }
 }
 
 function renderUpboPendingQueue(page, state) {
@@ -1196,14 +1211,40 @@ function openUpboItemEditor(page, existingItem = null) {
   const name = upboEditorField('항목 이름', 'input', { type: 'text', maxlength: 60, required: true, value: existingItem?.name || '', placeholder: '예: 체키 방셀' });
   const description = upboEditorField('설명 (선택)', 'textarea', { maxlength: 160, rows: 2, placeholder: '팬에게 안내할 내용을 적어 주세요.' });
   description.field.value = existingItem?.description || '';
+  const imageUrl = upboEditorField('이미지 주소 (선택)', 'input', { type: 'url', maxlength: 2048, value: existingItem?.imageUrl || '', placeholder: 'https://이미지주소' });
+  imageUrl.field.autocomplete = 'off';
+  const preview = document.createElement('div'); preview.className = 'upbo-item-preview'; preview.hidden = true;
+  const previewImage = document.createElement('img'); previewImage.alt = ''; previewImage.decoding = 'async'; previewImage.referrerPolicy = 'no-referrer'; previewImage.hidden = true;
+  const previewStatus = document.createElement('span'); previewStatus.className = 'upbo-item-preview-status';
+  preview.append(previewImage, previewStatus);
+  previewImage.addEventListener('load', () => {
+    if (previewImage.dataset.previewUrl !== normalizeUpboImageUrl(imageUrl.field.value)) return;
+    previewImage.hidden = false; previewStatus.textContent = '미리보기';
+  });
+  previewImage.addEventListener('error', () => {
+    if (previewImage.dataset.previewUrl !== normalizeUpboImageUrl(imageUrl.field.value)) return;
+    previewImage.hidden = true; previewStatus.textContent = '이미지를 불러오지 못했어요. 주소와 공개 설정을 확인해 주세요.';
+  });
+  const updatePreview = () => {
+    const raw = imageUrl.field.value.trim();
+    const url = normalizeUpboImageUrl(raw);
+    if (!raw) { preview.hidden = true; previewImage.removeAttribute('src'); previewStatus.textContent = ''; return; }
+    preview.hidden = false; previewImage.hidden = true;
+    if (!url) { previewStatus.textContent = 'HTTPS 이미지 주소를 입력해 주세요.'; previewImage.removeAttribute('src'); return; }
+    previewStatus.textContent = '미리보기를 불러오는 중…';
+    previewImage.dataset.previewUrl = url;
+    previewImage.src = url;
+  };
+  imageUrl.field.addEventListener('input', updatePreview);
+  updatePreview();
   const note = document.createElement('p'); note.className = 'upbo-editor-note';
-  note.textContent = '등록된 항목은 팬 신청서에 표시됩니다. 신청 승인 후 기록한 항목 이름은 확정 기록에 남습니다.';
+  note.textContent = '이미지 주소를 입력하면 미리보기가 표시됩니다. 등록된 항목은 팬 신청서에 표시됩니다.';
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer upbo-editor-footer';
   const hint = document.createElement('small'); hint.textContent = '신청 항목은 최대 100개까지 등록할 수 있어요.';
   const actions = document.createElement('div'); actions.className = 'profile-editor-footer-actions';
   const cancel = upboButton('취소', '', () => dialog.close());
   const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = existingItem ? '수정 저장' : '항목 추가';
-  actions.append(cancel, save); footer.append(hint, actions); form.append(heading, name.label, description.label, note, footer);
+  actions.append(cancel, save); footer.append(hint, actions); form.append(heading, name.label, description.label, imageUrl.label, preview, note, footer);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity() || save.disabled) return;
@@ -1212,6 +1253,7 @@ function openUpboItemEditor(page, existingItem = null) {
       await callUpbo({
         action: 'saveItem', streamerId: page.streamer.id,
         itemId: existingItem?.id || createUpboId(), name: name.field.value.trim(), description: description.field.value.trim(),
+        imageUrl: imageUrl.field.value.trim(),
       });
       dialog.close();
       await loadUpboBoard(page.streamer.id);
