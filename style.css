@@ -426,6 +426,12 @@
 .upbo-request-note{grid-column:1/-1;margin:0;color:#928a9a;font-size:11px;line-height:1.55}
 .upbo-item-list,.upbo-pending-list,.upbo-record-list{display:grid;gap:8px}
 .upbo-item-row,.upbo-pending-row,.upbo-record-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:11px 12px;border:1px solid #ffffff12;border-radius:10px;background:#ffffff04}
+.upbo-item-image{flex:none;width:54px;height:54px;border:1px solid #ffffff18;border-radius:8px;background:#111018;object-fit:cover}
+.upbo-item-preview{display:grid;justify-items:start;gap:7px;padding:9px;border:1px solid #ffffff18;border-radius:10px;background:#111018}
+.upbo-item-preview[hidden]{display:none}
+.upbo-item-preview img{display:block;width:auto;max-width:100%;max-height:240px;border-radius:6px;object-fit:contain}
+.upbo-item-preview img[hidden]{display:none}
+.upbo-item-preview-status{color:#aaa3b1;font-size:11px;line-height:1.5}
 .upbo-item-copy,.upbo-pending-copy,.upbo-record-copy{display:grid;gap:4px;min-width:0;flex:1}
 .upbo-item-copy strong,.upbo-pending-copy strong,.upbo-record-copy strong{color:#f2edf4;font-size:13px;overflow-wrap:anywhere}
 .upbo-item-copy span,.upbo-pending-copy span,.upbo-record-copy span{color:#c8c0ce;font-size:12px;overflow-wrap:anywhere}
