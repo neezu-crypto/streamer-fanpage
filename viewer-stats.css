@@ -976,3 +976,61 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
     font-size: 8px;
   }
 }
+
+/* Make the main streamer lookup read as the page's primary action. */
+.viewer-search-panel {
+  position: relative;
+  padding: 25px 24px 24px;
+  border: 1px solid #aebde0;
+  border-left: 5px solid var(--viewer-blue);
+  border-radius: 3px;
+  background: linear-gradient(125deg, #fff 0%, #f5f7ff 100%);
+  box-shadow: 0 12px 30px #243b711c;
+}
+.viewer-search-form label {
+  margin-bottom: 12px;
+  color: #243a69;
+  font-size: 16px;
+  font-weight: 800;
+}
+.viewer-search-row input {
+  height: 56px;
+  border-color: #aebddd;
+  background: #fff;
+  box-shadow: inset 0 1px 2px #17243a0a;
+  font-size: 16px;
+}
+.viewer-search-row input:focus {
+  border-color: var(--viewer-blue);
+  box-shadow: 0 0 0 3px #486bd626;
+}
+.viewer-search-row .button {
+  min-width: 100px;
+  font-size: 14px;
+}
+.viewer-search-hint {
+  color: #52627d;
+  font-size: 13px;
+}
+.viewer-queue-note {
+  color: #697891;
+}
+@media(max-width:620px) {
+  .viewer-search-panel {
+    padding: 18px 16px;
+  }
+  .viewer-search-form label {
+    font-size: 15px;
+  }
+  .viewer-search-row input {
+    height: 52px;
+  }
+  .viewer-search-row .button {
+    min-width: 86px;
+  }
+}
+@media(max-width:380px) {
+  .viewer-search-row .button {
+    min-width: 78px;
+  }
+}
