@@ -68,6 +68,7 @@ let toastTimer = 0;
 let liveStatusTimer = 0;
 let stockPriceUnsubscribe = null;
 let stockPriceSparklineRequest = 0;
+let fanPageQuickNavCleanup = null;
 let verifiedStreamerUid = '';
 let verifiedStreamerProfile = null;
 let verifiedStreamerProfileUid = '';
@@ -803,6 +804,10 @@ async function waitForPageAssets() {
   window.clearTimeout(timeoutId);
 }
 function setVisibleView(page) {
+  if (!page && fanPageQuickNavCleanup) {
+    fanPageQuickNavCleanup();
+    fanPageQuickNavCleanup = null;
+  }
   if (!page && liveStatusTimer) {
     window.clearInterval(liveStatusTimer);
     liveStatusTimer = 0;
@@ -2049,6 +2054,10 @@ function openProfileQuickEdit(page, field, target) {
 function renderFanPage(page) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
+  if (fanPageQuickNavCleanup) {
+    fanPageQuickNavCleanup();
+    fanPageQuickNavCleanup = null;
+  }
   if (stockPriceUnsubscribe) {
     stockPriceUnsubscribe();
     stockPriceUnsubscribe = null;
@@ -2203,6 +2212,7 @@ function renderFanPage(page) {
   if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
+  fanPageQuickNavCleanup = createFanPageQuickRemote(view);
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
   if (page.profile && page.profile.youtubeChannelUrl) loadYouTubeVideos(page.streamer.id);
@@ -2313,6 +2323,160 @@ function renderFanPage(page) {
     footer.append(note, footerActions); editor.append(grid, footer); editorDialog.append(editor);
     view.append(editorDialog);
   }
+}
+
+function createFanPageQuickRemote(view) {
+  const sectionLabels = [
+    ['fan-banner-top', '상단 배너'], ['profile-board', '프로필'],
+    ['fan-character-ogq-pair', '팬 캐릭터·OGQ'], ['upbo-section', '업보 정리'],
+    ['roulette-section', '룰렛 확률'], ['messenger-link-section', '메신저'],
+    ['live-section', '방송 상태'], ['vod-section', '다시보기'],
+    ['youtube-section', 'YouTube'], ['songbook-section', '노래책'],
+    ['ogq-section', 'OGQ 이모티콘'], ['cafe-section', '네이버 카페'],
+    ['calendar-section', '방송 일정'], ['fan-gallery-section', '팬 갤러리'],
+    ['fan-banner-bottom', '하단 배너'],
+  ];
+  const sections = [...view.children]
+    .filter((element) => element.tagName !== 'DIALOG' && !element.classList.contains('back-link'))
+    .map((element, index) => {
+      const label = sectionLabels.find(([className]) => element.classList.contains(className))?.[1]
+        || element.querySelector('h1, h2, h3')?.textContent.trim().replace(/\s+/g, ' ').slice(0, 18)
+        || `영역 ${index + 1}`;
+      if (!element.id) element.id = `fanpage-quick-section-${index + 1}`;
+      return { id: element.id, label };
+    });
+  if (!sections.length) return null;
+
+  const remote = document.createElement('aside'); remote.className = 'fan-quick-remote';
+  remote.setAttribute('aria-label', '팬페이지 빠른 이동 리모콘');
+  const toggle = document.createElement('button'); toggle.type = 'button';
+  toggle.className = 'fan-quick-toggle'; toggle.setAttribute('aria-label', '빠른 이동 리모콘 열기');
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h9M5 17h14"/><circle cx="17" cy="12" r="2"/></svg>';
+  const panel = document.createElement('div'); panel.className = 'fan-quick-panel'; panel.id = 'fanQuickPanel'; panel.hidden = true;
+  const header = document.createElement('div'); header.className = 'fan-quick-header';
+  const title = document.createElement('strong'); title.textContent = '빠른 이동';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'fan-quick-close';
+  close.setAttribute('aria-label', '빠른 이동 리모콘 닫기'); close.textContent = '×';
+  header.append(title, close);
+  const body = document.createElement('div'); body.className = 'fan-quick-body';
+  const nav = document.createElement('nav'); nav.className = 'fan-quick-links'; nav.setAttribute('aria-label', '팬페이지 영역');
+  const navButtons = sections.map((section, index) => {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'fan-quick-link';
+    const number = document.createElement('span'); number.className = 'fan-quick-number';
+    number.textContent = String(index + 1).padStart(2, '0');
+    const label = document.createElement('span'); label.className = 'fan-quick-label'; label.textContent = section.label;
+    button.append(number, label);
+    button.addEventListener('click', () => {
+      document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!window.matchMedia('(min-width: 1360px)').matches) setExpanded(false);
+    });
+    nav.append(button);
+    return button;
+  });
+  const scrubber = document.createElement('div'); scrubber.className = 'fan-quick-scrubber';
+  scrubber.tabIndex = 0; scrubber.setAttribute('role', 'slider'); scrubber.setAttribute('aria-label', '페이지 빠른 스크롤');
+  scrubber.setAttribute('aria-orientation', 'vertical'); scrubber.setAttribute('aria-valuemin', '0');
+  scrubber.setAttribute('aria-valuemax', '100'); scrubber.setAttribute('aria-valuenow', '0');
+  scrubber.setAttribute('aria-valuetext', '페이지 맨 위');
+  const rail = document.createElement('span'); rail.className = 'fan-quick-scroll-rail';
+  const thumb = document.createElement('span'); thumb.className = 'fan-quick-scroll-thumb';
+  scrubber.append(rail, thumb); body.append(nav, scrubber); panel.append(header, body);
+  toggle.setAttribute('aria-controls', panel.id);
+  remote.append(toggle, panel); view.append(remote);
+
+  let expanded = false;
+  let scrollFrame = 0;
+  let dragging = false;
+  let resizeObserver = null;
+  const isDesktop = () => window.matchMedia('(min-width: 1360px)').matches;
+  function setExpanded(value) {
+    expanded = !!value;
+    panel.hidden = isDesktop() ? false : !expanded;
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.setAttribute('aria-label', expanded ? '빠른 이동 리모콘 닫기' : '빠른 이동 리모콘 열기');
+    if (!expanded && panel.contains(document.activeElement)) toggle.focus({ preventScroll: true });
+    scheduleUpdate();
+  }
+  function syncDeviceMode() {
+    toggle.hidden = isDesktop();
+    if (isDesktop()) panel.hidden = false;
+    else panel.hidden = !expanded;
+    scheduleUpdate();
+  }
+  function scrollToProgress(clientY) {
+    const bounds = scrubber.getBoundingClientRect();
+    const thumbHeight = thumb.getBoundingClientRect().height;
+    const travel = Math.max(1, bounds.height - thumbHeight - 8);
+    const progress = Math.max(0, Math.min(1, (clientY - bounds.top - 4 - thumbHeight / 2) / travel));
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    window.scrollTo(0, progress * maxScroll);
+  }
+  function updateRemote() {
+    scrollFrame = 0;
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const progress = maxScroll ? Math.max(0, Math.min(1, window.scrollY / maxScroll)) : 0;
+    const travel = Math.max(0, scrubber.clientHeight - thumb.offsetHeight - 8);
+    thumb.style.transform = `translateY(${travel * progress}px)`;
+    scrubber.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
+    scrubber.setAttribute('aria-valuetext', `${Math.round(progress * 100)}% 내려옴`);
+    const marker = window.scrollY + window.innerHeight * 0.4;
+    let activeIndex = 0;
+    sections.forEach((section, index) => {
+      const target = document.getElementById(section.id);
+      if (target && target.getBoundingClientRect().top + window.scrollY <= marker) activeIndex = index;
+    });
+    navButtons.forEach((button, index) => {
+      if (index === activeIndex) {
+        button.classList.add('is-active'); button.setAttribute('aria-current', 'location');
+      } else {
+        button.classList.remove('is-active'); button.removeAttribute('aria-current');
+      }
+    });
+  }
+  function scheduleUpdate() {
+    if (!scrollFrame) scrollFrame = window.requestAnimationFrame(updateRemote);
+  }
+  function handleScrubberPointerDown(event) {
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault(); dragging = true;
+    try { scrubber.setPointerCapture(event.pointerId); } catch (_) { /* capture may be unavailable */ }
+    scrollToProgress(event.clientY);
+  }
+  function handleScrubberPointerMove(event) {
+    if (dragging) { event.preventDefault(); scrollToProgress(event.clientY); }
+  }
+  function endScrubberDrag() { dragging = false; }
+  function handleScrubberKeydown(event) {
+    const step = event.shiftKey || event.key === 'PageDown' || event.key === 'PageUp' ? 0.16 : 0.035;
+    if (event.key === 'Home') { event.preventDefault(); window.scrollTo(0, 0); }
+    else if (event.key === 'End') { event.preventDefault(); window.scrollTo(0, document.documentElement.scrollHeight); }
+    else if (event.key === 'ArrowDown' || event.key === 'PageDown') { event.preventDefault(); window.scrollBy(0, window.innerHeight * step); }
+    else if (event.key === 'ArrowUp' || event.key === 'PageUp') { event.preventDefault(); window.scrollBy(0, -window.innerHeight * step); }
+  }
+  const onScroll = () => scheduleUpdate();
+  const onResize = () => syncDeviceMode();
+  toggle.addEventListener('click', () => setExpanded(!expanded));
+  close.addEventListener('click', () => setExpanded(false));
+  scrubber.addEventListener('pointerdown', handleScrubberPointerDown);
+  scrubber.addEventListener('pointermove', handleScrubberPointerMove);
+  scrubber.addEventListener('pointerup', endScrubberDrag);
+  scrubber.addEventListener('pointercancel', endScrubberDrag);
+  scrubber.addEventListener('lostpointercapture', endScrubberDrag);
+  scrubber.addEventListener('keydown', handleScrubberKeydown);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onResize);
+  if (typeof ResizeObserver === 'function') {
+    resizeObserver = new ResizeObserver(scheduleUpdate);
+    resizeObserver.observe(view);
+  }
+  syncDeviceMode();
+  return () => {
+    window.removeEventListener('scroll', onScroll);
+    window.removeEventListener('resize', onResize);
+    if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
+    if (resizeObserver) resizeObserver.disconnect();
+  };
 }
 
 function refreshProfileRouletteAction(page) {
