@@ -4005,8 +4005,59 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
     return { submitted: true, requestId: id };
   }
 
-  if (!canManage && ['saveItem', 'deleteItem', 'approveRequest', 'deleteRequest', 'saveRecord', 'deleteRecord'].includes(action)) {
+  if (!canManage && ['saveItem', 'saveItems', 'deleteItem', 'approveRequest', 'deleteRequest', 'saveRecord', 'deleteRecord'].includes(action)) {
     throw new HttpsError('permission-denied', '업보 항목과 신청은 해당 스트리머와 관리자만 관리할 수 있습니다.');
+  }
+
+  if (action === 'saveItems') {
+    if (!Array.isArray(data.items) || !data.items.length || data.items.length > FANPAGE_UPBO_MAX_ITEMS) {
+      throw new HttpsError('invalid-argument', `한 번에 1개 이상 ${FANPAGE_UPBO_MAX_ITEMS}개 이하의 항목을 추가해 주세요.`);
+    }
+    const ids = new Set();
+    const now = Date.now();
+    const items = data.items.map((value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new HttpsError('invalid-argument', '업보 신청 항목을 확인해 주세요.');
+      }
+      const id = typeof value.id === 'string' ? value.id.trim() : '';
+      if (!validUpboId(id) || ids.has(id)) throw new HttpsError('invalid-argument', '업보 신청 항목 ID가 올바르지 않습니다.');
+      ids.add(id);
+      const rawImageUrl = typeof value.imageUrl === 'string' ? value.imageUrl.trim() : '';
+      const imageUrl = cleanHttpsImageUrl(rawImageUrl);
+      if (rawImageUrl && !imageUrl) throw new HttpsError('invalid-argument', 'HTTPS 이미지 주소를 입력해 주세요.');
+      return {
+        id,
+        item: {
+          name: upboText(value.name, 60, true),
+          description: upboText(value.description || '', 160),
+          imageUrl,
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+      };
+    });
+    const itemValues = Object.fromEntries(items.map(({ id, item }) => [id, item]));
+    let itemIdConflict = false;
+    let itemLimitExceeded = false;
+    const result = await itemsRef.transaction((current) => {
+      const stored = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
+      if (items.some(({ id }) => Object.prototype.hasOwnProperty.call(stored, id))) {
+        itemIdConflict = true;
+        return undefined;
+      }
+      if (Object.keys(stored).length + items.length > FANPAGE_UPBO_MAX_ITEMS) {
+        itemLimitExceeded = true;
+        return undefined;
+      }
+      return { ...stored, ...itemValues };
+    });
+    if (!result.committed) {
+      if (itemIdConflict) throw new HttpsError('already-exists', '이미 사용 중인 항목 ID가 있습니다. 다시 시도해 주세요.');
+      if (itemLimitExceeded) throw new HttpsError('resource-exhausted', `업보 신청 항목은 최대 ${FANPAGE_UPBO_MAX_ITEMS}개까지 등록할 수 있습니다.`);
+      throw new HttpsError('aborted', '항목 목록을 저장하지 못했습니다. 다시 시도해 주세요.');
+    }
+    return { items: items.map(({ id, item }) => ({ id, ...item })), canManage };
   }
 
   if (action === 'saveItem') {

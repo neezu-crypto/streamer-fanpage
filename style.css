@@ -432,6 +432,23 @@
 .upbo-item-preview img{display:block;width:auto;max-width:100%;max-height:240px;border-radius:6px;object-fit:contain}
 .upbo-item-preview img[hidden]{display:none}
 .upbo-item-preview-status{color:#aaa3b1;font-size:11px;line-height:1.5}
+.upbo-item-batch-names{width:100%;min-height:64px;padding:9px 10px;border:1px solid #ffffff20;border-radius:9px;background:#111018;color:var(--text);outline:0;font:12px/1.55 var(--font);resize:vertical}
+.upbo-item-batch-names:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.upbo-item-batch-status{margin:0;color:#aaa3b1;font-size:11px;line-height:1.5}
+.upbo-item-batch-status.is-error{color:#f2b6c8}
+.upbo-item-batch-list{display:grid;max-height:38vh;gap:7px;overflow:auto;padding-right:3px}
+.upbo-item-batch-row{display:grid;grid-template-columns:minmax(125px,.7fr) minmax(180px,1.3fr) 58px;align-items:center;gap:9px;padding:8px;border:1px solid #ffffff12;border-radius:9px;background:#ffffff04}
+.upbo-item-batch-copy{display:grid;gap:4px;min-width:0}
+.upbo-item-batch-number{color:#aaa3b1;font-size:10px}
+.upbo-item-batch-name{overflow:hidden;color:#f2edf4;font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+.upbo-item-batch-image-cell{display:grid;gap:4px;min-width:0}
+.upbo-item-batch-image-field{display:block;min-width:0;margin:0;color:#aaa3b1;font-size:9px}
+.upbo-item-batch-image-field input{display:block;width:100%;min-width:0;height:34px;margin-top:4px;padding:6px 8px;border:1px solid #ffffff20;border-radius:8px;background:#111018;color:var(--text);outline:0;font:10px var(--font)}
+.upbo-item-batch-image-field input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.upbo-item-batch-preview{display:grid;place-items:center;width:58px;height:58px;overflow:hidden;border:1px solid #ffffff18;border-radius:8px;background:#111018;color:#827b89;font-size:8px;text-align:center}
+.upbo-item-batch-preview img{display:block;width:100%;height:100%;object-fit:cover}
+.upbo-item-batch-preview img[hidden],.upbo-item-batch-preview span[hidden]{display:none}
+.upbo-item-batch-preview-status{min-height:12px;color:#aaa3b1;font-size:9px;line-height:1.35;overflow-wrap:anywhere}
 .upbo-item-copy,.upbo-pending-copy,.upbo-record-copy{display:grid;gap:4px;min-width:0;flex:1}
 .upbo-item-copy strong,.upbo-pending-copy strong,.upbo-record-copy strong{color:#f2edf4;font-size:13px;overflow-wrap:anywhere}
 .upbo-item-copy span,.upbo-pending-copy span,.upbo-record-copy span{color:#c8c0ce;font-size:12px;overflow-wrap:anywhere}
@@ -527,6 +544,7 @@
 }
 @media(max-width:720px){.upbo-request-form{grid-template-columns:repeat(2,minmax(0,1fr))}.upbo-request-submit{grid-column:1/-1}}
 @media(max-width:420px){.upbo-request-form{grid-template-columns:1fr}.upbo-request-submit,.upbo-request-note{grid-column:auto}.upbo-item-row,.upbo-pending-row,.upbo-record-row{align-items:flex-start;flex-direction:column}.upbo-row-actions{width:100%;justify-content:flex-end}}
+@media(max-width:560px){.upbo-item-batch-row{grid-template-columns:minmax(0,1fr) 54px;gap:7px}.upbo-item-batch-copy{grid-column:1;grid-row:1}.upbo-item-batch-image-cell{grid-column:1;grid-row:2}.upbo-item-batch-preview{grid-column:2;grid-row:1 / span 2;width:54px;height:54px}.upbo-item-batch-status{font-size:10px}}
 
 .messenger-link-section{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:18px;padding:18px 22px;border:1px solid #f58cac35;border-radius:16px;background:linear-gradient(125deg,#211e28,#19171f)}
 .messenger-link-copy{display:flex;align-items:center;gap:15px;min-width:0}
@@ -850,3 +868,9 @@
 #fanPageView.fanpage-theme-sora .fan-character-ogq-pair>.fan-feature-ogq-panel{display:flex;min-width:0;min-height:250px;flex-direction:column;justify-content:center;margin:0;padding:clamp(18px,3vw,30px);border:0;border-radius:0;background:radial-gradient(ellipse at 100% 0,#6387D116,transparent 58%);box-shadow:none}
 @media(max-width:720px){#fanPageView.fanpage-theme-sora .fan-character-ogq-pair{grid-template-columns:minmax(0,1fr);margin-top:14px;border-radius:17px}#fanPageView.fanpage-theme-sora .fan-character-ogq-pair>.fan-character-card{min-height:158px;padding:19px 145px 19px 19px;border-right:0;border-bottom:1px solid #6387D155}#fanPageView.fanpage-theme-sora .fan-character-ogq-pair>.fan-feature-ogq-panel{min-height:0;padding:19px}}
 @media(max-width:390px){#fanPageView.fanpage-theme-sora .fan-character-ogq-pair>.fan-character-card{min-height:140px;padding-right:116px}}
+
+/* Keep batch item inputs compact inside the upbo editor field defaults. */
+.upbo-editor-form .profile-editor-field textarea.upbo-item-batch-names{min-height:64px;padding:9px 10px;font:12px/1.55 var(--font)}
+.upbo-editor-form .profile-editor-field textarea.upbo-item-batch-names:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.upbo-editor-form .profile-editor-field.upbo-item-batch-image-field input{height:34px;min-height:34px;padding:6px 8px;font:10px var(--font)}
+.upbo-editor-form .profile-editor-field.upbo-item-batch-image-field input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
