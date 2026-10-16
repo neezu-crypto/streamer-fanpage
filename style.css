@@ -416,6 +416,9 @@
 .upbo-subsection-heading{justify-content:flex-start;margin-bottom:10px}
 .upbo-subsection-heading h4{margin:0;font:16px var(--display)}
 .upbo-subsection-heading .button{min-height:33px;padding:6px 10px;font-size:12px}
+.upbo-manager-heading{justify-content:space-between}
+.upbo-manager-heading-copy{display:flex;align-items:center;gap:10px;min-width:0}
+.upbo-add-item-inline{white-space:nowrap}
 .upbo-viewer-total{color:#928a9a;font-size:12px}
 .upbo-inline-empty{margin:0;padding:13px;border-radius:9px;background:#ffffff04;color:#918a98;font-size:13px;text-align:center}
 .upbo-request-form{display:grid;grid-template-columns:minmax(130px,1fr) minmax(180px,1.4fr) minmax(90px,.55fr) auto;align-items:end;gap:11px}

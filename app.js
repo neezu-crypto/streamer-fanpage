@@ -1029,12 +1029,16 @@ function renderUpboRequestForm(page, state) {
 
 function renderUpboItemManager(page, state) {
   const panel = document.createElement('section'); panel.className = 'upbo-subsection upbo-item-manager';
-  const heading = document.createElement('div'); heading.className = 'upbo-subsection-heading';
+  const heading = document.createElement('div'); heading.className = 'upbo-subsection-heading upbo-manager-heading';
+  const headingCopy = document.createElement('div'); headingCopy.className = 'upbo-manager-heading-copy';
   const title = document.createElement('h4'); title.textContent = '신청 가능한 항목';
   const count = document.createElement('span'); count.className = 'upbo-viewer-total'; count.textContent = `${state.items.length} / 100`;
-  heading.append(title, count); panel.append(heading);
+  headingCopy.append(title, count);
+  const addItem = upboButton('+ 항목 추가', 'button-primary upbo-small-button upbo-add-item-inline', () => openUpboItemEditor(page));
+  addItem.disabled = state.saving || state.items.length >= MAX_UPBO_ITEMS;
+  heading.append(headingCopy, addItem); panel.append(heading);
   if (!state.items.length) {
-    const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 항목이 없어요. 위의 항목 추가 버튼으로 등록해 주세요.';
+    const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 항목이 없어요. 항목 추가 버튼으로 등록해 주세요.';
     panel.append(empty); return panel;
   }
   const list = document.createElement('div'); list.className = 'upbo-item-list';
