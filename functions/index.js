@@ -95,6 +95,15 @@ const VIEWER_STATS_PERSISTENT_CACHE_PATH = 'streamerFanPageViewerStatsCache';
 const VIEWER_STATS_CACHE_SCHEMA_VERSION = 1;
 const VIEWER_STATS_CACHE_LOCK_TTL_MS = 90 * 1000;
 const VIEWER_STATS_CACHE_WAIT_TIMEOUT_MS = 75 * 1000;
+const VIEWER_PERIOD_CACHE_PATH = 'streamerFanPageViewerPeriodCache';
+const VIEWER_PERIOD_LOCK_PATH = 'streamerFanPageViewerPeriodLocks';
+const VIEWER_PERIOD_CACHE_SCHEMA_VERSION = 1;
+const VIEWER_PERIOD_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const VIEWER_PERIOD_CATALOG_CHECK_TTL_MS = 10 * 60 * 1000;
+const VIEWER_PERIOD_LOCK_TTL_MS = 6 * 60 * 1000;
+const VIEWER_PERIOD_LOCK_WAIT_MS = 12 * 1000;
+const VIEWER_PERIODS_DAYS = Object.freeze([7, 30, 90, 365]);
+const VIEWER_PERIOD_MAX_PAGES = 200;
 const VIEWER_STATS_JOBS_PATH = 'streamerFanPageViewerStatsJobs';
 const VIEWER_STATS_WORKER_CLAIMS_PATH = 'streamerFanPageViewerStatsWorkerClaims';
 const VIEWER_STATS_JOB_TTL_MS = 2 * 60 * 60 * 1000;
@@ -1471,6 +1480,294 @@ async function getOrFetchViewerStats(streamerId, vodId) {
     return result;
   } finally {
     if (fanpageViewerStatsInProgress.get(cacheKey) === task) fanpageViewerStatsInProgress.delete(cacheKey);
+  }
+}
+
+function viewerPeriodCacheRef(streamerId) {
+  const normalizedStreamerId = String(streamerId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(normalizedStreamerId)) {
+    throw new HttpsError('invalid-argument', '기간별 시청 통계 요청을 확인해 주세요.');
+  }
+  return db.ref(`${VIEWER_PERIOD_CACHE_PATH}/${normalizedStreamerId}`);
+}
+
+function viewerPeriodLockRef(streamerId) {
+  const normalizedStreamerId = String(streamerId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(normalizedStreamerId)) {
+    throw new HttpsError('invalid-argument', '기간별 시청 통계 요청을 확인해 주세요.');
+  }
+  return db.ref(`${VIEWER_PERIOD_LOCK_PATH}/${normalizedStreamerId}`);
+}
+
+function viewerPeriodTimestamp(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 0;
+  const normalized = raw.replace(' ', 'T');
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+  const timestamp = Date.parse(hasTimezone ? normalized : normalized + '+09:00');
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function viewerPeriodCatalogSignature(page) {
+  const rows = Array.isArray(page && page.rows) ? page.rows : [];
+  const total = Math.max(0, Math.floor(Number(page && page.total) || 0));
+  const fingerprint = rows.map((row) => [
+    String(row && (row.title_no || row.id) || '').trim(),
+    String(row && row.reg_date || '').trim(),
+  ].join(':')).join('|') + ':' + total;
+  return createHash('sha256').update(fingerprint).digest('hex').slice(0, 40);
+}
+
+function reusableViewerPeriodCache(record, now = Date.now(), streamerId = '') {
+  if (!record || record.status !== 'completed'
+    || Number(record.schemaVersion) !== VIEWER_PERIOD_CACHE_SCHEMA_VERSION
+    || (streamerId && String(record.streamerId || '').toLowerCase() !== String(streamerId).toLowerCase())
+    || !Number.isFinite(Number(record.generatedAt))
+    || !Number.isFinite(Number(record.expiresAt))
+    || Number(record.expiresAt) <= now
+    || !record.periods || typeof record.periods !== 'object'
+    || !record.vodCounts || typeof record.vodCounts !== 'object') return null;
+  for (const days of VIEWER_PERIODS_DAYS) {
+    if (!Object.prototype.hasOwnProperty.call(record.periods, String(days))) return null;
+    const peak = record.periods[String(days)];
+    if (peak && (!peak.vod || !/^\d{1,20}$/.test(String(peak.vod.id || ''))
+      || !Number.isFinite(Number(peak.viewers)) || Number(peak.viewers) < 0
+      || !Number.isFinite(Number(peak.second)) || Number(peak.second) < 0
+      || !Number.isFinite(Number(peak.timestamp)))) return null;
+  }
+  return record;
+}
+
+function viewerPeriodCacheResponse(record, cacheHit) {
+  return {
+    status: 'completed',
+    cacheHit: cacheHit === true,
+    generatedAt: Number(record.generatedAt) || 0,
+    expiresAt: Number(record.expiresAt) || 0,
+    vodCount: Math.max(0, Math.floor(Number(record.vodCount) || 0)),
+    periods: record.periods,
+    vodCounts: record.vodCounts,
+  };
+}
+
+async function fetchRecentViewerPeriodVods(streamerId, yearCutoff, firstPage = null) {
+  const vods = [];
+  const seenIds = new Set();
+  let reachedYearCutoff = false;
+  let pageLimitReached = false;
+  let firstPageSignature = '';
+
+  for (let page = 1; page <= VIEWER_PERIOD_MAX_PAGES; page += 1) {
+    const result = page === 1 && firstPage ? firstPage : await fetchSoopVodPage(streamerId, page);
+    if (page === 1) firstPageSignature = viewerPeriodCatalogSignature(result);
+    let oldestTimestamp = 0;
+    const normalizedRows = result.rows.map((row) => normalizeSoopVod(row));
+    if (normalizedRows.some((vod) => !vod)) {
+      throw new HttpsError('unavailable', 'SOOP 다시보기 목록 일부를 읽지 못해 기간별 결과를 갱신하지 못했습니다.');
+    }
+    normalizedRows.forEach((vod) => {
+      const timestamp = viewerPeriodTimestamp(vod.regDate);
+      if (!timestamp) {
+        throw new HttpsError('unavailable', 'SOOP 다시보기 날짜를 확인하지 못해 기간별 결과를 갱신하지 못했습니다.');
+      }
+      if (!oldestTimestamp || timestamp < oldestTimestamp) oldestTimestamp = timestamp;
+      if (timestamp >= yearCutoff && !seenIds.has(vod.id)) {
+        seenIds.add(vod.id);
+        vods.push({ vod, timestamp });
+      }
+    });
+
+    if (oldestTimestamp && oldestTimestamp < yearCutoff) {
+      reachedYearCutoff = true;
+      break;
+    }
+    if (page * SOOP_VOD_PAGE_SIZE >= result.total) break;
+    if (page === VIEWER_PERIOD_MAX_PAGES) pageLimitReached = true;
+  }
+
+  return { vods, pageLimitReached, reachedYearCutoff, firstPageSignature };
+}
+
+async function loadViewerPeriodStats(streamerId, vods) {
+  const statsByVodId = new Map();
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < vods.length) {
+      const item = vods[cursor];
+      cursor += 1;
+      const stats = await readPersistentViewerStatsCache(streamerId, item.vod.id);
+      if (stats) statsByVodId.set(item.vod.id, stats);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(24, vods.length) }, () => worker()));
+  return statsByVodId;
+}
+
+function makeViewerPeriodCache(streamerId, scannedVods, statsByVodId, pageSignature, generatedAt) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const periods = {};
+  const vodCounts = {};
+  let expiresAt = generatedAt + VIEWER_PERIOD_CACHE_TTL_MS;
+
+  VIEWER_PERIODS_DAYS.forEach((days) => {
+    const cutoff = generatedAt - (days * dayMs);
+    const eligible = scannedVods.filter((item) => item.timestamp >= cutoff);
+    vodCounts[String(days)] = eligible.length;
+    let peak = null;
+    eligible.forEach((item) => {
+      const stats = statsByVodId.get(item.vod.id);
+      const point = stats && stats.highest;
+      if (!point) return;
+      const viewers = Number(point.viewers);
+      const second = Number(point.second);
+      if (!Number.isFinite(viewers) || viewers < 0 || !Number.isFinite(second) || second < 0) return;
+      if (!peak || viewers > peak.viewers) {
+        peak = {
+          vod: item.vod,
+          viewers,
+          second,
+          timestamp: item.timestamp,
+        };
+      }
+    });
+    periods[String(days)] = peak;
+    if (peak) expiresAt = Math.min(expiresAt, peak.timestamp + (days * dayMs) + 1);
+  });
+
+  return {
+    status: 'completed',
+    schemaVersion: VIEWER_PERIOD_CACHE_SCHEMA_VERSION,
+    streamerId,
+    generatedAt,
+    catalogCheckedAt: generatedAt,
+    catalogSignature: pageSignature,
+    expiresAt,
+    vodCount: scannedVods.length,
+    periods,
+    vodCounts,
+  };
+}
+
+async function tryClaimViewerPeriodLock(streamerId) {
+  const lockRef = viewerPeriodLockRef(streamerId);
+  const lockId = randomUUID();
+  const now = Date.now();
+  const result = await lockRef.transaction((current) => {
+    if (current && Number(current.lockExpiresAt) > now) return;
+    return { lockId, lockExpiresAt: now + VIEWER_PERIOD_LOCK_TTL_MS };
+  });
+  const lock = result.snapshot.val();
+  return result.committed && lock && lock.lockId === lockId ? lockId : '';
+}
+
+async function releaseViewerPeriodLock(streamerId, lockId) {
+  if (!lockId) return;
+  await viewerPeriodLockRef(streamerId).transaction((current) => {
+    if (!current || current.lockId !== lockId) return;
+    return null;
+  }).catch(() => {});
+}
+
+async function waitForViewerPeriodCache(streamerId, minGeneratedAt = 0) {
+  const deadline = Date.now() + VIEWER_PERIOD_LOCK_WAIT_MS;
+  let delayMs = 400;
+  while (Date.now() < deadline) {
+    const snapshot = await viewerPeriodCacheRef(streamerId).get();
+    const cached = reusableViewerPeriodCache(snapshot.val(), Date.now(), streamerId);
+    if (cached && Number(cached.generatedAt) >= minGeneratedAt) return viewerPeriodCacheResponse(cached, true);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    delayMs = Math.min(1500, delayMs + 250);
+  }
+  return { status: 'processing' };
+}
+
+async function buildViewerPeriodCache(streamerId, firstPage = null) {
+  const generatedAt = Date.now();
+  const scanData = await fetchRecentViewerPeriodVods(
+    streamerId,
+    generatedAt - (365 * 24 * 60 * 60 * 1000),
+    firstPage,
+  );
+  if (scanData.pageLimitReached) {
+    return { status: 'needs-analysis', vodCount: scanData.vods.length, pageLimitReached: true };
+  }
+
+  const statsByVodId = await loadViewerPeriodStats(streamerId, scanData.vods);
+  const missingCount = scanData.vods.length - statsByVodId.size;
+  if (missingCount > 0) {
+    return { status: 'needs-analysis', vodCount: scanData.vods.length, missingCount };
+  }
+
+  const cache = makeViewerPeriodCache(
+    streamerId,
+    scanData.vods,
+    statsByVodId,
+    scanData.firstPageSignature,
+    generatedAt,
+  );
+  await viewerPeriodCacheRef(streamerId).set(cache);
+  return viewerPeriodCacheResponse(cache, false);
+}
+
+async function getViewerPeriodPeaks(streamerId, buildOnMiss = false, forceRefresh = false) {
+  const cacheRef = viewerPeriodCacheRef(streamerId);
+  let snapshot = await cacheRef.get();
+  let cached = reusableViewerPeriodCache(snapshot.val(), Date.now(), streamerId);
+  const rawCache = snapshot.val();
+  const now = Date.now();
+
+  if (!forceRefresh && cached && now - (Number(cached.catalogCheckedAt) || 0) < VIEWER_PERIOD_CATALOG_CHECK_TTL_MS) {
+    return viewerPeriodCacheResponse(cached, true);
+  }
+  if (!cached && !rawCache && !buildOnMiss) {
+    return { status: 'needs-analysis', missingCount: 0 };
+  }
+
+  const lockId = await tryClaimViewerPeriodLock(streamerId);
+  if (!lockId) {
+    const concurrentResult = await waitForViewerPeriodCache(
+      streamerId,
+      forceRefresh && cached ? Number(cached.generatedAt) + 1 : 0,
+    );
+    if (concurrentResult.status === 'completed') return concurrentResult;
+    if (cached && !forceRefresh) return { ...viewerPeriodCacheResponse(cached, true), catalogCheckPending: true };
+    return concurrentResult;
+  }
+
+  try {
+    snapshot = await cacheRef.get();
+    cached = reusableViewerPeriodCache(snapshot.val(), Date.now(), streamerId);
+    let firstPage = null;
+    if (cached) {
+      if (!forceRefresh && Date.now() - (Number(cached.catalogCheckedAt) || 0) < VIEWER_PERIOD_CATALOG_CHECK_TTL_MS) {
+        return viewerPeriodCacheResponse(cached, true);
+      }
+      firstPage = await fetchSoopVodPage(streamerId, 1);
+      const currentSignature = viewerPeriodCatalogSignature(firstPage);
+      if (!forceRefresh && currentSignature === cached.catalogSignature && Number(cached.expiresAt) > Date.now()) {
+        const checkedAt = Date.now();
+        const updated = await cacheRef.transaction((current) => {
+          if (!current || current.status !== 'completed'
+            || Number(current.generatedAt) !== Number(cached.generatedAt)
+            || current.catalogSignature !== currentSignature
+            || Number(current.expiresAt) <= checkedAt) return;
+          return { ...current, catalogCheckedAt: checkedAt };
+        });
+        const verifiedCache = reusableViewerPeriodCache(updated.snapshot.val(), checkedAt, streamerId);
+        if (verifiedCache) return viewerPeriodCacheResponse(verifiedCache, true);
+      }
+    } else {
+      const rawCache = snapshot.val();
+      if (rawCache && rawCache.status === 'completed') await cacheRef.remove();
+    }
+
+    const catalogChanged = !!(cached && firstPage
+      && viewerPeriodCatalogSignature(firstPage) !== cached.catalogSignature);
+    const result = await buildViewerPeriodCache(streamerId, firstPage);
+    if (result.status !== 'completed' && cached) await cacheRef.remove();
+    return catalogChanged ? { ...result, catalogChanged: true } : result;
+  } finally {
+    await releaseViewerPeriodLock(streamerId, lockId);
   }
 }
 
@@ -3115,7 +3412,7 @@ exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => 
   return { streamers };
 });
 
-exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck: true }, async (request) => {
+exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck: true, timeoutSeconds: 300 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const action = String(data.action || '');
@@ -3184,6 +3481,35 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
   if (!SOOP_ID_PATTERN.test(streamerId)) {
     throw new HttpsError('invalid-argument', 'SOOP 방송국 아이디를 확인해 주세요.');
+  }
+
+  if (action === 'periodPeaks') {
+    const [subscriptionSnapshot, admin, baseTier] = await Promise.all([
+      db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+      isAdminUid(uid),
+      resolveViewerStatsBaseTier(uid, request.auth),
+    ]);
+    const subscription = subscriptionSnapshot.val() || {};
+    const isSubscribed = (Number(subscription.expiresAt) || 0) > Date.now();
+    if (!admin && !isSubscribed) {
+      throw new HttpsError('permission-denied', '기간별 최고 시청 순간은 구독 계정에서 이용할 수 있습니다.');
+    }
+    const tier = viewerStatsTier(request.auth, {
+      isAdmin: admin,
+      isSubscribed,
+      isProtectedAccount: baseTier === 'account',
+    });
+    await enforceViewerStatsRateLimit(uid, 'stats', { tier });
+    const result = await getViewerPeriodPeaks(
+      streamerId,
+      data.mode === 'build' || data.forceRefresh === true,
+      data.forceRefresh === true,
+    );
+    if (result.status === 'completed' && result.cacheHit === true) {
+      await updateViewerStatsQueueMetrics(viewerStatsUidKey(uid), viewerStatsDayKey(), { cacheHits: 1 })
+        .catch((error) => console.warn('Could not record viewer period cache hit:', error));
+    }
+    return result;
   }
 
   if (action === 'vods') {

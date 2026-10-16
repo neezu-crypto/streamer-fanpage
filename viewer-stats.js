@@ -1414,6 +1414,31 @@ function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !subscri
   });
 }
 
+function showSharedPeriodPeakResult(data) {
+  if (!data || data.status !== 'completed') return false;
+  const peaks = new Map();
+  const vodCounts = new Map();
+  VIEWER_PEAK_PERIODS.forEach((period) => {
+    const peak = data.periods && data.periods[String(period.days)];
+    if (peak && peak.vod) {
+      peaks.set(period.days, {
+        vod: peak.vod,
+        viewers: Number(peak.viewers) || 0,
+        second: Number(peak.second) || 0,
+        timestamp: Number(peak.timestamp) || parseVodTimestamp(peak.vod.regDate),
+      });
+    }
+    vodCounts.set(period.days, Number(data.vodCounts && data.vodCounts[String(period.days)]) || 0);
+  });
+  renderPeriodPeakCards(peaks, vodCounts, false);
+  const sourceLabel = data.cacheHit ? '공용 캐시 결과' : '공용 분석 결과';
+  const generatedAt = formatSubscriptionDate(data.generatedAt);
+  $('viewerPeriodStatus').textContent = sourceLabel + ' · ' + (generatedAt ? generatedAt + ' 갱신' : '최신 결과');
+  $('viewerPeriodStatus').classList.remove('is-error');
+  $('viewerPeriodScanButton').dataset.hasResult = 'true';
+  return true;
+}
+
 function isCurrentPeriodScan(scanToken, loadToken) {
   return scanToken === periodScanToken && loadToken === activeLoadToken && !!selectedStreamer && subscriptionState.subscribed;
 }
@@ -1464,7 +1489,7 @@ async function fetchRecentYearVods(scanToken, loadToken, yearCutoff) {
   return { vods, pageLimitReached, reachedYearCutoff };
 }
 
-async function runPeriodPeakScan() {
+async function runPeriodPeakScan({ forceRefresh = false } = {}) {
   if (!selectedStreamer) return;
   const streamerId = selectedStreamer.soopId;
   const loadToken = activeLoadToken;
@@ -1504,6 +1529,23 @@ async function runPeriodPeakScan() {
   renderPeriodPeakCards(peaks, vodCounts, true);
 
   try {
+    try {
+      const sharedResult = await callViewerStats({
+        action: 'periodPeaks',
+        streamerId,
+        mode: forceRefresh ? 'build' : 'lookup',
+        forceRefresh,
+      });
+      if (!isCurrentPeriodScan(scanToken, loadToken)) return;
+      if (sharedResult.data && sharedResult.data.catalogChanged === true) vodPagesByNumber.clear();
+      if (showSharedPeriodPeakResult(sharedResult.data || {})) return;
+    } catch (cacheError) {
+      if (cacheError && ['functions/resource-exhausted', 'functions/permission-denied'].includes(cacheError.code)) {
+        throw cacheError;
+      }
+      console.warn('기간별 공용 결과를 확인하지 못해 개별 통계 캐시로 분석을 이어갑니다.', cacheError);
+    }
+
     const scanData = await fetchRecentYearVods(scanToken, loadToken, yearCutoff);
     if (!scanData || !isCurrentPeriodScan(scanToken, loadToken)) return;
     const { vods, pageLimitReached } = scanData;
@@ -1587,6 +1629,15 @@ async function runPeriodPeakScan() {
       ? ' · ' + rateLimitMessage + ' 미분석 ' + Math.max(0, vods.length - completed).toLocaleString('ko-KR') + '개'
       : '';
     $('viewerPeriodStatus').textContent = '최근 1년 다시보기 ' + vods.length.toLocaleString('ko-KR') + '개 중 ' + succeeded.toLocaleString('ko-KR') + '개 분석 완료' + suffix + limitMessage + quotaMessage;
+    if (!failed && !pageLimitReached && !rateLimitMessage) {
+      try {
+        const sharedResult = await callViewerStats({ action: 'periodPeaks', streamerId, mode: 'build' });
+        if (!isCurrentPeriodScan(scanToken, loadToken)) return;
+        showSharedPeriodPeakResult(sharedResult.data || {});
+      } catch (cacheError) {
+        console.warn('기간별 공용 결과를 저장하지 못했어요. 이번 분석 결과는 화면에 유지합니다.', cacheError);
+      }
+    }
   } catch (error) {
     if (!isCurrentPeriodScan(scanToken, loadToken)) return;
     $('viewerPeriodStatus').classList.add('is-error');
@@ -1606,6 +1657,7 @@ async function selectStreamer(streamer) {
   cancelQueuedStatsRequests();
   vodPagesByNumber = new Map();
   selectedStreamer = streamer;
+  $('viewerPeriodScanButton').dataset.hasResult = 'false';
   nextPage = 1;
   hasMoreVods = false;
   vodTotal = 0;
@@ -1744,7 +1796,9 @@ $('viewerComparisonSelection').addEventListener('click', (event) => {
   renderComparisonSelection();
 });
 
-$('viewerPeriodScanButton').addEventListener('click', runPeriodPeakScan);
+$('viewerPeriodScanButton').addEventListener('click', () => {
+  runPeriodPeakScan({ forceRefresh: $('viewerPeriodScanButton').dataset.hasResult === 'true' });
+});
 
 $('viewerSubscriptionAction').addEventListener('click', async () => {
   if (!subscriptionState.loaded) await refreshSubscriptionStatus();
