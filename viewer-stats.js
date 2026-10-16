@@ -1961,9 +1961,6 @@ $('viewerSubscriptionLoginCheck').addEventListener('click', async (event) => {
 });
 $('viewerSubscriptionClose').addEventListener('click', () => $('viewerSubscriptionDialog').close());
 $('viewerSubscriptionCloseBottom').addEventListener('click', () => $('viewerSubscriptionDialog').close());
-$('viewerSubscriptionDialog').addEventListener('click', (event) => {
-  if (event.target === $('viewerSubscriptionDialog')) $('viewerSubscriptionDialog').close();
-});
 $('viewerSubscriptionForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (subscriptionState.isAdmin) {

@@ -1096,7 +1096,6 @@ function openUpboTopicEditor(page, existingTopic = null) {
   const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = '저장';
   actions.append(cancel, save); footer.append(hint, actions); form.append(note, footer); dialog.append(form);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity() || save.disabled) return;
@@ -1150,7 +1149,6 @@ function openUpboViewerEditor(page, topic, existingViewer = null) {
   actions.append(cancel, save); footer.append(hint, actions);
   form.append(heading, grid, note, footer); dialog.append(form);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity() || save.disabled) return;
@@ -3313,7 +3311,6 @@ function renderFanPageScheduleDialog(page) {
     }
   });
   dialog.append(form);
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   return dialog;
 }
 
@@ -3398,7 +3395,6 @@ function renderVodPlayerDialog() {
     vodCommentRequestId += 1;
     vodCommentState = null;
   });
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   return dialog;
 }
 
@@ -3748,7 +3744,6 @@ function renderYouTubePlayerDialog() {
   link.href = 'https://www.youtube.com/'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'YouTube에서 열기 ↗';
   footer.append(note, link); card.append(heading, frame, footer); dialog.append(card);
   dialog.addEventListener('close', () => { iframe.src = 'about:blank'; });
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   return dialog;
 }
 
@@ -3932,9 +3927,6 @@ $('openAdminStats').addEventListener('click', () => {
   loadAdminStats();
 });
 $('closeAdminStats').addEventListener('click', () => $('adminStatsDialog').close());
-$('adminStatsDialog').addEventListener('click', (event) => {
-  if (event.target === $('adminStatsDialog')) $('adminStatsDialog').close();
-});
 $('refreshAdminStats').addEventListener('click', loadAdminStats);
 $('refreshViewerSubscriptionRequests').addEventListener('click', loadAdminViewerSubscriptionRequests);
 $('viewerSubscriptionAdminList').addEventListener('click', async (event) => {
