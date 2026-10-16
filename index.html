@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261016-feedback-streamer-only">
+  <link rel="stylesheet" href="style.css?v=20261017-feedback-sender-profile">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -85,6 +85,15 @@
         <button class="button profile-settings-close" id="closeDesignFeedback" type="button" aria-label="건의 창 닫기">×</button>
       </div>
       <p class="design-feedback-intro">스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요. 인증된 닉네임·SOOP 아이디·인증 시각이 문의 기록과 Discord 알림에 포함됩니다. 문의 내용은 관리자만 확인하며, Discord로는 보내지 않습니다. 하루 최대 5건까지 보낼 수 있어요.</p>
+      <div id="designFeedbackSenderProfile" class="design-feedback-sender hidden" aria-live="polite">
+        <img id="designFeedbackSenderAvatar" class="avatar" alt="" loading="lazy">
+        <div class="design-feedback-sender-copy">
+          <span class="design-feedback-sender-label">문의자 프로필</span>
+          <strong id="designFeedbackSenderName"></strong>
+          <span id="designFeedbackSenderSoopId"></span>
+        </div>
+        <span class="design-feedback-sender-badge">✓ 인증 스트리머</span>
+      </div>
       <form id="designFeedbackForm" autocomplete="off">
         <label for="designFeedbackCategory">문의 유형</label>
         <select id="designFeedbackCategory" name="category" required>
@@ -206,6 +215,6 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261016-feedback-streamer-only"></script>
+  <script type="module" src="app.js?v=20261017-feedback-sender-profile"></script>
 </body>
 </html>
