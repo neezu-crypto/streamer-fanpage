@@ -1454,7 +1454,7 @@ function renderFanPage(page) {
   section.className = 'profile-board';
   const label = document.createElement('div');
   label.className = 'profile-tab';
-  label.innerHTML = 'PROFILE <span aria-hidden="true">💗🖊</span>';
+  label.textContent = 'PROFILE';
   const identity = document.createElement('div');
   identity.className = 'profile-identity';
   const avatar = document.createElement('img');
