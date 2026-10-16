@@ -526,6 +526,29 @@ async function recordFanPageView(uid, streamerId) {
   await pruneFanPageDailyStats(streamerId, date);
 }
 
+async function recordVerifiedStreamerFanPageVisit(uid, verified) {
+  const dateKey = fanPageStatsDateKey();
+  const dedupRef = db.ref(`verifiedStreamerVisitDedup/streamerFanPage/${uid}/${dateKey}`);
+  let alreadyLogged = false;
+  const dedupResult = await dedupRef.transaction((current) => {
+    if (current) {
+      alreadyLogged = true;
+      return;
+    }
+    return true;
+  });
+  if (!dedupResult.committed || alreadyLogged) return false;
+
+  await db.ref('verifiedStreamerVisits').push({
+    uid,
+    nickname: verified.streamer.nickname || '',
+    soopId: verified.streamer.soopId || '',
+    market: 'streamerFanPage',
+    visitedAt: Date.now(),
+  });
+  return true;
+}
+
 function pageRef(streamerId) {
   return db.ref(`streamerFanPages/${streamerId}`);
 }
@@ -2951,6 +2974,11 @@ function normalizeFanpageVodComment(value, id) {
 exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+  if (verified) {
+    await recordVerifiedStreamerFanPageVisit(uid, verified).catch((error) => {
+      console.warn('Could not record the verified streamer fanpage visit:', error);
+    });
+  }
   const requestedId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
   if (verified && !isAdmin && requestedId !== verified.streamer.id) {
     return { verifiedStreamer: verified.streamer, isAdmin, redirectTo: verified.streamer.id };
