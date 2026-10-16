@@ -817,6 +817,16 @@
 .fanpage-view.has-top-banner{padding-top:0}
 .fanpage-view.has-bottom-banner{padding-bottom:0}
 .fan-banner-bottom{margin-top:0}
+.topbar.topbar-with-banner{height:42px;min-height:42px;padding:0 clamp(14px,4vw,54px)}
+.topbar-with-banner .brand{gap:7px}
+.topbar-with-banner .brand-symbol{font-size:20px}
+.topbar-with-banner .brand strong{font-size:15px}
+.topbar-with-banner .topbar-right{gap:9px}
+.topbar-with-banner .topbar-caption{font-size:9px}
+.topbar-with-banner .topbar-caption i{width:5px;height:5px;margin-right:5px}
+.topbar-with-banner .auth-actions{gap:4px}
+.topbar-with-banner .account-status{font-size:8px}
+.topbar-with-banner .auth-button{padding:4px 7px;border-radius:7px;font-size:8px}
 .fan-banner-list{display:grid;gap:0}
 .fan-banner-image{display:block;width:100%;height:auto;max-width:none;object-fit:contain}
 .banner-settings-editor{padding:13px;border:1px solid #ffffff16;border-radius:11px;background:#ffffff04}
@@ -831,6 +841,8 @@
 #fanPageView.fanpage-theme-sora .banner-settings-editor{border-color:#6387D155;background:#6387D10f}
 #fanPageView.fanpage-theme-sora .banner-settings-row input:focus{border-color:#6387D1;box-shadow:0 0 0 3px #6387D124}
 @media(max-width:560px){.banner-settings-heading{align-items:flex-start}.banner-settings-add,.banner-settings-remove{padding-inline:8px;font-size:10px}}
+@media(max-width:720px){.topbar.topbar-with-banner{height:auto;min-height:0;gap:4px;flex-wrap:wrap;padding:5px 12px}.topbar-with-banner .brand{gap:6px}.topbar-with-banner .brand-symbol{font-size:18px}.topbar-with-banner .brand strong{font-size:14px}.topbar-with-banner .topbar-right{width:100%;flex-direction:row;align-items:center;justify-content:space-between;gap:4px}.topbar-with-banner .topbar-caption{font-size:8px}.topbar-with-banner .auth-actions{width:auto;flex-wrap:nowrap;gap:3px}.topbar-with-banner .account-status{font-size:7px}.topbar-with-banner .auth-button{padding:4px 5px;font-size:7px}}
+@media(max-width:420px){.topbar-with-banner .topbar-right{align-items:center;flex-direction:row}.topbar-with-banner .account-status{margin-right:0}}
 
 /* Keep the fan character and OGQ preview as one joined feature card. */
 #fanPageView.fanpage-theme-sora .fan-character-ogq-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;overflow:hidden;margin-top:18px;border:1px solid #6387D155;border-radius:20px;background:linear-gradient(115deg,#202532,#1a1d28);box-shadow:0 18px 48px #0003}
