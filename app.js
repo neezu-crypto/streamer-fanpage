@@ -1002,7 +1002,12 @@ function renderUpboRequestForm(page, state) {
   items.forEach((entry) => {
     const selectedCount = draft.lines.filter((line) => line.itemId === entry.id).length;
     const imageUrl = normalizeUpboImageUrl(entry.imageUrl);
-    const button = upboButton('', `upbo-choice-item${imageUrl ? ' has-image' : ''}${selectedCount ? ' is-selected' : ''}`, () => {
+    const option = document.createElement('div'); option.className = 'upbo-choice-option';
+    const button = document.createElement('button'); button.type = 'button';
+    button.className = `button upbo-choice-item${imageUrl ? ' has-image' : ''}${selectedCount ? ' is-selected' : ''}`;
+    let suppressLongPressClick = false;
+    button.addEventListener('click', () => {
+      if (suppressLongPressClick) { suppressLongPressClick = false; return; }
       if (draft.lines.length >= MAX_UPBO_ITEMS) {
         showToast(`한 번에 최대 ${MAX_UPBO_ITEMS}개 항목까지 신청할 수 있어요.`);
         return;
@@ -1013,6 +1018,57 @@ function renderUpboRequestForm(page, state) {
       refreshUpboSection(page.streamer.id);
     });
     button.setAttribute('aria-label', `${entry.name} 항목 담기${selectedCount ? `, 현재 ${selectedCount}개 선택됨` : ''}`);
+    const preview = document.createElement('div'); preview.className = 'upbo-choice-preview';
+    preview.id = `upbo-preview-${entry.id}`; preview.setAttribute('role', 'tooltip');
+    button.setAttribute('aria-describedby', preview.id);
+    if (imageUrl) {
+      const previewImage = document.createElement('img'); previewImage.className = 'upbo-choice-preview-image';
+      previewImage.src = imageUrl; previewImage.alt = ''; previewImage.loading = 'lazy';
+      previewImage.decoding = 'async'; previewImage.referrerPolicy = 'no-referrer';
+      preview.append(previewImage);
+    }
+    const previewCopy = document.createElement('div'); previewCopy.className = 'upbo-choice-preview-copy';
+    const previewTitle = document.createElement('strong'); previewTitle.textContent = entry.name;
+    const previewDescription = document.createElement('p');
+    previewDescription.textContent = entry.description || '등록된 설명이 없어요.';
+    previewCopy.append(previewTitle, previewDescription); preview.append(previewCopy);
+    const placePreview = () => {
+      const bounds = button.getBoundingClientRect();
+      const previewHeight = preview.getBoundingClientRect().height;
+      option.classList.toggle('preview-align-right', bounds.left + bounds.width / 2 > window.innerWidth / 2);
+      option.classList.toggle('preview-below', bounds.top < previewHeight + 16);
+    };
+    button.addEventListener('pointerenter', (event) => { if (event.pointerType === 'mouse') placePreview(); });
+    button.addEventListener('focus', placePreview);
+    let longPressTimer = 0;
+    const hideLongPressPreview = () => {
+      window.clearTimeout(longPressTimer); longPressTimer = 0;
+      option.classList.remove('is-preview-open');
+    };
+    const resetLongPress = () => {
+      hideLongPressPreview();
+    };
+    button.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse') return;
+      suppressLongPressClick = false;
+      window.clearTimeout(longPressTimer);
+      longPressTimer = window.setTimeout(() => {
+        placePreview();
+        option.classList.add('is-preview-open');
+        suppressLongPressClick = true;
+      }, 450);
+    });
+    button.addEventListener('pointerup', () => {
+      hideLongPressPreview();
+    });
+    button.addEventListener('pointercancel', () => {
+      resetLongPress();
+      suppressLongPressClick = false;
+    });
+    button.addEventListener('pointerleave', resetLongPress);
+    button.addEventListener('contextmenu', (event) => {
+      if (suppressLongPressClick) event.preventDefault();
+    });
     if (imageUrl) {
       const image = document.createElement('img'); image.className = 'upbo-choice-image';
       image.src = imageUrl; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
@@ -1025,8 +1081,8 @@ function renderUpboRequestForm(page, state) {
       ? `${selectedCount}개 담김 · 눌러서 더 담기`
       : entry.description || '눌러서 담기';
     copy.append(name, description);
-    const mark = document.createElement('span'); mark.className = 'upbo-choice-mark'; mark.textContent = selected ? '✓' : '+';
-    button.append(copy, mark); availableGrid.append(button);
+    const mark = document.createElement('span'); mark.className = 'upbo-choice-mark'; mark.textContent = '+';
+    button.append(copy, mark); option.append(button, preview); availableGrid.append(option);
   });
   availablePanel.append(availableHeading, availableGrid);
 
