@@ -1001,14 +1001,14 @@ function renderUpboRequestForm(page, state) {
   const availableGrid = document.createElement('div'); availableGrid.className = 'upbo-choice-grid';
   items.forEach((entry) => {
     const selected = draft.lines.some((line) => line.itemId === entry.id);
-    const button = upboButton('', `upbo-choice-item${selected ? ' is-selected' : ''}`, () => {
+    const imageUrl = normalizeUpboImageUrl(entry.imageUrl);
+    const button = upboButton('', `upbo-choice-item${imageUrl ? ' has-image' : ''}${selected ? ' is-selected' : ''}`, () => {
       const existing = draft.lines.find((line) => line.itemId === entry.id);
       if (!existing) draft.lines.push({ itemId: entry.id, itemName: entry.name, quantity: 1, requestNotes: '' });
       draft.activeItemId = entry.id;
       refreshUpboSection(page.streamer.id);
     });
     button.setAttribute('aria-pressed', String(selected));
-    const imageUrl = normalizeUpboImageUrl(entry.imageUrl);
     if (imageUrl) {
       const image = document.createElement('img'); image.className = 'upbo-choice-image';
       image.src = imageUrl; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
