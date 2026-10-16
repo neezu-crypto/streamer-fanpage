@@ -1799,6 +1799,7 @@ function renderFanPage(page) {
   const topBanner = renderBannerSection(page, 'top');
   if (topBanner) view.append(topBanner);
   view.append(section);
+  let fanCharacterCard = null;
   if (String(page.streamer.id || '').toLowerCase() === 'yuhatty') {
     const character = document.createElement('section');
     character.className = 'fan-character-card';
@@ -1818,7 +1819,13 @@ function renderFanPage(page) {
     characterImage.loading = 'lazy';
     characterImage.decoding = 'async';
     character.append(characterCopy, characterImage);
-    view.append(character);
+    fanCharacterCard = character;
+  }
+  if (fanCharacterCard) {
+    const featuredPair = document.createElement('div');
+    featuredPair.className = 'fan-character-ogq-pair';
+    featuredPair.append(fanCharacterCard, renderOgqSection(page, true));
+    view.append(featuredPair);
   }
   view.append(renderUpboSection(page));
   const rouletteSection = renderRouletteSection(page);
@@ -1830,7 +1837,7 @@ function renderFanPage(page) {
   const youtubeSection = renderYouTubeSection(page);
   if (youtubeSection) view.append(youtubeSection);
   view.append(renderSongbookSection(page));
-  view.append(renderOgqSection(page));
+  if (!fanCharacterCard) view.append(renderOgqSection(page));
   const cafeSection = renderCafeSection(page);
   if (cafeSection) view.append(cafeSection);
   view.append(renderCalendarSection(page));
@@ -3062,7 +3069,7 @@ function refreshSongbookSection(streamerId) {
   if (section) section.replaceWith(renderSongbookSection(currentPage));
 }
 
-function renderOgqSection(page) {
+function renderOgqSection(page, paired = false) {
   const profile = page.profile || {};
   const streamerId = page.streamer.id;
   let ogqUrl = '';
@@ -3073,7 +3080,7 @@ function renderOgqSection(page) {
   } catch (_) {}
 
   const section = document.createElement('section');
-  section.className = 'ogq-section content-card';
+  section.className = `ogq-section content-card${paired ? ' fan-feature-ogq-panel' : ''}`;
   section.id = 'ogqSection';
   const heading = document.createElement('div');
   heading.className = 'ogq-heading';
@@ -3125,7 +3132,7 @@ function renderOgqSection(page) {
 function refreshOgqSection(streamerId) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const section = $('ogqSection');
-  if (section) section.replaceWith(renderOgqSection(currentPage));
+  if (section) section.replaceWith(renderOgqSection(currentPage, section.classList.contains('fan-feature-ogq-panel')));
 }
 
 function refreshYouTubeSection(streamerId) {

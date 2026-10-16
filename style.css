@@ -826,3 +826,10 @@
 #fanPageView.fanpage-theme-sora .banner-settings-editor{border-color:#6387D155;background:#6387D10f}
 #fanPageView.fanpage-theme-sora .banner-settings-row input:focus{border-color:#6387D1;box-shadow:0 0 0 3px #6387D124}
 @media(max-width:560px){.banner-settings-heading{align-items:flex-start}.banner-settings-add,.banner-settings-remove{padding-inline:8px;font-size:10px}}
+
+/* Keep the fan character and OGQ preview as one joined feature card. */
+#fanPageView.fanpage-theme-sora .fan-character-ogq-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;overflow:hidden;margin-top:18px;border:1px solid #6387D155;border-radius:20px;background:linear-gradient(115deg,#202532,#1a1d28);box-shadow:0 18px 48px #0003}
+#fanPageView.fanpage-theme-sora .fan-character-ogq-pair>.fan-character-card{min-width:0;min-height:250px;margin:0;border:0;border-right:1px solid #6387D155;border-radius:0;box-shadow:none}
+#fanPageView.fanpage-theme-sora .fan-character-ogq-pair>.fan-feature-ogq-panel{display:flex;min-width:0;min-height:250px;flex-direction:column;justify-content:center;margin:0;padding:clamp(18px,3vw,30px);border:0;border-radius:0;background:radial-gradient(ellipse at 100% 0,#6387D116,transparent 58%);box-shadow:none}
+@media(max-width:720px){#fanPageView.fanpage-theme-sora .fan-character-ogq-pair{grid-template-columns:minmax(0,1fr);margin-top:14px;border-radius:17px}#fanPageView.fanpage-theme-sora .fan-character-ogq-pair>.fan-character-card{min-height:158px;padding:19px 145px 19px 19px;border-right:0;border-bottom:1px solid #6387D155}#fanPageView.fanpage-theme-sora .fan-character-ogq-pair>.fan-feature-ogq-panel{min-height:0;padding:19px}}
+@media(max-width:390px){#fanPageView.fanpage-theme-sora .fan-character-ogq-pair>.fan-character-card{min-height:140px;padding-right:116px}}
