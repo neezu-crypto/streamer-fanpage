@@ -4047,16 +4047,14 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
     }
     const itemsSnapshot = await itemsRef.get();
     const storedItems = itemsSnapshot.val() || {};
-    const selectedIds = new Set();
     const selections = data.items.map((value) => {
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
         throw new HttpsError('invalid-argument', '선택한 신청 항목을 확인해 주세요.');
       }
       const itemId = typeof value.itemId === 'string' ? value.itemId.trim() : '';
-      if (!validUpboId(itemId) || selectedIds.has(itemId)) {
-        throw new HttpsError('invalid-argument', '신청 항목은 중복 없이 선택해 주세요.');
+      if (!validUpboId(itemId)) {
+        throw new HttpsError('invalid-argument', '신청 항목을 확인해 주세요.');
       }
-      selectedIds.add(itemId);
       const item = normalizeStoredUpboItem(itemId, storedItems[itemId]);
       if (!item || !item.active) {
         throw new HttpsError('failed-precondition', '신청할 수 없는 항목이 포함되어 있습니다. 항목 목록을 새로고침해 주세요.');
