@@ -3207,6 +3207,11 @@ function renderCalendarSection(page) {
   const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'STREAMER SCHEDULE';
   const title = document.createElement('h2'); title.textContent = '방송 일정';
   copy.append(eyebrow, title);
+  if (page.isOwner) {
+    const ownerHint = document.createElement('p'); ownerHint.className = 'calendar-owner-hint';
+    ownerHint.textContent = '날짜를 더블 클릭해 해당 날짜에 일정을 추가할 수 있어요.';
+    copy.append(ownerHint);
+  }
   const controls = document.createElement('div'); controls.className = 'calendar-controls';
   const mode = document.createElement('div'); mode.className = 'calendar-mode-switch'; mode.setAttribute('role', 'group'); mode.setAttribute('aria-label', '캘린더 보기');
   [['month', '월간'], ['week', '주간']].forEach(([value, label]) => {
@@ -3279,19 +3284,30 @@ function renderCalendarSection(page) {
     const dateKey = localDateKey(date);
     const events = eventsByDate.get(dateKey) || [];
     const cell = document.createElement('button'); cell.type = 'button'; cell.className = 'calendar-day';
+    if (page.isOwner) cell.classList.add('calendar-day-can-add');
     if (state.view === 'month' && date.getMonth() + 1 !== state.month) cell.classList.add('is-outside-month');
     if (dateKey === localDateKey(new Date())) cell.classList.add('is-today');
     if (dateKey === state.selectedDate) cell.classList.add('is-selected');
-    cell.setAttribute('role', 'gridcell'); cell.setAttribute('aria-label', `${date.getMonth() + 1}월 ${date.getDate()}일, 일정 ${events.length}개`);
+    cell.setAttribute('role', 'gridcell');
+    cell.setAttribute('aria-label', `${date.getMonth() + 1}월 ${date.getDate()}일, 일정 ${events.length}개${page.isOwner ? ', 더블 클릭하여 일정 추가' : ''}`);
+    if (page.isOwner) cell.title = '더블 클릭하여 이 날짜에 일정 추가';
+    let dayClickTimer = 0;
     cell.addEventListener('click', () => {
-      const changesMonth = state.view === 'month' && (date.getFullYear() !== state.year || date.getMonth() + 1 !== state.month);
-      state.selectedDate = dateKey;
-      state.year = date.getFullYear(); state.month = date.getMonth() + 1;
-      if (changesMonth) {
-        state.error = ''; state.days = []; state.fetchedAt = null; state.stale = false;
-        refreshCalendarSection(streamerId); loadCalendar(streamerId);
-      } else refreshCalendarSection(streamerId);
+      if (!page.isOwner) {
+        selectCalendarDate(streamerId, state, date);
+        return;
+      }
+      window.clearTimeout(dayClickTimer);
+      dayClickTimer = window.setTimeout(() => selectCalendarDate(streamerId, state, date), 360);
     });
+    if (page.isOwner) {
+      cell.addEventListener('dblclick', (event) => {
+        event.preventDefault();
+        window.clearTimeout(dayClickTimer);
+        selectCalendarDate(streamerId, state, date);
+        openFanPageScheduleDialog(dateKey);
+      });
+    }
     const number = document.createElement('span'); number.className = 'calendar-day-number'; number.textContent = String(date.getDate()); cell.append(number);
     const eventList = document.createElement('span'); eventList.className = 'calendar-day-events';
     events.slice(0, state.view === 'week' ? 3 : 2).forEach((event) => {
@@ -3366,6 +3382,19 @@ function openFanPageScheduleDialog(selectedDate) {
   form.reset();
   form.querySelector('[name="date"]').value = selectedDate || localDateKey(new Date());
   dialog.showModal();
+}
+
+function selectCalendarDate(streamerId, state, date) {
+  const changesMonth = state.view === 'month'
+    && (date.getFullYear() !== state.year || date.getMonth() + 1 !== state.month);
+  state.selectedDate = localDateKey(date);
+  state.year = date.getFullYear();
+  state.month = date.getMonth() + 1;
+  if (changesMonth) {
+    state.error = ''; state.days = []; state.fetchedAt = null; state.stale = false;
+    refreshCalendarSection(streamerId);
+    loadCalendar(streamerId);
+  } else refreshCalendarSection(streamerId);
 }
 
 async function deleteFanPageSchedule(page, event, button) {
