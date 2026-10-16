@@ -48,6 +48,17 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
 const MAX_LOADED_VIDEO_ITEMS = 500;
 const MAX_BANNER_IMAGE_ITEMS = 20;
+const PROFILE_QUICK_EDIT_FIELDS = {
+  birthday: { label: '생일', maxLength: 20, placeholder: '예: 02.11' },
+  mbti: { label: 'MBTI', maxLength: 8, placeholder: '예: INFJ' },
+  major: { label: '전공', maxLength: 50, placeholder: '전공을 입력해 주세요.' },
+  debutDate: { label: '데뷔일', maxLength: 20, placeholder: '예: 2026. 07. 15' },
+  fanNickname: { label: '팬닉', maxLength: 30, placeholder: '팬닉을 입력해 주세요.' },
+  fandomName: { label: '팬덤명', maxLength: 30, placeholder: '팬덤명을 입력해 주세요.' },
+  contents: { label: '콘텐츠', maxLength: 160, placeholder: '쉼표로 구분해 입력해 주세요.' },
+  scheduleText: { label: '방송 시간', maxLength: 120, multiline: true, placeholder: '방송 시간을 입력해 주세요.' },
+  intro: { label: 'ABOUT 문구', maxLength: 700, multiline: true, placeholder: '소개 문구를 입력해 주세요.' },
+};
 const $ = (id) => document.getElementById(id);
 let currentPage = null;
 let searchTimer = 0;
@@ -1206,6 +1217,107 @@ async function deleteUpboTopic(page, topicId) {
   } finally { state.saving = false; refreshUpboSection(page.streamer.id); }
 }
 
+function profileQuickEditValue(page, field) {
+  if (field === 'intro') return String(page.intro || '');
+  if (field === 'contents') return Array.isArray(page.profile?.contents) ? page.profile.contents.join(', ') : '';
+  return String(page.profile?.[field] || '');
+}
+
+function profileQuickEditDisplayValue(page, field) {
+  if (field === 'contents') return Array.isArray(page.profile?.contents) ? page.profile.contents.join(' · ') : '';
+  return profileQuickEditValue(page, field);
+}
+
+function setProfileQuickEditText(target, page, field) {
+  const value = profileQuickEditDisplayValue(page, field);
+  const valueElement = target.querySelector('.profile-field-value');
+  if (valueElement) {
+    valueElement.textContent = value || (field === 'intro' ? '소개 문구를 추가해 보세요.' : '미등록');
+  }
+  const fieldLabel = PROFILE_QUICK_EDIT_FIELDS[field].label;
+  target.setAttribute('aria-label', `${fieldLabel}: ${value || '미등록'}. 클릭하여 수정`);
+}
+
+function attachProfileQuickEdit(target, page, field) {
+  if (!page.isOwner) return;
+  target.type = 'button';
+  target.classList.add('profile-editable');
+  target.title = '클릭하여 수정';
+  setProfileQuickEditText(target, page, field);
+  target.addEventListener('click', () => openProfileQuickEdit(page, field, target));
+}
+
+function openProfileQuickEdit(page, field, target) {
+  const definition = PROFILE_QUICK_EDIT_FIELDS[field];
+  if (!page.isOwner || !definition || !target.isConnected) return;
+  const form = document.createElement('form');
+  form.className = 'profile-inline-editor';
+  const editor = definition.multiline ? document.createElement('textarea') : document.createElement('input');
+  if (!definition.multiline) editor.type = 'text';
+  editor.maxLength = definition.maxLength;
+  editor.value = profileQuickEditValue(page, field);
+  editor.placeholder = definition.placeholder;
+  editor.autocomplete = 'off';
+  editor.setAttribute('aria-label', `${definition.label} 수정`);
+  if (definition.multiline) editor.rows = field === 'intro' ? 4 : 3;
+  const actions = document.createElement('div'); actions.className = 'profile-inline-editor-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
+  const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = '저장';
+  const status = document.createElement('small'); status.className = 'profile-inline-editor-status';
+  status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+  actions.append(cancel, save); form.append(editor, actions, status);
+
+  cancel.addEventListener('click', () => {
+    form.replaceWith(target);
+    target.focus();
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (save.disabled) return;
+    let value = editor.value.trim();
+    if (field === 'contents') {
+      value = value.split(',').map((item) => item.trim()).filter(Boolean);
+      if (value.length > 8 || value.some((item) => item.length > 20)) {
+        status.textContent = '콘텐츠는 최대 8개, 항목마다 20자까지 입력할 수 있어요.';
+        return;
+      }
+    }
+    save.disabled = true; cancel.disabled = true; save.textContent = '저장 중…';
+    status.textContent = '';
+    try {
+      const payload = { streamerId: page.streamer.id };
+      if (field === 'intro') payload.intro = value;
+      else payload.profile = profileForLinkSave(page.profile, field, value);
+      const result = await callSave(payload);
+      if (!currentPage || currentPage.streamer.id !== page.streamer.id) {
+        form.remove();
+        return;
+      }
+      currentPage.intro = result.data.page.intro;
+      currentPage.profile = result.data.page.profile;
+      page.intro = currentPage.intro;
+      page.profile = currentPage.profile;
+      setProfileQuickEditText(target, page, field);
+      const settingsDialog = $('profileSettingsDialog');
+      const settingsInput = settingsDialog?.querySelector(`[name="${field}"]`);
+      if (settingsInput) {
+        settingsInput.value = field === 'contents'
+          ? (page.profile.contents || []).join(', ')
+          : (field === 'intro' ? page.intro : (page.profile[field] || ''));
+      }
+      form.replaceWith(target);
+      showToast('수정 내용을 저장했어요.');
+    } catch (error) {
+      status.textContent = error.message || '수정 내용을 저장하지 못했어요.';
+      save.disabled = false; cancel.disabled = false; save.textContent = '저장';
+    }
+  });
+
+  target.replaceWith(form);
+  editor.focus();
+  if (editor instanceof HTMLInputElement) editor.select();
+}
+
 function renderFanPage(page) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
@@ -1249,34 +1361,35 @@ function renderFanPage(page) {
   const facts = document.createElement('div');
   facts.className = 'profile-facts';
   const factRows = [
-    ['생일', profile.birthday], ['MBTI', profile.mbti],
-    ['전공', profile.major], ['데뷔', profile.debutDate],
+    ['birthday', '생일', profile.birthday], ['mbti', 'MBTI', profile.mbti],
+    ['major', '전공', profile.major], ['debutDate', '데뷔', profile.debutDate],
   ];
-  factRows.forEach(([key, value]) => {
-    const row = document.createElement('div'); row.className = 'profile-fact';
-    const term = document.createElement('span'); term.textContent = key;
-    const description = document.createElement('strong'); description.textContent = value || '미등록';
-    row.append(term, description); facts.append(row);
+  factRows.forEach(([field, labelText, value]) => {
+    const row = document.createElement(page.isOwner ? 'button' : 'div'); row.className = 'profile-fact';
+    const term = document.createElement('span'); term.textContent = labelText;
+    const description = document.createElement('strong'); description.className = 'profile-field-value'; description.textContent = value || '미등록';
+    row.append(term, description); attachProfileQuickEdit(row, page, field); facts.append(row);
   });
 
   let about = null;
-  if (page.intro) {
-    about = document.createElement('div'); about.className = 'profile-about';
+  if (page.intro || page.isOwner) {
+    about = document.createElement(page.isOwner ? 'button' : 'div'); about.className = 'profile-about';
     const aboutLabel = document.createElement('strong'); aboutLabel.textContent = 'ABOUT';
-    const aboutText = document.createElement('span'); aboutText.textContent = page.intro;
+    const aboutText = document.createElement('span'); aboutText.className = 'profile-field-value'; aboutText.textContent = page.intro || '소개 문구를 추가해 보세요.';
     about.append(aboutLabel, aboutText);
+    attachProfileQuickEdit(about, page, 'intro');
   }
 
   const details = document.createElement('div'); details.className = 'profile-details';
   const detailRows = [
-    ['팬닉', profile.fanNickname], ['팬덤명', profile.fandomName],
-    ['콘텐츠', Array.isArray(profile.contents) ? profile.contents.join(' · ') : ''], ['방송 시간', profile.scheduleText],
+    ['fanNickname', '팬닉', profile.fanNickname], ['fandomName', '팬덤명', profile.fandomName],
+    ['contents', '콘텐츠', Array.isArray(profile.contents) ? profile.contents.join(' · ') : ''], ['scheduleText', '방송 시간', profile.scheduleText],
   ];
-  detailRows.forEach(([key, value]) => {
-    const item = document.createElement('div'); item.className = 'profile-detail';
-    const term = document.createElement('span'); term.className = 'profile-detail-label'; term.textContent = key;
-    const description = document.createElement('span'); description.className = 'profile-detail-value'; description.textContent = value || '미등록';
-    item.append(term, description); details.append(item);
+  detailRows.forEach(([field, labelText, value]) => {
+    const item = document.createElement(page.isOwner ? 'button' : 'div'); item.className = 'profile-detail';
+    const term = document.createElement('span'); term.className = 'profile-detail-label'; term.textContent = labelText;
+    const description = document.createElement('span'); description.className = 'profile-detail-value profile-field-value'; description.textContent = value || '미등록';
+    item.append(term, description); attachProfileQuickEdit(item, page, field); details.append(item);
   });
   const stockCard = renderStreamerStockPrice(page);
 
@@ -1413,7 +1526,7 @@ function renderFanPage(page) {
     );
     grid.append(bannerEditors.topBannerImageUrls.element, bannerEditors.bottomBannerImageUrls.element);
     const introLabel = document.createElement('label'); introLabel.className = 'profile-editor-field profile-editor-wide'; introLabel.textContent = 'ABOUT 문구';
-    const introInput = document.createElement('textarea'); introInput.maxLength = 700; introInput.value = page.intro || '';
+    const introInput = document.createElement('textarea'); introInput.name = 'intro'; introInput.maxLength = 700; introInput.value = page.intro || '';
     introLabel.append(introInput); grid.append(introLabel);
     const footer = document.createElement('div'); footer.className = 'edit-footer profile-editor-footer';
     const note = document.createElement('small'); note.textContent = '수정 내용은 서버에 저장됩니다.';
