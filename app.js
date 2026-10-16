@@ -1455,7 +1455,6 @@ function renderFanPage(page) {
     });
     footerActions.append(cancel, save);
     footer.append(note, footerActions); editor.append(grid, footer); editorDialog.append(editor);
-    editorDialog.addEventListener('click', (event) => { if (event.target === editorDialog) editorDialog.close(); });
     view.append(editorDialog);
   }
 }
