@@ -429,7 +429,8 @@
 .upbo-choice-panel,.upbo-cart-panel{display:grid;gap:9px;min-width:0}
 .upbo-choice-panel h5,.upbo-cart-heading h5{margin:0;font:15px var(--display)}
 .upbo-choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
-.upbo-choice-item{display:grid;grid-template-columns:50px minmax(0,1fr) 22px;align-items:center;gap:9px;min-width:0;min-height:76px;padding:10px;border:1px solid #ffffff22;border-radius:11px;background:#ffffff07;color:var(--text);text-align:left;transition:border-color .15s,background .15s,transform .15s}
+.upbo-choice-item{display:grid;grid-template-columns:minmax(0,1fr) 22px;align-items:center;gap:9px;min-width:0;min-height:76px;padding:10px;border:1px solid #ffffff22;border-radius:11px;background:#ffffff07;color:var(--text);text-align:left;transition:border-color .15s,background .15s,transform .15s}
+.upbo-choice-item.has-image{grid-template-columns:50px minmax(0,1fr) 22px}
 .upbo-choice-item:hover{transform:translateY(-1px);border-color:#f58cac70;background:#f58cac0d}
 .upbo-choice-item.is-selected{border-color:#f58cac99;background:#f58cac16}
 .upbo-choice-image,.upbo-choice-image-placeholder{display:grid;place-items:center;width:50px;height:50px;border-radius:8px;background:#111018;color:var(--pink);object-fit:cover}
