@@ -832,6 +832,7 @@ function upboStateFor(streamerId) {
       topicsRequestId: 0, topicRequestId: 0,
       boardLoaded: false, loadingBoard: false, loadingMoreRecords: false, loadingMorePending: false,
       submitting: false, items: [], pending: [], records: [],
+      requestDraft: { nickname: '', lines: [], activeItemId: '' },
       pendingHasMore: false, pendingNextCursor: '', recordsHasMore: false, recordsNextCursor: '',
       boardRequestId: 0,
     });
@@ -989,33 +990,136 @@ function renderUpboRequestForm(page, state) {
     empty.textContent = state.canManage ? '신청 항목을 추가하면 팬들이 여기서 신청할 수 있어요.' : '아직 신청할 수 있는 항목이 없어요.';
     panel.append(empty); return panel;
   }
+  const draft = state.requestDraft || (state.requestDraft = { nickname: '', lines: [], activeItemId: '' });
   const form = document.createElement('form'); form.className = 'upbo-request-form'; form.autocomplete = 'off';
   const nickname = upboEditorField('닉네임', 'input', { type: 'text', maxlength: 40, required: true, placeholder: '방송에서 사용하는 닉네임' });
-  nickname.field.autocomplete = 'off';
-  const item = upboEditorField('신청 항목', 'select');
+  nickname.field.autocomplete = 'off'; nickname.field.value = draft.nickname;
+  nickname.field.addEventListener('input', () => { draft.nickname = nickname.field.value; });
+
+  const availablePanel = document.createElement('div'); availablePanel.className = 'upbo-choice-panel';
+  const availableHeading = document.createElement('h5'); availableHeading.textContent = '신청할 항목을 선택해 주세요';
+  const availableGrid = document.createElement('div'); availableGrid.className = 'upbo-choice-grid';
   items.forEach((entry) => {
-    const option = document.createElement('option'); option.value = entry.id;
-    option.textContent = entry.description ? `${entry.name} · ${entry.description}` : entry.name;
-    item.field.append(option);
+    const selected = draft.lines.some((line) => line.itemId === entry.id);
+    const button = upboButton('', `upbo-choice-item${selected ? ' is-selected' : ''}`, () => {
+      const existing = draft.lines.find((line) => line.itemId === entry.id);
+      if (!existing) draft.lines.push({ itemId: entry.id, itemName: entry.name, quantity: 1, requestNotes: '' });
+      draft.activeItemId = entry.id;
+      refreshUpboSection(page.streamer.id);
+    });
+    button.setAttribute('aria-pressed', String(selected));
+    const imageUrl = normalizeUpboImageUrl(entry.imageUrl);
+    if (imageUrl) {
+      const image = document.createElement('img'); image.className = 'upbo-choice-image';
+      image.src = imageUrl; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
+      button.append(image);
+    }
+    const copy = document.createElement('span'); copy.className = 'upbo-choice-copy';
+    const name = document.createElement('strong'); name.textContent = entry.name;
+    const description = document.createElement('small'); description.textContent = entry.description || (selected ? '선택됨' : '눌러서 담기');
+    copy.append(name, description);
+    const mark = document.createElement('span'); mark.className = 'upbo-choice-mark'; mark.textContent = selected ? '✓' : '+';
+    button.append(copy, mark); availableGrid.append(button);
   });
-  const quantity = upboEditorField('수량', 'input', { type: 'number', min: 1, max: 1000000, step: 1, required: true, value: 1 });
-  quantity.field.inputMode = 'numeric';
+  availablePanel.append(availableHeading, availableGrid);
+
+  const cartPanel = document.createElement('div'); cartPanel.className = 'upbo-cart-panel';
+  const cartHeading = document.createElement('div'); cartHeading.className = 'upbo-cart-heading';
+  const cartTitle = document.createElement('h5'); cartTitle.textContent = '선택한 항목';
+  const cartCount = document.createElement('span'); cartCount.className = 'upbo-viewer-total'; cartCount.textContent = `${draft.lines.length}개`;
+  cartHeading.append(cartTitle, cartCount); cartPanel.append(cartHeading);
+  if (!draft.lines.length) {
+    const cartEmpty = document.createElement('p'); cartEmpty.className = 'upbo-inline-empty';
+    cartEmpty.textContent = '항목을 누르면 여기에 담겨요.'; cartPanel.append(cartEmpty);
+  } else {
+    const cartList = document.createElement('div'); cartList.className = 'upbo-cart-list';
+    draft.lines.forEach((line) => {
+      const card = document.createElement('div');
+      const expanded = draft.activeItemId === line.itemId;
+      card.className = `upbo-cart-item${expanded ? ' is-expanded' : ''}`;
+      const item = items.find((candidate) => candidate.id === line.itemId);
+      const cardHeading = document.createElement('div'); cardHeading.className = 'upbo-cart-item-heading';
+      const toggle = upboButton('', 'upbo-cart-item-toggle', () => {
+        draft.activeItemId = expanded ? '' : line.itemId;
+        refreshUpboSection(page.streamer.id);
+      });
+      toggle.setAttribute('aria-expanded', String(expanded));
+      const name = document.createElement('strong'); name.textContent = item ? item.name : line.itemName;
+      const summary = document.createElement('span'); summary.className = 'upbo-cart-quantity-summary';
+      summary.textContent = line.quantity > 0 ? `× ${Number(line.quantity).toLocaleString('ko-KR')}` : '수량 입력';
+      toggle.append(name, summary);
+      const remove = upboButton('×', 'upbo-cart-remove', () => {
+        draft.lines = draft.lines.filter((candidate) => candidate.itemId !== line.itemId);
+        if (draft.activeItemId === line.itemId) draft.activeItemId = '';
+        refreshUpboSection(page.streamer.id);
+      });
+      remove.setAttribute('aria-label', `${line.itemName} 선택 해제`);
+      cardHeading.append(toggle, remove); card.append(cardHeading);
+      if (expanded) {
+        const controls = document.createElement('div'); controls.className = 'upbo-cart-controls';
+        const quantityLabel = document.createElement('label'); quantityLabel.className = 'upbo-cart-quantity-label';
+        quantityLabel.append(document.createTextNode('수량'));
+        const quantityControl = document.createElement('div'); quantityControl.className = 'upbo-cart-quantity-control';
+        const quantityInput = document.createElement('input'); quantityInput.type = 'number';
+        quantityInput.className = 'upbo-cart-quantity-input'; quantityInput.min = '1'; quantityInput.max = '1000000';
+        quantityInput.step = '1'; quantityInput.required = true; quantityInput.value = line.quantity > 0 ? String(line.quantity) : '1';
+        quantityInput.inputMode = 'numeric'; quantityInput.setAttribute('aria-label', `${line.itemName} 수량`);
+        function updateQuantitySummary() {
+          summary.textContent = line.quantity > 0 ? `× ${Number(line.quantity).toLocaleString('ko-KR')}` : '수량 입력';
+        }
+        const decrease = upboButton('−', 'upbo-cart-quantity-step', () => {
+          const value = Math.max(1, (Number(line.quantity) || 1) - 1);
+          line.quantity = value; quantityInput.value = String(value); updateQuantitySummary();
+        });
+        decrease.setAttribute('aria-label', `${line.itemName} 수량 줄이기`);
+        const increase = upboButton('+', 'upbo-cart-quantity-step', () => {
+          const value = Math.min(1000000, (Number(line.quantity) || 0) + 1);
+          line.quantity = value; quantityInput.value = String(value); updateQuantitySummary();
+        });
+        increase.setAttribute('aria-label', `${line.itemName} 수량 늘리기`);
+        quantityInput.addEventListener('input', () => {
+          const value = Number(quantityInput.value);
+          line.quantity = Number.isSafeInteger(value) && value >= 1 && value <= 1000000 ? value : 0;
+          updateQuantitySummary();
+        });
+        quantityInput.addEventListener('change', () => {
+          if (!quantityInput.value || line.quantity < 1) {
+            line.quantity = 1; quantityInput.value = '1'; updateQuantitySummary();
+          }
+        });
+        quantityControl.append(decrease, quantityInput, increase);
+        quantityLabel.append(quantityControl);
+        const requestNotes = upboEditorField('요청사항 (선택)', 'textarea', { maxlength: 500, rows: 3, placeholder: '스트리머에게 전달할 내용을 적어 주세요.' });
+        requestNotes.field.classList.add('upbo-cart-request-notes');
+        requestNotes.field.value = line.requestNotes || '';
+        requestNotes.field.addEventListener('input', () => { line.requestNotes = requestNotes.field.value; });
+        controls.append(quantityLabel, requestNotes.label); card.append(controls);
+      }
+      cartList.append(card);
+    });
+    cartPanel.append(cartList);
+  }
+
   const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary upbo-request-submit';
-  submit.textContent = state.submitting ? '신청 중…' : '신청 보내기'; submit.disabled = state.submitting;
+  submit.textContent = state.submitting ? '신청 중…' : `선택 ${draft.lines.length}개 신청 보내기`;
+  submit.disabled = state.submitting || !draft.lines.length;
   const note = document.createElement('p'); note.className = 'upbo-request-note';
-  note.textContent = '닉네임과 신청 수량을 확인해 제출해 주세요. 승인된 신청만 공개 기록에 등록됩니다.';
-  form.append(nickname.label, item.label, quantity.label, submit, note);
+  note.textContent = '선택한 각 항목은 스트리머 검토 목록에 따로 표시되며, 승인된 항목만 공개 기록에 등록됩니다.';
+  form.append(nickname.label, availablePanel, cartPanel, submit, note);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity() || state.submitting) return;
     state.submitting = true; submit.disabled = true; submit.textContent = '신청 중…';
+    form.querySelectorAll('button, input, textarea').forEach((control) => { control.disabled = true; });
     try {
+      const submittedCount = draft.lines.length;
       await callUpbo({
-        action: 'submitRequest', streamerId: page.streamer.id,
-        nickname: nickname.field.value.trim(), itemId: item.field.value, quantity: Number(quantity.field.value),
+        action: 'submitRequests', streamerId: page.streamer.id,
+        nickname: nickname.field.value.trim(),
+        items: draft.lines.map((line) => ({ itemId: line.itemId, quantity: Number(line.quantity), requestNotes: line.requestNotes || '' })),
       });
-      form.reset();
-      showToast('신청을 보냈어요. 스트리머 확인 후 등록됩니다.');
+      state.requestDraft = { nickname: '', lines: [], activeItemId: '' };
+      showToast(`${submittedCount}개 항목 신청을 보냈어요. 스트리머 확인 후 등록됩니다.`);
       await loadUpboBoard(page.streamer.id);
     } catch (error) {
       showToast(error.message || '신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -1123,9 +1227,14 @@ function renderUpboPendingQueue(page, state) {
   state.pending.forEach((request) => {
     const row = document.createElement('article'); row.className = 'upbo-pending-row';
     const copy = document.createElement('div'); copy.className = 'upbo-pending-copy';
-    const summary = document.createElement('strong'); summary.textContent = `${request.nickname} · ${request.itemName} × ${request.quantity.toLocaleString('ko-KR')}`;
+    const groupSummary = request.requestGroupSize > 1 ? ` · 함께 신청 ${request.requestGroupSize}개 항목` : '';
+    const summary = document.createElement('strong'); summary.textContent = `${request.nickname} · ${request.itemName} × ${request.quantity.toLocaleString('ko-KR')}${groupSummary}`;
     const submitted = document.createElement('span'); submitted.textContent = `신청 ${formatUpboDateTime(request.submittedAt)}`;
     copy.append(summary, submitted);
+    if (request.requestNotes) {
+      const requestNotes = document.createElement('small'); requestNotes.className = 'upbo-pending-request-notes';
+      requestNotes.textContent = `요청사항: ${request.requestNotes}`; copy.append(requestNotes);
+    }
     const actions = document.createElement('div'); actions.className = 'upbo-row-actions';
     actions.append(
       upboButton('검토·등록', 'button-primary upbo-small-button', () => openUpboSubmissionEditor(page, request)),
@@ -1476,7 +1585,11 @@ function openUpboSubmissionEditor(page, entry, isRecord = false) {
   const quantity = upboEditorField('수량', 'input', { type: 'number', min: 1, max: 1000000, step: 1, required: true, value: entry.quantity });
   quantity.field.inputMode = 'numeric';
   const note = document.createElement('p'); note.className = 'upbo-editor-note';
-  note.textContent = isRecord ? '수정 내용은 공개된 확정 기록에 반영됩니다.' : '수정한 내용으로 승인하면 팬페이지의 공개 업보 기록에 등록됩니다.';
+  note.textContent = isRecord
+    ? '수정 내용은 공개된 확정 기록에 반영됩니다.'
+    : entry.requestNotes
+      ? `팬 요청사항: ${entry.requestNotes}`
+      : '팬 요청사항이 없습니다. 승인하면 팬페이지의 공개 업보 기록에 등록됩니다.';
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer upbo-editor-footer';
   const hint = document.createElement('small'); hint.textContent = isRecord ? '공개 기록 수정' : `신청 시각 ${formatUpboDateTime(entry.submittedAt)}`;
   const actions = document.createElement('div'); actions.className = 'profile-editor-footer-actions';
