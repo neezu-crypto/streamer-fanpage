@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f6fa">
-  <meta name="description" content="스트리머 고점체크: SOOP 다시보기별 최고·최저 시청자 순간을 찾아 바로 재생합니다.">
+  <meta name="description" content="스트리머 고점체크: SOOP 다시보기 시청 통계를 확인하고 같은 날 두 스트리머의 고점을 비교합니다.">
   <title>스트리머 고점체크</title>
   <link rel="icon" type="image/svg+xml" href="viewer-stats-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-queue">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261016-branding">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261016-compare">
 </head>
 <body class="viewer-stats-page">
   <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
@@ -71,7 +71,7 @@
       <section class="viewer-stats-hero">
         <p class="eyebrow">SOOP VIEWER ANALYTICS</p>
         <h1>방송의 흐름을<br><span>숫자로 확인하세요</span></h1>
-        <p>다시보기별 최고·최저 시청 순간부터 기간별 최고 기록까지, 필요한 통계를 한곳에서 확인할 수 있습니다.</p>
+        <p>다시보기별 최고·최저 시청 순간과 같은 날 두 스트리머 비교, 기간별 최고 기록을 한곳에서 확인할 수 있습니다.</p>
       </section>
 
       <section class="viewer-search-panel" aria-labelledby="viewerSearchTitle">
@@ -86,6 +86,24 @@
         <p class="viewer-queue-note">익명도 이용할 수 있어요. 혼잡하면 로그인·구독 요청이 먼저 처리될 수 있고, 이용 등급별 한도가 적용됩니다.</p>
         <div class="viewer-search-results" id="viewerSearchResults" aria-label="스트리머 검색 결과"></div>
       </section>
+      </section>
+
+      <section class="viewer-comparison-panel" aria-labelledby="viewerComparisonTitle">
+        <div class="viewer-comparison-heading">
+          <div>
+            <p class="eyebrow">SAME-DAY VOD COMPARISON</p>
+            <h2 id="viewerComparisonTitle">같은 날 다시보기 2개 비교</h2>
+            <p>스트리머를 바꿔가며 같은 날짜의 다시보기 두 개를 담고, 고점과 평균 대비 상승폭을 비교하세요.</p>
+          </div>
+          <span class="viewer-comparison-count" id="viewerComparisonCount">0 / 2 선택</span>
+        </div>
+        <div class="viewer-comparison-selection" id="viewerComparisonSelection"></div>
+        <p class="viewer-comparison-status" id="viewerComparisonStatus" role="status" aria-live="polite">스트리머를 검색한 뒤 각 다시보기 카드에서 ‘비교에 담기’를 선택해 주세요.</p>
+        <div class="viewer-comparison-actions">
+          <button class="button" id="viewerComparisonClear" type="button" disabled>선택 비우기</button>
+          <button class="button button-primary" id="viewerComparisonRun" type="button" disabled>비교 결과 확인</button>
+        </div>
+        <div class="viewer-comparison-results hidden" id="viewerComparisonResults" aria-live="polite"></div>
       </section>
 
       <section class="viewer-results hidden" id="viewerResults" aria-live="polite">
@@ -112,7 +130,7 @@
             <div class="viewer-subscription-copy">
               <p class="eyebrow">STREAMER PEAK CHECK PASS</p>
               <h4 id="viewerSubscriptionTitle">고점체크 구독</h4>
-              <p>별풍선 10개로 30일 이용 · 무료 체험과 자동 결제 없이, 모든 스트리머의 기간별 최고 순간과 평균 대비 상승폭을 확인하세요.</p>
+              <p>별풍선 10개로 30일 이용 · 무료 체험과 자동 결제 없이, 기간별 최고 순간·평균 대비 상승폭·같은 날 두 스트리머의 다시보기 비교를 확인하세요.</p>
               <p class="viewer-subscription-status" id="viewerSubscriptionStatus" role="status" aria-live="polite">구독 상태를 확인하고 있어요.</p>
             </div>
             <div class="viewer-subscription-actions">
@@ -153,9 +171,9 @@
       <div id="viewerSubscriptionPurchaseInfo">
         <p class="viewer-subscription-dialog-intro">구독 권한은 현재 로그인한 개인 계정에 적용되며, 모든 스트리머에 사용할 수 있어요. 별풍선 10개 후원 1회당 30일 이용권이 부여되고, 남은 기간이 있으면 이어서 연장됩니다. 무료 체험과 자동 갱신은 없습니다.</p>
         <ol class="viewer-subscription-steps">
-          <li><a href="https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&amp;szWork=BJ_STATION&amp;sys_type=web&amp;location=station" target="_blank" rel="noopener noreferrer">운영자 방송국에 별풍선 10개 후원 ↗</a></li>
-          <li>후원에 사용한 SOOP 닉네임을 입력하고 신청해 주세요.</li>
-          <li>운영자가 방송에서 직접 확인한 뒤 구독을 승인합니다.</li>
+          <li><strong>2단계 · 별풍선 후원</strong> <a href="https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&amp;szWork=BJ_STATION&amp;sys_type=web&amp;location=station" target="_blank" rel="noopener noreferrer">운영자 방송국에 10개 후원 ↗</a></li>
+          <li><strong>3단계 · 신청</strong> 후원에 사용한 SOOP 닉네임을 입력하고 신청해 주세요.</li>
+          <li><strong>4단계 · 승인</strong> 운영자가 방송에서 직접 확인한 뒤 구독을 승인합니다.</li>
         </ol>
         <label for="viewerSubscriptionNickname">후원자 SOOP 닉네임</label>
         <input id="viewerSubscriptionNickname" name="nickname" maxlength="20" autocomplete="nickname" placeholder="별풍선을 보낸 닉네임" required>
@@ -166,9 +184,16 @@
         <button class="button" id="viewerSubscriptionCloseBottom" type="button">닫기</button>
         <button class="button button-primary" id="viewerSubscriptionSubmit" type="submit">후원 신청하기</button>
       </div>
-      <p class="viewer-subscription-login-note hidden" id="viewerSubscriptionLoginNote">구독 신청에는 Google·Kakao 계정 연결 또는 스트리머 인증이 필요합니다. <a href="index.html?login=1" target="_blank" rel="noopener noreferrer">팬페이지에서 로그인하기 ↗</a> 로그인 후 이 페이지에서 상태를 새로고침해 주세요.</p>
+      <div class="viewer-subscription-login-note hidden" id="viewerSubscriptionLoginNote">
+        <strong>1단계 · 계정 로그인</strong>
+        <p>선택한 다시보기는 그대로 유지돼요. 로그인 후 구독을 신청하고 승인이 끝나면 비교 결과가 자동으로 열립니다.</p>
+        <div class="viewer-subscription-login-actions">
+          <a class="button button-primary" href="index.html?login=1" target="_blank" rel="noopener noreferrer">새 탭에서 로그인 ↗</a>
+          <button class="button" id="viewerSubscriptionLoginCheck" type="button">로그인 상태 확인</button>
+        </div>
+      </div>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261016-branding"></script>
+  <script type="module" src="viewer-stats.js?v=20261016-compare"></script>
 </body>
 </html>
