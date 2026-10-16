@@ -1476,7 +1476,8 @@ function renderFanPage(page) {
   if (about) section.append(about);
   section.append(details, stockCard, actions);
   if (!page.isOwner) view.append(back);
-  view.append(renderBannerSection(page, 'top'));
+  const topBanner = renderBannerSection(page, 'top');
+  if (topBanner) view.append(topBanner);
   view.append(section);
   if (String(page.streamer.id || '').toLowerCase() === 'yuhatty') {
     const character = document.createElement('section');
@@ -1515,7 +1516,8 @@ function renderFanPage(page) {
   view.append(renderCalendarSection(page));
   const gallerySection = renderGallerySection(page);
   view.append(gallerySection);
-  view.append(renderBannerSection(page, 'bottom'));
+  const bottomBanner = renderBannerSection(page, 'bottom');
+  if (bottomBanner) view.append(bottomBanner);
   if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
@@ -1691,108 +1693,26 @@ function createBannerSettingsEditor(field, labelText, sourceUrls) {
 function renderBannerSection(page, position) {
   const isTop = position === 'top';
   const field = isTop ? 'topBannerImageUrls' : 'bottomBannerImageUrls';
-  const section = document.createElement('section');
-  section.className = `fan-banner-section content-card fan-banner-${position}`;
-  section.id = `${position}BannerSection`;
-  const heading = document.createElement('div'); heading.className = 'fan-banner-heading';
-  const copy = document.createElement('div');
-  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = isTop ? 'TOP FANPAGE BANNER' : 'BOTTOM FANPAGE BANNER';
-  const title = document.createElement('h2'); title.textContent = isTop ? '상단 배너' : '하단 배너';
-  copy.append(eyebrow, title); heading.append(copy); section.append(heading);
-
   const storedUrls = page.profile && page.profile[field];
   const urls = Array.isArray(storedUrls) ? storedUrls.map((url) => {
     try { return normalizeBannerImageUrl(url); } catch (_) { return ''; }
   }).filter(Boolean).slice(0, MAX_BANNER_IMAGE_ITEMS) : [];
+  if (!urls.length) return null;
+
+  const section = document.createElement('section');
+  section.className = `fan-banner-section fan-banner-${position}`;
+  section.id = `${position}BannerSection`;
+  section.setAttribute('aria-label', `${page.streamer.nickname} ${isTop ? '상단' : '하단'} 배너`);
   const list = document.createElement('div'); list.className = 'fan-banner-list';
-  if (!urls.length) {
-    const empty = document.createElement('p'); empty.className = 'profile-link-empty-state';
-    empty.textContent = page.isOwner ? '배너 이미지가 아직 등록되지 않았어요. 이미지 주소를 추가해 보세요.' : '아직 등록된 배너 이미지가 없어요.';
-    list.append(empty);
-  } else {
-    urls.forEach((url, index) => {
-      const item = document.createElement('div'); item.className = 'fan-banner-item';
-      const image = document.createElement('img'); image.className = 'fan-banner-image';
-      image.src = url; image.alt = `${page.streamer.nickname} ${isTop ? '상단' : '하단'} 배너 ${index + 1}`;
-      image.loading = isTop && index === 0 ? 'eager' : 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
-      const fallback = document.createElement('span'); fallback.className = 'fan-banner-fallback hidden';
-      fallback.textContent = '배너 이미지를 불러오지 못했어요.';
-      image.addEventListener('error', () => { image.classList.add('hidden'); fallback.classList.remove('hidden'); }, { once: true });
-      item.append(image, fallback);
-      if (page.isOwner) {
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button fan-banner-remove';
-        remove.textContent = '이미지 삭제'; remove.setAttribute('aria-label', `${isTop ? '상단' : '하단'} 배너 이미지 ${index + 1} 삭제`);
-        remove.addEventListener('click', () => {
-          const nextUrls = urls.filter((_, itemIndex) => itemIndex !== index);
-          saveBannerImageUrls(page, field, nextUrls, remove);
-        });
-        item.append(remove);
-      }
-      list.append(item);
-    });
-  }
+  urls.forEach((url, index) => {
+    const image = document.createElement('img'); image.className = 'fan-banner-image';
+    image.src = url; image.alt = `${page.streamer.nickname} ${isTop ? '상단' : '하단'} 배너 ${index + 1}`;
+    image.loading = isTop && index === 0 ? 'eager' : 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
+    image.addEventListener('error', () => image.remove(), { once: true });
+    list.append(image);
+  });
   section.append(list);
-
-  if (page.isOwner) {
-    const form = document.createElement('form'); form.className = 'fan-banner-editor';
-    const input = document.createElement('input'); input.type = 'url'; input.maxLength = 2048;
-    input.placeholder = 'https://이미지주소'; input.required = true; input.autocomplete = 'url';
-    input.setAttribute('aria-label', `${isTop ? '상단' : '하단'} 배너 이미지 주소`);
-    const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary'; add.textContent = '+ 배너 추가';
-    const note = document.createElement('small'); note.className = 'fan-banner-editor-note';
-    note.textContent = `HTTPS 이미지 주소를 등록할 수 있어요. ${urls.length}/${MAX_BANNER_IMAGE_ITEMS}`;
-    const status = document.createElement('p'); status.className = 'profile-link-editor-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-    add.disabled = urls.length >= MAX_BANNER_IMAGE_ITEMS;
-    form.append(input, add, note, status);
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (!input.checkValidity() || add.disabled) { input.reportValidity(); return; }
-      let url;
-      try { url = normalizeBannerImageUrl(input.value); }
-      catch (error) { status.textContent = error.message; status.classList.add('is-error'); input.focus(); return; }
-      if (urls.includes(url)) { status.textContent = '이미 등록된 이미지 주소예요.'; status.classList.add('is-error'); return; }
-      status.textContent = ''; status.classList.remove('is-error');
-      await saveBannerImageUrls(page, field, [...urls, url], add, status);
-    });
-    section.append(form);
-  }
   return section;
-}
-
-async function saveBannerImageUrls(page, field, urls, button, status = null) {
-  if (!page.isOwner || !Array.isArray(urls)) return;
-  let normalizedUrls;
-  try {
-    normalizedUrls = [...new Set(urls.map(normalizeBannerImageUrl).filter(Boolean))];
-    if (normalizedUrls.length > MAX_BANNER_IMAGE_ITEMS) throw new Error(`배너는 위치별 최대 ${MAX_BANNER_IMAGE_ITEMS}개까지 등록할 수 있어요.`);
-  } catch (error) {
-    if (status) { status.textContent = error.message; status.classList.add('is-error'); }
-    else showToast(error.message || '배너 주소를 확인해 주세요.');
-    return;
-  }
-  button.disabled = true;
-  try {
-    const result = await callSave({
-      streamerId: page.streamer.id,
-      profile: profileForLinkSave(page.profile, field, normalizedUrls),
-    });
-    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    currentPage.profile = result.data.page.profile;
-    page.profile = currentPage.profile;
-    refreshBannerSection('top'); refreshBannerSection('bottom');
-    showToast('배너 이미지를 저장했어요.');
-  } catch (error) {
-    if (status) { status.textContent = error.message || '배너 이미지를 저장하지 못했어요.'; status.classList.add('is-error'); }
-    else showToast(error.message || '배너 이미지를 저장하지 못했어요.');
-  } finally {
-    button.disabled = false;
-  }
-}
-
-function refreshBannerSection(position) {
-  if (!currentPage) return;
-  const section = $(`${position}BannerSection`);
-  if (section) section.replaceWith(renderBannerSection(currentPage, position));
 }
 
 function profileForLinkSave(source, field, value) {
