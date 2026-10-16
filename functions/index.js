@@ -91,6 +91,10 @@ const fanpageViewerStatsInProgress = new Map();
 const soopStreamerSearchCache = new Map();
 const FANPAGE_VIEWER_STATS_CACHE_TTL_MS = 10 * 60 * 1000;
 const FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS = 200;
+const VIEWER_STATS_PERSISTENT_CACHE_PATH = 'streamerFanPageViewerStatsCache';
+const VIEWER_STATS_CACHE_SCHEMA_VERSION = 1;
+const VIEWER_STATS_CACHE_LOCK_TTL_MS = 90 * 1000;
+const VIEWER_STATS_CACHE_WAIT_TIMEOUT_MS = 75 * 1000;
 const VIEWER_STATS_JOBS_PATH = 'streamerFanPageViewerStatsJobs';
 const VIEWER_STATS_WORKER_CLAIMS_PATH = 'streamerFanPageViewerStatsWorkerClaims';
 const VIEWER_STATS_JOB_TTL_MS = 2 * 60 * 60 * 1000;
@@ -1338,25 +1342,133 @@ async function enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiu
   }
 }
 
+function viewerStatsPersistentCacheRef(streamerId, vodId) {
+  const normalizedStreamerId = String(streamerId || '').trim().toLowerCase();
+  const normalizedVodId = String(vodId || '').trim();
+  if (!SOOP_ID_PATTERN.test(normalizedStreamerId) || !/^\d{1,20}$/.test(normalizedVodId)) {
+    throw new HttpsError('invalid-argument', '시청 통계 캐시 요청을 확인해 주세요.');
+  }
+  return db.ref(`${VIEWER_STATS_PERSISTENT_CACHE_PATH}/${normalizedStreamerId}/${normalizedVodId}`);
+}
+
+function reusableViewerStatsFromCache(record, streamerId, vodId) {
+  if (!record || record.status !== 'completed' || Number(record.schemaVersion) !== VIEWER_STATS_CACHE_SCHEMA_VERSION) {
+    return null;
+  }
+  const stats = record.stats;
+  const normalizedStreamerId = String(streamerId || '').trim().toLowerCase();
+  const normalizedVodId = String(vodId || '').trim();
+  const validPoint = (point) => point && Number.isFinite(Number(point.second)) && Number(point.second) >= 0
+    && Number.isFinite(Number(point.viewers)) && Number(point.viewers) >= 0;
+  if (!stats || String(stats.streamerId || '').toLowerCase() !== normalizedStreamerId
+    || String(stats.vodId || '') !== normalizedVodId
+    || !validPoint(stats.highest) || !validPoint(stats.lowest)
+    || !Number.isFinite(Number(stats.averageViewers)) || Number(stats.averageViewers) < 0) {
+    return null;
+  }
+  return stats;
+}
+
+async function readPersistentViewerStatsCache(streamerId, vodId) {
+  const snapshot = await viewerStatsPersistentCacheRef(streamerId, vodId).get();
+  return reusableViewerStatsFromCache(snapshot.val(), streamerId, vodId);
+}
+
+function rememberViewerStatsInMemory(cacheKey, stats) {
+  fanpageViewerStatsMemoryCache.set(cacheKey, {
+    value: stats,
+    expiresAt: Date.now() + FANPAGE_VIEWER_STATS_CACHE_TTL_MS,
+  });
+  while (fanpageViewerStatsMemoryCache.size > FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS) {
+    fanpageViewerStatsMemoryCache.delete(fanpageViewerStatsMemoryCache.keys().next().value);
+  }
+}
+
+async function fetchAndPersistViewerStats(streamerId, vodId) {
+  const cacheRef = viewerStatsPersistentCacheRef(streamerId, vodId);
+  const waitDeadline = Date.now() + VIEWER_STATS_CACHE_WAIT_TIMEOUT_MS;
+  let waitDelay = 400;
+
+  while (Date.now() < waitDeadline) {
+    const now = Date.now();
+    const lockId = randomUUID();
+    const claim = await cacheRef.transaction((current) => {
+      if (reusableViewerStatsFromCache(current, streamerId, vodId)) return;
+      if (current && current.status === 'processing' && Number(current.lockExpiresAt) > now) return;
+      return {
+        status: 'processing',
+        lockId,
+        lockExpiresAt: now + VIEWER_STATS_CACHE_LOCK_TTL_MS,
+      };
+    });
+    const current = claim.snapshot.val();
+    const cachedStats = reusableViewerStatsFromCache(current, streamerId, vodId);
+    if (cachedStats) return { stats: cachedStats, cacheHit: true };
+
+    if (claim.committed && current && current.status === 'processing' && current.lockId === lockId) {
+      try {
+        const stats = await fetchSoopVodViewerCountStats(streamerId, vodId);
+        const saved = await cacheRef.transaction((latest) => {
+          if (reusableViewerStatsFromCache(latest, streamerId, vodId)) return;
+          const ownsLock = latest && latest.status === 'processing' && latest.lockId === lockId;
+          const expiredLock = latest && latest.status === 'processing'
+            && Number(latest.lockExpiresAt) <= Date.now();
+          if (!ownsLock && !expiredLock && latest && latest.status === 'processing') return;
+          return {
+            status: 'completed',
+            schemaVersion: VIEWER_STATS_CACHE_SCHEMA_VERSION,
+            analyzedAt: Number(stats.checkedAt) || Date.now(),
+            stats,
+          };
+        });
+        const savedStats = reusableViewerStatsFromCache(saved.snapshot.val(), streamerId, vodId);
+        if (!savedStats) {
+          throw new HttpsError('unavailable', '분석 결과를 공용 캐시에 저장하지 못했어요. 다시 시도해 주세요.');
+        }
+        return { stats: savedStats, cacheHit: !saved.committed };
+      } catch (error) {
+        const latest = await cacheRef.get().catch(() => null);
+        const latestStats = reusableViewerStatsFromCache(latest && latest.val(), streamerId, vodId);
+        if (latestStats) return { stats: latestStats, cacheHit: true };
+        await cacheRef.transaction((value) => {
+          if (value && value.status === 'processing' && value.lockId === lockId) return null;
+          return;
+        }).catch(() => {});
+        throw error;
+      }
+    }
+
+    const activeLockExpiry = current && current.status === 'processing'
+      ? Number(current.lockExpiresAt) || 0
+      : 0;
+    if (activeLockExpiry && activeLockExpiry <= Date.now()) continue;
+    await new Promise((resolve) => setTimeout(resolve, waitDelay));
+    waitDelay = Math.min(2000, Math.ceil(waitDelay * 1.5));
+  }
+
+  const latestStats = await readPersistentViewerStatsCache(streamerId, vodId);
+  if (latestStats) return { stats: latestStats, cacheHit: true };
+  throw new HttpsError('unavailable', '이 다시보기는 다른 이용자의 분석이 진행 중입니다. 잠시 후 다시 시도해 주세요.');
+}
+
 async function getOrFetchViewerStats(streamerId, vodId) {
-  const cacheKey = streamerId + ':' + vodId;
+  const normalizedStreamerId = String(streamerId || '').trim().toLowerCase();
+  const normalizedVodId = String(vodId || '').trim();
+  const cacheKey = normalizedStreamerId + ':' + normalizedVodId;
   const cached = fanpageViewerStatsMemoryCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return { stats: cached.value, cacheHit: true };
   const inProgress = fanpageViewerStatsInProgress.get(cacheKey);
-  if (inProgress) return { stats: await inProgress, cacheHit: true };
+  if (inProgress) {
+    const sharedResult = await inProgress;
+    return { stats: sharedResult.stats, cacheHit: true };
+  }
 
-  const task = fetchSoopVodViewerCountStats(streamerId, vodId);
+  const task = fetchAndPersistViewerStats(normalizedStreamerId, normalizedVodId);
   fanpageViewerStatsInProgress.set(cacheKey, task);
   try {
-    const stats = await task;
-    fanpageViewerStatsMemoryCache.set(cacheKey, {
-      value: stats,
-      expiresAt: Date.now() + FANPAGE_VIEWER_STATS_CACHE_TTL_MS,
-    });
-    while (fanpageViewerStatsMemoryCache.size > FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS) {
-      fanpageViewerStatsMemoryCache.delete(fanpageViewerStatsMemoryCache.keys().next().value);
-    }
-    return { stats, cacheHit: false };
+    const result = await task;
+    rememberViewerStatsInMemory(cacheKey, result.stats);
+    return result;
   } finally {
     if (fanpageViewerStatsInProgress.get(cacheKey) === task) fanpageViewerStatsInProgress.delete(cacheKey);
   }
@@ -3122,6 +3234,13 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
       return { stats: viewerStatsForResponse(cached.value, includePremiumMetrics) };
     }
     await enforceViewerStatsRateLimit(uid, action, { tier });
+    const persistentCachedStats = await readPersistentViewerStatsCache(streamerId, vodId);
+    if (persistentCachedStats) {
+      rememberViewerStatsInMemory(cacheKey, persistentCachedStats);
+      await updateViewerStatsQueueMetrics(viewerStatsUidKey(uid), viewerStatsDayKey(), { cacheHits: 1 })
+        .catch((error) => console.warn('Could not record viewer stats cache hit:', error));
+      return { stats: viewerStatsForResponse(persistentCachedStats, includePremiumMetrics) };
+    }
     return enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiumMetrics);
   }
 
