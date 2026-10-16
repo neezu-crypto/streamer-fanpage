@@ -73,6 +73,9 @@ const FANPAGE_UPBO_MAX_TOPICS = 20;
 const FANPAGE_UPBO_MAX_ROWS = 50;
 const FANPAGE_UPBO_VIEWER_PAGE_SIZE = 100;
 const FANPAGE_UPBO_MAX_VIEWER_COUNT = 5000;
+const FANPAGE_UPBO_MAX_ITEMS = 100;
+const FANPAGE_UPBO_BOARD_PAGE_SIZE = 100;
+const FANPAGE_UPBO_MAX_QUANTITY = 1000000;
 const YOUTUBE_DATA_API_KEY = defineSecret('YOUTUBE_DATA_API_KEY');
 const GALLERY_PUBLIC_IMAGE_HOST = 'pub-aa5574dbd45e4404b18ab8efaae54e67.r2.dev';
 const GALLERY_CATEGORY_LABELS = Object.freeze({
@@ -626,6 +629,79 @@ function normalizeStoredUpboViewer(id, value) {
     request: typeof value.request === 'string' ? value.request.slice(0, 300) : '',
     createdAt: Number(value.createdAt) || 0,
     updatedAt: Number(value.updatedAt) || 0,
+  };
+}
+
+function normalizeStoredUpboItem(id, value) {
+  if (!validUpboId(id) || !value || typeof value !== 'object' || typeof value.name !== 'string') return null;
+  const name = value.name.trim().slice(0, 60);
+  if (!name) return null;
+  return {
+    id,
+    name,
+    description: typeof value.description === 'string' ? value.description.slice(0, 160) : '',
+    active: value.active !== false,
+    createdAt: Number(value.createdAt) || 0,
+    updatedAt: Number(value.updatedAt) || 0,
+  };
+}
+
+function normalizeStoredUpboSubmission(id, value) {
+  if (!validUpboId(id) || !value || typeof value !== 'object' || value.status !== 'pending') return null;
+  const nickname = typeof value.nickname === 'string' ? value.nickname.trim().slice(0, 40) : '';
+  const itemName = typeof value.itemName === 'string' ? value.itemName.trim().slice(0, 60) : '';
+  const itemId = typeof value.itemId === 'string' && validUpboId(value.itemId) ? value.itemId : '';
+  const quantity = Number(value.quantity);
+  const submittedAt = Number(value.submittedAt) || 0;
+  if (!nickname || !itemName || !itemId || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > FANPAGE_UPBO_MAX_QUANTITY || !submittedAt) return null;
+  return { id, nickname, itemId, itemName, quantity, submittedAt };
+}
+
+function normalizeStoredUpboRecord(id, value) {
+  if (!validUpboId(id) || !value || typeof value !== 'object') return null;
+  const nickname = typeof value.nickname === 'string' ? value.nickname.trim().slice(0, 40) : '';
+  const itemName = typeof value.itemName === 'string' ? value.itemName.trim().slice(0, 60) : '';
+  const itemId = typeof value.itemId === 'string' && validUpboId(value.itemId) ? value.itemId : '';
+  const quantity = Number(value.quantity);
+  const approvedAt = Number(value.approvedAt) || 0;
+  if (!nickname || !itemName || !itemId || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > FANPAGE_UPBO_MAX_QUANTITY || !approvedAt) return null;
+  return {
+    id, nickname, itemId, itemName, quantity,
+    submittedAt: Number(value.submittedAt) || approvedAt,
+    approvedAt,
+    updatedAt: Number(value.updatedAt) || approvedAt,
+  };
+}
+
+function validateUpboQuantity(value) {
+  const quantity = Number(value);
+  if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > FANPAGE_UPBO_MAX_QUANTITY) {
+    throw new HttpsError('invalid-argument', `수량은 1 이상 ${FANPAGE_UPBO_MAX_QUANTITY.toLocaleString('ko-KR')} 이하의 정수로 입력해 주세요.`);
+  }
+  return quantity;
+}
+
+function upboTimestampId(timestamp = Date.now()) {
+  return `${String(Number.MAX_SAFE_INTEGER - timestamp).padStart(16, '0')}_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+}
+
+async function readUpboNodePage(ref, cursor, pageSize, normalize) {
+  let query = ref.orderByKey();
+  if (cursor) query = query.startAt(cursor);
+  const snapshot = await query.limitToFirst(pageSize + (cursor ? 2 : 1)).get();
+  const items = [];
+  snapshot.forEach((child) => {
+    if (cursor && child.key <= cursor) return false;
+    const item = normalize(child.key, child.val());
+    if (item) items.push(item);
+    return items.length >= pageSize + 1;
+  });
+  const hasMore = items.length > pageSize;
+  const pageItems = items.slice(0, pageSize);
+  return {
+    items: pageItems,
+    hasMore,
+    nextCursor: hasMore && pageItems.length ? pageItems[pageItems.length - 1].id : '',
   };
 }
 
@@ -3869,6 +3945,198 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
   const canManage = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
   const rootRef = upboRootRef(target.streamer.id);
   const topicsRef = rootRef.child('topics');
+  const itemsRef = rootRef.child('items');
+  const submissionsRef = rootRef.child('submissions');
+  const recordsRef = rootRef.child('records');
+
+  if (action === 'loadBoard') {
+    const [itemsSnapshot, recordsPage, pendingPage] = await Promise.all([
+      itemsRef.get(),
+      readUpboNodePage(
+        recordsRef,
+        typeof data.recordCursor === 'string' && validUpboId(data.recordCursor) ? data.recordCursor : '',
+        FANPAGE_UPBO_BOARD_PAGE_SIZE,
+        normalizeStoredUpboRecord,
+      ),
+      canManage
+        ? readUpboNodePage(
+          submissionsRef,
+          typeof data.pendingCursor === 'string' && validUpboId(data.pendingCursor) ? data.pendingCursor : '',
+          FANPAGE_UPBO_BOARD_PAGE_SIZE,
+          normalizeStoredUpboSubmission,
+        )
+        : Promise.resolve({ items: [], hasMore: false, nextCursor: '' }),
+    ]);
+    const items = Object.entries(itemsSnapshot.val() || {})
+      .map(([id, value]) => normalizeStoredUpboItem(id, value))
+      .filter((item) => item && (canManage || item.active))
+      .sort((a, b) => Number(b.active) - Number(a.active) || a.createdAt - b.createdAt || a.name.localeCompare(b.name, 'ko'))
+      .slice(0, FANPAGE_UPBO_MAX_ITEMS);
+    return {
+      items,
+      records: recordsPage.items,
+      recordsHasMore: recordsPage.hasMore,
+      recordsNextCursor: recordsPage.nextCursor,
+      pending: pendingPage.items,
+      pendingHasMore: pendingPage.hasMore,
+      pendingNextCursor: pendingPage.nextCursor,
+      canManage,
+    };
+  }
+
+  if (action === 'submitRequest') {
+    const nickname = upboText(data.nickname, 40, true);
+    const itemId = String(data.itemId || '').trim();
+    if (!validUpboId(itemId)) throw new HttpsError('invalid-argument', '신청할 항목을 선택해 주세요.');
+    const item = normalizeStoredUpboItem(itemId, (await itemsRef.child(itemId).get()).val());
+    if (!item || !item.active) throw new HttpsError('failed-precondition', '현재 신청할 수 없는 항목입니다. 새로고침해 주세요.');
+    const quantity = validateUpboQuantity(data.quantity);
+    const id = upboTimestampId();
+    const submission = {
+      nickname,
+      itemId: item.id,
+      itemName: item.name,
+      quantity,
+      submittedAt: Date.now(),
+      status: 'pending',
+    };
+    await submissionsRef.child(id).set(submission);
+    return { submitted: true, requestId: id };
+  }
+
+  if (!canManage && ['saveItem', 'deleteItem', 'approveRequest', 'deleteRequest', 'saveRecord', 'deleteRecord'].includes(action)) {
+    throw new HttpsError('permission-denied', '업보 항목과 신청은 해당 스트리머와 관리자만 관리할 수 있습니다.');
+  }
+
+  if (action === 'saveItem') {
+    const itemId = String(data.itemId || '').trim();
+    if (!validUpboId(itemId)) throw new HttpsError('invalid-argument', '업보 항목을 확인해 주세요.');
+    const itemRef = itemsRef.child(itemId);
+    const previous = (await itemRef.get()).val() || {};
+    if (!previous.createdAt && Object.keys((await itemsRef.get()).val() || {}).length >= FANPAGE_UPBO_MAX_ITEMS) {
+      throw new HttpsError('resource-exhausted', `업보 신청 항목은 ${FANPAGE_UPBO_MAX_ITEMS}개까지 등록할 수 있습니다.`);
+    }
+    const item = {
+      name: upboText(data.name, 60, true),
+      description: upboText(data.description || '', 160),
+      active: previous.active !== false,
+      createdAt: Number(previous.createdAt) || Date.now(),
+      updatedAt: Date.now(),
+    };
+    await itemRef.set(item);
+    return { item: { id: itemId, ...item }, canManage };
+  }
+
+  if (action === 'deleteItem') {
+    const itemId = String(data.itemId || '').trim();
+    if (!validUpboId(itemId)) throw new HttpsError('invalid-argument', '업보 항목을 확인해 주세요.');
+    const itemRef = itemsRef.child(itemId);
+    if (!(await itemRef.get()).exists()) throw new HttpsError('not-found', '삭제할 업보 항목을 찾을 수 없습니다.');
+    await itemRef.remove();
+    return { deleted: true, canManage };
+  }
+
+  if (action === 'approveRequest') {
+    const requestId = String(data.requestId || '').trim();
+    if (!validUpboId(requestId)) throw new HttpsError('invalid-argument', '팬 신청을 확인해 주세요.');
+    const requestRef = submissionsRef.child(requestId);
+    const pendingSnapshot = await requestRef.get();
+    const pending = normalizeStoredUpboSubmission(requestId, pendingSnapshot.val());
+    if (!pending) throw new HttpsError('not-found', '승인 대기 중인 신청을 찾을 수 없습니다.');
+    const nickname = upboText(data.nickname ?? pending.nickname, 40, true);
+    const itemId = String(data.itemId ?? pending.itemId).trim();
+    if (!validUpboId(itemId)) throw new HttpsError('invalid-argument', '등록할 항목을 선택해 주세요.');
+    const selectedItem = normalizeStoredUpboItem(itemId, (await itemsRef.child(itemId).get()).val());
+    const itemName = selectedItem && selectedItem.active
+      ? selectedItem.name
+      : itemId === pending.itemId ? pending.itemName : '';
+    if (!itemName) throw new HttpsError('failed-precondition', '등록 항목을 찾을 수 없습니다. 항목을 다시 선택해 주세요.');
+    const quantity = validateUpboQuantity(data.quantity ?? pending.quantity);
+    const approvedAt = Date.now();
+    const recordId = upboTimestampId(approvedAt);
+    const lockId = randomUUID();
+    const claim = await requestRef.transaction((current) => {
+      if (!current || current.status !== 'pending') return undefined;
+      return { ...current, status: 'processing', processingAt: approvedAt, processingId: lockId };
+    });
+    if (!claim.committed) throw new HttpsError('failed-precondition', '이미 처리 중이거나 삭제된 신청입니다. 새로고침해 주세요.');
+    const record = {
+      nickname,
+      itemId,
+      itemName,
+      quantity,
+      submittedAt: pending.submittedAt,
+      approvedAt,
+      updatedAt: approvedAt,
+    };
+    try {
+      await rootRef.update({
+        [`records/${recordId}`]: record,
+        [`submissions/${requestId}`]: null,
+      });
+    } catch (error) {
+      await requestRef.transaction((current) => {
+        if (!current || current.processingId !== lockId) return undefined;
+        return { ...pending, status: 'pending' };
+      }).catch(() => undefined);
+      throw error;
+    }
+    return { record: { id: recordId, ...record }, canManage };
+  }
+
+  if (action === 'deleteRequest') {
+    const requestId = String(data.requestId || '').trim();
+    if (!validUpboId(requestId)) throw new HttpsError('invalid-argument', '팬 신청을 확인해 주세요.');
+    const requestRef = submissionsRef.child(requestId);
+    const deletion = await requestRef.transaction((current) => {
+      if (!current || current.status !== 'pending') return undefined;
+      return null;
+    });
+    if (!deletion.committed) throw new HttpsError('not-found', '삭제할 팬 신청을 찾을 수 없습니다.');
+    return { deleted: true, canManage };
+  }
+
+  if (action === 'saveRecord') {
+    const recordId = String(data.recordId || '').trim();
+    if (!validUpboId(recordId)) throw new HttpsError('invalid-argument', '확정 기록을 확인해 주세요.');
+    const recordRef = recordsRef.child(recordId);
+    const previous = normalizeStoredUpboRecord(recordId, (await recordRef.get()).val());
+    if (!previous) throw new HttpsError('not-found', '수정할 확정 기록을 찾을 수 없습니다.');
+    const nickname = upboText(data.nickname ?? previous.nickname, 40, true);
+    const itemId = String(data.itemId ?? previous.itemId).trim();
+    if (!validUpboId(itemId)) throw new HttpsError('invalid-argument', '등록 항목을 선택해 주세요.');
+    const selectedItem = normalizeStoredUpboItem(itemId, (await itemsRef.child(itemId).get()).val());
+    const itemName = selectedItem && selectedItem.active
+      ? selectedItem.name
+      : itemId === previous.itemId ? previous.itemName : '';
+    if (!itemName) throw new HttpsError('failed-precondition', '등록 항목을 찾을 수 없습니다. 항목을 다시 선택해 주세요.');
+    const updated = {
+      ...previous,
+      nickname,
+      itemId,
+      itemName,
+      quantity: validateUpboQuantity(data.quantity ?? previous.quantity),
+      updatedAt: Date.now(),
+    };
+    await recordRef.set({
+      nickname: updated.nickname,
+      itemId: updated.itemId,
+      itemName: updated.itemName,
+      quantity: updated.quantity,
+      submittedAt: updated.submittedAt,
+      approvedAt: updated.approvedAt,
+      updatedAt: updated.updatedAt,
+    });
+    return { record: updated, canManage };
+  }
+
+  if (action === 'deleteRecord') {
+    const recordId = String(data.recordId || '').trim();
+    if (!validUpboId(recordId)) throw new HttpsError('invalid-argument', '확정 기록을 확인해 주세요.');
+    const deletion = await recordsRef.child(recordId).transaction((current) => current ? null : undefined);
+    if (!deletion.committed) throw new HttpsError('not-found', '삭제할 확정 기록을 찾을 수 없습니다.');
+    return { deleted: true, canManage };
+  }
 
   if (action === 'listTopics') {
     const snapshot = await topicsRef.get();
