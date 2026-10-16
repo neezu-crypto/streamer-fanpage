@@ -675,10 +675,15 @@ function normalizeStoredUpboSubmission(id, value) {
   const nickname = typeof value.nickname === 'string' ? value.nickname.trim().slice(0, 40) : '';
   const itemName = typeof value.itemName === 'string' ? value.itemName.trim().slice(0, 60) : '';
   const itemId = typeof value.itemId === 'string' && validUpboId(value.itemId) ? value.itemId : '';
+  const requestNotes = typeof value.requestNotes === 'string' ? value.requestNotes.trim().slice(0, 500) : '';
+  const requestGroupId = typeof value.requestGroupId === 'string' && validUpboId(value.requestGroupId) ? value.requestGroupId : '';
+  const requestGroupSize = Number.isSafeInteger(Number(value.requestGroupSize)) && Number(value.requestGroupSize) > 1
+    ? Math.min(FANPAGE_UPBO_MAX_ITEMS, Number(value.requestGroupSize))
+    : 1;
   const quantity = Number(value.quantity);
   const submittedAt = Number(value.submittedAt) || 0;
   if (!nickname || !itemName || !itemId || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > FANPAGE_UPBO_MAX_QUANTITY || !submittedAt) return null;
-  return { id, nickname, itemId, itemName, quantity, submittedAt };
+  return { id, nickname, itemId, itemName, quantity, requestNotes, requestGroupId, requestGroupSize, submittedAt };
 }
 
 function normalizeStoredUpboRecord(id, value) {
@@ -4021,16 +4026,68 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
     if (!item || !item.active) throw new HttpsError('failed-precondition', '현재 신청할 수 없는 항목입니다. 새로고침해 주세요.');
     const quantity = validateUpboQuantity(data.quantity);
     const id = upboTimestampId();
+    const requestNotes = upboText(data.requestNotes || '', 500);
     const submission = {
       nickname,
       itemId: item.id,
       itemName: item.name,
       quantity,
+      requestNotes,
       submittedAt: Date.now(),
       status: 'pending',
     };
     await submissionsRef.child(id).set(submission);
     return { submitted: true, requestId: id };
+  }
+
+  if (action === 'submitRequests') {
+    const nickname = upboText(data.nickname, 40, true);
+    if (!Array.isArray(data.items) || !data.items.length || data.items.length > FANPAGE_UPBO_MAX_ITEMS) {
+      throw new HttpsError('invalid-argument', `신청 항목은 1개 이상 ${FANPAGE_UPBO_MAX_ITEMS}개 이하로 선택해 주세요.`);
+    }
+    const itemsSnapshot = await itemsRef.get();
+    const storedItems = itemsSnapshot.val() || {};
+    const selectedIds = new Set();
+    const selections = data.items.map((value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new HttpsError('invalid-argument', '선택한 신청 항목을 확인해 주세요.');
+      }
+      const itemId = typeof value.itemId === 'string' ? value.itemId.trim() : '';
+      if (!validUpboId(itemId) || selectedIds.has(itemId)) {
+        throw new HttpsError('invalid-argument', '신청 항목은 중복 없이 선택해 주세요.');
+      }
+      selectedIds.add(itemId);
+      const item = normalizeStoredUpboItem(itemId, storedItems[itemId]);
+      if (!item || !item.active) {
+        throw new HttpsError('failed-precondition', '신청할 수 없는 항목이 포함되어 있습니다. 항목 목록을 새로고침해 주세요.');
+      }
+      return {
+        item,
+        quantity: validateUpboQuantity(value.quantity),
+        requestNotes: upboText(value.requestNotes || '', 500),
+      };
+    });
+    const submittedAt = Date.now();
+    const requestGroupId = randomUUID();
+    const submissions = {};
+    const requestIds = [];
+    selections.forEach(({ item, quantity, requestNotes }) => {
+      const requestId = submissionsRef.push().key;
+      requestIds.push(requestId);
+      submissions[requestId] = {
+        nickname,
+        itemId: item.id,
+        itemName: item.name,
+        quantity,
+        requestNotes,
+        requestGroupId,
+        requestGroupSize: selections.length,
+        submittedAt,
+        status: 'pending',
+      };
+    });
+    await submissionsRef.update(submissions);
+    return { submitted: true, requestIds, count: requestIds.length };
   }
 
   if (!canManage && ['saveItem', 'saveItems', 'deleteItem', 'approveRequest', 'deleteRequest', 'saveRecord', 'deleteRecord'].includes(action)) {
