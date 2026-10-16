@@ -3744,6 +3744,106 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
   };
 });
 
+exports.streamerFanPageDesignFeedback = onCall({ maxInstances: 10 }, async (request) => {
+  const uid = requireAuth(request);
+  const payload = request.data && typeof request.data === 'object' ? request.data : {};
+  const action = String(payload.action || 'submit');
+  const feedbackRoot = db.ref('streamerFanPageDesignFeedback');
+
+  if (action === 'submit') {
+    const categories = new Set(['design', 'suggestion', 'bug', 'other']);
+    const category = String(payload.category || '').trim();
+    const title = String(payload.title || '').trim().slice(0, 80);
+    const content = String(payload.content || '').trim().slice(0, 2000);
+    const streamerId = String(payload.streamerId || '').trim().toLowerCase();
+    if (!categories.has(category)) throw new HttpsError('invalid-argument', '문의 유형을 확인해 주세요.');
+    if (title.length < 2) throw new HttpsError('invalid-argument', '제목은 2자 이상 입력해 주세요.');
+    if (content.length < 5) throw new HttpsError('invalid-argument', '내용은 5자 이상 입력해 주세요.');
+    if (streamerId && !SOOP_ID_PATTERN.test(streamerId)) {
+      throw new HttpsError('invalid-argument', '팬페이지 정보를 확인할 수 없습니다.');
+    }
+
+    let streamer = null;
+    if (streamerId) {
+      const verified = await findVerifiedBySoopId(streamerId);
+      if (!verified) throw new HttpsError('invalid-argument', '대상 스트리머를 확인할 수 없습니다.');
+      streamer = verified.streamer;
+    }
+
+    const dayKey = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const limitRef = db.ref(`streamerFanPageDesignFeedbackLimits/${uid}`);
+    let exceededLimit = false;
+    const limitResult = await limitRef.transaction((current) => {
+      const record = current && typeof current === 'object' ? current : {};
+      const count = Number(record.count) || 0;
+      if (record.day !== dayKey) return { day: dayKey, count: 1 };
+      if (count >= 5) {
+        exceededLimit = true;
+        return;
+      }
+      return { day: dayKey, count: count + 1 };
+    });
+    if (!limitResult.committed || exceededLimit) {
+      throw new HttpsError('resource-exhausted', '하루에 보낼 수 있는 건의는 5건까지예요.');
+    }
+
+    const submission = feedbackRoot.push();
+    await submission.set({
+      category,
+      title,
+      content,
+      streamerId: streamer ? streamer.id : '',
+      streamerNickname: streamer ? streamer.nickname : '',
+      senderUid: uid,
+      status: 'open',
+      createdAt: Date.now(),
+    });
+    return { submitted: true, feedbackId: submission.key };
+  }
+
+  if (!await isAdminUid(uid)) {
+    throw new HttpsError('permission-denied', '관리자만 접수된 건의를 관리할 수 있습니다.');
+  }
+
+  if (action === 'list') {
+    const snapshot = await feedbackRoot.get();
+    const items = Object.entries(snapshot.val() || {})
+      .map(([id, item]) => ({
+        id,
+        category: String(item && item.category || ''),
+        title: String(item && item.title || '').slice(0, 80),
+        content: String(item && item.content || '').slice(0, 2000),
+        streamerId: String(item && item.streamerId || ''),
+        streamerNickname: String(item && item.streamerNickname || ''),
+        senderUid: String(item && item.senderUid || ''),
+        status: item && item.status === 'resolved' ? 'resolved' : 'open',
+        createdAt: Number(item && item.createdAt) || 0,
+      }))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 100);
+    return { items };
+  }
+
+  const feedbackId = String(payload.feedbackId || '').trim();
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(feedbackId)) {
+    throw new HttpsError('invalid-argument', '건의 항목을 확인할 수 없습니다.');
+  }
+  const feedbackRef = feedbackRoot.child(feedbackId);
+  if (action === 'status') {
+    const status = payload.status === 'resolved' ? 'resolved' : payload.status === 'open' ? 'open' : '';
+    if (!status) throw new HttpsError('invalid-argument', '처리 상태를 확인해 주세요.');
+    const snapshot = await feedbackRef.get();
+    if (!snapshot.exists()) throw new HttpsError('not-found', '건의를 찾을 수 없습니다.');
+    await feedbackRef.update({ status, resolvedAt: status === 'resolved' ? Date.now() : null });
+    return { updated: true, status };
+  }
+  if (action === 'delete') {
+    await feedbackRef.remove();
+    return { deleted: true };
+  }
+  throw new HttpsError('invalid-argument', '요청을 처리할 수 없습니다.');
+});
+
 exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};

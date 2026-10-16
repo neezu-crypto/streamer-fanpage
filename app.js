@@ -21,6 +21,7 @@ const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
 const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
 const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
 const callAdminStats = httpsCallable(functions, 'streamerFanPageAdminStats');
+const callDesignFeedback = httpsCallable(functions, 'streamerFanPageDesignFeedback');
 const callAdminViewerSubscriptionRequests = httpsCallable(functions, 'streamerFanPageAdminViewerSubscriptionRequests');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
 const callSongbook = httpsCallable(functions, 'streamerFanPageSongbook');
@@ -71,6 +72,7 @@ let isAdminUser = false;
 let adminStatsLoading = false;
 let adminStatsData = null;
 let adminViewerSubscriptionsLoading = false;
+let adminDesignFeedbackLoading = false;
 let verifiedStatusUnsubscribe = null;
 let switchApprovalUnsubscribe = null;
 let switchHandoffInProgress = false;
@@ -670,6 +672,65 @@ async function loadAdminStats() {
     adminStatsLoading = false;
     $('refreshAdminStats').disabled = false;
     $('refreshAdminStats').textContent = '↻ 새로고침';
+  }
+}
+function renderAdminDesignFeedback(items) {
+  const container = $('adminDesignFeedbackList');
+  container.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'admin-design-feedback-empty';
+    empty.textContent = '접수된 디자인 문의나 건의가 없어요.';
+    container.append(empty);
+    return;
+  }
+  const categories = { design: '디자인 변경 문의', suggestion: '기능 건의', bug: '오류 제보', other: '기타' };
+  items.forEach((item) => {
+    const article = document.createElement('article');
+    article.className = `admin-design-feedback-item${item.status === 'resolved' ? ' is-resolved' : ''}`;
+    const heading = document.createElement('div'); heading.className = 'admin-design-feedback-item-heading';
+    const title = document.createElement('strong'); title.textContent = item.title || '(제목 없음)';
+    const category = document.createElement('span'); category.className = 'admin-design-feedback-category';
+    category.textContent = categories[item.category] || '기타';
+    heading.append(title, category);
+    const content = document.createElement('p'); content.className = 'admin-design-feedback-content'; content.textContent = item.content || '';
+    const page = item.streamerNickname
+      ? `${item.streamerNickname} 팬페이지${item.streamerId ? ` (@${item.streamerId})` : ''}`
+      : '사이트 전체';
+    const sender = String(item.senderUid || '');
+    const meta = document.createElement('p'); meta.className = 'admin-design-feedback-meta';
+    meta.textContent = `${item.status === 'resolved' ? '처리 완료 · ' : ''}${page} · ${formatCommentDate(item.createdAt)} · 접수자 ${sender ? `${sender.slice(0, 8)}…` : '확인 불가'}`;
+    const actions = document.createElement('div'); actions.className = 'admin-design-feedback-item-actions';
+    const statusButton = document.createElement('button'); statusButton.type = 'button'; statusButton.className = 'button';
+    statusButton.dataset.designFeedbackAction = 'status'; statusButton.dataset.feedbackId = item.id;
+    statusButton.dataset.feedbackStatus = item.status === 'resolved' ? 'open' : 'resolved';
+    statusButton.textContent = item.status === 'resolved' ? '미처리로 변경' : '처리 완료';
+    const deleteButton = document.createElement('button'); deleteButton.type = 'button'; deleteButton.className = 'button';
+    deleteButton.dataset.designFeedbackAction = 'delete'; deleteButton.dataset.feedbackId = item.id;
+    deleteButton.textContent = '삭제';
+    actions.append(statusButton, deleteButton);
+    article.append(heading, content, meta, actions);
+    container.append(article);
+  });
+}
+async function loadAdminDesignFeedback() {
+  if (!isAdminUser || adminDesignFeedbackLoading) return;
+  adminDesignFeedbackLoading = true;
+  $('refreshDesignFeedback').disabled = true;
+  $('refreshDesignFeedback').textContent = '불러오는 중…';
+  $('adminDesignFeedbackStatus').textContent = '접수된 건의를 불러오고 있어요.';
+  try {
+    const result = await callDesignFeedback({ action: 'list' });
+    if (!isAdminUser) return;
+    const items = Array.isArray(result.data?.items) ? result.data.items : [];
+    renderAdminDesignFeedback(items);
+    $('adminDesignFeedbackStatus').textContent = `최근 접수 ${items.length.toLocaleString('ko-KR')}건 · 최대 100건 표시`;
+  } catch (error) {
+    $('adminDesignFeedbackStatus').textContent = error.message || '건의를 불러오지 못했어요.';
+  } finally {
+    adminDesignFeedbackLoading = false;
+    $('refreshDesignFeedback').disabled = false;
+    $('refreshDesignFeedback').textContent = '↻ 건의 새로고침';
   }
 }
 async function waitForPageAssets() {
@@ -4038,9 +4099,79 @@ $('openAdminStats').addEventListener('click', () => {
   if (!isAdminUser) return;
   $('adminStatsDialog').showModal();
   loadAdminStats();
+  loadAdminDesignFeedback();
 });
 $('closeAdminStats').addEventListener('click', () => $('adminStatsDialog').close());
 $('refreshAdminStats').addEventListener('click', loadAdminStats);
+$('refreshDesignFeedback').addEventListener('click', loadAdminDesignFeedback);
+$('openDesignFeedback').addEventListener('click', () => {
+  const activeId = routeId().toLowerCase();
+  const streamer = currentPage?.streamer && String(currentPage.streamer.id || '').toLowerCase() === activeId
+    ? currentPage.streamer
+    : null;
+  $('designFeedbackContext').textContent = streamer
+    ? `대상: ${streamer.nickname} 팬페이지 · 접수 내용은 관리자만 확인합니다.`
+    : '대상: 사이트 전체 · 접수 내용은 관리자만 확인합니다.';
+  $('designFeedbackStatus').textContent = '';
+  $('designFeedbackStatus').classList.remove('is-error');
+  $('designFeedbackForm').reset();
+  $('designFeedbackDialog').showModal();
+});
+$('closeDesignFeedback').addEventListener('click', () => $('designFeedbackDialog').close());
+$('cancelDesignFeedback').addEventListener('click', () => $('designFeedbackDialog').close());
+$('designFeedbackForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!form.reportValidity()) return;
+  const submit = $('submitDesignFeedback');
+  const status = $('designFeedbackStatus');
+  submit.disabled = true;
+  status.classList.remove('is-error');
+  status.textContent = '의견을 접수하고 있어요.';
+  try {
+    if (!auth.currentUser) await waitForAuthRestore();
+    if (!auth.currentUser) await signInAnonymously(auth);
+    const activeId = routeId().toLowerCase();
+    const streamerId = currentPage?.streamer && String(currentPage.streamer.id || '').toLowerCase() === activeId
+      ? String(currentPage.streamer.id || '').trim().toLowerCase()
+      : '';
+    await callDesignFeedback({
+      action: 'submit',
+      category: $('designFeedbackCategory').value,
+      title: $('designFeedbackTitleInput').value.trim(),
+      content: $('designFeedbackMessage').value.trim(),
+      streamerId,
+    });
+    form.reset();
+    $('designFeedbackDialog').close();
+    showToast('디자인 문의 / 건의를 접수했어요.');
+  } catch (error) {
+    status.classList.add('is-error');
+    status.textContent = error.message || '건의를 접수하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  } finally {
+    submit.disabled = false;
+  }
+});
+$('adminDesignFeedbackList').addEventListener('click', async (event) => {
+  const button = event.target.closest('button[data-design-feedback-action][data-feedback-id]');
+  if (!button || !isAdminUser) return;
+  const action = button.dataset.designFeedbackAction;
+  const feedbackId = button.dataset.feedbackId;
+  if (action === 'delete' && !confirm('이 건의를 삭제할까요?')) return;
+  button.disabled = true;
+  $('adminDesignFeedbackStatus').textContent = action === 'delete' ? '건의를 삭제하고 있어요.' : '처리 상태를 저장하고 있어요.';
+  try {
+    await callDesignFeedback({
+      action,
+      feedbackId,
+      status: button.dataset.feedbackStatus,
+    });
+    await loadAdminDesignFeedback();
+  } catch (error) {
+    $('adminDesignFeedbackStatus').textContent = error.message || '건의를 처리하지 못했어요.';
+    button.disabled = false;
+  }
+});
 $('refreshViewerSubscriptionRequests').addEventListener('click', loadAdminViewerSubscriptionRequests);
 $('viewerSubscriptionAdminList').addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-subscription-action][data-request-id]');
