@@ -88,24 +88,6 @@
       </section>
       </section>
 
-      <section class="viewer-comparison-panel" aria-labelledby="viewerComparisonTitle">
-        <div class="viewer-comparison-heading">
-          <div>
-            <p class="eyebrow">SAME-DAY VOD COMPARISON</p>
-            <h2 id="viewerComparisonTitle">같은 날 다시보기 2개 비교</h2>
-            <p>스트리머를 바꿔가며 같은 날짜의 다시보기 두 개를 담고, 고점과 평균 대비 상승폭을 비교하세요.</p>
-          </div>
-          <span class="viewer-comparison-count" id="viewerComparisonCount">0 / 2 선택</span>
-        </div>
-        <div class="viewer-comparison-selection" id="viewerComparisonSelection"></div>
-        <p class="viewer-comparison-status" id="viewerComparisonStatus" role="status" aria-live="polite">스트리머를 검색한 뒤 각 다시보기 카드에서 ‘비교에 담기’를 선택해 주세요.</p>
-        <div class="viewer-comparison-actions">
-          <button class="button" id="viewerComparisonClear" type="button" disabled>선택 비우기</button>
-          <button class="button button-primary" id="viewerComparisonRun" type="button" disabled>비교 결과 확인</button>
-        </div>
-        <div class="viewer-comparison-results hidden" id="viewerComparisonResults" aria-live="polite"></div>
-      </section>
-
       <section class="viewer-results hidden" id="viewerResults" aria-live="polite">
         <div class="viewer-results-heading">
           <div class="viewer-streamer-identity">
@@ -140,6 +122,23 @@
           </div>
           <p class="viewer-period-status" id="viewerPeriodStatus" role="status" aria-live="polite">구독하면 최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 시청 순간을 찾을 수 있습니다.</p>
           <div class="viewer-period-grid" id="viewerPeriodGrid"></div>
+        </section>
+        <section class="viewer-comparison-panel" aria-labelledby="viewerComparisonTitle">
+          <div class="viewer-comparison-heading">
+            <div>
+              <p class="eyebrow">SAME-DAY VOD COMPARISON</p>
+              <h2 id="viewerComparisonTitle">같은 날 다시보기 2개 비교</h2>
+              <p>스트리머를 바꿔가며 같은 날짜의 다시보기 두 개를 담고, 고점과 평균 대비 상승폭을 비교하세요.</p>
+            </div>
+            <span class="viewer-comparison-count" id="viewerComparisonCount">0 / 2 선택</span>
+          </div>
+          <div class="viewer-comparison-selection" id="viewerComparisonSelection"></div>
+          <p class="viewer-comparison-status" id="viewerComparisonStatus" role="status" aria-live="polite">스트리머를 검색한 뒤 각 다시보기 카드에서 ‘비교에 담기’를 선택해 주세요.</p>
+          <div class="viewer-comparison-actions">
+            <button class="button" id="viewerComparisonClear" type="button" disabled>선택 비우기</button>
+            <button class="button button-primary" id="viewerComparisonRun" type="button" disabled>비교 결과 확인</button>
+          </div>
+          <div class="viewer-comparison-results hidden" id="viewerComparisonResults" aria-live="polite"></div>
         </section>
         <div class="viewer-list-heading">
           <div><h3>방송 다시보기</h3><span id="viewerVodCount"></span></div>
