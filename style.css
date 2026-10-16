@@ -686,7 +686,7 @@
 .design-feedback-status:empty{display:none}
 .design-feedback-status.is-error{color:#ffb7c9}
 .design-feedback-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
-.design-feedback-actions button:disabled{opacity:.58;cursor:wait}
+.design-feedback-actions button:disabled{opacity:.58;cursor:not-allowed}
 .admin-design-feedback{margin:20px 0;padding:17px;border:1px solid var(--line);border-radius:14px;background:#ffffff04}
 .admin-design-feedback .admin-viewer-usage-heading{align-items:center}
 .admin-design-feedback-status{margin:12px 0;color:var(--muted);font-size:11px;line-height:1.6}

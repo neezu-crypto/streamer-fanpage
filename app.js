@@ -144,6 +144,20 @@ function renderAuthControls() {
   $('choiceKakaoLogin').classList.toggle('hidden', kakaoLinked);
   $('choiceKakaoLogin').textContent = user && !user.isAnonymous ? '카카오 계정 연결' : '카카오로 로그인';
   $('logoutButton').classList.toggle('hidden', !user || (user.isAnonymous && !kakaoLinked && !streamerVerified));
+  updateDesignFeedbackEligibility();
+}
+
+function updateDesignFeedbackEligibility() {
+  const submit = $('submitDesignFeedback');
+  if (!submit) return;
+  const verified = !!(auth.currentUser && verifiedStreamerUid === auth.currentUser.uid);
+  submit.disabled = !verified;
+  const status = $('designFeedbackStatus');
+  if (status && !verified && $('designFeedbackDialog').open) {
+    status.textContent = '스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요.';
+  } else if (status && verified && status.textContent === '스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요.') {
+    status.textContent = '';
+  }
 }
 
 function canSaveCommentProfile(user = auth.currentUser) {
@@ -698,8 +712,17 @@ function renderAdminDesignFeedback(items) {
       ? `${item.streamerNickname} 팬페이지${item.streamerId ? ` (@${item.streamerId})` : ''}`
       : '사이트 전체';
     const sender = String(item.senderUid || '');
+    const verification = item.senderVerification && typeof item.senderVerification === 'object'
+      ? item.senderVerification
+      : {};
+    const verifiedNickname = String(verification.nickname || '').trim();
+    const verifiedSoopId = String(verification.soopId || '').trim();
+    const verifiedAt = Number(verification.verifiedAt) || 0;
+    const verifiedIdentity = verifiedNickname
+      ? `${verifiedNickname}${verifiedSoopId ? ` (@${verifiedSoopId})` : ''}`
+      : '확인 불가';
     const meta = document.createElement('p'); meta.className = 'admin-design-feedback-meta';
-    meta.textContent = `${item.status === 'resolved' ? '처리 완료 · ' : ''}${page} · ${formatCommentDate(item.createdAt)} · 접수자 ${sender ? `${sender.slice(0, 8)}…` : '확인 불가'}`;
+    meta.textContent = `${item.status === 'resolved' ? '처리 완료 · ' : ''}${page} · 인증 제출자 ${verifiedIdentity}${verifiedAt ? ` · 인증일 ${formatCommentDate(verifiedAt)}` : ''} · ${formatCommentDate(item.createdAt)} · UID ${sender ? `${sender.slice(0, 8)}…` : '확인 불가'}`;
     const actions = document.createElement('div'); actions.className = 'admin-design-feedback-item-actions';
     const statusButton = document.createElement('button'); statusButton.type = 'button'; statusButton.className = 'button';
     statusButton.dataset.designFeedbackAction = 'status'; statusButton.dataset.feedbackId = item.id;
@@ -4030,12 +4053,13 @@ $('openDesignFeedback').addEventListener('click', () => {
     ? currentPage.streamer
     : null;
   $('designFeedbackContext').textContent = streamer
-    ? `대상: ${streamer.nickname} 팬페이지 · 접수 내용은 관리자만 확인합니다.`
-    : '대상: 사이트 전체 · 접수 내용은 관리자만 확인합니다.';
+    ? `대상: ${streamer.nickname} 팬페이지 · 인증 스트리머만 제출할 수 있어요.`
+    : '대상: 사이트 전체 · 인증 스트리머만 제출할 수 있어요.';
   $('designFeedbackStatus').textContent = '';
   $('designFeedbackStatus').classList.remove('is-error');
   $('designFeedbackForm').reset();
   $('designFeedbackDialog').showModal();
+  updateDesignFeedbackEligibility();
 });
 $('closeDesignFeedback').addEventListener('click', () => $('designFeedbackDialog').close());
 $('cancelDesignFeedback').addEventListener('click', () => $('designFeedbackDialog').close());
@@ -4045,12 +4069,14 @@ $('designFeedbackForm').addEventListener('submit', async (event) => {
   if (!form.reportValidity()) return;
   const submit = $('submitDesignFeedback');
   const status = $('designFeedbackStatus');
+  if (!auth.currentUser || verifiedStreamerUid !== auth.currentUser.uid) {
+    status.textContent = '스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요.';
+    return;
+  }
   submit.disabled = true;
   status.classList.remove('is-error');
   status.textContent = '의견을 접수하고 있어요.';
   try {
-    if (!auth.currentUser) await waitForAuthRestore();
-    if (!auth.currentUser) await signInAnonymously(auth);
     const activeId = routeId().toLowerCase();
     const streamerId = currentPage?.streamer && String(currentPage.streamer.id || '').toLowerCase() === activeId
       ? String(currentPage.streamer.id || '').trim().toLowerCase()
@@ -4069,7 +4095,7 @@ $('designFeedbackForm').addEventListener('submit', async (event) => {
     status.classList.add('is-error');
     status.textContent = error.message || '건의를 접수하지 못했어요. 잠시 후 다시 시도해 주세요.';
   } finally {
-    submit.disabled = false;
+    submit.disabled = !(auth.currentUser && verifiedStreamerUid === auth.currentUser.uid);
   }
 });
 $('adminDesignFeedbackList').addEventListener('click', async (event) => {

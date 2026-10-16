@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261016-banner-full-bleed">
+  <link rel="stylesheet" href="style.css?v=20261016-feedback-streamer-only">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -84,7 +84,7 @@
         <div><p class="eyebrow">FANPAGE FEEDBACK</p><h2 id="designFeedbackTitle">디자인 변경 문의 / 건의 보내기</h2></div>
         <button class="button profile-settings-close" id="closeDesignFeedback" type="button" aria-label="건의 창 닫기">×</button>
       </div>
-      <p class="design-feedback-intro">팬페이지 디자인이나 기능에 대한 의견을 보내 주세요. 접수 내용은 관리자만 확인하며, 하루 최대 5건까지 보낼 수 있어요. 답변 연락처는 수집하지 않습니다.</p>
+      <p class="design-feedback-intro">스트리머 인증을 완료한 계정만 문의를 보낼 수 있어요. 인증된 닉네임·SOOP 아이디·인증 시각이 문의 기록과 Discord 알림에 포함됩니다. 문의 내용은 관리자만 확인하며, Discord로는 보내지 않습니다. 하루 최대 5건까지 보낼 수 있어요.</p>
       <form id="designFeedbackForm" autocomplete="off">
         <label for="designFeedbackCategory">문의 유형</label>
         <select id="designFeedbackCategory" name="category" required>
@@ -101,7 +101,7 @@
         <p class="design-feedback-status" id="designFeedbackStatus" role="status" aria-live="polite"></p>
         <div class="design-feedback-actions">
           <button class="button" id="cancelDesignFeedback" type="button">취소</button>
-          <button class="button button-primary" id="submitDesignFeedback" type="submit">건의 보내기</button>
+          <button class="button button-primary" id="submitDesignFeedback" type="submit" disabled>건의 보내기</button>
         </div>
       </form>
     </section>
@@ -206,6 +206,6 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261016-banner-full-bleed"></script>
+  <script type="module" src="app.js?v=20261016-feedback-streamer-only"></script>
 </body>
 </html>
