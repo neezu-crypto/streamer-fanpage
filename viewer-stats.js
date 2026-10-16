@@ -131,6 +131,8 @@ let subscriptionState = {
   expiresAt: 0,
   pending: false,
   pendingRequestId: '',
+  pendingDonorSoopId: '',
+  pendingDonationCompletedAt: 0,
   lastRequestStatus: '',
 };
 const viewerStatsMemoryCache = new Map();
@@ -258,7 +260,11 @@ function renderSubscriptionControls() {
     action.textContent = state.pending ? '신청 상태 보기' : '구독 연장하기';
     scan.textContent = '최근 1년 분석';
   } else if (state.pending) {
-    status.textContent = '별풍선 후원 신청을 운영자가 확인하고 있어요.';
+    status.textContent = state.pendingDonationCompletedAt
+      ? '별풍선 후원 알림을 자동 확인하고 있어요.'
+      : state.pendingDonorSoopId
+        ? '구독 신청이 등록됐어요. 후원 뒤 자동 확인을 시작해 주세요.'
+        : '이전 방식의 구독 신청을 운영자가 수동 확인하고 있어요.';
     action.textContent = '신청 상태 보기';
     scan.textContent = '구독 전용 분석';
   } else if (!state.accountProtected) {
@@ -288,7 +294,7 @@ function refreshExistingVodCardAccess() {
 function scheduleSubscriptionStatusRefresh() {
   window.clearTimeout(subscriptionRefreshTimer);
   if (subscriptionState.pending) {
-    subscriptionRefreshTimer = window.setTimeout(() => refreshSubscriptionStatus(), 60 * 1000);
+    subscriptionRefreshTimer = window.setTimeout(() => refreshSubscriptionStatus(), 10 * 1000);
     return;
   }
   if (subscriptionState.isAdmin) {
@@ -319,6 +325,8 @@ async function refreshSubscriptionStatus({ resumeComparison = true } = {}) {
       expiresAt: Number(data.expiresAt) || 0,
       pending: data.pending === true,
       pendingRequestId: typeof data.pendingRequestId === 'string' ? data.pendingRequestId : '',
+      pendingDonorSoopId: typeof data.pendingDonorSoopId === 'string' ? data.pendingDonorSoopId : '',
+      pendingDonationCompletedAt: Number(data.pendingDonationCompletedAt) || 0,
       lastRequestStatus: typeof data.lastRequestStatus === 'string' ? data.lastRequestStatus : '',
     };
     renderSubscriptionControls();
@@ -361,15 +369,33 @@ function renderSubscriptionDialogStatus(message = '') {
   const cancel = $('viewerSubscriptionCancel');
   const loginNote = $('viewerSubscriptionLoginNote');
   const purchaseInfo = $('viewerSubscriptionPurchaseInfo');
+  const donationStep = $('viewerSubscriptionDonationStep');
+  const donationHelp = $('viewerSubscriptionDonationHelp');
+  const donationLink = $('viewerSubscriptionDonationLink');
+  const donationComplete = $('viewerSubscriptionDonationComplete');
   const hasPending = subscriptionState.pending && subscriptionState.pendingRequestId;
+  const autoVerificationReady = !!subscriptionState.pendingDonorSoopId;
+  const donationCompleted = subscriptionState.pendingDonationCompletedAt > 0;
   const comparisonContext = !!pendingComparisonRequest;
   $('viewerSubscriptionDialogTitle').textContent = comparisonContext ? '비교 결과 확인' : '고점체크 구독';
   $('viewerSubscriptionDialog').querySelector('.eyebrow').textContent = comparisonContext ? 'RESULT ACCESS' : '30-DAY PASS';
-  purchaseInfo.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected);
+  purchaseInfo.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
+  donationStep.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !hasPending);
   loginNote.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.accountProtected);
   submit.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
   cancel.classList.toggle('hidden', subscriptionState.isAdmin || !hasPending);
-  submit.textContent = subscriptionState.subscribed ? '후원 후 30일 연장 신청' : '후원 신청하기';
+  donationLink.classList.toggle('hidden', !autoVerificationReady);
+  donationComplete.classList.toggle('hidden', !autoVerificationReady || donationCompleted);
+  donationComplete.disabled = false;
+  donationComplete.textContent = '후원 완료 · 자동 확인 시작';
+  if (!autoVerificationReady) {
+    donationHelp.textContent = '이 신청은 자동 확인에 필요한 SOOP 아이디 정보가 없어요. 후원 내역은 관리자가 수동 확인합니다.';
+  } else if (donationCompleted) {
+    donationHelp.textContent = '후원 완료 신호를 받았어요. 관리자 브라우저가 SOOP 알림을 대조 중이며, 한 신청만 조건에 맞으면 30일 이용권이 자동 적용됩니다. 확인할 수 없으면 관리자가 직접 확인합니다.';
+  } else {
+    donationHelp.textContent = '신청에 입력한 SOOP 계정으로 별풍선 10개를 후원한 뒤 자동 확인을 시작해 주세요.';
+  }
+  submit.textContent = subscriptionState.subscribed ? '신청 등록 · 30일 연장' : '구독 신청 등록';
   if (subscriptionState.isAdmin) {
     status.textContent = '관리자 권한으로 기간별 최고 순간과 평균 대비 상승폭을 포함한 모든 구독 기능을 이용할 수 있어요.';
   } else if (message) {
@@ -379,15 +405,21 @@ function renderSubscriptionDialogStatus(message = '') {
       ? '비교 대상은 유지됩니다. Google·Kakao 로그인 또는 스트리머 인증 후 구독을 신청할 수 있어요.'
       : '익명 계정은 구독 권한을 구매할 수 없어요. Google·Kakao 로그인 또는 스트리머 인증 후 이용해 주세요.';
   } else if (hasPending) {
-    status.textContent = comparisonContext
-      ? '신청이 접수됐어요. 운영자가 후원을 확인하면 이 페이지에서 비교 결과가 자동으로 열립니다.'
-      : '신청이 접수되어 운영자가 후원을 확인하고 있어요. 확인이 끝나면 이 계정에 30일 이용권이 적용됩니다.';
+    if (!autoVerificationReady) {
+      status.textContent = '이전 방식으로 접수된 신청입니다. 관리자가 후원 내역을 수동 확인하며, 자동 확인을 원하면 신청을 취소하고 다시 등록해 주세요.';
+    } else if (donationCompleted) {
+      status.textContent = comparisonContext
+        ? '후원 알림 자동 확인 중이에요. 일치하면 두 다시보기의 비교 결과가 자동으로 열립니다.'
+        : '후원 알림을 자동 대조하고 있어요. 확인되면 이 계정에 30일 이용권이 적용됩니다.';
+    } else {
+      status.textContent = '신청이 등록됐어요. 운영자 방송국에 10개 후원한 뒤 ‘후원 완료 · 자동 확인 시작’을 눌러 주세요.';
+    }
   } else if (subscriptionState.subscribed) {
     status.textContent = formatSubscriptionDate(subscriptionState.expiresAt) + '까지 구독 중이에요. 미리 갱신해도 남은 기간에 30일이 더해집니다.';
   } else {
     status.textContent = comparisonContext
-      ? '별풍선 10개 후원 신청을 완료해 주세요. 운영자 승인 후 선택한 두 다시보기의 비교 결과가 자동으로 열립니다.'
-      : '후원자 닉네임을 확인해 운영자가 수동 승인합니다. 승인 전까지 구독 기능은 잠겨 있어요.';
+      ? '후원자 SOOP 정보를 입력해 신청을 등록하고 후원 완료를 알리면, 후원 알림이 일치할 때 비교 결과가 자동으로 열립니다.'
+      : '별풍선 후원 알림이 신청 정보와 일치하면 30일 이용권이 자동 승인됩니다. 확인할 수 없거나 신청이 겹치면 관리자가 수동 확인합니다.';
   }
 }
 
@@ -1676,18 +1708,21 @@ $('viewerSubscriptionForm').addEventListener('submit', async (event) => {
   }
   const nickname = $('viewerSubscriptionNickname').value.trim();
   if (!nickname || !$('viewerSubscriptionNickname').reportValidity()) return;
+  const donorSoopId = $('viewerSubscriptionSoopId').value.trim().toLowerCase();
+  if (!donorSoopId || !$('viewerSubscriptionSoopId').reportValidity()) return;
   const submit = $('viewerSubscriptionSubmit');
   submit.disabled = true;
-  renderSubscriptionDialogStatus('신청을 접수하고 있어요.');
+  renderSubscriptionDialogStatus('신청을 등록하고 있어요.');
   try {
-    const response = await callViewerSubscription({ action: 'request', nickname });
+    const response = await callViewerSubscription({ action: 'request', nickname, donorSoopId });
     const result = response.data || {};
     await refreshSubscriptionStatus();
     renderSubscriptionDialogStatus(result.action === 'already-pending'
-      ? '이미 확인 대기 중인 신청이 있어요. 별풍선 10개 후원 여부를 운영자가 확인 중입니다.'
-      : '신청이 접수됐어요. 별풍선 후원을 확인한 뒤 이 계정에 30일 이용권을 적용합니다.');
+      ? '이미 대기 중인 신청이 있어요. 현재 신청 정보를 확인해 주세요.'
+      : '신청을 등록했어요. 이제 운영자 방송국에 10개 후원한 뒤 자동 확인을 시작해 주세요.');
     if (result.action === 'pending' || result.action === 'already-pending') {
       $('viewerSubscriptionNickname').value = '';
+      $('viewerSubscriptionSoopId').value = '';
     }
   } catch (error) {
     renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '구독 신청을 접수하지 못했어요.'));
@@ -1697,8 +1732,28 @@ $('viewerSubscriptionForm').addEventListener('submit', async (event) => {
   }
 });
 
+$('viewerSubscriptionDonationComplete').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  if (!subscriptionState.pendingRequestId || !subscriptionState.pendingDonorSoopId || subscriptionState.pendingDonationCompletedAt) return;
+  button.disabled = true;
+  button.textContent = '자동 확인을 시작하고 있어요…';
+  try {
+    await callViewerSubscription({ action: 'donationComplete', requestId: subscriptionState.pendingRequestId });
+    await refreshSubscriptionStatus();
+    renderSubscriptionDialogStatus('후원 완료 신호를 받았어요. 알림이 일치하면 자동 승인됩니다.');
+  } catch (error) {
+    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '자동 확인을 시작하지 못했어요. 신청 상태를 새로고침해 주세요.'));
+  } finally {
+    button.disabled = false;
+    renderSubscriptionDialogStatus();
+  }
+});
+
 $('viewerSubscriptionCancel').addEventListener('click', async () => {
-  if (!subscriptionState.pendingRequestId || !confirm('구독 신청을 취소할까요?')) return;
+  const cancelMessage = subscriptionState.pendingDonationCompletedAt
+    ? '이미 후원 완료를 알린 신청입니다. 취소하면 자동 확인과 30일 이용권 발급이 진행되지 않습니다. 취소할까요?'
+    : '구독 신청을 취소할까요?';
+  if (!subscriptionState.pendingRequestId || !confirm(cancelMessage)) return;
   const cancel = $('viewerSubscriptionCancel');
   cancel.disabled = true;
   try {

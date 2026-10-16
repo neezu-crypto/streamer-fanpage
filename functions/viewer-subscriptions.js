@@ -10,6 +10,7 @@ const SUBSCRIPTION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const BALLOON_COST = 10;
 const MAX_DONOR_NICKNAME_LENGTH = 20;
 const FORBIDDEN_TEXT_RE = /[<>\x00-\x1F\x7F]/;
+const PROCESSING_STALE_MS = 2 * 60 * 1000;
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -95,6 +96,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     if (info.pendingRequestId && !isPending) {
       await subscriptionRef.child('pendingRequestId')
         .transaction((current) => current === info.pendingRequestId ? null : current);
+      await db.ref(`${PENDING_PATH}/${info.pendingRequestId}`).remove().catch(() => null);
     }
     return {
       accountProtected: access.accountProtected,
@@ -104,6 +106,8 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
       pending: isPending,
       pendingRequestId: isPending ? info.pendingRequestId : '',
       pendingRequestedAt: isPending ? Math.max(0, Number(pendingRequest.requestedAt) || 0) : 0,
+      pendingDonorSoopId: isPending ? String(pendingRequest.donorSoopId || '').slice(0, 20) : '',
+      pendingDonationCompletedAt: isPending ? Math.max(0, Number(pendingRequest.donationCompletedAt) || 0) : 0,
       lastRequestStatus: lastRequest && typeof lastRequest.status === 'string' ? lastRequest.status : '',
       lastReviewedAt: Math.max(0, Number(lastRequest && lastRequest.reviewedAt) || 0),
       balloonCost: BALLOON_COST,
@@ -114,8 +118,12 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
   if (action === 'request') {
     await requireProtectedAccount(request);
     const nickname = typeof data.nickname === 'string' ? data.nickname.trim().slice(0, MAX_DONOR_NICKNAME_LENGTH) : '';
+    const donorSoopId = typeof data.donorSoopId === 'string' ? data.donorSoopId.trim().toLowerCase() : '';
     if (!nickname || FORBIDDEN_TEXT_RE.test(nickname)) {
       throw new HttpsError('invalid-argument', '후원에 사용한 SOOP 닉네임을 입력해 주세요.');
+    }
+    if (!/^[a-z0-9]{2,20}$/.test(donorSoopId)) {
+      throw new HttpsError('invalid-argument', '후원에 사용한 SOOP 아이디를 확인해 주세요.');
     }
 
     const now = Date.now();
@@ -147,21 +155,66 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     const record = {
       requesterUid: uid,
       nickname,
+      donorSoopId,
       balloonCost: BALLOON_COST,
       durationDays: 30,
       status: 'pending',
       requestedAt: now,
+      donationCompletedAt: 0,
     };
     try {
       await db.ref().update({
         [`${REQUESTS_PATH}/${requestId}`]: record,
-        [`${PENDING_PATH}/${requestId}`]: now,
+        [`${PENDING_PATH}/${requestId}`]: {
+          status: 'pending',
+          requestedAt: now,
+          donorSoopId,
+          balloonCost: BALLOON_COST,
+          donationCompletedAt: 0,
+        },
       });
     } catch (error) {
       await subscriptionRef.child('pendingRequestId').transaction((current) => current === requestId ? null : current);
       throw error;
     }
     return { action: 'pending', requestedAt: now };
+  }
+
+  if (action === 'donationComplete') {
+    await requireProtectedAccount(request);
+    const requestId = typeof data.requestId === 'string' ? data.requestId.trim() : '';
+    if (!/^[A-Za-z0-9_-]{8,64}$/.test(requestId)) throw new HttpsError('invalid-argument', '신청 번호를 확인해 주세요.');
+    const requestRef = db.ref(`${REQUESTS_PATH}/${requestId}`);
+    const now = Date.now();
+    const result = await requestRef.transaction((current) => {
+      if (!current || current.requesterUid !== uid || current.status !== 'pending' ||
+          !/^[a-z0-9]{2,20}$/.test(String(current.donorSoopId || '')) ||
+          Number(current.balloonCost) !== BALLOON_COST) return;
+      if (Number(current.donationCompletedAt) > 0) return current;
+      return { ...current, donationCompletedAt: now, updatedAt: now };
+    });
+    const completed = result.snapshot.val();
+    if (!result.committed && (!completed || completed.requesterUid !== uid || completed.status !== 'pending' ||
+        !(Number(completed.donationCompletedAt) > 0))) {
+      throw new HttpsError('failed-precondition', '후원 확인을 시작할 수 있는 대기 신청이 없습니다.');
+    }
+    const donationCompletedAt = Math.max(0, Number(completed.donationCompletedAt) || now);
+    const pendingRef = db.ref(`${PENDING_PATH}/${requestId}`);
+    await pendingRef.transaction((current) => {
+      if (current && current.status === 'processing') return current;
+      return {
+        status: 'pending',
+        requestedAt: Math.max(0, Number(completed.requestedAt) || 0),
+        donorSoopId: String(completed.donorSoopId || ''),
+        balloonCost: BALLOON_COST,
+        donationCompletedAt,
+      };
+    });
+    const latestRequest = (await requestRef.get()).val();
+    if (!latestRequest || !['pending', 'processing'].includes(latestRequest.status)) {
+      await pendingRef.remove();
+    }
+    return { donationCompletedAt };
   }
 
   if (action === 'cancel') {
@@ -211,8 +264,12 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
         requestId,
         requesterUid: String(record.requesterUid || ''),
         nickname: String(record.nickname || '').slice(0, MAX_DONOR_NICKNAME_LENGTH),
+        donorSoopId: String(record.donorSoopId || '').slice(0, 20),
+        donationCompletedAt: Math.max(0, Number(record.donationCompletedAt) || 0),
         status: record.status,
         requestedAt: Math.max(0, Number(record.requestedAt) || 0),
+        processingAt: Math.max(0, Number(record.processingAt) || 0),
+        verificationSource: String(record.verificationSource || ''),
       };
     }))).filter(Boolean);
     requests.sort((a, b) => a.requestedAt - b.requestedAt);
@@ -240,14 +297,26 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
     return { ok: true, status: 'rejected' };
   }
 
+  const claimToken = require('node:crypto').randomBytes(16).toString('hex');
   const claim = await requestRef.transaction((current) => {
-    if (!current || !['pending', 'processing'].includes(current.status)) return;
-    return { ...current, status: 'processing', reviewedBy: adminUid, processingAt: now };
+    const staleProcessing = current && current.status === 'processing' &&
+      now - (Number(current.processingAt) || 0) >= PROCESSING_STALE_MS;
+    if (!current || (current.status !== 'pending' && !staleProcessing)) return;
+    return {
+      ...current,
+      status: 'processing',
+      reviewedBy: adminUid,
+      processingAt: now,
+      processingToken: claimToken,
+    };
   });
   if (!claim.committed) {
     const current = claim.snapshot.val();
     if (current && current.status === 'approved') {
       const existing = await db.ref(`${SUBSCRIPTIONS_PATH}/${current.requesterUid}`).get();
+      await db.ref(`${PENDING_PATH}/${requestId}`).remove();
+      await db.ref(`${SUBSCRIPTIONS_PATH}/${current.requesterUid}/pendingRequestId`)
+        .transaction((pendingId) => pendingId === requestId ? null : pendingId);
       return { ok: true, status: 'approved', expiresAt: Number(existing.val() && existing.val().expiresAt) || 0 };
     }
     throw new HttpsError('failed-precondition', '처리 중이거나 이미 처리된 신청입니다.');
@@ -255,30 +324,61 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
 
   const record = claim.snapshot.val();
   const subscriptionRef = db.ref(`${SUBSCRIPTIONS_PATH}/${record.requesterUid}`);
-  const entitlement = await subscriptionRef.transaction((current) => {
-    const previous = current && typeof current === 'object' ? current : {};
-    if (previous.lastApprovedRequestId === requestId) return previous;
-    const currentExpiry = Math.max(0, Number(previous.expiresAt) || 0);
-    return {
-      ...previous,
-      expiresAt: Math.max(Date.now(), currentExpiry) + SUBSCRIPTION_DURATION_MS,
-      lastApprovedAt: Date.now(),
-      lastApprovedRequestId: requestId,
-    };
-  });
-  if (!entitlement.committed) {
-    const current = entitlement.snapshot.val() || {};
-    if (current.lastApprovedRequestId !== requestId) {
-      throw new HttpsError('aborted', '구독 기간 갱신을 완료하지 못했습니다. 다시 승인 처리해 주세요.');
+  try {
+    await db.ref(`${PENDING_PATH}/${requestId}/status`).set('processing');
+    const entitlement = await subscriptionRef.transaction((current) => {
+      const previous = current && typeof current === 'object' ? current : {};
+      if (previous.lastApprovedRequestId === requestId) return previous;
+      if (previous.pendingRequestId && previous.pendingRequestId !== requestId) return;
+      const approvedAt = Date.now();
+      const currentExpiry = Math.max(0, Number(previous.expiresAt) || 0);
+      return {
+        ...previous,
+        expiresAt: Math.max(approvedAt, currentExpiry) + SUBSCRIPTION_DURATION_MS,
+        lastApprovedAt: approvedAt,
+        lastApprovedRequestId: requestId,
+      };
+    });
+    if (!entitlement.committed) {
+      const current = entitlement.snapshot.val() || {};
+      if (current.lastApprovedRequestId !== requestId) {
+        throw new HttpsError('aborted', '구독 기간 갱신을 완료하지 못했습니다. 다시 승인 처리해 주세요.');
+      }
     }
+    const expiresAt = Number(entitlement.snapshot.val() && entitlement.snapshot.val().expiresAt) || 0;
+    const finalized = await requestRef.transaction((current) => {
+      if (!current || current.status !== 'processing' || current.processingToken !== claimToken) return;
+      return {
+        ...current,
+        status: 'approved',
+        reviewedAt: Date.now(),
+        reviewedBy: adminUid,
+        approvedUntil: expiresAt,
+        processingAt: null,
+        processingToken: null,
+      };
+    });
+    if (!finalized.committed && !(finalized.snapshot.val() && finalized.snapshot.val().status === 'approved')) {
+      throw new HttpsError('aborted', '구독 신청 상태를 완료로 바꾸지 못했습니다. 다시 확인해 주세요.');
+    }
+    await db.ref(`${PENDING_PATH}/${requestId}`).remove();
+    await subscriptionRef.child('pendingRequestId').transaction((current) => current === requestId ? null : current);
+    return { ok: true, status: 'approved', expiresAt };
+  } catch (error) {
+    const restored = await requestRef.transaction((current) => {
+      if (!current || current.status !== 'processing' || current.processingToken !== claimToken) return;
+      return { ...current, status: 'pending', processingAt: null, processingToken: null };
+    }).catch(() => null);
+    if (restored && restored.committed) {
+      const pending = restored.snapshot.val() || {};
+      await db.ref(`${PENDING_PATH}/${requestId}`).set({
+        status: 'pending',
+        requestedAt: Number(pending.requestedAt) || 0,
+        donorSoopId: String(pending.donorSoopId || ''),
+        balloonCost: Number(pending.balloonCost) || 0,
+        donationCompletedAt: Number(pending.donationCompletedAt) || 0,
+      }).catch(() => null);
+    }
+    throw error;
   }
-  const expiresAt = Number(entitlement.snapshot.val() && entitlement.snapshot.val().expiresAt) || 0;
-  await db.ref().update({
-    [`${REQUESTS_PATH}/${requestId}/status`]: 'approved',
-    [`${REQUESTS_PATH}/${requestId}/reviewedAt`]: Date.now(),
-    [`${REQUESTS_PATH}/${requestId}/approvedUntil`]: expiresAt,
-    [`${PENDING_PATH}/${requestId}`]: null,
-  });
-  await subscriptionRef.child('pendingRequestId').transaction((current) => current === requestId ? null : current);
-  return { ok: true, status: 'approved', expiresAt };
 });
