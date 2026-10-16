@@ -6,12 +6,13 @@
   <meta name="theme-color" content="#f4f6fa">
   <meta name="description" content="스트리머 고점체크: SOOP 다시보기 시청 통계를 확인하고 같은 날 두 스트리머의 고점을 비교합니다.">
   <title>스트리머 고점체크</title>
+  <script src="input-privacy.js?v=20261016-input-privacy"></script>
   <link rel="icon" type="image/svg+xml" href="viewer-stats-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-queue">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261016-business-angular2">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261016-input-privacy">
 </head>
 <body class="viewer-stats-page">
   <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
@@ -75,7 +76,7 @@
       </section>
 
       <section class="viewer-search-panel" aria-labelledby="viewerSearchTitle">
-        <form id="viewerSearchForm" class="viewer-search-form">
+        <form id="viewerSearchForm" class="viewer-search-form" autocomplete="off">
           <label id="viewerSearchTitle" for="viewerSearchInput">스트리머 검색</label>
           <div class="viewer-search-row">
             <input id="viewerSearchInput" type="search" maxlength="100" placeholder="닉네임, SOOP 아이디 또는 방송국 주소" autocomplete="off">
@@ -84,13 +85,6 @@
         </form>
         <p class="viewer-search-hint" id="viewerSearchHint" role="status" aria-live="polite">닉네임 또는 SOOP 방송국 아이디·주소로 검색하세요.</p>
         <p class="viewer-queue-note">익명도 이용할 수 있어요. 혼잡하면 로그인·구독 요청이 먼저 처리될 수 있고, 이용 등급별 한도가 적용됩니다.</p>
-        <div class="viewer-recent-searches hidden" id="viewerRecentSearches">
-          <div class="viewer-recent-heading">
-            <strong>최근 검색</strong>
-            <span>이 브라우저에 최대 3명 저장</span>
-          </div>
-          <div class="viewer-recent-list" id="viewerRecentList" aria-label="최근 검색한 스트리머"></div>
-        </div>
         <div class="viewer-search-results" id="viewerSearchResults" aria-label="스트리머 검색 결과"></div>
       </section>
       </section>
@@ -142,7 +136,7 @@
           <div class="viewer-comparison-controls">
             <div class="viewer-comparison-picker" data-comparison-slot="0">
               <label class="viewer-comparison-label" for="viewerComparisonSearch0"><span>01</span>첫 번째 스트리머</label>
-              <form class="viewer-comparison-search-form" id="viewerComparisonSearchForm0">
+              <form class="viewer-comparison-search-form" id="viewerComparisonSearchForm0" autocomplete="off">
                 <input id="viewerComparisonSearch0" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
                 <button class="button" type="submit" id="viewerComparisonSearchButton0">검색</button>
               </form>
@@ -152,7 +146,7 @@
             </div>
             <div class="viewer-comparison-picker" data-comparison-slot="1">
               <label class="viewer-comparison-label" for="viewerComparisonSearch1"><span>02</span>두 번째 스트리머</label>
-              <form class="viewer-comparison-search-form" id="viewerComparisonSearchForm1">
+              <form class="viewer-comparison-search-form" id="viewerComparisonSearchForm1" autocomplete="off">
                 <input id="viewerComparisonSearch1" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
                 <button class="button" type="submit" id="viewerComparisonSearchButton1">검색</button>
               </form>
@@ -162,7 +156,7 @@
             </div>
             <div class="viewer-comparison-date-field">
               <label class="viewer-comparison-label" for="viewerComparisonDate"><span>03</span>비교할 날짜</label>
-              <input id="viewerComparisonDate" type="date" aria-label="비교할 날짜">
+              <input id="viewerComparisonDate" type="date" autocomplete="off" aria-label="비교할 날짜">
               <p>선택한 날의 다시보기를 자동으로 찾습니다. 같은 날 방송이 여러 개면 모두 확인해 최고 고점을 비교합니다.</p>
             </div>
           </div>
@@ -196,7 +190,7 @@
     </footer>
   </div>
   <dialog class="viewer-subscription-dialog" id="viewerSubscriptionDialog" aria-labelledby="viewerSubscriptionDialogTitle">
-    <form class="viewer-subscription-dialog-card" id="viewerSubscriptionForm">
+    <form class="viewer-subscription-dialog-card" id="viewerSubscriptionForm" autocomplete="off">
       <button class="viewer-subscription-close" id="viewerSubscriptionClose" type="button" aria-label="닫기">×</button>
       <p class="eyebrow">30-DAY PASS</p>
       <h2 id="viewerSubscriptionDialogTitle">고점체크 구독</h2>
@@ -208,7 +202,7 @@
           <li><strong>3단계 · 자동 확인</strong> 후원 후 돌아와 완료를 누르면 관리자 SOOP 알림과 대조해, 한 신청만 조건에 맞을 때 자동 승인합니다.</li>
         </ol>
         <label for="viewerSubscriptionNickname">후원자 SOOP 닉네임</label>
-        <input id="viewerSubscriptionNickname" name="nickname" maxlength="20" autocomplete="nickname" placeholder="별풍선을 보낸 닉네임" required>
+        <input id="viewerSubscriptionNickname" name="nickname" maxlength="20" autocomplete="off" placeholder="별풍선을 보낸 닉네임" required>
         <label for="viewerSubscriptionSoopId">후원자 SOOP 아이디</label>
         <input id="viewerSubscriptionSoopId" name="donorSoopId" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" pattern="[A-Za-z0-9]{2,20}" title="SOOP 방송국 주소의 아이디를 입력해 주세요." placeholder="SOOP 방송국 주소의 아이디" required>
       </div>
@@ -233,6 +227,6 @@
       </div>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261016-streamer-date-comparison"></script>
+  <script type="module" src="viewer-stats.js?v=20261016-input-privacy"></script>
 </body>
 </html>

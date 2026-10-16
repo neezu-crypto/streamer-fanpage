@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#151320">
   <meta name="description" content="좋아하는 스트리머의 공식 팬페이지를 만나보세요.">
   <title>스트리머 팬페이지</title>
+  <script src="input-privacy.js?v=20261016-input-privacy"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
@@ -91,12 +92,12 @@
     </div>
   </dialog>
   <dialog id="streamerVerifyDialog" class="account-dialog">
-    <form class="account-dialog-card verification-form" id="streamerVerificationForm" style="max-height:calc(100dvh - 32px);overflow-y:auto;">
+    <form class="account-dialog-card verification-form" id="streamerVerificationForm" autocomplete="off" style="max-height:calc(100dvh - 32px);overflow-y:auto;">
       <p class="eyebrow">STREAMER VERIFICATION</p>
       <h2>스트리머 인증</h2>
       <p>닉네임과 SOOP 아이디를 입력해 인증을 신청하세요. 신청은 서버에서 확인하며, 승인 후 본인 팬페이지로 자동 연결됩니다.</p>
       <label for="verificationNickname">스트리머 닉네임</label>
-      <input id="verificationNickname" name="nickname" maxlength="20" autocomplete="nickname" required>
+      <input id="verificationNickname" name="nickname" maxlength="20" autocomplete="off" required>
       <label for="verificationSoopId">SOOP 아이디</label>
       <input id="verificationSoopId" name="soopId" minlength="2" maxlength="20" pattern="[A-Za-z0-9]{2,20}" autocomplete="off" required>
       <p class="verification-status" id="verificationStatus" role="status" aria-live="polite">관리자 승인 후 인증이 완료됩니다.</p>
