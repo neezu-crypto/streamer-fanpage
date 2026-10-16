@@ -3751,6 +3751,10 @@ exports.streamerFanPageDesignFeedback = onCall({ maxInstances: 10 }, async (requ
   const feedbackRoot = db.ref('streamerFanPageDesignFeedback');
 
   if (action === 'submit') {
+    const verifiedSender = await findVerifiedByUid(uid);
+    if (!verifiedSender) {
+      throw new HttpsError('permission-denied', '스트리머 인증을 완료한 계정만 문의를 보낼 수 있습니다.');
+    }
     const categories = new Set(['design', 'suggestion', 'bug', 'other']);
     const category = String(payload.category || '').trim();
     const title = String(payload.title || '').trim().slice(0, 80);
@@ -3794,6 +3798,11 @@ exports.streamerFanPageDesignFeedback = onCall({ maxInstances: 10 }, async (requ
       content,
       streamerId: streamer ? streamer.id : '',
       streamerNickname: streamer ? streamer.nickname : '',
+      senderVerification: {
+        nickname: verifiedSender.streamer.nickname,
+        soopId: verifiedSender.streamer.soopId,
+        verifiedAt: Number(verifiedSender.record.verifiedAt) || null,
+      },
       senderUid: uid,
       status: 'open',
       createdAt: Date.now(),
@@ -3815,6 +3824,11 @@ exports.streamerFanPageDesignFeedback = onCall({ maxInstances: 10 }, async (requ
         content: String(item && item.content || '').slice(0, 2000),
         streamerId: String(item && item.streamerId || ''),
         streamerNickname: String(item && item.streamerNickname || ''),
+        senderVerification: {
+          nickname: String(item && item.senderVerification && item.senderVerification.nickname || '').slice(0, 40),
+          soopId: String(item && item.senderVerification && item.senderVerification.soopId || '').slice(0, 20),
+          verifiedAt: Number(item && item.senderVerification && item.senderVerification.verifiedAt) || 0,
+        },
         senderUid: String(item && item.senderUid || ''),
         status: item && item.status === 'resolved' ? 'resolved' : 'open',
         createdAt: Number(item && item.createdAt) || 0,
