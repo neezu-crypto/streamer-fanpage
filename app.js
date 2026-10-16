@@ -49,6 +49,7 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
 const MAX_LOADED_VIDEO_ITEMS = 500;
 const MAX_BANNER_IMAGE_ITEMS = 20;
+const MAX_UPBO_ITEMS = 100;
 const PROFILE_QUICK_EDIT_FIELDS = {
   birthday: { label: '생일', maxLength: 20, placeholder: '예: 02.11' },
   mbti: { label: 'MBTI', maxLength: 8, placeholder: '예: INFJ' },
@@ -1201,65 +1202,190 @@ function loadMoreUpboPending(streamerId) { return loadUpboBoard(streamerId, 'pen
 function openUpboItemEditor(page, existingItem = null) {
   const state = upboStateFor(page.streamer.id);
   if (!state.canManage || state.saving) return;
-  if (!existingItem && state.items.length >= 100) {
+  if (!existingItem && state.items.length >= MAX_UPBO_ITEMS) {
     showToast('신청 항목은 최대 100개까지 등록할 수 있어요.'); return;
   }
+  const isBatch = !existingItem;
+  const remainingSlots = Math.max(0, MAX_UPBO_ITEMS - state.items.length);
   const dialog = document.createElement('dialog'); dialog.className = 'account-dialog upbo-editor-dialog';
   const form = document.createElement('form'); form.className = 'account-dialog-card upbo-editor-form';
   const heading = document.createElement('div'); heading.className = 'profile-editor-heading';
-  const title = document.createElement('h2'); title.textContent = existingItem ? '신청 항목 수정' : '신청 항목 추가';
+  const title = document.createElement('h2'); title.textContent = existingItem ? '신청 항목 수정' : '신청 항목 빠른 추가';
   const close = upboButton('×', 'profile-settings-close', () => dialog.close()); close.setAttribute('aria-label', '항목 편집 닫기');
   heading.append(title, close);
-  const name = upboEditorField('항목 이름', 'input', { type: 'text', maxlength: 60, required: true, value: existingItem?.name || '', placeholder: '예: 체키 방셀' });
-  const description = upboEditorField('설명 (선택)', 'textarea', { maxlength: 160, rows: 2, placeholder: '팬에게 안내할 내용을 적어 주세요.' });
-  description.field.value = existingItem?.description || '';
-  const imageUrl = upboEditorField('이미지 주소 (선택)', 'input', { type: 'url', maxlength: 2048, value: existingItem?.imageUrl || '', placeholder: 'https://이미지주소' });
-  imageUrl.field.autocomplete = 'off';
-  const preview = document.createElement('div'); preview.className = 'upbo-item-preview'; preview.hidden = true;
-  const previewImage = document.createElement('img'); previewImage.alt = ''; previewImage.decoding = 'async'; previewImage.referrerPolicy = 'no-referrer'; previewImage.hidden = true;
-  const previewStatus = document.createElement('span'); previewStatus.className = 'upbo-item-preview-status';
-  preview.append(previewImage, previewStatus);
-  previewImage.addEventListener('load', () => {
-    if (previewImage.dataset.previewUrl !== normalizeUpboImageUrl(imageUrl.field.value)) return;
-    previewImage.hidden = false; previewStatus.textContent = '미리보기';
-  });
-  previewImage.addEventListener('error', () => {
-    if (previewImage.dataset.previewUrl !== normalizeUpboImageUrl(imageUrl.field.value)) return;
-    previewImage.hidden = true; previewStatus.textContent = '이미지를 불러오지 못했어요. 주소와 공개 설정을 확인해 주세요.';
-  });
-  const updatePreview = () => {
-    const raw = imageUrl.field.value.trim();
+  const name = upboEditorField(
+    isBatch ? '항목 이름 (쉼표로 구분)' : '항목 이름',
+    isBatch ? 'textarea' : 'input',
+    isBatch
+      ? { maxlength: MAX_UPBO_ITEMS * 62, rows: 2, required: true, placeholder: '예: 체키 방셀, 편지 방셀, 팬미팅' }
+      : { type: 'text', maxlength: 60, required: true, value: existingItem.name, placeholder: '예: 체키 방셀' },
+  );
+  if (isBatch) name.field.classList.add('upbo-item-batch-names');
+  let description = null;
+  let imageUrl = null;
+  let preview = null;
+  let previewImage = null;
+  let previewStatus = null;
+  const batchRows = isBatch ? document.createElement('div') : null;
+  const batchStatus = isBatch ? document.createElement('p') : null;
+  const drafts = [];
+  let batchNameCount = 0;
+  let save = null;
+
+  const setPreview = (rawValue, image, status, placeholder = null) => {
+    const raw = String(rawValue || '').trim();
     const url = normalizeUpboImageUrl(raw);
-    if (!raw) { preview.hidden = true; previewImage.removeAttribute('src'); previewStatus.textContent = ''; return; }
-    preview.hidden = false; previewImage.hidden = true;
-    if (!url) { previewStatus.textContent = 'HTTPS 이미지 주소를 입력해 주세요.'; previewImage.removeAttribute('src'); return; }
-    previewStatus.textContent = '미리보기를 불러오는 중…';
-    previewImage.dataset.previewUrl = url;
-    previewImage.src = url;
+    if (image.dataset.previewUrl !== url) image.hidden = true;
+    if (!raw) {
+      image.removeAttribute('src'); image.dataset.previewUrl = 'none';
+      if (placeholder) { placeholder.hidden = false; placeholder.textContent = '미리보기'; }
+      status.textContent = '이미지 주소를 입력하면 미리보기가 표시됩니다.';
+      return;
+    }
+    if (!url) {
+      image.removeAttribute('src'); image.dataset.previewUrl = 'invalid';
+      if (placeholder) { placeholder.hidden = false; placeholder.textContent = '미리보기'; }
+      status.textContent = 'HTTPS 이미지 주소를 입력해 주세요.';
+      return;
+    }
+    if (placeholder) placeholder.hidden = true;
+    status.textContent = '미리보기를 불러오는 중…';
+    image.dataset.previewUrl = url;
+    image.src = url;
   };
-  imageUrl.field.addEventListener('input', updatePreview);
-  updatePreview();
+
+  if (isBatch) {
+    batchRows.className = 'upbo-item-batch-list';
+    batchStatus.className = 'upbo-item-batch-status';
+  } else {
+    description = upboEditorField('설명 (선택)', 'textarea', { maxlength: 160, rows: 2, placeholder: '팬에게 안내할 내용을 적어 주세요.' });
+    description.field.value = existingItem.description || '';
+    imageUrl = upboEditorField('이미지 주소 (선택)', 'input', { type: 'url', maxlength: 2048, value: existingItem.imageUrl || '', placeholder: 'https://이미지주소' });
+    imageUrl.field.autocomplete = 'off';
+    preview = document.createElement('div'); preview.className = 'upbo-item-preview'; preview.hidden = true;
+    previewImage = document.createElement('img'); previewImage.alt = ''; previewImage.decoding = 'async'; previewImage.referrerPolicy = 'no-referrer'; previewImage.hidden = true;
+    previewStatus = document.createElement('span'); previewStatus.className = 'upbo-item-preview-status';
+    preview.append(previewImage, previewStatus);
+    previewImage.addEventListener('load', () => {
+      if (previewImage.dataset.previewUrl !== normalizeUpboImageUrl(imageUrl.field.value)) return;
+      previewImage.hidden = false; previewStatus.textContent = '미리보기';
+    });
+    previewImage.addEventListener('error', () => {
+      if (previewImage.dataset.previewUrl !== normalizeUpboImageUrl(imageUrl.field.value)) return;
+      previewImage.hidden = true; previewStatus.textContent = '이미지를 불러오지 못했어요. 주소와 공개 설정을 확인해 주세요.';
+    });
+    const updatePreview = () => {
+      const raw = imageUrl.field.value.trim();
+      if (!raw) { preview.hidden = true; previewImage.removeAttribute('src'); previewImage.dataset.previewUrl = 'none'; previewStatus.textContent = ''; return; }
+      preview.hidden = false;
+      setPreview(raw, previewImage, previewStatus);
+    };
+    imageUrl.field.addEventListener('input', updatePreview);
+    updatePreview();
+  }
+
+  const updateBatchStatus = () => {
+    if (!isBatch || !batchStatus || !save) return;
+    const hasTooMany = batchNameCount > remainingSlots || batchNameCount > MAX_UPBO_ITEMS;
+    const hasLongName = drafts.some((draft) => draft.name.length > 60);
+    const hasInvalidImageUrl = drafts.some((draft) => draft.imageUrl && !normalizeUpboImageUrl(draft.imageUrl));
+    save.disabled = !batchNameCount || hasTooMany || hasLongName || hasInvalidImageUrl;
+    batchStatus.classList.toggle('is-error', hasTooMany || hasLongName || hasInvalidImageUrl);
+    if (!batchNameCount) batchStatus.textContent = '항목 이름을 쉼표로 구분해 입력하면 항목별 이미지 주소를 설정할 수 있어요.';
+    else if (hasTooMany) batchStatus.textContent = `현재 ${remainingSlots}개까지 추가할 수 있어요. 항목 이름을 줄여 주세요.`;
+    else if (hasLongName) batchStatus.textContent = '항목 이름은 각각 60자까지 입력할 수 있어요.';
+    else if (hasInvalidImageUrl) batchStatus.textContent = '미리보기 주소는 HTTPS 이미지 주소로 입력해 주세요.';
+    else batchStatus.textContent = `${batchNameCount}개 항목을 한 번에 추가합니다. 이미지 주소는 각 항목에 따로 입력할 수 있어요.`;
+  };
+
+  const renderBatchRows = () => {
+    if (!isBatch) return;
+    const parsedNames = name.field.value.split(/[,，]/).map((value) => value.trim()).filter(Boolean);
+    batchNameCount = parsedNames.length;
+    const visibleNames = parsedNames.slice(0, Math.min(MAX_UPBO_ITEMS, remainingSlots + 1));
+    const previous = drafts.splice(0, drafts.length);
+    const used = new Set();
+    const next = visibleNames.map((value, index) => {
+      const key = value.toLocaleLowerCase('ko-KR');
+      let previousIndex = previous.findIndex((draft, draftIndex) => !used.has(draftIndex) && draft.name.toLocaleLowerCase('ko-KR') === key);
+      if (previousIndex < 0 && previous[index] && !used.has(index)) previousIndex = index;
+      if (previousIndex >= 0) used.add(previousIndex);
+      return { id: previousIndex >= 0 ? previous[previousIndex].id : createUpboId(), name: value, imageUrl: previousIndex >= 0 ? previous[previousIndex].imageUrl : '' };
+    });
+    drafts.push(...next);
+    batchRows.replaceChildren();
+    drafts.forEach((draft, index) => {
+      const row = document.createElement('div'); row.className = 'upbo-item-batch-row';
+      const copy = document.createElement('div'); copy.className = 'upbo-item-batch-copy';
+      const itemNumber = document.createElement('span'); itemNumber.className = 'upbo-item-batch-number'; itemNumber.textContent = `항목 ${index + 1}`;
+      const itemName = document.createElement('strong'); itemName.className = 'upbo-item-batch-name'; itemName.textContent = draft.name;
+      copy.append(itemNumber, itemName);
+      const imageField = upboEditorField('이미지 주소 (선택)', 'input', { type: 'url', maxlength: 2048, value: draft.imageUrl, placeholder: 'https://이미지주소' });
+      imageField.field.autocomplete = 'off'; imageField.label.classList.add('upbo-item-batch-image-field');
+      const previewBox = document.createElement('div'); previewBox.className = 'upbo-item-batch-preview';
+      const itemImage = document.createElement('img'); itemImage.alt = ''; itemImage.decoding = 'async'; itemImage.referrerPolicy = 'no-referrer'; itemImage.hidden = true;
+      const placeholder = document.createElement('span'); placeholder.textContent = '미리보기';
+      const itemPreviewStatus = document.createElement('small'); itemPreviewStatus.className = 'upbo-item-batch-preview-status';
+      previewBox.append(itemImage, placeholder);
+      const imageCell = document.createElement('div'); imageCell.className = 'upbo-item-batch-image-cell';
+      imageCell.append(imageField.label, itemPreviewStatus);
+      row.append(copy, imageCell, previewBox);
+      itemImage.addEventListener('load', () => {
+        if (itemImage.dataset.previewUrl !== normalizeUpboImageUrl(imageField.field.value)) return;
+        itemImage.hidden = false; placeholder.hidden = true; itemPreviewStatus.textContent = '미리보기';
+      });
+      itemImage.addEventListener('error', () => {
+        if (itemImage.dataset.previewUrl !== normalizeUpboImageUrl(imageField.field.value)) return;
+        itemImage.hidden = true; placeholder.hidden = false; placeholder.textContent = '불러오기 실패';
+        itemPreviewStatus.textContent = '주소를 확인해 주세요.';
+      });
+      imageField.field.addEventListener('input', () => {
+        draft.imageUrl = imageField.field.value.trim();
+        setPreview(draft.imageUrl, itemImage, itemPreviewStatus, placeholder);
+        updateBatchStatus();
+      });
+      if (draft.imageUrl) setPreview(draft.imageUrl, itemImage, itemPreviewStatus, placeholder);
+      batchRows.append(row);
+    });
+    updateBatchStatus();
+  };
+  if (isBatch) name.field.addEventListener('input', renderBatchRows);
+
   const note = document.createElement('p'); note.className = 'upbo-editor-note';
-  note.textContent = '이미지 주소를 입력하면 미리보기가 표시됩니다. 등록된 항목은 팬 신청서에 표시됩니다.';
+  note.textContent = isBatch
+    ? '쉼표로 항목 이름을 나누어 한 번에 추가할 수 있어요. 각 항목에 HTTPS 이미지 주소를 넣으면 작은 미리보기와 함께 저장됩니다.'
+    : '이미지 주소를 입력하면 미리보기가 표시됩니다. 등록된 항목은 팬 신청서에 표시됩니다.';
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer upbo-editor-footer';
-  const hint = document.createElement('small'); hint.textContent = '신청 항목은 최대 100개까지 등록할 수 있어요.';
+  const hint = document.createElement('small'); hint.textContent = isBatch ? `현재 ${remainingSlots}개까지 추가 가능 · 최대 ${MAX_UPBO_ITEMS}개` : `신청 항목은 최대 ${MAX_UPBO_ITEMS}개까지 등록할 수 있어요.`;
   const actions = document.createElement('div'); actions.className = 'profile-editor-footer-actions';
   const cancel = upboButton('취소', '', () => dialog.close());
-  const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = existingItem ? '수정 저장' : '항목 추가';
-  actions.append(cancel, save); footer.append(hint, actions); form.append(heading, name.label, description.label, imageUrl.label, preview, note, footer);
+  save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = existingItem ? '수정 저장' : '항목 추가';
+  actions.append(cancel, save); footer.append(hint, actions);
+  form.append(heading, name.label);
+  if (isBatch) form.append(batchStatus, batchRows);
+  else form.append(description.label, imageUrl.label, preview);
+  form.append(note, footer);
+  if (isBatch) renderBatchRows();
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity() || save.disabled) return;
     save.disabled = true; save.textContent = '저장 중…'; state.saving = true;
     try {
-      await callUpbo({
-        action: 'saveItem', streamerId: page.streamer.id,
-        itemId: existingItem?.id || createUpboId(), name: name.field.value.trim(), description: description.field.value.trim(),
-        imageUrl: imageUrl.field.value.trim(),
-      });
+      if (isBatch) {
+        await callUpbo({
+          action: 'saveItems', streamerId: page.streamer.id,
+          items: drafts.map((draft) => ({ id: draft.id, name: draft.name, imageUrl: draft.imageUrl, description: '' })),
+        });
+      } else {
+        await callUpbo({
+          action: 'saveItem', streamerId: page.streamer.id,
+          itemId: existingItem.id, name: name.field.value.trim(), description: description.field.value.trim(),
+          imageUrl: imageUrl.field.value.trim(),
+        });
+      }
       dialog.close();
       await loadUpboBoard(page.streamer.id);
-      showToast(existingItem ? '신청 항목을 수정했어요.' : '신청 항목을 추가했어요.');
+      showToast(existingItem ? '신청 항목을 수정했어요.' : `${drafts.length}개 신청 항목을 추가했어요.`);
     } catch (error) {
       showToast(error.message || '신청 항목을 저장하지 못했어요.');
     } finally {
