@@ -94,6 +94,8 @@ async function loadDevbarLinks() {
 const MAX_CONCURRENT_STATS_REQUESTS = 3;
 const MAX_PERIOD_SCAN_PAGES = 200;
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
+const MAX_RECENT_STREAMERS = 3;
+const RECENT_STREAMERS_STORAGE_KEY = 'streamerFanPage.viewerStats.recentStreamers.v1';
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const VIEWER_PEAK_PERIODS = [
   { days: 7, label: '최근 7일' },
@@ -101,6 +103,7 @@ const VIEWER_PEAK_PERIODS = [
   { days: 90, label: '최근 90일' },
   { days: 365, label: '최근 1년' },
 ];
+let recentStreamers = readRecentStreamers();
 
 let searchRequestId = 0;
 let activeLoadToken = 0;
@@ -624,6 +627,64 @@ function setSearchHint(message, isError = false) {
   const hint = $('viewerSearchHint');
   hint.textContent = message;
   hint.classList.toggle('is-error', isError);
+}
+
+function normalizeRecentStreamer(value) {
+  if (!value || typeof value !== 'object') return null;
+  const soopId = String(value.soopId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(soopId)) return null;
+  const nickname = String(value.nickname || soopId).trim().slice(0, 100) || soopId;
+  return { nickname, soopId };
+}
+
+function readRecentStreamers() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(RECENT_STREAMERS_STORAGE_KEY) || '[]');
+    if (!Array.isArray(stored)) return [];
+    const seen = new Set();
+    return stored
+      .map(normalizeRecentStreamer)
+      .filter((streamer) => {
+        if (!streamer || seen.has(streamer.soopId)) return false;
+        seen.add(streamer.soopId);
+        return true;
+      })
+      .slice(0, MAX_RECENT_STREAMERS);
+  } catch (_) {
+    return [];
+  }
+}
+
+function renderRecentStreamers() {
+  const section = $('viewerRecentSearches');
+  const list = $('viewerRecentList');
+  list.replaceChildren();
+  section.classList.toggle('hidden', recentStreamers.length === 0);
+  recentStreamers.forEach((streamer) => {
+    const button = document.createElement('button');
+    button.className = 'viewer-recent-item';
+    button.type = 'button';
+    button.dataset.recentSoopId = streamer.soopId;
+    const name = document.createElement('strong');
+    name.textContent = streamer.nickname;
+    const id = document.createElement('span');
+    id.textContent = 'SOOP ID · ' + streamer.soopId;
+    button.append(name, id);
+    list.append(button);
+  });
+}
+
+function saveRecentStreamer(streamer) {
+  const normalized = normalizeRecentStreamer(streamer);
+  if (!normalized) return;
+  recentStreamers = [normalized, ...recentStreamers.filter((item) => item.soopId !== normalized.soopId)]
+    .slice(0, MAX_RECENT_STREAMERS);
+  try {
+    window.localStorage.setItem(RECENT_STREAMERS_STORAGE_KEY, JSON.stringify(recentStreamers));
+  } catch (_) {
+    // Keep this session's list usable when browser storage is unavailable.
+  }
+  renderRecentStreamers();
 }
 
 function renderSearchResults(streamers) {
@@ -1548,6 +1609,7 @@ async function selectStreamer(streamer) {
   nextPage = 1;
   hasMoreVods = false;
   vodTotal = 0;
+  saveRecentStreamer(streamer);
   if (statsObserver) statsObserver.disconnect();
   $('viewerVodGrid').replaceChildren();
   $('viewerLoadMore').classList.add('hidden');
@@ -1646,6 +1708,15 @@ $('viewerSearchResults').addEventListener('click', (event) => {
   const streamers = $('viewerSearchResults')._streamers || [];
   const streamer = streamers[Number(button.dataset.streamerIndex)];
   if (streamer) selectStreamer(streamer);
+});
+
+$('viewerRecentList').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-recent-soop-id]');
+  if (!button) return;
+  const streamer = recentStreamers.find((item) => item.soopId === button.dataset.recentSoopId);
+  if (!streamer) return;
+  $('viewerSearchInput').value = streamer.nickname;
+  selectStreamer({ ...streamerForId(streamer.soopId), nickname: streamer.nickname });
 });
 
 $('viewerLoadMore').addEventListener('click', () => {
@@ -1781,6 +1852,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 setupDevbarMarquee();
+renderRecentStreamers();
 renderComparisonSelection();
 loadDevbarLinks();
 getAuthReady().catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));

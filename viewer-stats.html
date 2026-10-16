@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-queue">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261016-subscription">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261016-recent-search">
 </head>
 <body class="viewer-stats-page">
   <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
@@ -84,6 +84,13 @@
         </form>
         <p class="viewer-search-hint" id="viewerSearchHint" role="status" aria-live="polite">닉네임 또는 SOOP 방송국 아이디·주소로 검색하세요.</p>
         <p class="viewer-queue-note">익명도 이용할 수 있어요. 혼잡하면 로그인·구독 요청이 먼저 처리될 수 있고, 이용 등급별 한도가 적용됩니다.</p>
+        <div class="viewer-recent-searches hidden" id="viewerRecentSearches">
+          <div class="viewer-recent-heading">
+            <strong>최근 검색</strong>
+            <span>이 브라우저에 최대 3명 저장</span>
+          </div>
+          <div class="viewer-recent-list" id="viewerRecentList" aria-label="최근 검색한 스트리머"></div>
+        </div>
         <div class="viewer-search-results" id="viewerSearchResults" aria-label="스트리머 검색 결과"></div>
       </section>
       </section>
@@ -200,6 +207,6 @@
       </div>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261016-subscription"></script>
+  <script type="module" src="viewer-stats.js?v=20261016-recent-search"></script>
 </body>
 </html>
