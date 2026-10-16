@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-profile-quick-edit">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261017-subscription-modal-offer">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261017-vod-first-collapsible-tools">
 </head>
 <body class="viewer-stats-page">
   <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
@@ -101,67 +101,70 @@
           </div>
           <a class="button" id="viewerStationLink" href="https://www.sooplive.com/" target="_blank" rel="noopener noreferrer">SOOP 방송국 ↗</a>
         </div>
-        <section class="viewer-period-peaks" aria-labelledby="viewerPeriodTitle">
-          <div class="viewer-period-heading">
-            <div>
-              <p class="eyebrow">PERIOD HIGHS</p>
-              <h3 id="viewerPeriodTitle">기간별 최고 시청 순간</h3>
-            </div>
-            <button class="button" id="viewerPeriodScanButton" type="button">구독 전용 분석</button>
-          </div>
-          <p class="viewer-period-status" id="viewerPeriodStatus" role="status" aria-live="polite">분석 버튼을 누르면 구독 안내를 확인할 수 있습니다.</p>
-          <div class="viewer-period-grid" id="viewerPeriodGrid"></div>
-        </section>
-        <section class="viewer-comparison-panel" aria-labelledby="viewerComparisonTitle">
-          <div class="viewer-comparison-heading">
-            <div>
-              <p class="eyebrow">SAME-DAY VOD COMPARISON</p>
-              <h2 id="viewerComparisonTitle">같은 날 스트리머 2명 비교</h2>
-              <p>두 스트리머와 날짜를 고르면 해당 날짜의 방송 다시보기를 찾아 고점과 평균 대비 상승폭을 비교합니다.</p>
-            </div>
-            <span class="viewer-comparison-count" id="viewerComparisonCount">0 / 2명 선택</span>
-          </div>
-          <div class="viewer-comparison-controls">
-            <div class="viewer-comparison-picker" data-comparison-slot="0">
-              <label class="viewer-comparison-label" for="viewerComparisonSearch0"><span>01</span>첫 번째 스트리머</label>
-              <form class="viewer-comparison-search-form" id="viewerComparisonSearchForm0" autocomplete="off">
-                <input id="viewerComparisonSearch0" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
-                <button class="button" type="submit" id="viewerComparisonSearchButton0">검색</button>
-              </form>
-              <div class="viewer-comparison-search-results" id="viewerComparisonSearchResults0" role="listbox" aria-label="첫 번째 스트리머 검색 결과"></div>
-              <div class="viewer-comparison-selected hidden" id="viewerComparisonSelected0"></div>
-              <p class="viewer-comparison-picker-status" id="viewerComparisonPickerStatus0" role="status" aria-live="polite">닉네임이나 SOOP ID를 검색하세요.</p>
-            </div>
-            <div class="viewer-comparison-picker" data-comparison-slot="1">
-              <label class="viewer-comparison-label" for="viewerComparisonSearch1"><span>02</span>두 번째 스트리머</label>
-              <form class="viewer-comparison-search-form" id="viewerComparisonSearchForm1" autocomplete="off">
-                <input id="viewerComparisonSearch1" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
-                <button class="button" type="submit" id="viewerComparisonSearchButton1">검색</button>
-              </form>
-              <div class="viewer-comparison-search-results" id="viewerComparisonSearchResults1" role="listbox" aria-label="두 번째 스트리머 검색 결과"></div>
-              <div class="viewer-comparison-selected hidden" id="viewerComparisonSelected1"></div>
-              <p class="viewer-comparison-picker-status" id="viewerComparisonPickerStatus1" role="status" aria-live="polite">첫 번째와 다른 스트리머를 선택하세요.</p>
-            </div>
-            <div class="viewer-comparison-date-field">
-              <label class="viewer-comparison-label" for="viewerComparisonDate"><span>03</span>비교할 날짜</label>
-              <input id="viewerComparisonDate" type="date" autocomplete="off" aria-label="비교할 날짜">
-              <p>선택한 날의 다시보기를 자동으로 찾습니다. 같은 날 방송이 여러 개면 모두 확인해 최고 고점을 비교합니다.</p>
-            </div>
-          </div>
-          <p class="viewer-comparison-status" id="viewerComparisonStatus" role="status" aria-live="polite">스트리머 2명과 날짜를 선택해 주세요.</p>
-          <div class="viewer-comparison-actions">
-            <button class="button" id="viewerComparisonClear" type="button" disabled>선택 초기화</button>
-            <button class="button button-primary" id="viewerComparisonRun" type="button" disabled>비교 결과 확인</button>
-          </div>
-          <div class="viewer-comparison-results hidden" id="viewerComparisonResults" aria-live="polite"></div>
-        </section>
         <div class="viewer-list-heading">
-          <div><h3>방송 다시보기</h3><span id="viewerVodCount"></span></div>
+          <div><p class="eyebrow">VOD LIBRARY</p><h3>방송 다시보기</h3><span id="viewerVodCount"></span></div>
           <span class="viewer-list-note">1분 단위 · 시작/종료 5분 제외</span>
         </div>
         <p class="viewer-vod-status" id="viewerVodStatus" role="status" aria-live="polite">다시보기를 불러오고 있어요.</p>
         <div class="viewer-vod-grid" id="viewerVodGrid"></div>
         <button class="button viewer-load-more hidden" id="viewerLoadMore" type="button">더 많은 다시보기 불러오기</button>
+
+        <details class="viewer-period-peaks viewer-collapsible-panel" aria-labelledby="viewerPeriodTitle">
+          <summary class="viewer-collapsible-summary">
+            <span class="viewer-collapsible-title"><span class="eyebrow">PERIOD HIGHS</span><strong id="viewerPeriodTitle">기간별 최고 시청 순간</strong></span>
+            <span class="viewer-collapsible-hint">최근 7일 · 30일 · 90일 · 1년</span>
+          </summary>
+          <div class="viewer-collapsible-content">
+            <div class="viewer-period-heading">
+              <button class="button" id="viewerPeriodScanButton" type="button">구독 전용 분석</button>
+            </div>
+            <p class="viewer-period-status" id="viewerPeriodStatus" role="status" aria-live="polite">분석 버튼을 누르면 구독 안내를 확인할 수 있습니다.</p>
+            <div class="viewer-period-grid" id="viewerPeriodGrid"></div>
+          </div>
+        </details>
+
+        <details class="viewer-comparison-panel viewer-collapsible-panel" aria-labelledby="viewerComparisonTitle">
+          <summary class="viewer-collapsible-summary">
+            <span class="viewer-collapsible-title"><span class="eyebrow">SAME-DAY COMPARISON</span><strong id="viewerComparisonTitle">같은 날 스트리머 2명 비교</strong></span>
+            <span class="viewer-comparison-count" id="viewerComparisonCount">0 / 2명 선택</span>
+          </summary>
+          <div class="viewer-collapsible-content">
+            <p class="viewer-comparison-intro">두 스트리머와 날짜를 고르면 해당 날짜의 방송 다시보기를 찾아 고점과 평균 대비 상승폭을 비교합니다.</p>
+            <div class="viewer-comparison-controls">
+              <div class="viewer-comparison-picker" data-comparison-slot="0">
+                <label class="viewer-comparison-label" for="viewerComparisonSearch0"><span>01</span>첫 번째 스트리머</label>
+                <form class="viewer-comparison-search-form" id="viewerComparisonSearchForm0" autocomplete="off">
+                  <input id="viewerComparisonSearch0" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
+                  <button class="button" type="submit" id="viewerComparisonSearchButton0">검색</button>
+                </form>
+                <div class="viewer-comparison-search-results" id="viewerComparisonSearchResults0" role="listbox" aria-label="첫 번째 스트리머 검색 결과"></div>
+                <div class="viewer-comparison-selected hidden" id="viewerComparisonSelected0"></div>
+                <p class="viewer-comparison-picker-status" id="viewerComparisonPickerStatus0" role="status" aria-live="polite">닉네임이나 SOOP ID를 검색하세요.</p>
+              </div>
+              <div class="viewer-comparison-picker" data-comparison-slot="1">
+                <label class="viewer-comparison-label" for="viewerComparisonSearch1"><span>02</span>두 번째 스트리머</label>
+                <form class="viewer-comparison-search-form" id="viewerComparisonSearchForm1" autocomplete="off">
+                  <input id="viewerComparisonSearch1" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
+                  <button class="button" type="submit" id="viewerComparisonSearchButton1">검색</button>
+                </form>
+                <div class="viewer-comparison-search-results" id="viewerComparisonSearchResults1" role="listbox" aria-label="두 번째 스트리머 검색 결과"></div>
+                <div class="viewer-comparison-selected hidden" id="viewerComparisonSelected1"></div>
+                <p class="viewer-comparison-picker-status" id="viewerComparisonPickerStatus1" role="status" aria-live="polite">첫 번째와 다른 스트리머를 선택하세요.</p>
+              </div>
+              <div class="viewer-comparison-date-field">
+                <label class="viewer-comparison-label" for="viewerComparisonDate"><span>03</span>비교할 날짜</label>
+                <input id="viewerComparisonDate" type="date" autocomplete="off" aria-label="비교할 날짜">
+                <p>선택한 날의 다시보기를 자동으로 찾습니다. 같은 날 방송이 여러 개면 모두 확인해 최고 고점을 비교합니다.</p>
+              </div>
+            </div>
+            <p class="viewer-comparison-status" id="viewerComparisonStatus" role="status" aria-live="polite">스트리머 2명과 날짜를 선택해 주세요.</p>
+            <div class="viewer-comparison-actions">
+              <button class="button" id="viewerComparisonClear" type="button" disabled>선택 초기화</button>
+              <button class="button button-primary" id="viewerComparisonRun" type="button" disabled>비교 결과 확인</button>
+            </div>
+            <div class="viewer-comparison-results hidden" id="viewerComparisonResults" aria-live="polite"></div>
+          </div>
+        </details>
       </section>
 
       <section class="viewer-empty" id="viewerEmpty" aria-live="polite">
@@ -219,6 +222,6 @@
       </div>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261017-subscription-modal-offer"></script>
+  <script type="module" src="viewer-stats.js?v=20261017-vod-first-collapsible-tools"></script>
 </body>
 </html>
