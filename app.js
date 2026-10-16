@@ -811,6 +811,7 @@ function setVisibleView(page) {
     stockPriceUnsubscribe = null;
   }
   if (!page) stockPriceSparklineRequest += 1;
+  document.querySelector('.topbar').classList.remove('topbar-with-banner');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
   $('homeView').classList.toggle('hidden', !!page);
   $('fanPageView').classList.toggle('hidden', !page);
@@ -1799,6 +1800,7 @@ function renderFanPage(page) {
   section.append(details, stockCard, actions);
   const topBanner = renderBannerSection(page, 'top');
   if (topBanner) {
+    document.querySelector('.topbar').classList.add('topbar-with-banner');
     view.classList.add('has-top-banner');
     view.append(topBanner);
   }
