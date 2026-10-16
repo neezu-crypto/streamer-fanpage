@@ -241,48 +241,9 @@ function formatSubscriptionDate(value) {
 
 function renderSubscriptionControls() {
   const state = subscriptionState;
-  const status = $('viewerSubscriptionStatus');
-  const action = $('viewerSubscriptionAction');
-  const scan = $('viewerPeriodScanButton');
-  if (!state.loaded) {
-    status.textContent = '구독 상태를 확인하고 있어요.';
-    action.textContent = '구독 상태 확인 중…';
-    action.disabled = true;
-    scan.textContent = '구독 전용 분석';
-    return;
-  }
-  action.disabled = false;
-  if (state.isAdmin) {
-    status.textContent = '관리자 권한 · 구독 여부와 관계없이 모든 분석 기능을 이용할 수 있어요.';
-    action.textContent = '관리자 전체 권한';
-    action.disabled = true;
-    scan.textContent = '최근 1년 분석';
-  } else if (state.subscribed) {
-    status.textContent = '구독 중 · ' + formatSubscriptionDate(state.expiresAt) + '까지 이용할 수 있어요.'
-      + (state.pending ? ' 갱신 신청도 확인 중입니다.' : '');
-    action.textContent = state.pending ? '신청 상태 보기' : '구독 연장하기';
-    scan.textContent = '최근 1년 분석';
-  } else if (state.pending) {
-    status.textContent = state.pendingDonationCompletedAt
-      ? '별풍선 후원 알림을 자동 확인하고 있어요.'
-      : state.pendingDonorSoopId
-        ? '구독 신청이 등록됐어요. 후원 뒤 자동 확인을 시작해 주세요.'
-        : '이전 방식의 구독 신청을 운영자가 수동 확인하고 있어요.';
-    action.textContent = '신청 상태 보기';
-    scan.textContent = '구독 전용 분석';
-  } else if (!state.accountProtected) {
-    status.textContent = '구독 신청은 Google·Kakao 계정 연결 또는 스트리머 인증이 필요해요.';
-    action.textContent = '로그인하고 구독하기';
-    scan.textContent = '구독 전용 분석';
-  } else if (state.lastRequestStatus === 'rejected') {
-    status.textContent = '최근 구독 신청이 승인되지 않았어요. 후원자 닉네임을 확인한 뒤 다시 신청할 수 있어요.';
-    action.textContent = '다시 구독 신청하기';
-    scan.textContent = '구독 전용 분석';
-  } else {
-    status.textContent = '무료 기능을 이용 중이에요. 구독하면 기간별 최고 순간과 평균 대비 상승폭을 볼 수 있어요.';
-    action.textContent = '별풍선 10개로 구독';
-    scan.textContent = '구독 전용 분석';
-  }
+  $('viewerPeriodScanButton').textContent = state.loaded && (state.isAdmin || state.subscribed)
+    ? '최근 1년 분석'
+    : '구독 전용 분석';
 }
 
 function refreshExistingVodCardAccess() {
@@ -359,9 +320,9 @@ async function refreshSubscriptionStatus({ resumeComparison = true } = {}) {
     return true;
   } catch (error) {
     if (token !== subscriptionRefreshToken) return;
-    $('viewerSubscriptionStatus').textContent = viewerStatsErrorMessage(error, '구독 상태를 확인하지 못했어요.');
-    $('viewerSubscriptionAction').disabled = false;
-    $('viewerSubscriptionAction').textContent = '구독 상태 다시 확인';
+    if ($('viewerSubscriptionDialog').open) {
+      renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '구독 상태를 확인하지 못했어요.'));
+    }
     return false;
   }
 }
@@ -371,6 +332,7 @@ function renderSubscriptionDialogStatus(message = '') {
   const submit = $('viewerSubscriptionSubmit');
   const cancel = $('viewerSubscriptionCancel');
   const loginNote = $('viewerSubscriptionLoginNote');
+  const offer = $('viewerSubscriptionOffer');
   const purchaseInfo = $('viewerSubscriptionPurchaseInfo');
   const donationStep = $('viewerSubscriptionDonationStep');
   const donationHelp = $('viewerSubscriptionDonationHelp');
@@ -380,6 +342,7 @@ function renderSubscriptionDialogStatus(message = '') {
   const autoVerificationReady = !!subscriptionState.pendingDonorSoopId;
   const donationCompleted = subscriptionState.pendingDonationCompletedAt > 0;
   const comparisonContext = !!pendingComparisonRequest;
+  offer.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.subscribed || !!hasPending);
   $('viewerSubscriptionDialogTitle').textContent = comparisonContext ? '비교 결과 확인' : '고점체크 구독';
   $('viewerSubscriptionDialog').querySelector('.eyebrow').textContent = comparisonContext ? 'RESULT ACCESS' : '30-DAY PASS';
   purchaseInfo.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
@@ -1784,7 +1747,7 @@ async function selectStreamer(streamer) {
   $('viewerPeriodScanButton').textContent = subscriptionState.subscribed ? '최근 1년 분석' : '구독 전용 분석';
   $('viewerPeriodStatus').textContent = subscriptionState.subscribed
     ? '최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 순간을 찾습니다.'
-    : '기간별 최고 시청 순간은 구독 기능이에요. 별풍선 10개로 30일 동안 이용할 수 있습니다.';
+    : '분석 버튼을 누르면 구독 안내를 확인할 수 있습니다.';
   $('viewerPeriodStatus').classList.remove('is-error');
   renderPeriodPeakCards(new Map(), new Map(), false);
   $('viewerResults').classList.remove('hidden');
@@ -1943,12 +1906,6 @@ $('viewerPeriodScanButton').addEventListener('click', () => {
   runPeriodPeakScan({ forceRefresh: $('viewerPeriodScanButton').dataset.hasResult === 'true' });
 });
 
-$('viewerSubscriptionAction').addEventListener('click', async () => {
-  if (!subscriptionState.loaded) await refreshSubscriptionStatus();
-  openSubscriptionDialog();
-});
-
-$('viewerSubscriptionRefresh').addEventListener('click', refreshSubscriptionStatus);
 $('viewerSubscriptionLoginCheck').addEventListener('click', async (event) => {
   const button = event.currentTarget;
   button.disabled = true;
