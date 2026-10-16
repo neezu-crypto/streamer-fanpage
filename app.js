@@ -832,7 +832,7 @@ function upboStateFor(streamerId) {
       topicsRequestId: 0, topicRequestId: 0,
       boardLoaded: false, loadingBoard: false, loadingMoreRecords: false, loadingMorePending: false,
       submitting: false, items: [], pending: [], records: [],
-      requestDraft: { nickname: '', lines: [], activeItemId: '' },
+      requestDraft: { nickname: '', lines: [], activeLineId: '' },
       pendingHasMore: false, pendingNextCursor: '', recordsHasMore: false, recordsNextCursor: '',
       boardRequestId: 0,
     });
@@ -990,7 +990,7 @@ function renderUpboRequestForm(page, state) {
     empty.textContent = state.canManage ? '신청 항목을 추가하면 팬들이 여기서 신청할 수 있어요.' : '아직 신청할 수 있는 항목이 없어요.';
     panel.append(empty); return panel;
   }
-  const draft = state.requestDraft || (state.requestDraft = { nickname: '', lines: [], activeItemId: '' });
+  const draft = state.requestDraft || (state.requestDraft = { nickname: '', lines: [], activeLineId: '' });
   const form = document.createElement('form'); form.className = 'upbo-request-form'; form.autocomplete = 'off';
   const nickname = upboEditorField('닉네임', 'input', { type: 'text', maxlength: 40, required: true, placeholder: '방송에서 사용하는 닉네임' });
   nickname.field.autocomplete = 'off'; nickname.field.value = draft.nickname;
@@ -1000,15 +1000,19 @@ function renderUpboRequestForm(page, state) {
   const availableHeading = document.createElement('h5'); availableHeading.textContent = '신청할 항목을 선택해 주세요';
   const availableGrid = document.createElement('div'); availableGrid.className = 'upbo-choice-grid';
   items.forEach((entry) => {
-    const selected = draft.lines.some((line) => line.itemId === entry.id);
+    const selectedCount = draft.lines.filter((line) => line.itemId === entry.id).length;
     const imageUrl = normalizeUpboImageUrl(entry.imageUrl);
-    const button = upboButton('', `upbo-choice-item${imageUrl ? ' has-image' : ''}${selected ? ' is-selected' : ''}`, () => {
-      const existing = draft.lines.find((line) => line.itemId === entry.id);
-      if (!existing) draft.lines.push({ itemId: entry.id, itemName: entry.name, quantity: 1, requestNotes: '' });
-      draft.activeItemId = entry.id;
+    const button = upboButton('', `upbo-choice-item${imageUrl ? ' has-image' : ''}${selectedCount ? ' is-selected' : ''}`, () => {
+      if (draft.lines.length >= MAX_UPBO_ITEMS) {
+        showToast(`한 번에 최대 ${MAX_UPBO_ITEMS}개 항목까지 신청할 수 있어요.`);
+        return;
+      }
+      const line = { lineId: createUpboId(), itemId: entry.id, itemName: entry.name, quantity: 1, requestNotes: '' };
+      draft.lines.push(line);
+      draft.activeLineId = line.lineId;
       refreshUpboSection(page.streamer.id);
     });
-    button.setAttribute('aria-pressed', String(selected));
+    button.setAttribute('aria-label', `${entry.name} 항목 담기${selectedCount ? `, 현재 ${selectedCount}개 선택됨` : ''}`);
     if (imageUrl) {
       const image = document.createElement('img'); image.className = 'upbo-choice-image';
       image.src = imageUrl; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
@@ -1016,7 +1020,10 @@ function renderUpboRequestForm(page, state) {
     }
     const copy = document.createElement('span'); copy.className = 'upbo-choice-copy';
     const name = document.createElement('strong'); name.textContent = entry.name;
-    const description = document.createElement('small'); description.textContent = entry.description || (selected ? '선택됨' : '눌러서 담기');
+    const description = document.createElement('small');
+    description.textContent = selectedCount
+      ? `${selectedCount}개 담김 · 눌러서 더 담기`
+      : entry.description || '눌러서 담기';
     copy.append(name, description);
     const mark = document.createElement('span'); mark.className = 'upbo-choice-mark'; mark.textContent = selected ? '✓' : '+';
     button.append(copy, mark); availableGrid.append(button);
@@ -1034,13 +1041,14 @@ function renderUpboRequestForm(page, state) {
   } else {
     const cartList = document.createElement('div'); cartList.className = 'upbo-cart-list';
     draft.lines.forEach((line) => {
+      if (!line.lineId) line.lineId = createUpboId();
       const card = document.createElement('div');
-      const expanded = draft.activeItemId === line.itemId;
+      const expanded = draft.activeLineId === line.lineId;
       card.className = `upbo-cart-item${expanded ? ' is-expanded' : ''}`;
       const item = items.find((candidate) => candidate.id === line.itemId);
       const cardHeading = document.createElement('div'); cardHeading.className = 'upbo-cart-item-heading';
       const toggle = upboButton('', 'upbo-cart-item-toggle', () => {
-        draft.activeItemId = expanded ? '' : line.itemId;
+        draft.activeLineId = expanded ? '' : line.lineId;
         refreshUpboSection(page.streamer.id);
       });
       toggle.setAttribute('aria-expanded', String(expanded));
@@ -1049,8 +1057,8 @@ function renderUpboRequestForm(page, state) {
       summary.textContent = line.quantity > 0 ? `× ${Number(line.quantity).toLocaleString('ko-KR')}` : '수량 입력';
       toggle.append(name, summary);
       const remove = upboButton('×', 'upbo-cart-remove', () => {
-        draft.lines = draft.lines.filter((candidate) => candidate.itemId !== line.itemId);
-        if (draft.activeItemId === line.itemId) draft.activeItemId = '';
+        draft.lines = draft.lines.filter((candidate) => candidate.lineId !== line.lineId);
+        if (draft.activeLineId === line.lineId) draft.activeLineId = '';
         refreshUpboSection(page.streamer.id);
       });
       remove.setAttribute('aria-label', `${line.itemName} 선택 해제`);
@@ -1118,7 +1126,7 @@ function renderUpboRequestForm(page, state) {
         nickname: nickname.field.value.trim(),
         items: draft.lines.map((line) => ({ itemId: line.itemId, quantity: Number(line.quantity), requestNotes: line.requestNotes || '' })),
       });
-      state.requestDraft = { nickname: '', lines: [], activeItemId: '' };
+      state.requestDraft = { nickname: '', lines: [], activeLineId: '' };
       showToast(`${submittedCount}개 항목 신청을 보냈어요. 스트리머 확인 후 등록됩니다.`);
       await loadUpboBoard(page.streamer.id);
     } catch (error) {
