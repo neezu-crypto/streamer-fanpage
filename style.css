@@ -952,6 +952,9 @@
 .fan-quick-scroll-thumb{position:absolute;top:4px;left:calc(50% - 7px);width:14px;height:38px;transform:translateY(0);border:1px solid #ffffff52;border-radius:99px;background:var(--pink);box-shadow:0 0 14px color-mix(in srgb,var(--pink),transparent 60%);will-change:transform}
 .fan-quick-scrubber:focus-visible .fan-quick-scroll-thumb,.fan-quick-toggle:focus-visible,.fan-quick-close:focus-visible,.fan-quick-link:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
 @media(min-width:1280px){
+  .fan-quick-header{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+  .fan-quick-remote.is-dragging .fan-quick-header{cursor:grabbing}
+  .fan-quick-header strong::before{content:"⠿";margin-right:6px;color:#b9afc3;font-size:15px;vertical-align:-1px}
   .fan-quick-remote{right:auto;left:max(8px,calc((100vw - 1060px)/2 - 116px));top:50%;transform:translateY(-50%)}
   .fan-quick-toggle{display:none}
   .fan-quick-panel{width:112px;max-height:70dvh}
