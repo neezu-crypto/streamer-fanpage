@@ -109,6 +109,8 @@ let searchRequestId = 0;
 let activeLoadToken = 0;
 let selectedStreamer = null;
 let vodSortMode = 'date-desc';
+let vodSearchKeyword = '';
+let vodListRequestToken = 0;
 let authReady = null;
 let nextPage = 1;
 let hasMoreVods = false;
@@ -1501,28 +1503,36 @@ function observeVodCard(card) {
 function updateVodHeading() {
   const loadedCount = $('viewerVodGrid').children.length;
   $('viewerVodCount').textContent = vodTotal
-    ? loadedCount.toLocaleString('ko-KR') + '개 표시 · 전체 ' + vodTotal.toLocaleString('ko-KR') + '개'
-    : '등록된 다시보기 없음';
+    ? loadedCount.toLocaleString('ko-KR') + '개 표시 · ' + (vodSearchKeyword ? '검색 결과 ' : '전체 ') + vodTotal.toLocaleString('ko-KR') + '개'
+    : vodSearchKeyword ? '검색 결과 0개' : '등록된 다시보기 없음';
 }
 
 async function loadVodPage(loadToken, page) {
+  const requestToken = vodListRequestToken;
+  const keyword = vodSearchKeyword;
   if (!selectedStreamer || loadToken !== activeLoadToken) return;
   $('viewerLoadMore').disabled = true;
   $('viewerLoadMore').textContent = page === 1 ? '다시보기를 불러오는 중…' : '불러오는 중…';
-  $('viewerVodStatus').textContent = page === 1 ? 'SOOP 다시보기 목록을 불러오고 있어요.' : '다음 다시보기를 불러오고 있어요.';
+  $('viewerVodStatus').textContent = keyword
+    ? (page === 1 ? '키워드 검색 결과를 불러오고 있어요.' : '다음 검색 결과를 불러오고 있어요.')
+    : (page === 1 ? 'SOOP 다시보기 목록을 불러오고 있어요.' : '다음 다시보기를 불러오고 있어요.');
   try {
-    const result = await callViewerStats({ action: 'vods', streamerId: selectedStreamer.soopId, page });
-    if (loadToken !== activeLoadToken) return;
+    const result = await callViewerStats({ action: 'vods', streamerId: selectedStreamer.soopId, page, keyword });
+    if (loadToken !== activeLoadToken || requestToken !== vodListRequestToken || keyword !== vodSearchKeyword) return;
     const payload = result.data || {};
     const vods = Array.isArray(payload.vods) ? payload.vods : [];
     vodTotal = Math.max(0, Number(payload.total) || 0);
     nextPage = Number(payload.page) + 1;
     hasMoreVods = payload.hasMore === true;
-    vodPagesByNumber.set(page, { vods, total: vodTotal, hasMore: hasMoreVods });
+    if (!keyword) vodPagesByNumber.set(page, { vods, total: vodTotal, hasMore: hasMoreVods });
     if (page === 1 && !vods.length) {
-      $('viewerVodStatus').textContent = '이 방송국에 등록된 다시보기가 없어요.';
+      $('viewerVodStatus').textContent = keyword
+        ? '“' + keyword + '” 검색 결과가 없어요.'
+        : '이 방송국에 등록된 다시보기가 없어요.';
     } else {
-      $('viewerVodStatus').textContent = '다시보기별 유저 수 그래프를 불러오고 있어요. 화면에 가까운 영상부터 분석합니다.';
+      $('viewerVodStatus').textContent = keyword
+        ? '“' + keyword + '” 검색 결과 ' + vodTotal.toLocaleString('ko-KR') + '개 · 화면에 가까운 영상부터 분석합니다.'
+        : '다시보기별 유저 수 그래프를 불러오고 있어요. 화면에 가까운 영상부터 분석합니다.';
     }
     const knownIds = new Set([...$('viewerVodGrid').querySelectorAll('[data-vod-id]')].map((card) => card.dataset.vodId));
     vods.forEach((vod) => {
@@ -1536,10 +1546,10 @@ async function loadVodPage(loadToken, page) {
     updateVodHeading();
     $('viewerLoadMore').classList.toggle('hidden', !hasMoreVods);
   } catch (error) {
-    if (loadToken !== activeLoadToken) return;
+    if (loadToken !== activeLoadToken || requestToken !== vodListRequestToken || keyword !== vodSearchKeyword) return;
     $('viewerVodStatus').textContent = viewerStatsErrorMessage(error, '다시보기 목록을 불러오지 못했어요.');
   } finally {
-    if (loadToken === activeLoadToken) {
+    if (loadToken === activeLoadToken && requestToken === vodListRequestToken && keyword === vodSearchKeyword) {
       $('viewerLoadMore').disabled = false;
       $('viewerLoadMore').textContent = '더 많은 다시보기 불러오기';
     }
@@ -1826,11 +1836,15 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
 async function selectStreamer(streamer) {
   activeLoadToken += 1;
   const loadToken = activeLoadToken;
+  vodListRequestToken += 1;
   periodScanToken += 1;
   cancelQueuedStatsRequests();
   vodPagesByNumber = new Map();
   vodPagesStreamerId = String(streamer.soopId || '').toLowerCase();
   selectedStreamer = streamer;
+  vodSearchKeyword = '';
+  $('viewerVodSearchInput').value = '';
+  $('viewerVodSearchButton').disabled = false;
   $('viewerPeriodScanButton').dataset.hasResult = 'false';
   nextPage = 1;
   hasMoreVods = false;
@@ -1937,6 +1951,29 @@ $('viewerSearchResults').addEventListener('click', (event) => {
 
 $('viewerLoadMore').addEventListener('click', () => {
   if (hasMoreVods && selectedStreamer) loadVodPage(activeLoadToken, nextPage);
+});
+
+$('viewerVodSearchForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!selectedStreamer) return;
+  vodSearchKeyword = $('viewerVodSearchInput').value.trim();
+  vodListRequestToken += 1;
+  const requestToken = vodListRequestToken;
+  cancelQueuedStatsRequests();
+  if (statsObserver) statsObserver.disconnect();
+  $('viewerVodGrid').replaceChildren();
+  vodTotal = 0;
+  nextPage = 1;
+  hasMoreVods = false;
+  $('viewerLoadMore').classList.add('hidden');
+  $('viewerLoadMore').disabled = false;
+  updateVodHeading();
+  $('viewerVodSearchButton').disabled = true;
+  try {
+    await loadVodPage(activeLoadToken, 1);
+  } finally {
+    if (requestToken === vodListRequestToken) $('viewerVodSearchButton').disabled = false;
+  }
 });
 
 $('viewerVodSort').addEventListener('change', (event) => {
