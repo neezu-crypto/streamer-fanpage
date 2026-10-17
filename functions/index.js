@@ -46,7 +46,7 @@ const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
 const SOOP_VOD_INFO_API = 'https://api.m.sooplive.com/station/video/a/view';
 const SOOP_VOD_STAR2_STATS_API = 'https://apisabana.sooplive.com/service/vod_star2_stats.php';
 const SOOP_STATION_API = 'https://chapi.sooplive.com/api';
-const SOOP_RANK_SEARCH_API = 'https://afevent2.sooplive.com/app/rank/api.php';
+const SOOP_STREAMER_SEARCH_API = 'https://sch.sooplive.co.kr/api.php';
 const SOOP_STREAMER_SEARCH_CACHE_TTL_MS = 60 * 1000;
 const SOOP_CALENDAR_API = 'https://api-channel.sooplive.com/v1.1/channel';
 const CALENDAR_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -391,30 +391,26 @@ async function searchSoopStreamers(query) {
   if (cached && cached.expiresAt > Date.now()) return cached.streamers;
 
   try {
-    const response = await fetch(SOOP_RANK_SEARCH_API, {
-      method: 'POST',
-      headers: {
-        accept: 'application/json, text/plain, */*',
-        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        origin: 'https://afevent2.sooplive.com',
-        referer: 'https://afevent2.sooplive.com/app/rank/index.php?szWhich=game',
-        'user-agent': 'Mozilla/5.0',
-      },
-      body: new URLSearchParams({
-        szWhich: 'game',
-        nPage: '1',
-        szSearch: normalizedQuery,
-        szGender: 'A',
-      }),
+    const url = new URL(SOOP_STREAMER_SEARCH_API);
+    url.search = new URLSearchParams({
+      m: 'bjSearch',
+      v: '3.0',
+      szOrder: 'score',
+      szKeyword: normalizedQuery,
+    }).toString();
+    const response = await fetch(url, {
+      headers: { accept: 'application/json, text/plain, */*' },
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) return [];
 
     const payload = await response.json();
-    if (Number(payload && payload.RESULT) !== 1 || !Array.isArray(payload.ALL_RANK)) return [];
-    const streamers = payload.ALL_RANK.map((row) => {
-      const soopId = String((row && row.bj_id) || '').trim();
-      const nickname = typeof (row && row.bj_nick) === 'string' ? row.bj_nick.trim() : '';
+    if (Number(payload && payload.RESULT) !== 1 || !Array.isArray(payload.DATA)) return [];
+    const streamers = payload.DATA.map((row) => {
+      const soopId = String((row && row.user_id) || '').trim();
+      const nickname = typeof (row && row.user_nick) === 'string' && row.user_nick.trim()
+        ? row.user_nick.trim()
+        : typeof (row && row.station_name) === 'string' ? row.station_name.trim() : '';
       if (!nickname || !nickname.toLocaleLowerCase().includes(normalizedQuery)
         && !soopId.toLocaleLowerCase().includes(normalizedQuery)) return null;
       return publicStreamer(soopId, { nickname, soopId });
