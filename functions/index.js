@@ -92,6 +92,7 @@ const weflabRouletteFetchInProgress = new Map();
 const fanpageViewerStatsMemoryCache = new Map();
 const fanpageViewerStatsInProgress = new Map();
 const soopStreamerSearchCache = new Map();
+const soopStreamerNicknameCache = new Map();
 const FANPAGE_VIEWER_STATS_CACHE_TTL_MS = 10 * 60 * 1000;
 const FANPAGE_VIEWER_STATS_CACHE_MAX_ITEMS = 200;
 const VIEWER_STATS_PERSISTENT_CACHE_PATH = 'streamerFanPageViewerStatsCache';
@@ -441,6 +442,45 @@ async function searchSoopStreamers(query, { sortByFavorites = false } = {}) {
     console.warn('SOOP broadcaster search failed:', error.message || error);
     return [];
   }
+}
+
+async function lookupSoopStreamerNickname(soopId) {
+  const normalizedId = String(soopId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(normalizedId)) return '';
+  const cached = soopStreamerNicknameCache.get(normalizedId);
+  if (cached && cached.expiresAt > Date.now()) return cached.nickname;
+
+  const matches = await searchSoopStreamers(normalizedId);
+  const exactMatch = matches.find((streamer) => streamer.id === normalizedId);
+  const nickname = exactMatch && exactMatch.nickname ? exactMatch.nickname.trim().slice(0, 40) : '';
+  soopStreamerNicknameCache.set(normalizedId, {
+    nickname,
+    expiresAt: Date.now() + (nickname ? 6 * 60 * 60 * 1000 : 5 * 60 * 1000),
+  });
+  while (soopStreamerNicknameCache.size > 2000) {
+    soopStreamerNicknameCache.delete(soopStreamerNicknameCache.keys().next().value);
+  }
+  return nickname;
+}
+
+async function lookupSoopStreamerNicknames(soopIds, concurrency = 8) {
+  const ids = [...new Set((Array.isArray(soopIds) ? soopIds : [])
+    .map((id) => String(id || '').trim().toLowerCase())
+    .filter((id) => SOOP_ID_PATTERN.test(id)))];
+  const names = new Map();
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, async () => {
+    while (nextIndex < ids.length) {
+      const id = ids[nextIndex++];
+      try {
+        const nickname = await lookupSoopStreamerNickname(id);
+        if (nickname) names.set(id, nickname);
+      } catch (error) {
+        console.warn(`Could not resolve SOOP nickname for ${id}:`, error.message || error);
+      }
+    }
+  }));
+  return names;
 }
 
 async function findVerifiedByUid(uid) {
@@ -3869,10 +3909,18 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     .map((tier) => [tier, Object.keys(viewerQueueSnap.val() && viewerQueueSnap.val()[tier] || {}).length]));
   viewerQueueMetrics.queuedNow = Object.values(queuedByTier).reduce((total, count) => total + count, 0);
   viewerQueueMetrics.queuedByTier = queuedByTier;
-  const topSearchedStreamers = Object.entries(searchedStreamerCounts)
-    .map(([id, count]) => ({ id, soopId: id, nickname: streamerNameById.get(id) || `@${id}`, count }))
-    .sort((a, b) => b.count - a.count || a.nickname.localeCompare(b.nickname, 'ko'))
+  const topSearchedEntries = Object.entries(searchedStreamerCounts)
+    .map(([id, count]) => ({ id, count }))
+    .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id))
     .slice(0, 30);
+  const missingStreamerIds = topSearchedEntries
+    .map(({ id }) => id)
+    .filter((id) => !streamerNameById.has(id));
+  const resolvedStreamerNames = await lookupSoopStreamerNicknames(missingStreamerIds);
+  resolvedStreamerNames.forEach((nickname, id) => streamerNameById.set(id, nickname));
+  const topSearchedStreamers = topSearchedEntries
+    .map(({ id, count }) => ({ id, soopId: id, nickname: streamerNameById.get(id) || `@${id}`, count }))
+    .sort((a, b) => b.count - a.count || a.nickname.localeCompare(b.nickname, 'ko'));
 
   return {
     generatedAt: Date.now(),
