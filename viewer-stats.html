@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-profile-quick-edit">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261017-search-panel-emphasis">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261017-vod-sort">
 </head>
 <body class="viewer-stats-page">
   <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
@@ -104,8 +104,18 @@
         </div>
         <div class="viewer-list-heading">
           <div><p class="eyebrow">VOD LIBRARY</p><h3>방송 다시보기</h3><span id="viewerVodCount"></span></div>
-          <span class="viewer-list-note">1분 단위 · 시작/종료 5분 제외</span>
+          <div class="viewer-list-controls">
+            <label class="viewer-vod-sort-label" for="viewerVodSort">정렬</label>
+            <select class="viewer-vod-sort" id="viewerVodSort">
+              <option value="date-desc">최신 날짜순</option>
+              <option value="date-asc">오래된 날짜순</option>
+              <option value="peak-desc">최고 시청자 많은순</option>
+              <option value="peak-asc">최고 시청자 적은순</option>
+            </select>
+            <span class="viewer-list-note">1분 단위 · 시작/종료 5분 제외</span>
+          </div>
         </div>
+        <p class="viewer-vod-sort-hint">정렬은 불러온 다시보기에 적용돼요. 시청자순은 분석된 영상이 위에 오고, 나머지는 최신 날짜순으로 표시됩니다.</p>
         <p class="viewer-vod-status" id="viewerVodStatus" role="status" aria-live="polite">다시보기를 불러오고 있어요.</p>
         <div class="viewer-vod-grid" id="viewerVodGrid"></div>
         <button class="button viewer-load-more hidden" id="viewerLoadMore" type="button">더 많은 다시보기 불러오기</button>
@@ -223,6 +233,6 @@
       </div>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261017-skip-short-vods"></script>
+  <script type="module" src="viewer-stats.js?v=20261017-vod-sort"></script>
 </body>
 </html>
