@@ -140,6 +140,7 @@ let subscriptionState = {
   pending: false,
   pendingRequestId: '',
   pendingDonorSoopId: '',
+  pendingBalloonCost: 33,
   pendingDonationCompletedAt: 0,
   lastRequestStatus: '',
 };
@@ -295,6 +296,7 @@ async function refreshSubscriptionStatus({ resumeComparison = true } = {}) {
       pending: data.pending === true,
       pendingRequestId: typeof data.pendingRequestId === 'string' ? data.pendingRequestId : '',
       pendingDonorSoopId: typeof data.pendingDonorSoopId === 'string' ? data.pendingDonorSoopId : '',
+      pendingBalloonCost: Number(data.pendingBalloonCost) || 33,
       pendingDonationCompletedAt: Number(data.pendingDonationCompletedAt) || 0,
       lastRequestStatus: typeof data.lastRequestStatus === 'string' ? data.lastRequestStatus : '',
     };
@@ -315,8 +317,8 @@ async function refreshSubscriptionStatus({ resumeComparison = true } = {}) {
       comparisonGateWaiting = true;
       setComparisonStatus(subscriptionState.accountProtected
         ? subscriptionState.pending
-          ? '구독 신청 승인 대기 중이에요. 승인되면 선택한 스트리머와 날짜의 비교 결과가 자동으로 열립니다.'
-          : '로그인이 확인됐어요. 별풍선 10개 구독을 신청하면 승인 후 비교 결과가 자동으로 열립니다.'
+          ? `구독 신청 승인 대기 중이에요. ${subscriptionState.pendingBalloonCost}개 후원을 확인하면 선택한 스트리머와 날짜의 비교 결과가 자동으로 열립니다.`
+          : '로그인이 확인됐어요. 별풍선 33개 구독을 신청하면 승인 후 비교 결과가 자동으로 열립니다.'
         : '선택한 스트리머와 날짜는 유지돼요. 새 탭에서 로그인한 뒤 이 화면으로 돌아와 주세요.');
       renderComparisonSelection();
     }
@@ -346,6 +348,7 @@ function renderSubscriptionDialogStatus(message = '') {
   const hasPending = subscriptionState.pending && subscriptionState.pendingRequestId;
   const autoVerificationReady = !!subscriptionState.pendingDonorSoopId;
   const donationCompleted = subscriptionState.pendingDonationCompletedAt > 0;
+  const pendingBalloonCost = Number(subscriptionState.pendingBalloonCost) || 33;
   const comparisonContext = !!pendingComparisonRequest;
   offer.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.subscribed || !!hasPending);
   $('viewerSubscriptionDialogTitle').textContent = comparisonContext ? '비교 결과 확인' : '고점체크 구독';
@@ -364,7 +367,7 @@ function renderSubscriptionDialogStatus(message = '') {
   } else if (donationCompleted) {
     donationHelp.textContent = '후원 완료 신호를 받았어요. 관리자 브라우저가 SOOP 알림을 대조 중이며, 한 신청만 조건에 맞으면 30일 이용권이 자동 적용됩니다. 확인할 수 없으면 관리자가 직접 확인합니다.';
   } else {
-    donationHelp.textContent = '신청에 입력한 SOOP 계정으로 별풍선 10개를 후원한 뒤 자동 확인을 시작해 주세요.';
+    donationHelp.textContent = `신청에 입력한 SOOP 계정으로 별풍선 ${pendingBalloonCost}개를 후원한 뒤 자동 확인을 시작해 주세요.`;
   }
   submit.textContent = subscriptionState.subscribed ? '신청 등록 · 30일 연장' : '구독 신청 등록';
   if (subscriptionState.isAdmin) {
@@ -383,7 +386,7 @@ function renderSubscriptionDialogStatus(message = '') {
         ? '후원 알림 자동 확인 중이에요. 일치하면 선택한 날짜의 비교 결과가 자동으로 열립니다.'
         : '후원 알림을 자동 대조하고 있어요. 확인되면 이 계정에 30일 이용권이 적용됩니다.';
     } else {
-      status.textContent = '신청이 등록됐어요. 운영자 방송국에 10개 후원한 뒤 ‘후원 완료 · 자동 확인 시작’을 눌러 주세요.';
+      status.textContent = `신청이 등록됐어요. 운영자 방송국에 ${pendingBalloonCost}개 후원한 뒤 ‘후원 완료 · 자동 확인 시작’을 눌러 주세요.`;
     }
   } else if (subscriptionState.subscribed) {
     status.textContent = formatSubscriptionDate(subscriptionState.expiresAt) + '까지 구독 중이에요. 미리 갱신해도 남은 기간에 30일이 더해집니다.';
@@ -2078,7 +2081,7 @@ $('viewerSubscriptionForm').addEventListener('submit', async (event) => {
     await refreshSubscriptionStatus();
     renderSubscriptionDialogStatus(result.action === 'already-pending'
       ? '이미 대기 중인 신청이 있어요. 현재 신청 정보를 확인해 주세요.'
-      : '신청을 등록했어요. 이제 운영자 방송국에 10개 후원한 뒤 자동 확인을 시작해 주세요.');
+      : '신청을 등록했어요. 이제 운영자 방송국에 33개 후원한 뒤 자동 확인을 시작해 주세요.');
     if (result.action === 'pending' || result.action === 'already-pending') {
       $('viewerSubscriptionNickname').value = '';
       $('viewerSubscriptionSoopId').value = '';

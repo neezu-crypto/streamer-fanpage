@@ -7,7 +7,7 @@ const SUBSCRIPTIONS_PATH = 'streamerFanPageViewerSubscriptions';
 const REQUESTS_PATH = 'streamerFanPageViewerSubscriptionRequests';
 const PENDING_PATH = 'streamerFanPageViewerSubscriptionPending';
 const SUBSCRIPTION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
-const BALLOON_COST = 10;
+const BALLOON_COST = 33;
 const MAX_DONOR_NICKNAME_LENGTH = 20;
 const FORBIDDEN_TEXT_RE = /[<>\x00-\x1F\x7F]/;
 const PROCESSING_STALE_MS = 2 * 60 * 1000;
@@ -107,6 +107,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
       pendingRequestId: isPending ? info.pendingRequestId : '',
       pendingRequestedAt: isPending ? Math.max(0, Number(pendingRequest.requestedAt) || 0) : 0,
       pendingDonorSoopId: isPending ? String(pendingRequest.donorSoopId || '').slice(0, 20) : '',
+      pendingBalloonCost: isPending ? Number(pendingRequest.balloonCost) || BALLOON_COST : 0,
       pendingDonationCompletedAt: isPending ? Math.max(0, Number(pendingRequest.donationCompletedAt) || 0) : 0,
       lastRequestStatus: lastRequest && typeof lastRequest.status === 'string' ? lastRequest.status : '',
       lastReviewedAt: Math.max(0, Number(lastRequest && lastRequest.reviewedAt) || 0),
@@ -189,7 +190,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     const result = await requestRef.transaction((current) => {
       if (!current || current.requesterUid !== uid || current.status !== 'pending' ||
           !/^[a-z0-9]{2,20}$/.test(String(current.donorSoopId || '')) ||
-          Number(current.balloonCost) !== BALLOON_COST) return;
+          ![10, BALLOON_COST].includes(Number(current.balloonCost))) return;
       if (Number(current.donationCompletedAt) > 0) return current;
       return { ...current, donationCompletedAt: now, updatedAt: now };
     });
@@ -206,7 +207,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
         status: 'pending',
         requestedAt: Math.max(0, Number(completed.requestedAt) || 0),
         donorSoopId: String(completed.donorSoopId || ''),
-        balloonCost: BALLOON_COST,
+        balloonCost: Number(completed.balloonCost),
         donationCompletedAt,
       };
     });
