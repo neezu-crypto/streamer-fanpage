@@ -2433,7 +2433,7 @@ function showSponsorDonationStep(record) {
   $('sponsorRequestFields').classList.add('hidden');
   $('sponsorDonationStep').classList.remove('hidden');
   $('sponsorRequestTitle').textContent = '후원 신청 확인';
-  $('sponsorRequestIntro').textContent = '후원이 확인되면 운영자가 승인하고 홍보 카드에 반영합니다.';
+  $('sponsorRequestIntro').textContent = '후원 알림이 신청 정보와 유일하게 일치하면 자동 승인되어 홍보 카드에 표시됩니다.';
   const summary = $('sponsorDonationSummary');
   summary.replaceChildren();
   const rows = [
@@ -2457,8 +2457,8 @@ function showSponsorDonationStep(record) {
   $('sponsorDonationLink').classList.toggle('hidden', completed);
   $('sponsorRequestDone').classList.toggle('hidden', false);
   $('sponsorDonationStatus').textContent = completed
-    ? '후원 완료를 접수했습니다. 운영자가 실제 후원 내역을 확인한 뒤 승인합니다.'
-    : `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원한 뒤 완료 버튼을 눌러주세요. 확인 후 관리자가 승인합니다.`;
+    ? '후원 완료를 접수했습니다. SOOP 알림과 신청 정보가 일치하면 자동 승인되고 홍보 카드에 표시됩니다. 확인이 모호하면 운영자가 검토합니다.'
+    : `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원해 주세요. 후원 알림이 신청 정보와 유일하게 일치하면 자동 승인됩니다. 완료 버튼을 누르면 후원 시각 대조에 도움이 됩니다.`;
   $('sponsorRequestStatus').textContent = '';
   startSponsorStatusPolling();
 }
@@ -2482,7 +2482,7 @@ async function refreshSponsorRequestStatus() {
       return;
     }
     if (data.status === 'processing') {
-      if ($('sponsorRequestDialog').open) $('sponsorDonationStatus').textContent = '운영자가 신청 내용을 확인하고 있습니다.';
+      if ($('sponsorRequestDialog').open) $('sponsorDonationStatus').textContent = '후원 내역을 확인해 홍보 카드를 승인 처리하고 있습니다.';
       return;
     }
     window.clearInterval(sponsorPollTimer);
@@ -2655,7 +2655,7 @@ $('sponsorDonationComplete').addEventListener('click', async () => {
   try {
     await callSponsorAds({ action: 'donationComplete', requestId: sponsorRequestId });
     if (sponsorRequestRecord) sponsorRequestRecord.donationCompletedAt = Date.now();
-    $('sponsorDonationStatus').textContent = '후원 완료를 접수했어요. 운영자가 실제 후원 내역을 확인한 뒤 승인합니다.';
+    $('sponsorDonationStatus').textContent = '후원 완료를 접수했어요. SOOP 알림과 신청 정보가 일치하면 자동 승인되고 홍보 카드에 표시됩니다. 확인이 모호하면 운영자가 검토합니다.';
     showSponsorDonationStep(sponsorRequestRecord);
   } catch (error) {
     $('sponsorDonationStatus').textContent = viewerStatsErrorMessage(error, '후원 완료를 접수하지 못했습니다.');
