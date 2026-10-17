@@ -94,6 +94,7 @@ async function loadDevbarLinks() {
 const MAX_CONCURRENT_STATS_REQUESTS = 3;
 const MAX_PERIOD_SCAN_PAGES = 200;
 const VIEWER_VOD_PAGE_SIZE = 60;
+const VIEWER_STATS_EXCLUDED_EDGE_SECONDS = 5 * 60;
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
 try { window.localStorage.removeItem('streamerFanPage.viewerStats.recentStreamers.v1'); } catch (_) {}
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
@@ -1096,13 +1097,27 @@ async function analyzeComparisonStreamer(streamer, vods, request, index) {
   if (!vods.length) {
     throw new Error((streamer.nickname || streamer.soopId) + '의 ' + formatVodDate(request.date) + ' 다시보기를 찾지 못했어요.');
   }
+  const excludedShortVods = vods.filter((vod) => {
+    const durationMs = Number(vod && vod.durationMs);
+    return Number.isFinite(durationMs) && durationMs > 0
+      && Math.floor(durationMs / 1000) <= VIEWER_STATS_EXCLUDED_EDGE_SECONDS * 2;
+  });
+  const analyzableVods = vods.filter((vod) => !excludedShortVods.includes(vod));
+  if (!analyzableVods.length) {
+    throw new Error((streamer.nickname || streamer.soopId) + '의 당일 다시보기는 모두 10분 이하라 시작·종료 5분을 제외한 비교 구간이 없어요.');
+  }
   let cursor = 0;
   let completed = 0;
   let best = null;
   let failure = null;
+  const excludedNote = excludedShortVods.length
+    ? ' · 10분 이하 ' + excludedShortVods.length.toLocaleString('ko-KR') + '개 제외'
+    : '';
+  setComparisonPickerStatus(index, (streamer.nickname || streamer.soopId) + ' · 0 / '
+    + analyzableVods.length.toLocaleString('ko-KR') + '개 분석 대기' + excludedNote);
   const worker = async () => {
-    while (isCurrentComparisonRequest(request) && !failure && cursor < vods.length) {
-      const vod = vods[cursor++];
+    while (isCurrentComparisonRequest(request) && !failure && cursor < analyzableVods.length) {
+      const vod = analyzableVods[cursor++];
       try {
         const stats = await loadVodStats(
           vod,
@@ -1120,20 +1135,30 @@ async function analyzeComparisonStreamer(streamer, vods, request, index) {
         }
         if (!best || peak > Number(best.stats.highest.viewers)) best = { vod, stats };
         completed += 1;
-        setComparisonPickerStatus(index, (streamer.nickname || streamer.soopId) + ' · ' + completed.toLocaleString('ko-KR') + ' / ' + vods.length.toLocaleString('ko-KR') + '개 분석 완료');
+        setComparisonPickerStatus(index, (streamer.nickname || streamer.soopId) + ' · '
+          + completed.toLocaleString('ko-KR') + ' / ' + analyzableVods.length.toLocaleString('ko-KR')
+          + '개 분석 완료' + excludedNote);
       } catch (error) {
         if (!isCurrentComparisonRequest(request)) return;
         failure = error;
       }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT_STATS_REQUESTS, vods.length) }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT_STATS_REQUESTS, analyzableVods.length) }, () => worker()));
   if (!isCurrentComparisonRequest(request)) return null;
   if (failure) {
-    throw new Error((streamer.nickname || streamer.soopId) + '의 당일 다시보기 ' + vods.length.toLocaleString('ko-KR') + '개 중 일부 통계를 불러오지 못해 비교를 완료하지 못했어요. ' + (failure.message || '잠시 후 다시 시도해 주세요.'));
+    throw new Error((streamer.nickname || streamer.soopId) + '의 당일 비교 대상 다시보기 '
+      + analyzableVods.length.toLocaleString('ko-KR') + '개 중 일부 통계를 불러오지 못해 비교를 완료하지 못했어요. '
+      + (failure.message || '잠시 후 다시 시도해 주세요.'));
   }
   if (!best) throw new Error((streamer.nickname || streamer.soopId) + '의 당일 다시보기 통계가 없어요.');
-  return { streamer, vod: best.vod, stats: best.stats, vodCount: vods.length };
+  return {
+    streamer,
+    vod: best.vod,
+    stats: best.stats,
+    vodCount: analyzableVods.length,
+    excludedShortVodCount: excludedShortVods.length,
+  };
 }
 
 function renderComparisonResults(request, comparisons) {
@@ -1166,7 +1191,7 @@ function renderComparisonResults(request, comparisons) {
   const grid = document.createElement('div');
   grid.className = 'viewer-comparison-result-grid';
   comparisons.forEach((result, index) => {
-    const { streamer, vod, stats, vodCount } = result;
+    const { streamer, vod, stats, vodCount, excludedShortVodCount } = result;
     const peak = peaks[index];
     const average = Math.max(0, Number(stats.averageViewers) || 0);
     const uplift = Math.round(peak - average);
@@ -1180,7 +1205,9 @@ function renderComparisonResults(request, comparisons) {
     vodTitle.textContent = vod.title || '제목 없음';
     const vodMeta = document.createElement('p');
     vodMeta.className = 'viewer-comparison-result-vod-meta';
-    vodMeta.textContent = '당일 다시보기 ' + vodCount.toLocaleString('ko-KR') + '개 중 최고 고점';
+    vodMeta.textContent = '당일 다시보기 ' + vodCount.toLocaleString('ko-KR') + '개 분석'
+      + (excludedShortVodCount ? ' · 10분 이하 ' + excludedShortVodCount.toLocaleString('ko-KR') + '개 제외' : '')
+      + ' 중 최고 고점';
     const metrics = document.createElement('div');
     metrics.className = 'viewer-comparison-result-metrics';
     metrics.append(
