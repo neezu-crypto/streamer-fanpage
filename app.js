@@ -2369,7 +2369,7 @@ function createFanPageQuickRemote(view) {
     button.append(number, label);
     button.addEventListener('click', () => {
       document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      if (!window.matchMedia('(min-width: 1360px)').matches) setExpanded(false);
+      if (!window.matchMedia('(min-width: 1280px)').matches) setExpanded(false);
     });
     nav.append(button);
     return button;
@@ -2388,8 +2388,81 @@ function createFanPageQuickRemote(view) {
   let expanded = false;
   let scrollFrame = 0;
   let dragging = false;
+  let remoteDrag = null;
   let resizeObserver = null;
-  const isDesktop = () => window.matchMedia('(min-width: 1360px)').matches;
+  const positionStorageKey = 'streamerFanPage.quickRemotePosition';
+  const isDesktop = () => window.matchMedia('(min-width: 1280px)').matches;
+  function positionRemote(left, top) {
+    const bounds = remote.getBoundingClientRect();
+    const maxLeft = Math.max(8, window.innerWidth - bounds.width - 8);
+    const maxTop = Math.max(8, window.innerHeight - bounds.height - 8);
+    remote.style.right = 'auto';
+    remote.style.transform = 'none';
+    remote.style.left = `${Math.max(8, Math.min(maxLeft, left))}px`;
+    remote.style.top = `${Math.max(8, Math.min(maxTop, top))}px`;
+  }
+  function restoreDesktopPosition() {
+    if (!isDesktop()) {
+      remote.style.left = '';
+      remote.style.top = '';
+      remote.style.right = '';
+      remote.style.transform = '';
+      return;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(positionStorageKey) || 'null');
+      if (!saved || !Number.isFinite(saved.x) || !Number.isFinite(saved.y)) {
+        remote.style.left = '';
+        remote.style.top = '';
+        remote.style.right = '';
+        remote.style.transform = '';
+        return;
+      }
+      const bounds = remote.getBoundingClientRect();
+      const spanX = Math.max(0, window.innerWidth - bounds.width - 16);
+      const spanY = Math.max(0, window.innerHeight - bounds.height - 16);
+      positionRemote(8 + saved.x * spanX, 8 + saved.y * spanY);
+    } catch (_) {
+      remote.style.left = '';
+      remote.style.top = '';
+      remote.style.right = '';
+      remote.style.transform = '';
+    }
+  }
+  function startRemoteDrag(event) {
+    if (!isDesktop() || event.button !== 0 || event.target.closest('button')) return;
+    event.preventDefault();
+    const bounds = remote.getBoundingClientRect();
+    remoteDrag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, left: bounds.left, top: bounds.top, moved: false };
+    remote.classList.add('is-dragging');
+    positionRemote(bounds.left, bounds.top);
+    try { header.setPointerCapture(event.pointerId); } catch (_) { /* capture may be unavailable */ }
+  }
+  function moveRemoteDrag(event) {
+    if (!remoteDrag || event.pointerId !== remoteDrag.pointerId) return;
+    const deltaX = event.clientX - remoteDrag.startX;
+    const deltaY = event.clientY - remoteDrag.startY;
+    if (!remoteDrag.moved && Math.hypot(deltaX, deltaY) < 4) return;
+    remoteDrag.moved = true;
+    event.preventDefault();
+    positionRemote(remoteDrag.left + deltaX, remoteDrag.top + deltaY);
+  }
+  function finishRemoteDrag(event) {
+    if (!remoteDrag || (event.pointerId !== undefined && event.pointerId !== remoteDrag.pointerId)) return;
+    const moved = remoteDrag.moved;
+    remoteDrag = null;
+    remote.classList.remove('is-dragging');
+    if (!moved) return;
+    const bounds = remote.getBoundingClientRect();
+    const maxLeft = Math.max(1, window.innerWidth - bounds.width - 16);
+    const maxTop = Math.max(1, window.innerHeight - bounds.height - 16);
+    try {
+      localStorage.setItem(positionStorageKey, JSON.stringify({
+        x: Math.max(0, Math.min(1, (bounds.left - 8) / maxLeft)),
+        y: Math.max(0, Math.min(1, (bounds.top - 8) / maxTop)),
+      }));
+    } catch (_) { /* position remains usable for this page even when storage is unavailable */ }
+  }
   function setExpanded(value) {
     expanded = !!value;
     panel.hidden = isDesktop() ? false : !expanded;
@@ -2399,9 +2472,11 @@ function createFanPageQuickRemote(view) {
     scheduleUpdate();
   }
   function syncDeviceMode() {
-    toggle.hidden = isDesktop();
-    if (isDesktop()) panel.hidden = false;
+    const desktop = isDesktop();
+    toggle.hidden = desktop;
+    if (desktop) panel.hidden = false;
     else panel.hidden = !expanded;
+    if (!remoteDrag) restoreDesktopPosition();
     scheduleUpdate();
   }
   function scrollToProgress(clientY) {
@@ -2455,9 +2530,22 @@ function createFanPageQuickRemote(view) {
     else if (event.key === 'ArrowUp' || event.key === 'PageUp') { event.preventDefault(); window.scrollBy(0, -window.innerHeight * step); }
   }
   const onScroll = () => scheduleUpdate();
-  const onResize = () => syncDeviceMode();
+  const onResize = () => {
+    if (remoteDrag && !isDesktop()) {
+      const pointerId = remoteDrag.pointerId;
+      remote.classList.remove('is-dragging');
+      remoteDrag = null;
+      try { if (header.hasPointerCapture(pointerId)) header.releasePointerCapture(pointerId); } catch (_) { /* capture may already be released */ }
+    }
+    syncDeviceMode();
+  };
   toggle.addEventListener('click', () => setExpanded(!expanded));
   close.addEventListener('click', () => setExpanded(false));
+  header.addEventListener('pointerdown', startRemoteDrag);
+  header.addEventListener('pointermove', moveRemoteDrag);
+  header.addEventListener('pointerup', finishRemoteDrag);
+  header.addEventListener('pointercancel', finishRemoteDrag);
+  header.addEventListener('lostpointercapture', finishRemoteDrag);
   scrubber.addEventListener('pointerdown', handleScrubberPointerDown);
   scrubber.addEventListener('pointermove', handleScrubberPointerMove);
   scrubber.addEventListener('pointerup', endScrubberDrag);
@@ -2474,6 +2562,11 @@ function createFanPageQuickRemote(view) {
   return () => {
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', onResize);
+    header.removeEventListener('pointerdown', startRemoteDrag);
+    header.removeEventListener('pointermove', moveRemoteDrag);
+    header.removeEventListener('pointerup', finishRemoteDrag);
+    header.removeEventListener('pointercancel', finishRemoteDrag);
+    header.removeEventListener('lostpointercapture', finishRemoteDrag);
     if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
     if (resizeObserver) resizeObserver.disconnect();
   };
