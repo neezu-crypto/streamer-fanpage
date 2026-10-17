@@ -12,7 +12,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-profile-quick-edit">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261018-comparison-thumbnails">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261018-sponsor-rails">
+  <link rel="stylesheet" href="viewer-sponsors.css?v=20261018-30day-policy">
 </head>
 <body class="viewer-stats-page">
   <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
@@ -68,6 +69,9 @@
       </div>
     </header>
 
+    <aside class="viewer-sponsor-rail viewer-sponsor-rail-left" id="sponsorRailLeft" aria-label="오늘의 후원 스트리머 왼쪽"></aside>
+    <aside class="viewer-sponsor-rail viewer-sponsor-rail-right" id="sponsorRailRight" aria-label="오늘의 후원 스트리머 오른쪽"></aside>
+
     <main class="main-content viewer-stats-main">
       <section class="viewer-workspace" aria-label="스트리머 통계 검색">
       <section class="viewer-stats-hero">
@@ -88,6 +92,17 @@
         <p class="viewer-queue-note">익명도 이용할 수 있어요. 혼잡하면 로그인·구독 요청이 먼저 처리될 수 있고, 이용 등급별 한도가 적용됩니다.</p>
         <div class="viewer-search-results" id="viewerSearchResults" aria-label="스트리머 검색 결과"></div>
       </section>
+      </section>
+
+      <section class="viewer-sponsor-mobile" id="sponsorRailMobile" aria-label="오늘의 후원 스트리머"></section>
+
+      <section class="viewer-sponsor-admin hidden" id="sponsorAdminPanel" aria-labelledby="sponsorAdminTitle">
+        <div class="viewer-sponsor-admin-heading">
+          <div><p class="viewer-sponsor-eyebrow">ADMIN · SPONSOR PLACEMENTS</p><h2 id="sponsorAdminTitle">스트리머 홍보 신청 관리</h2></div>
+          <button class="button" id="sponsorAdminRefresh" type="button">새로고침</button>
+        </div>
+        <p class="viewer-sponsor-admin-status" id="sponsorAdminStatus" role="status" aria-live="polite"></p>
+        <div class="viewer-sponsor-request-list" id="sponsorAdminRequests"></div>
       </section>
 
       <section class="viewer-results hidden" id="viewerResults" aria-live="polite">
@@ -241,6 +256,55 @@
       </div>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261018-comparison-thumbnails"></script>
+  <dialog class="viewer-sponsor-dialog" id="sponsorRequestDialog" aria-labelledby="sponsorRequestTitle">
+    <form class="viewer-sponsor-dialog-card" id="sponsorRequestForm" autocomplete="off">
+      <button class="viewer-sponsor-close" id="sponsorRequestClose" type="button" aria-label="닫기">×</button>
+      <p class="viewer-sponsor-eyebrow">TODAY'S SPONSORED STREAMER</p>
+      <h2 id="sponsorRequestTitle">스트리머 홍보 신청</h2>
+      <p class="viewer-sponsor-dialog-intro" id="sponsorRequestIntro">홍보할 스트리머와 후원 계정, 노출 기간을 입력하세요.</p>
+      <section id="sponsorRequestFields">
+        <div class="viewer-sponsor-form-grid">
+          <label>스트리머 닉네임
+            <input id="sponsorRequestNickname" name="nickname" type="text" maxlength="40" autocomplete="off" required>
+            <small id="sponsorNicknameError"></small>
+          </label>
+          <label>스트리머 SOOP 아이디
+            <input id="sponsorRequestSoopId" name="soopId" type="text" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+            <small id="sponsorSoopIdMessage">홍보 중이거나 신청 확인 중인 스트리머는 중복 신청할 수 없어요.</small>
+          </label>
+          <div class="viewer-sponsor-profile hidden" id="sponsorRequestProfile">
+            <img id="sponsorRequestProfileImage" alt="">
+            <span id="sponsorRequestProfileStatus">SOOP 프로필 미리보기</span>
+          </div>
+          <label>후원할 계정의 SOOP 아이디
+            <input id="sponsorRequestDonorId" name="donorSoopId" type="text" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+            <small id="sponsorDonorIdError"></small>
+          </label>
+          <label>홍보 기간 (최대 30일)
+            <input id="sponsorRequestDays" name="days" type="number" min="1" max="30" step="1" value="1" required>
+            <small id="sponsorDaysError">하루 별풍선 10개 · 최대 30일</small>
+          </label>
+        </div>
+        <div class="viewer-sponsor-price"><span id="sponsorRequestCostLabel">1일 × 10개</span><strong id="sponsorRequestTotal">10개</strong></div>
+        <p class="viewer-sponsor-notice">신청을 등록한 뒤 운영자 방송국에 별풍선을 후원해 주세요. 후원 완료를 알리면 운영자가 확인하고 승인합니다.</p>
+        <div class="viewer-sponsor-actions">
+          <button class="button" id="sponsorRequestCancel" type="button">닫기</button>
+          <button class="button button-primary" id="sponsorRequestSubmit" type="submit">신청 정보 확인</button>
+        </div>
+      </section>
+      <section class="viewer-sponsor-donation hidden" id="sponsorDonationStep" aria-live="polite">
+        <div class="viewer-sponsor-summary" id="sponsorDonationSummary"></div>
+        <a class="button button-primary" id="sponsorDonationLink" href="https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&amp;szWork=BJ_STATION&amp;sys_type=web&amp;location=station" target="_blank" rel="noopener noreferrer">운영자 방송국에서 후원하기 ↗</a>
+        <p class="viewer-sponsor-donation-status" id="sponsorDonationStatus"></p>
+        <div class="viewer-sponsor-actions">
+          <button class="button" id="sponsorRequestWithdraw" type="button">신청 취소</button>
+          <button class="button button-primary" id="sponsorDonationComplete" type="button">후원 완료했어요</button>
+          <button class="button hidden" id="sponsorRequestDone" type="button">닫기</button>
+        </div>
+      </section>
+      <p class="viewer-sponsor-dialog-status" id="sponsorRequestStatus" role="status" aria-live="polite"></p>
+    </form>
+  </dialog>
+  <script type="module" src="viewer-stats.js?v=20261018-sponsor-rails"></script>
 </body>
 </html>

@@ -25,12 +25,18 @@ const {
   streamerFanPageViewerSubscription,
   streamerFanPageAdminViewerSubscriptionRequests,
 } = require('./viewer-subscriptions');
+const {
+  streamerFanPageSponsorAds,
+  streamerFanPageAdminSponsorAds,
+} = require('./sponsor-ads');
 
 initializeApp();
 const db = getDatabase();
 const adminFunctions = getAdminFunctions();
 exports.streamerFanPageViewerSubscription = streamerFanPageViewerSubscription;
 exports.streamerFanPageAdminViewerSubscriptionRequests = streamerFanPageAdminViewerSubscriptionRequests;
+exports.streamerFanPageSponsorAds = streamerFanPageSponsorAds;
+exports.streamerFanPageAdminSponsorAds = streamerFanPageAdminSponsorAds;
 const MAX_INTRO_LENGTH = 700;
 const MAX_BANNER_IMAGE_ITEMS = 20;
 const RECENT_PAGE_LIMIT = 8;
@@ -3414,8 +3420,15 @@ exports.streamerFanPageLiveStatus = onCall({ maxInstances: 20 }, async (request)
   requireAuth(request);
   const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
   const target = await findVerifiedBySoopId(streamerId);
-  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
-  return await fetchSoopLiveStatus(target.streamer.soopId);
+  if (target) return await fetchSoopLiveStatus(target.streamer.soopId);
+  const sponsorSnapshot = await db.ref('streamerFanPageSponsorAds').get();
+  const now = Date.now();
+  const sponsored = Object.values(sponsorSnapshot.val() || {}).some((ad) => ad
+    && String(ad.soopId || '').toLowerCase() === streamerId
+    && ad.status === 'active'
+    && Number(ad.expiresAt) > now);
+  if (!sponsored) throw new HttpsError('not-found', '활성 후원 스트리머 또는 인증된 스트리머를 찾을 수 없습니다.');
+  return await fetchSoopLiveStatus(streamerId);
 });
 
 exports.streamerFanPageGallery = onCall({ maxInstances: 20 }, async (request) => {
