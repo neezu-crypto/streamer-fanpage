@@ -2458,7 +2458,7 @@ function showSponsorDonationStep(record) {
   $('sponsorRequestDone').classList.toggle('hidden', false);
   $('sponsorDonationStatus').textContent = completed
     ? '후원 완료를 접수했습니다. SOOP 알림과 신청 정보가 일치하면 자동 승인되고 홍보 카드에 표시됩니다. 확인이 모호하면 운영자가 검토합니다.'
-    : `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원해 주세요. 후원 알림이 신청 정보와 유일하게 일치하면 자동 승인됩니다. 완료 버튼을 누르면 후원 시각 대조에 도움이 됩니다.`;
+    : `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원해 주세요. 알림이 신청 정보와 유일하게 일치하면 자동 승인됩니다. 자동 승인되지 않으면 완료 버튼을 눌러 운영자 수동 확인을 요청해 주세요.`;
   $('sponsorRequestStatus').textContent = '';
   startSponsorStatusPolling();
 }
