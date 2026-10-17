@@ -1141,3 +1141,44 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
     min-width: 78px;
   }
 }
+
+/* Show the winning replay alongside each same-day comparison result. */
+.viewer-comparison-result-card {
+  overflow: hidden;
+  padding: 0;
+}
+.viewer-comparison-result-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: linear-gradient(135deg, #e7ebf2, #cfd8e5);
+}
+.viewer-comparison-result-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.viewer-comparison-result-thumb.is-missing::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #8290a6;
+  content: 'SOOP REPLAY';
+  font: 700 11px var(--font);
+  letter-spacing: .16em;
+}
+.viewer-comparison-result-thumb:focus-visible {
+  outline: 3px solid var(--viewer-blue);
+  outline-offset: -3px;
+}
+.viewer-comparison-result-body {
+  padding: 14px;
+}
+@media(max-width:620px) {
+  .viewer-comparison-result-body {
+    padding: 12px;
+  }
+}

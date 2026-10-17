@@ -1260,6 +1260,26 @@ function renderComparisonResults(request, comparisons) {
     const upliftRate = average > 0 ? Math.round((uplift / average) * 100) : null;
     const card = document.createElement('article');
     card.className = 'viewer-comparison-result-card';
+    const thumbnail = document.createElement('a');
+    thumbnail.className = 'viewer-comparison-result-thumb' + (vod.thumbnailUrl ? '' : ' is-missing');
+    thumbnail.href = playbackUrl(vod.id, stats.highest.second);
+    thumbnail.target = '_blank';
+    thumbnail.rel = 'noopener noreferrer';
+    thumbnail.setAttribute('aria-label', (vod.title || '다시보기') + ' 고점부터 재생');
+    if (vod.thumbnailUrl) {
+      const image = document.createElement('img');
+      image.src = vod.thumbnailUrl;
+      image.alt = (vod.title || '다시보기') + ' 썸네일';
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      image.addEventListener('error', () => {
+        image.remove();
+        thumbnail.classList.add('is-missing');
+      }, { once: true });
+      thumbnail.append(image);
+    }
+    const body = document.createElement('div');
+    body.className = 'viewer-comparison-result-body';
     const name = document.createElement('h4');
     name.textContent = streamer.nickname || streamer.soopId;
     const vodTitle = document.createElement('p');
@@ -1291,7 +1311,8 @@ function renderComparisonResults(request, comparisons) {
     play.target = '_blank';
     play.rel = 'noopener noreferrer';
     play.textContent = '고점 ' + formatClock(stats.highest.second) + ' · ' + peak.toLocaleString('ko-KR') + '명부터 재생 ↗';
-    card.append(name, vodTitle, vodMeta, metrics, bar, play);
+    body.append(name, vodTitle, vodMeta, metrics, bar, play);
+    card.append(thumbnail, body);
     grid.append(card);
   });
   results.append(heading, summary, grid);
