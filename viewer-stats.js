@@ -95,6 +95,7 @@ const MAX_CONCURRENT_STATS_REQUESTS = 3;
 const MAX_PERIOD_SCAN_PAGES = 200;
 const VIEWER_VOD_PAGE_SIZE = 60;
 const VIEWER_STATS_EXCLUDED_EDGE_SECONDS = 5 * 60;
+const VIEWER_STATS_INSUFFICIENT_WINDOW_CODE = 'insufficient-analysis-window';
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
 try { window.localStorage.removeItem('streamerFanPage.viewerStats.recentStreamers.v1'); } catch (_) {}
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
@@ -846,7 +847,9 @@ async function waitForViewerStatsJob(jobId, job) {
     }
     if (data.status === 'failed' || data.status === 'expired') {
       const error = new Error(data.errorMessage || '시청자 그래프를 계산하지 못했어요. 다시 시도해 주세요.');
-      error.code = 'functions/unavailable';
+      error.code = data.errorCode === VIEWER_STATS_INSUFFICIENT_WINDOW_CODE
+        ? 'viewer-stats/insufficient-analysis-window'
+        : 'functions/unavailable';
       throw error;
     }
     if (data.status === 'cancelled') {
@@ -876,7 +879,11 @@ function showStatsError(card, error, loadToken) {
   message.className = 'viewer-stat-state';
   message.textContent = viewerStatsErrorMessage(error, '유저 수 그래프를 불러오지 못했어요.');
   card._statsActions.append(message);
-  const retryableCodes = new Set(['functions/failed-precondition', 'functions/not-found']);
+  const retryableCodes = new Set([
+    'functions/failed-precondition',
+    'functions/not-found',
+    'viewer-stats/insufficient-analysis-window',
+  ]);
   if (!retryableCodes.has(error && error.code)) {
     const retry = document.createElement('button');
     retry.type = 'button';
@@ -1110,11 +1117,18 @@ async function analyzeComparisonStreamer(streamer, vods, request, index) {
   let completed = 0;
   let best = null;
   let failure = null;
-  const excludedNote = excludedShortVods.length
-    ? ' · 10분 이하 ' + excludedShortVods.length.toLocaleString('ko-KR') + '개 제외'
-    : '';
-  setComparisonPickerStatus(index, (streamer.nickname || streamer.soopId) + ' · 0 / '
-    + analyzableVods.length.toLocaleString('ko-KR') + '개 분석 대기' + excludedNote);
+  let excludedShortVodCount = excludedShortVods.length;
+  let dynamicallyExcludedShortVodCount = 0;
+  const updateComparisonProgress = () => {
+    const analyzableCount = analyzableVods.length - dynamicallyExcludedShortVodCount;
+    const excludedNote = excludedShortVodCount
+      ? ' · 10분 이하 ' + excludedShortVodCount.toLocaleString('ko-KR') + '개 제외'
+      : '';
+    setComparisonPickerStatus(index, (streamer.nickname || streamer.soopId) + ' · '
+      + completed.toLocaleString('ko-KR') + ' / ' + analyzableCount.toLocaleString('ko-KR')
+      + '개 분석 완료' + excludedNote);
+  };
+  updateComparisonProgress();
   const worker = async () => {
     while (isCurrentComparisonRequest(request) && !failure && cursor < analyzableVods.length) {
       const vod = analyzableVods[cursor++];
@@ -1135,11 +1149,15 @@ async function analyzeComparisonStreamer(streamer, vods, request, index) {
         }
         if (!best || peak > Number(best.stats.highest.viewers)) best = { vod, stats };
         completed += 1;
-        setComparisonPickerStatus(index, (streamer.nickname || streamer.soopId) + ' · '
-          + completed.toLocaleString('ko-KR') + ' / ' + analyzableVods.length.toLocaleString('ko-KR')
-          + '개 분석 완료' + excludedNote);
+        updateComparisonProgress();
       } catch (error) {
         if (!isCurrentComparisonRequest(request)) return;
+        if (error && error.code === 'viewer-stats/insufficient-analysis-window') {
+          dynamicallyExcludedShortVodCount += 1;
+          excludedShortVodCount += 1;
+          updateComparisonProgress();
+          continue;
+        }
         failure = error;
       }
     }
@@ -1147,17 +1165,23 @@ async function analyzeComparisonStreamer(streamer, vods, request, index) {
   await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT_STATS_REQUESTS, analyzableVods.length) }, () => worker()));
   if (!isCurrentComparisonRequest(request)) return null;
   if (failure) {
+    const analyzableCount = analyzableVods.length - dynamicallyExcludedShortVodCount;
     throw new Error((streamer.nickname || streamer.soopId) + '의 당일 비교 대상 다시보기 '
-      + analyzableVods.length.toLocaleString('ko-KR') + '개 중 일부 통계를 불러오지 못해 비교를 완료하지 못했어요. '
+      + analyzableCount.toLocaleString('ko-KR') + '개 중 일부 통계를 불러오지 못해 비교를 완료하지 못했어요. '
       + (failure.message || '잠시 후 다시 시도해 주세요.'));
   }
-  if (!best) throw new Error((streamer.nickname || streamer.soopId) + '의 당일 다시보기 통계가 없어요.');
+  if (!best) {
+    if (excludedShortVodCount >= vods.length) {
+      throw new Error((streamer.nickname || streamer.soopId) + '의 당일 다시보기는 모두 10분 이하라 시작·종료 5분을 제외한 비교 구간이 없어요.');
+    }
+    throw new Error((streamer.nickname || streamer.soopId) + '의 당일 다시보기 통계가 없어요.');
+  }
   return {
     streamer,
     vod: best.vod,
     stats: best.stats,
-    vodCount: analyzableVods.length,
-    excludedShortVodCount: excludedShortVods.length,
+    vodCount: completed,
+    excludedShortVodCount,
   };
 }
 
