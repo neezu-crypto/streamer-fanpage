@@ -385,18 +385,25 @@ function publicStreamer(key, record) {
   };
 }
 
-async function searchSoopStreamers(query) {
+async function searchSoopStreamers(query, { sortByFavorites = false } = {}) {
   const normalizedQuery = String(query || '').trim().toLocaleLowerCase();
-  const cached = soopStreamerSearchCache.get(normalizedQuery);
+  const sortOrder = sortByFavorites ? 'favorite_cnt' : 'score';
+  const cacheKey = normalizedQuery + ':' + sortOrder;
+  const cached = soopStreamerSearchCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.streamers;
 
   try {
     const url = new URL(SOOP_STREAMER_SEARCH_API);
     url.search = new URLSearchParams({
+      l: 'DF',
       m: 'bjSearch',
       v: '3.0',
-      szOrder: 'score',
+      szOrder: sortOrder,
       szKeyword: normalizedQuery,
+      nPageNo: '1',
+      nListCnt: sortByFavorites ? '30' : '10',
+      w: 'webk',
+      tab: 'bj',
     }).toString();
     const response = await fetch(url, {
       headers: { accept: 'application/json, text/plain, */*' },
@@ -413,10 +420,14 @@ async function searchSoopStreamers(query) {
         : typeof (row && row.station_name) === 'string' ? row.station_name.trim() : '';
       if (!nickname || !nickname.toLocaleLowerCase().includes(normalizedQuery)
         && !soopId.toLocaleLowerCase().includes(normalizedQuery)) return null;
-      return publicStreamer(soopId, { nickname, soopId });
+      const streamer = publicStreamer(soopId, { nickname, soopId });
+      if (!streamer) return null;
+      const rawFavoriteCount = String((row && row.favorite_cnt) ?? '').replaceAll(',', '').trim();
+      const favoriteCount = /^\d+$/.test(rawFavoriteCount) ? Number(rawFavoriteCount) : null;
+      return { ...streamer, favoriteCount };
     }).filter(Boolean);
 
-    soopStreamerSearchCache.set(normalizedQuery, {
+    soopStreamerSearchCache.set(cacheKey, {
       streamers,
       expiresAt: Date.now() + SOOP_STREAMER_SEARCH_CACHE_TTL_MS,
     });
@@ -3530,6 +3541,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
 
   if (action === 'search') {
     const query = String(data.query || '').trim().toLocaleLowerCase();
+    const sortByFavorites = data.sortByFavorites === true;
     if (query.length > 40) throw new HttpsError('invalid-argument', '검색어가 너무 깁니다.');
     if (!query) return { streamers: [] };
     const tier = await resolveViewerStatsTier(uid, request.auth);
@@ -3537,7 +3549,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     const [verifiedSnapshot, namesSnapshot, soopResults] = await Promise.all([
       db.ref('streamerVerifications').get(),
       db.ref('streamerNames').get(),
-      searchSoopStreamers(query),
+      searchSoopStreamers(query, { sortByFavorites }),
     ]);
     const byId = new Map();
     Object.entries(verifiedSnapshot.val() || {}).forEach(([key, record]) => {
@@ -3563,7 +3575,8 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
       });
     });
     soopResults.forEach((streamer) => {
-      if (!byId.has(streamer.id)) byId.set(streamer.id, streamer);
+      const existing = byId.get(streamer.id);
+      byId.set(streamer.id, existing ? { ...existing, ...streamer } : streamer);
     });
     const rank = (streamer) => {
       const nickname = streamer.nickname.toLocaleLowerCase();
@@ -3573,10 +3586,27 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
       if (soopId.startsWith(query)) return 2;
       return 3;
     };
-    const streamers = [...byId.values()]
-      .sort((a, b) => rank(a) - rank(b) || a.nickname.localeCompare(b.nickname, 'ko'))
-      .slice(0, 30);
-    return { streamers };
+    const resultById = sortByFavorites && soopResults.length
+      ? new Map(soopResults.map((streamer) => [
+        streamer.id,
+        { ...(byId.get(streamer.id) || {}), ...streamer },
+      ]))
+      : byId;
+    const sortedStreamers = [...resultById.values()]
+      .sort((a, b) => {
+        if (sortByFavorites) {
+          const favoriteDifference = (Number.isFinite(b.favoriteCount) ? b.favoriteCount : -1)
+            - (Number.isFinite(a.favoriteCount) ? a.favoriteCount : -1);
+          if (favoriteDifference) return favoriteDifference;
+        }
+        return rank(a) - rank(b) || a.nickname.localeCompare(b.nickname, 'ko');
+      });
+    const streamers = sortedStreamers.slice(0, sortByFavorites ? 3 : 30);
+    return {
+      streamers,
+      hasMore: sortByFavorites && sortedStreamers.length > streamers.length,
+      favoritesSorted: !sortByFavorites || soopResults.some((streamer) => Number.isFinite(streamer.favoriteCount)),
+    };
   }
 
   if (action === 'statsResult') {

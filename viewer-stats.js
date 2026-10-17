@@ -444,12 +444,17 @@ function renderComparisonSearchResults(index, streamers) {
     copy.className = 'viewer-comparison-search-copy';
     const name = document.createElement('strong');
     name.textContent = streamer.nickname || streamer.soopId;
+    const favorites = document.createElement('span');
+    favorites.className = 'viewer-comparison-search-popularity';
+    favorites.textContent = Number.isFinite(streamer.favoriteCount)
+      ? '즐겨찾기 ' + streamer.favoriteCount.toLocaleString('ko-KR') + '개'
+      : '즐겨찾기 수 확인 불가';
     const id = document.createElement('span');
     id.textContent = 'SOOP ID · ' + streamer.soopId;
-    copy.append(name, id);
+    copy.append(name, favorites, id);
     const select = document.createElement('span');
     select.className = 'viewer-comparison-search-select';
-    select.textContent = '선택';
+    select.textContent = (streamerIndex + 1) + '위 · 선택';
     button.append(avatar, copy, select);
     results.append(button);
   });
@@ -553,7 +558,7 @@ async function searchComparisonStreamer(index, query) {
   renderComparisonSearchResults(index, []);
   try {
     await getAuthReady();
-    const response = await callViewerStats({ action: 'search', query: searchQuery });
+    const response = await callViewerStats({ action: 'search', query: searchQuery, sortByFavorites: true });
     if (requestId !== comparisonSearchRequestSequence[index]) return;
     const candidates = Array.isArray(response.data && response.data.streamers) ? response.data.streamers.slice() : [];
     const isStationUrl = /^https?:\/\//i.test(cleanQuery) && Boolean(idFromInput);
@@ -561,11 +566,11 @@ async function searchComparisonStreamer(index, query) {
       && (isStationUrl || candidates.length === 0)) {
       candidates.unshift(streamerForId(idFromInput));
     }
-    const normalizedQuery = searchQuery.toLocaleLowerCase();
-    const exactMatches = candidates.filter((item) => String(item.soopId).toLocaleLowerCase() === normalizedQuery
-      || String(item.nickname).toLocaleLowerCase() === normalizedQuery);
-    if (exactMatches.length === 1) {
-      selectComparisonStreamer(index, exactMatches[0]);
+    const exactIdMatches = idFromInput
+      ? candidates.filter((item) => String(item.soopId).toLocaleLowerCase() === idFromInput)
+      : [];
+    if (exactIdMatches.length === 1) {
+      selectComparisonStreamer(index, exactIdMatches[0]);
       return;
     }
     if (candidates.length === 1) {
@@ -573,9 +578,14 @@ async function searchComparisonStreamer(index, query) {
       return;
     }
     renderComparisonSearchResults(index, candidates);
-    setComparisonPickerStatus(index, candidates.length
-      ? '검색 결과 ' + candidates.length.toLocaleString('ko-KR') + '명 · 비교할 스트리머를 선택해 주세요.'
-      : '검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.', !candidates.length);
+    const resultMessage = !candidates.length
+      ? '검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.'
+      : response.data && response.data.favoritesSorted
+        ? response.data.hasMore
+          ? '즐겨찾기 수 기준 상위 3명 · 비교할 스트리머를 선택해 주세요.'
+          : '즐겨찾기 수가 많은 순으로 ' + candidates.length.toLocaleString('ko-KR') + '명 · 비교할 스트리머를 선택해 주세요.'
+        : '즐겨찾기 순위를 불러오지 못했어요. 아래 결과에서 스트리머를 선택해 주세요.';
+    setComparisonPickerStatus(index, resultMessage, !candidates.length);
   } catch (error) {
     if (requestId === comparisonSearchRequestSequence[index]) {
       setComparisonPickerStatus(index, viewerStatsErrorMessage(error, '스트리머 검색에 실패했어요.'), true);
