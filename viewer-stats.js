@@ -108,6 +108,7 @@ const VIEWER_PEAK_PERIODS = [
 let searchRequestId = 0;
 let activeLoadToken = 0;
 let selectedStreamer = null;
+let vodSortMode = 'date-desc';
 let authReady = null;
 let nextPage = 1;
 let hasMoreVods = false;
@@ -606,6 +607,36 @@ function parseVodTimestamp(value) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function sortLoadedVodCards() {
+  const grid = $('viewerVodGrid');
+  if (!grid) return;
+  const cards = [...grid.querySelectorAll('.viewer-vod-card')].map((card, index) => ({ card, index }));
+  const dateOf = ({ card }) => parseVodTimestamp(card._vod && card._vod.regDate);
+  const compareDate = (a, b, ascending = false) => {
+    const dateA = dateOf(a);
+    const dateB = dateOf(b);
+    if (Boolean(dateA) !== Boolean(dateB)) return dateA ? -1 : 1;
+    const difference = dateA - dateB;
+    return (ascending ? difference : -difference) || a.index - b.index;
+  };
+  cards.sort((a, b) => {
+    if (vodSortMode === 'peak-desc' || vodSortMode === 'peak-asc') {
+      const peakA = Number(a.card._peakViewers);
+      const peakB = Number(b.card._peakViewers);
+      const hasPeakA = Number.isFinite(peakA);
+      const hasPeakB = Number.isFinite(peakB);
+      if (hasPeakA !== hasPeakB) return hasPeakA ? -1 : 1;
+      if (hasPeakA && peakA !== peakB) {
+        return vodSortMode === 'peak-desc' ? peakB - peakA : peakA - peakB;
+      }
+      return compareDate(a, b);
+    }
+
+    return compareDate(a, b, vodSortMode === 'date-asc');
+  });
+  cards.forEach(({ card }) => grid.append(card));
+}
+
 function formatVodDuration(durationMs) {
   const seconds = Math.floor(Math.max(0, Number(durationMs) || 0) / 1000);
   return seconds ? formatClock(seconds) : '';
@@ -745,6 +776,7 @@ function createVodCard(vod, loadToken) {
 }
 
 function showStatsLinks(card, stats) {
+  card._peakViewers = Number(stats.highest && stats.highest.viewers);
   const highestUrl = playbackUrl(card._vod.id, stats.highest.second);
   const lowestUrl = playbackUrl(card._vod.id, stats.lowest.second);
   card._openLink.href = highestUrl;
@@ -801,6 +833,7 @@ function showStatsLinks(card, stats) {
   }
   card._statsActions.append(uplift);
   card.dataset.statsState = 'ready';
+  if (vodSortMode === 'peak-desc' || vodSortMode === 'peak-asc') sortLoadedVodCards();
 }
 
 function showQueueWaitMessage(card, loadToken) {
@@ -1499,6 +1532,7 @@ async function loadVodPage(loadToken, page) {
       $('viewerVodGrid').append(card);
       observeVodCard(card);
     });
+    sortLoadedVodCards();
     updateVodHeading();
     $('viewerLoadMore').classList.toggle('hidden', !hasMoreVods);
   } catch (error) {
@@ -1903,6 +1937,11 @@ $('viewerSearchResults').addEventListener('click', (event) => {
 
 $('viewerLoadMore').addEventListener('click', () => {
   if (hasMoreVods && selectedStreamer) loadVodPage(activeLoadToken, nextPage);
+});
+
+$('viewerVodSort').addEventListener('change', (event) => {
+  vodSortMode = event.target.value;
+  sortLoadedVodCards();
 });
 
 [0, 1].forEach((index) => {
