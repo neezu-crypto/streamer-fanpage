@@ -1242,10 +1242,10 @@ async function fetchSoopLiveStatus(soopId) {
   };
 }
 
-async function fetchSoopVodPage(soopId, page) {
+async function fetchSoopVodPage(soopId, page, keyword = '') {
   const url = new URL(`${SOOP_VOD_API}/${encodeURIComponent(soopId)}/vods/review`);
   url.search = new URLSearchParams({
-    keyword: '',
+    keyword: String(keyword || '').trim(),
     orderby: 'reg_date',
     page: String(page),
     field: 'title,contents,user_nick,user_id',
@@ -3672,9 +3672,13 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     if (!Number.isSafeInteger(page) || page < 1 || page > 200) {
       throw new HttpsError('invalid-argument', '다시보기 페이지 요청을 확인해 주세요.');
     }
+    const keyword = typeof data.keyword === 'string' ? data.keyword.trim() : '';
+    if ((data.keyword !== undefined && typeof data.keyword !== 'string') || keyword.length > 80) {
+      throw new HttpsError('invalid-argument', '검색어는 80자 이내로 입력해 주세요.');
+    }
     const tier = await resolveViewerStatsTier(uid, request.auth);
     await enforceViewerStatsRateLimit(uid, action, { streamerId, page, tier });
-    const result = await fetchSoopVodPage(streamerId, page);
+    const result = await fetchSoopVodPage(streamerId, page, keyword);
     const vods = result.rows.map((row) => normalizeSoopVod(row)).filter(Boolean);
     if (vods.length !== result.rows.length) {
       throw new HttpsError('unavailable', 'SOOP 다시보기 응답 일부를 읽지 못했습니다.');
