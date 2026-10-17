@@ -112,6 +112,8 @@ const VIEWER_STATS_WORKER_CLAIMS_PATH = 'streamerFanPageViewerStatsWorkerClaims'
 const VIEWER_STATS_JOB_TTL_MS = 2 * 60 * 60 * 1000;
 const VIEWER_STATS_JOB_PROCESSING_LEASE_MS = 3 * 60 * 1000;
 const VIEWER_STATS_JOB_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
+const VIEWER_STATS_INSUFFICIENT_WINDOW_CODE = 'insufficient-analysis-window';
+const VIEWER_STATS_INSUFFICIENT_WINDOW_MESSAGE = '시작과 종료 5분을 제외하면 통계 구간이 남지 않는 짧은 다시보기예요.';
 let lastViewerStatsJobCleanupAt = 0;
 let viewerStatsJobCleanupPromise = null;
 const VIEWER_STATS_USAGE_ACTIONS = Object.freeze(['search', 'vods', 'stats']);
@@ -2014,12 +2016,18 @@ async function processViewerStatsJob(claimed) {
   try {
     fetched = await getOrFetchViewerStats(job.streamerId, job.vodId);
   } catch (error) {
+    const hasInsufficientAnalysisWindow = error instanceof HttpsError
+      && error.code === 'failed-precondition'
+      && error.message === '시작과 종료 구간을 제외하면 분석할 시간이 부족합니다.';
     await jobRef.update({
       status: 'failed',
       finishedAt: Date.now(),
       processingLeaseUntil: null,
       claimedBy: null,
-      errorMessage: '시청자 그래프를 계산하지 못했어요. 다시 시도해 주세요.',
+      errorCode: hasInsufficientAnalysisWindow ? VIEWER_STATS_INSUFFICIENT_WINDOW_CODE : null,
+      errorMessage: hasInsufficientAnalysisWindow
+        ? VIEWER_STATS_INSUFFICIENT_WINDOW_MESSAGE
+        : '시청자 그래프를 계산하지 못했어요. 다시 시도해 주세요.',
     });
     await updateViewerStatsQueueMetrics(job.requesterKey, viewerStatsDayKey(job.createdAt), { failed: 1 }).catch((metricError) => {
       console.warn(`Could not record viewer stats failure metric for ${jobId}:`, metricError);
@@ -2122,7 +2130,13 @@ async function getViewerStatsJobResult(uid, jobId) {
     };
   }
   if (job.status === 'failed' || job.status === 'expired') {
-    return { status: job.status, errorMessage: String(job.errorMessage || '시청자 그래프를 계산하지 못했어요.') };
+    return {
+      status: job.status,
+      errorMessage: String(job.errorMessage || '시청자 그래프를 계산하지 못했어요.'),
+      ...(job.errorCode === VIEWER_STATS_INSUFFICIENT_WINDOW_CODE
+        ? { errorCode: VIEWER_STATS_INSUFFICIENT_WINDOW_CODE }
+        : {}),
+    };
   }
   if (job.status === 'cancelled') return { status: 'cancelled' };
   return { status: job.status === 'processing' ? 'processing' : 'queued' };
