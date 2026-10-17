@@ -23,6 +23,9 @@ const database = getDatabase(app);
 const functions = getFunctions(app, 'us-central1');
 const callViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats');
 const callViewerSubscription = httpsCallable(functions, 'streamerFanPageViewerSubscription');
+const callSponsorAds = httpsCallable(functions, 'streamerFanPageSponsorAds');
+const callAdminSponsorAds = httpsCallable(functions, 'streamerFanPageAdminSponsorAds');
+const callSponsorLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
 const $ = (id) => document.getElementById(id);
 
 function setupDevbarMarquee() {
@@ -146,6 +149,14 @@ let subscriptionState = {
 };
 const viewerStatsMemoryCache = new Map();
 const viewerStatsInProgress = new Map();
+const sponsorLiveStatusCache = new Map();
+const SPONSOR_PENDING_REQUEST_KEY = 'streamerFanPage.sponsor.pendingRequest.v1';
+let sponsorRequestId = '';
+let sponsorRequestRecord = null;
+let sponsorRequestRail = 'left';
+let sponsorProfileRequestId = 0;
+let sponsorPollTimer = 0;
+let sponsorRequestPreviousFocus = null;
 
 function waitForAuthRestore() {
   return new Promise((resolve) => {
@@ -2151,6 +2162,540 @@ $('viewerSubscriptionCancel').addEventListener('click', async () => {
   }
 });
 
+function setSponsorHint(id, message, isError = false) {
+  const hint = $(id);
+  if (!hint) return;
+  hint.textContent = message;
+  hint.classList.toggle('is-error', isError);
+}
+
+function makeSponsorTitle() {
+  const title = document.createElement('p');
+  title.className = 'viewer-sponsor-rail-title';
+  title.textContent = '오늘의 후원 스트리머';
+  return title;
+}
+
+function makeSponsorOpenCard(rail) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'viewer-sponsor-card viewer-sponsor-card-open';
+  button.dataset.sponsorRail = rail;
+  button.setAttribute('aria-label', '스트리머 홍보하기');
+  const icon = document.createElement('span');
+  icon.className = 'viewer-sponsor-open-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = '+';
+  const copy = document.createElement('span');
+  const name = document.createElement('strong');
+  name.textContent = '스트리머 홍보하기';
+  copy.append(name);
+  button.append(icon, copy);
+  button.addEventListener('click', () => openSponsorRequest(button));
+  return button;
+}
+
+function makeSponsorPendingSlot() {
+  const card = document.createElement('div');
+  card.className = 'viewer-sponsor-card viewer-sponsor-card-pending';
+  const icon = document.createElement('span');
+  icon.className = 'viewer-sponsor-open-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = '…';
+  const copy = document.createElement('span');
+  const name = document.createElement('strong');
+  name.textContent = '신청 확인 중';
+  const note = document.createElement('small');
+  note.textContent = '후원 내역 확인 대기';
+  copy.append(name, note);
+  card.append(icon, copy);
+  return card;
+}
+
+function makeSponsorLivePreview() {
+  const preview = document.createElement('span');
+  preview.className = 'viewer-sponsor-live-preview';
+  preview.setAttribute('aria-hidden', 'true');
+  const thumb = document.createElement('span');
+  thumb.className = 'viewer-sponsor-live-preview-thumb';
+  thumb.textContent = '방송 상태를 확인합니다';
+  const image = document.createElement('img');
+  image.alt = '';
+  image.hidden = true;
+  const label = document.createElement('span');
+  label.className = 'viewer-sponsor-live-preview-label';
+  label.textContent = 'LIVE';
+  label.hidden = true;
+  thumb.append(image, label);
+  preview.append(thumb);
+  return { preview, thumb, image, label };
+}
+
+function loadSponsorLivePreview(card, previewParts) {
+  if (card.dataset.liveState) return;
+  const soopId = card.dataset.soopId;
+  if (!soopId) return;
+  card.dataset.liveState = 'loading';
+  previewParts.thumb.firstChild.textContent = '방송 상태를 확인합니다';
+  let statusPromise = sponsorLiveStatusCache.get(soopId);
+  if (!statusPromise) {
+    statusPromise = callSponsorLiveStatus({ streamerId: soopId }).then((response) => response.data || {});
+    sponsorLiveStatusCache.set(soopId, statusPromise);
+  }
+  statusPromise.then((status) => {
+    if (status.isLive && status.thumbnailUrl) {
+      previewParts.thumb.firstChild.textContent = '';
+      previewParts.image.src = status.thumbnailUrl;
+      previewParts.image.hidden = false;
+      previewParts.label.hidden = false;
+      card.dataset.liveState = 'loaded';
+    } else {
+      previewParts.thumb.firstChild.textContent = '현재 방송 중이 아닙니다';
+      card.dataset.liveState = 'offline';
+    }
+  }).catch(() => {
+    sponsorLiveStatusCache.delete(soopId);
+    previewParts.thumb.firstChild.textContent = '라이브 정보를 불러오지 못했습니다';
+    card.dataset.liveState = 'error';
+  });
+}
+
+function makeSponsorAdCard(ad, rail) {
+  const card = document.createElement('a');
+  card.className = 'viewer-sponsor-card';
+  card.href = ad.stationUrl;
+  card.target = '_blank';
+  card.rel = 'noopener noreferrer';
+  card.dataset.soopId = ad.soopId;
+  card.setAttribute('aria-label', `${ad.nickname} 방송국 새 탭에서 열기`);
+  const image = document.createElement('img');
+  image.src = ad.avatarUrl;
+  image.alt = '';
+  image.loading = 'lazy';
+  image.addEventListener('error', () => {
+    image.hidden = true;
+    fallback.hidden = false;
+  }, { once: true });
+  const fallback = document.createElement('span');
+  fallback.className = 'viewer-sponsor-avatar-fallback';
+  fallback.textContent = String(ad.nickname || '?').slice(0, 1);
+  fallback.hidden = true;
+  const nickname = document.createElement('strong');
+  nickname.textContent = ad.nickname;
+  const previewParts = makeSponsorLivePreview();
+  card.append(image, fallback, nickname, previewParts.preview);
+  const requestPreview = () => loadSponsorLivePreview(card, previewParts);
+  card.addEventListener('mouseenter', requestPreview, { once: true });
+  card.addEventListener('focus', requestPreview, { once: true });
+  card.dataset.rail = rail;
+  return card;
+}
+
+function distributeSponsorAds(ads) {
+  const sorted = (Array.isArray(ads) ? ads : []).slice()
+    .sort((a, b) => Number(b.expiresAt) - Number(a.expiresAt));
+  const hasRail = sorted.some((ad) => ad.rail === 'left' || ad.rail === 'right');
+  if (hasRail) {
+    return {
+      left: sorted.filter((ad) => ad.rail === 'left').slice(0, 5),
+      right: sorted.filter((ad) => ad.rail === 'right').slice(0, 5),
+    };
+  }
+  return {
+    left: sorted.filter((_, index) => index % 2 === 0).slice(0, 5),
+    right: sorted.filter((_, index) => index % 2 === 1).slice(0, 5),
+  };
+}
+
+function renderSponsorRails(ads, pendingByRail = { left: 0, right: 0 }) {
+  const rails = distributeSponsorAds(ads);
+  const pending = {
+    left: Math.max(0, Math.min(5, Number(pendingByRail.left) || 0)),
+    right: Math.max(0, Math.min(5, Number(pendingByRail.right) || 0)),
+  };
+  const mobileItems = { left: [], right: [] };
+  for (const [side, elementId] of [['left', 'sponsorRailLeft'], ['right', 'sponsorRailRight']]) {
+    const rail = $(elementId);
+    if (!rail) continue;
+    rail.replaceChildren(makeSponsorTitle());
+    rails[side].forEach((ad) => {
+      const card = makeSponsorAdCard(ad, side);
+      rail.append(card);
+      mobileItems[side].push(makeSponsorAdCard(ad, side));
+    });
+    for (let index = 0; index < pending[side]; index += 1) {
+      rail.append(makeSponsorPendingSlot());
+      mobileItems[side].push(makeSponsorPendingSlot());
+    }
+    if (rails[side].length + pending[side] < 5) {
+      rail.append(makeSponsorOpenCard(side));
+      mobileItems[side].push(makeSponsorOpenCard(side));
+    }
+  }
+
+  const mobile = $('sponsorRailMobile');
+  if (!mobile) return;
+  mobile.replaceChildren(makeSponsorTitle());
+  const max = Math.max(mobileItems.left.length, mobileItems.right.length);
+  for (let index = 0; index < max; index += 1) {
+    if (mobileItems.left[index]) mobile.append(mobileItems.left[index]);
+    if (mobileItems.right[index]) mobile.append(mobileItems.right[index]);
+  }
+}
+
+function sponsorDate(timestamp) {
+  if (!timestamp) return '확인 대기';
+  return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(timestamp));
+}
+
+async function loadAdminSponsorRequests() {
+  const list = $('sponsorAdminRequests');
+  if (!list) return;
+  $('sponsorAdminStatus').textContent = '신청 목록을 불러오는 중…';
+  try {
+    const response = await callAdminSponsorAds({ action: 'list' });
+    const requests = response.data && Array.isArray(response.data.requests) ? response.data.requests : [];
+    list.replaceChildren();
+    if (!requests.length) {
+      $('sponsorAdminStatus').textContent = '검토할 홍보 신청이 없습니다.';
+      return;
+    }
+    $('sponsorAdminStatus').textContent = `${requests.length}건의 대기 신청 · 후원 완료를 표시한 신청만 승인할 수 있습니다.`;
+    requests.forEach((request) => {
+      const item = document.createElement('article');
+      item.className = 'viewer-sponsor-request-item';
+      const details = document.createElement('div');
+      const name = document.createElement('strong');
+      name.textContent = `${request.nickname} · ${request.soopId}`;
+      const meta = document.createElement('span');
+      meta.textContent = `후원 계정 ${request.donorSoopId} · ${request.days}일 / ${Number(request.balloonCost).toLocaleString('ko-KR')}개 · 신청 ${sponsorDate(request.requestedAt)} · ${request.donationCompletedAt ? `후원 완료 ${sponsorDate(request.donationCompletedAt)}` : '후원 완료 표시 전'}`;
+      details.append(name, meta);
+      const actions = document.createElement('div');
+      actions.className = 'viewer-sponsor-request-actions';
+      const reject = document.createElement('button');
+      reject.type = 'button';
+      reject.className = 'button';
+      reject.textContent = '반려';
+      const approve = document.createElement('button');
+      approve.type = 'button';
+      approve.className = 'button button-primary';
+      approve.textContent = '후원 확인 · 승인';
+      approve.disabled = !request.donationCompletedAt;
+      const process = async (action, button) => {
+        button.disabled = true;
+        $('sponsorAdminStatus').textContent = '신청을 처리하고 있어요.';
+        try {
+          await callAdminSponsorAds({ action, requestId: request.requestId });
+          await refreshSponsorAds();
+        } catch (error) {
+          $('sponsorAdminStatus').textContent = viewerStatsErrorMessage(error, '신청을 처리하지 못했습니다.');
+          button.disabled = false;
+        }
+      };
+      reject.addEventListener('click', () => process('reject', reject));
+      approve.addEventListener('click', () => process('approve', approve));
+      actions.append(reject, approve);
+      item.append(details, actions);
+      list.append(item);
+    });
+  } catch (error) {
+    $('sponsorAdminStatus').textContent = viewerStatsErrorMessage(error, '홍보 신청 목록을 불러오지 못했습니다.');
+  }
+}
+
+async function refreshSponsorAds() {
+  try {
+    await getAuthReady();
+    const response = await callSponsorAds({ action: 'list' });
+    const data = response.data || {};
+    renderSponsorRails(data.ads || [], data.pendingByRail || { left: 0, right: 0 });
+    $('sponsorAdminPanel').classList.toggle('hidden', data.isAdmin !== true);
+    if (data.isAdmin === true) await loadAdminSponsorRequests();
+  } catch (error) {
+    console.error('오늘의 후원 스트리머를 불러오지 못했습니다.', error);
+    renderSponsorRails([]);
+  }
+}
+
+function getSavedSponsorRequestId() {
+  try { return localStorage.getItem(SPONSOR_PENDING_REQUEST_KEY) || ''; } catch (_) { return ''; }
+}
+
+function setSavedSponsorRequestId(requestId) {
+  try {
+    if (requestId) localStorage.setItem(SPONSOR_PENDING_REQUEST_KEY, requestId);
+    else localStorage.removeItem(SPONSOR_PENDING_REQUEST_KEY);
+  } catch (_) {}
+}
+
+function showSponsorDonationStep(record) {
+  sponsorRequestRecord = record;
+  $('sponsorRequestFields').classList.add('hidden');
+  $('sponsorDonationStep').classList.remove('hidden');
+  $('sponsorRequestTitle').textContent = '후원 신청 확인';
+  $('sponsorRequestIntro').textContent = '후원이 확인되면 운영자가 승인하고 홍보 카드에 반영합니다.';
+  const summary = $('sponsorDonationSummary');
+  summary.replaceChildren();
+  const rows = [
+    ['홍보 스트리머', `${record.nickname} · ${record.soopId}`],
+    ['후원 계정', record.donorSoopId],
+    ['노출 기간', `${record.days}일`],
+    ['필요 별풍선', `${Number(record.balloonCost).toLocaleString('ko-KR')}개`],
+  ];
+  rows.forEach(([label, value]) => {
+    const cell = document.createElement('div');
+    const caption = document.createElement('span');
+    caption.textContent = label;
+    const strong = document.createElement('strong');
+    strong.textContent = value;
+    cell.append(caption, strong);
+    summary.append(cell);
+  });
+  const completed = Number(record.donationCompletedAt) > 0;
+  $('sponsorDonationComplete').classList.toggle('hidden', completed);
+  $('sponsorRequestWithdraw').classList.toggle('hidden', completed);
+  $('sponsorDonationLink').classList.toggle('hidden', completed);
+  $('sponsorRequestDone').classList.toggle('hidden', false);
+  $('sponsorDonationStatus').textContent = completed
+    ? '후원 완료를 접수했습니다. 운영자가 실제 후원 내역을 확인한 뒤 승인합니다.'
+    : `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원한 뒤 완료 버튼을 눌러주세요. 확인 후 관리자가 승인합니다.`;
+  $('sponsorRequestStatus').textContent = '';
+  startSponsorStatusPolling();
+}
+
+function closeSponsorDialog() {
+  const dialog = $('sponsorRequestDialog');
+  if (dialog.open) dialog.close();
+  window.clearInterval(sponsorPollTimer);
+  sponsorPollTimer = 0;
+  if (sponsorRequestPreviousFocus && document.contains(sponsorRequestPreviousFocus)) sponsorRequestPreviousFocus.focus();
+}
+
+async function refreshSponsorRequestStatus() {
+  if (!sponsorRequestId) return;
+  try {
+    const response = await callSponsorAds({ action: 'status', requestId: sponsorRequestId });
+    const data = response.data || {};
+    if (data.status === 'pending') {
+      sponsorRequestRecord = { ...data, requestId: sponsorRequestId };
+      if ($('sponsorRequestDialog').open) showSponsorDonationStep(sponsorRequestRecord);
+      return;
+    }
+    if (data.status === 'processing') {
+      if ($('sponsorRequestDialog').open) $('sponsorDonationStatus').textContent = '운영자가 신청 내용을 확인하고 있습니다.';
+      return;
+    }
+    window.clearInterval(sponsorPollTimer);
+    sponsorPollTimer = 0;
+    if (data.status === 'approved') {
+      setSavedSponsorRequestId('');
+      if ($('sponsorRequestDialog').open) {
+        $('sponsorDonationLink').classList.add('hidden');
+        $('sponsorDonationComplete').classList.add('hidden');
+        $('sponsorRequestWithdraw').classList.add('hidden');
+        $('sponsorRequestDone').classList.remove('hidden');
+        $('sponsorDonationStatus').textContent = `신청이 승인됐어요. ${sponsorDate(data.expiresAt)}까지 후원 스트리머 카드에 표시됩니다.`;
+      }
+      await refreshSponsorAds();
+      return;
+    }
+    setSavedSponsorRequestId('');
+    sponsorRequestId = '';
+    if ($('sponsorRequestDialog').open) {
+      $('sponsorDonationStep').classList.add('hidden');
+      $('sponsorRequestFields').classList.remove('hidden');
+      $('sponsorRequestTitle').textContent = '스트리머 홍보 신청';
+      $('sponsorRequestIntro').textContent = '홍보할 스트리머와 후원 계정, 노출 기간을 입력하세요.';
+      const messages = { rejected: '신청이 반려되었습니다. 입력 정보를 확인한 뒤 다시 신청할 수 있어요.', expired: '후원 완료 전 신청이 만료되었습니다. 다시 신청해 주세요.', cancelled: '신청이 취소되었습니다.' };
+      $('sponsorRequestStatus').textContent = messages[data.status] || '신청 상태가 변경되었습니다.';
+    }
+  } catch (error) {
+    if ($('sponsorRequestDialog').open) $('sponsorDonationStatus').textContent = viewerStatsErrorMessage(error, '신청 상태를 확인하지 못했습니다.');
+  }
+}
+
+function startSponsorStatusPolling() {
+  window.clearInterval(sponsorPollTimer);
+  if (!sponsorRequestId || !$('sponsorRequestDialog').open) return;
+  sponsorPollTimer = window.setInterval(refreshSponsorRequestStatus, 20000);
+}
+
+async function openSponsorRequest(button) {
+  sponsorRequestPreviousFocus = button;
+  sponsorRequestRail = button.dataset.sponsorRail === 'right' ? 'right' : 'left';
+  sponsorRequestId = getSavedSponsorRequestId();
+  $('sponsorRequestStatus').textContent = '';
+  $('sponsorRequestDialog').showModal();
+  if (sponsorRequestId) {
+    await refreshSponsorRequestStatus();
+    if (sponsorRequestId && !sponsorRequestRecord) {
+      $('sponsorRequestFields').classList.remove('hidden');
+      $('sponsorDonationStep').classList.add('hidden');
+    }
+  } else {
+    $('sponsorRequestFields').classList.remove('hidden');
+    $('sponsorDonationStep').classList.add('hidden');
+    $('sponsorRequestTitle').textContent = '스트리머 홍보 신청';
+    $('sponsorRequestIntro').textContent = '홍보할 스트리머와 후원 계정, 노출 기간을 입력하세요.';
+    $('sponsorRequestForm').reset();
+    updateSponsorPrice();
+    window.setTimeout(() => $('sponsorRequestNickname').focus(), 0);
+  }
+}
+
+function updateSponsorPrice() {
+  const days = Number.parseInt($('sponsorRequestDays').value, 10);
+  const valid = Number.isInteger(days) && days >= 1 && days <= 30;
+  $('sponsorRequestCostLabel').textContent = valid ? `${days}일 × 10개` : '기간을 확인해 주세요';
+  $('sponsorRequestTotal').textContent = valid ? `${(days * 10).toLocaleString('ko-KR')}개` : '—';
+}
+
+$('sponsorRequestForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const nickname = $('sponsorRequestNickname').value.trim();
+  const soopId = $('sponsorRequestSoopId').value.trim().toLowerCase();
+  const donorSoopId = $('sponsorRequestDonorId').value.trim().toLowerCase();
+  const days = Number.parseInt($('sponsorRequestDays').value, 10);
+  let firstInvalid = null;
+  $('sponsorNicknameError').textContent = '';
+  $('sponsorSoopIdMessage').textContent = '홍보 중이거나 신청 확인 중인 스트리머는 중복 신청할 수 없어요.';
+  $('sponsorSoopIdMessage').classList.remove('is-error');
+  $('sponsorDonorIdError').textContent = '';
+  $('sponsorDaysError').textContent = '하루 별풍선 10개 · 최대 30일';
+  document.querySelectorAll('#sponsorRequestForm input').forEach((input) => input.removeAttribute('aria-invalid'));
+  if (!nickname || nickname.length > 40) {
+    $('sponsorNicknameError').textContent = '스트리머 닉네임을 입력해 주세요.';
+    firstInvalid ||= $('sponsorRequestNickname');
+  }
+  if (!/^[a-z0-9]{2,20}$/.test(soopId)) {
+    $('sponsorSoopIdMessage').textContent = 'SOOP 아이디를 영문 소문자와 숫자 2~20자로 입력해 주세요.';
+    $('sponsorSoopIdMessage').classList.add('is-error');
+    firstInvalid ||= $('sponsorRequestSoopId');
+  }
+  if (!/^[a-z0-9]{2,20}$/.test(donorSoopId)) {
+    $('sponsorDonorIdError').textContent = '후원 계정의 SOOP 아이디를 확인해 주세요.';
+    firstInvalid ||= $('sponsorRequestDonorId');
+  }
+  if (!Number.isInteger(days) || days < 1 || days > 30) {
+    $('sponsorDaysError').textContent = '홍보 기간은 1~30일로 선택해 주세요.';
+    firstInvalid ||= $('sponsorRequestDays');
+  }
+  if (firstInvalid) {
+    firstInvalid.setAttribute('aria-invalid', 'true');
+    firstInvalid.focus();
+    return;
+  }
+  const submit = $('sponsorRequestSubmit');
+  submit.disabled = true;
+  setSponsorHint('sponsorRequestStatus', '신청을 등록하고 있어요.');
+  try {
+    await getAuthReady();
+    const response = await callSponsorAds({ action: 'submit', nickname, soopId, donorSoopId, days, rail: sponsorRequestRail });
+    const data = response.data || {};
+    sponsorRequestId = String(data.requestId || '');
+    sponsorRequestRecord = { requestId: sponsorRequestId, nickname, soopId, donorSoopId, days, balloonCost: Number(data.balloonCost) || days * 10, status: 'pending', donationCompletedAt: 0 };
+    setSavedSponsorRequestId(sponsorRequestId);
+    showSponsorDonationStep(sponsorRequestRecord);
+  } catch (error) {
+    const message = viewerStatsErrorMessage(error, '신청을 접수하지 못했습니다.');
+    const duplicate = String(error && error.code || '').endsWith('already-exists')
+      || message.includes('이미 홍보 중')
+      || message.includes('이미 확인 중');
+    if (duplicate) {
+      $('sponsorSoopIdMessage').textContent = message;
+      $('sponsorSoopIdMessage').classList.add('is-error');
+      setSponsorHint('sponsorRequestStatus', '');
+    } else {
+      setSponsorHint('sponsorRequestStatus', message, true);
+    }
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+$('sponsorRequestSoopId').addEventListener('input', () => {
+  const soopId = $('sponsorRequestSoopId').value.trim().toLowerCase();
+  const hint = $('sponsorSoopIdMessage');
+  hint.textContent = '홍보 중이거나 신청 확인 중인 스트리머는 중복 신청할 수 없어요.';
+  hint.classList.remove('is-error');
+  const image = $('sponsorRequestProfileImage');
+  const profile = $('sponsorRequestProfile');
+  const request = ++sponsorProfileRequestId;
+  if (!/^[a-z0-9]{2,20}$/.test(soopId)) {
+    profile.classList.add('hidden');
+    image.removeAttribute('src');
+    $('sponsorRequestProfileStatus').textContent = '';
+    return;
+  }
+  profile.classList.remove('hidden');
+  $('sponsorRequestProfileStatus').textContent = 'SOOP 프로필을 확인 중…';
+  image.onload = () => {
+    if (request === sponsorProfileRequestId) $('sponsorRequestProfileStatus').textContent = '입력한 SOOP 프로필';
+  };
+  image.onerror = () => {
+    if (request === sponsorProfileRequestId) $('sponsorRequestProfileStatus').textContent = '프로필을 불러오지 못했어요. 아이디를 확인해 주세요.';
+  };
+  image.src = `https://stimg.sooplive.com/LOGO/${soopId.slice(0, 2)}/${soopId}/${soopId}.jpg`;
+});
+$('sponsorRequestDays').addEventListener('input', updateSponsorPrice);
+$('sponsorRequestClose').addEventListener('click', closeSponsorDialog);
+$('sponsorRequestCancel').addEventListener('click', closeSponsorDialog);
+$('sponsorRequestDone').addEventListener('click', closeSponsorDialog);
+$('sponsorRequestDialog').addEventListener('click', (event) => {
+  if (event.target === $('sponsorRequestDialog')) closeSponsorDialog();
+});
+$('sponsorRequestDialog').addEventListener('close', () => {
+  window.clearInterval(sponsorPollTimer);
+  sponsorPollTimer = 0;
+});
+$('sponsorDonationComplete').addEventListener('click', async () => {
+  if (!sponsorRequestId) return;
+  const button = $('sponsorDonationComplete');
+  button.disabled = true;
+  try {
+    await callSponsorAds({ action: 'donationComplete', requestId: sponsorRequestId });
+    if (sponsorRequestRecord) sponsorRequestRecord.donationCompletedAt = Date.now();
+    $('sponsorDonationStatus').textContent = '후원 완료를 접수했어요. 운영자가 실제 후원 내역을 확인한 뒤 승인합니다.';
+    showSponsorDonationStep(sponsorRequestRecord);
+  } catch (error) {
+    $('sponsorDonationStatus').textContent = viewerStatsErrorMessage(error, '후원 완료를 접수하지 못했습니다.');
+    button.disabled = false;
+  }
+});
+$('sponsorRequestWithdraw').addEventListener('click', async () => {
+  if (!sponsorRequestId || !confirm('홍보 신청을 취소할까요?')) return;
+  const button = $('sponsorRequestWithdraw');
+  button.disabled = true;
+  try {
+    await callSponsorAds({ action: 'cancel', requestId: sponsorRequestId });
+    setSavedSponsorRequestId('');
+    sponsorRequestId = '';
+    sponsorRequestRecord = null;
+    $('sponsorDonationStep').classList.add('hidden');
+    $('sponsorRequestFields').classList.remove('hidden');
+    $('sponsorRequestTitle').textContent = '스트리머 홍보 신청';
+    setSponsorHint('sponsorRequestStatus', '신청을 취소했습니다.');
+  } catch (error) {
+    $('sponsorDonationStatus').textContent = viewerStatsErrorMessage(error, '신청을 취소하지 못했습니다.');
+  } finally {
+    button.disabled = false;
+  }
+});
+$('sponsorAdminRefresh').addEventListener('click', loadAdminSponsorRequests);
+
+let sponsorLoadedForUid = '';
+onAuthStateChanged(auth, (user) => {
+  if (!user || sponsorLoadedForUid === user.uid) return;
+  sponsorLoadedForUid = user.uid;
+  refreshSponsorAds();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    refreshSponsorAds();
+    if ($('sponsorRequestDialog').open && sponsorRequestId) refreshSponsorRequestStatus();
+  }
+});
+
 let observedAuthIdentity = '';
 onAuthStateChanged(auth, (user) => {
   if (!user) return;
@@ -2166,4 +2711,7 @@ document.addEventListener('visibilitychange', () => {
 setupDevbarMarquee();
 renderComparisonSelection();
 loadDevbarLinks();
-getAuthReady().catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));
+getAuthReady().then(() => {
+  sponsorRequestId = getSavedSponsorRequestId();
+  if (sponsorRequestId) refreshSponsorRequestStatus();
+}).catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));
