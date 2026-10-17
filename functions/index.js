@@ -757,6 +757,11 @@ function normalizeStreamerName(value) {
   return String(value || '').normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ko-KR');
 }
 
+function normalizeGalleryStreamerName(value) {
+  // 주식 종목명은 `[크루명] 닉네임` 형식일 수 있으므로 크루 표기만 제거한다.
+  return normalizeStreamerName(value).replace(/^\[[^\]]{1,60}\]\s*/, '');
+}
+
 function findStockForStreamer(streamer, stockNames) {
   const targetName = normalizeStreamerName(streamer && streamer.nickname);
   if (!targetName || !stockNames || typeof stockNames !== 'object') return null;
@@ -799,13 +804,13 @@ async function findGalleryStreamerIds(target) {
   }
 
   // 갤러리 계정 연결이 아직 없는 스트리머는 갤러리 업로드가 사용하는
-  // streamerNames의 실제 이름을 기준으로 찾아 표기명 차이로 인한 오탐을 줄인다.
+  // streamerNames를 기준으로 찾고, `[크루명]` 표기는 제거한 뒤 유일하게 일치할 때만 연결한다.
   const namesSnap = await db.ref('streamerNames').get();
-  const expectedName = normalizeStreamerName(target.streamer.nickname);
+  const expectedName = normalizeGalleryStreamerName(target.streamer.nickname);
   if (!expectedName) return [];
   const names = namesSnap.val() || {};
   const matches = [...new Set(Object.entries(names)
-    .filter(([id, name]) => isSafeGalleryStreamerId(id) && normalizeStreamerName(name) === expectedName)
+    .filter(([id, name]) => isSafeGalleryStreamerId(id) && normalizeGalleryStreamerName(name) === expectedName)
     .map(([id]) => id))];
   // 이름만으로 둘 이상의 방송국이 매칭되면 잘못된 갤러리를 섞지 않도록 노출하지 않는다.
   return matches.length === 1 ? matches : [];
