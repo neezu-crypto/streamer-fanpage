@@ -125,6 +125,63 @@ body.fanpage-home-kawaii-active .recent-section { max-width: 1020px; margin-top:
 body.fanpage-home-kawaii-active .section-heading h2 { color: #51465d; }
 body.fanpage-home-kawaii-active .section-heading .eyebrow { color: #d86f98; }
 body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: linear-gradient(135deg, #ffe3ed, #e3edff); }
+
+/* Keep the initial loading and recovery screen in the same pastel world. */
+.startup-cover {
+  color-scheme: light;
+  color: #51465d;
+  background:
+    radial-gradient(circle at 1px 1px, #edc8d51c 1px, transparent 1.5px) 0 0 / 27px 27px,
+    radial-gradient(ellipse at 18% 0%, #ffe8f0 0, transparent 38%),
+    radial-gradient(ellipse at 86% 75%, #eaf1ff 0, transparent 38%),
+    #fffaf7;
+  backdrop-filter: none;
+}
+.startup-card {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(125px, .42fr);
+  align-items: center;
+  gap: 22px;
+  width: min(620px, 100%);
+  min-height: 260px;
+  padding: 34px 38px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 32px;
+  background: linear-gradient(118deg, #ffe3ed 0%, #f7eaff 54%, #e3edff 100%);
+  color: #51465d;
+  text-align: left;
+  box-shadow: 0 8px 0 #dcc9df99, 0 22px 65px #75608024;
+}
+.startup-card::before {
+  position: absolute;
+  z-index: -1;
+  top: -190px;
+  right: 9%;
+  width: 350px;
+  height: 350px;
+  border: 1px solid #fff9;
+  border-radius: 50%;
+  box-shadow: 0 0 0 23px #ffffff29, 0 0 0 48px #ffffff1d;
+  content: "";
+}
+.startup-copy { position: relative; z-index: 1; }
+.startup-mark { width: 34px; margin: 0 0 12px; color: #d86f98; font-size: 27px; line-height: 1; }
+.startup-card .eyebrow { margin-bottom: 8px; color: #9b7298; font-size: 9px; }
+.startup-card h1 { color: #51465d; font-size: 27px; }
+.startup-card > .startup-copy > p:not(.eyebrow) { margin: 0; color: #71647b; font-size: 12px; line-height: 1.7; }
+.startup-progress { height: 5px; margin: 21px 0 0; background: #ffffffa8; }
+.startup-progress span { background: linear-gradient(90deg, #ee86aa, #b8a6ed, #8fa9e8); }
+.startup-card .button-primary { border-color: #ee86aa; background: #ee86aa; color: #fff; }
+.startup-mascot { position: relative; width: 100%; align-self: end; margin-bottom: -12px; }
+.startup-mascot img { display: block; width: 100%; height: auto; transition: opacity .18s ease, transform .24s ease; }
+.startup-mascot-wink { position: absolute; inset: 0; opacity: 0; }
+.startup-card:hover .startup-mascot-idle { opacity: 0; transform: scale(.98); }
+.startup-card:hover .startup-mascot-wink { opacity: 1; transform: scale(1.02); }
+.startup-cover.is-error .startup-mascot { opacity: .78; }
+.startup-cover.is-not-found .startup-card { background: linear-gradient(118deg, #ffe9e6 0%, #f8eaff 54%, #e3edff 100%); }
 #fanPageView.fanpage-layout-1 {
   --kawaii-accent: #ee86aa;
   --kawaii-accent-deep: #d86f98;
@@ -382,6 +439,16 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
   .fanpage-design-one-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   #fanPageView.fanpage-layout-1 .profile-board { grid-template-columns: minmax(240px, .9fr) minmax(300px, 1.1fr); }
 }
+@media (max-width: 560px) {
+  .startup-cover { padding: 18px; }
+  .startup-card { display: block; min-height: 264px; padding: 26px 22px; border-radius: 27px; }
+  .startup-copy { padding-bottom: 28px; }
+  .startup-card h1 { max-width: 275px; font-size: 24px; }
+  .startup-card > .startup-copy > p:not(.eyebrow) { max-width: 310px; padding-right: 18px; }
+  .startup-progress { max-width: calc(100% - 82px); margin-top: 18px; }
+  .startup-card .button { position: relative; z-index: 2; }
+  .startup-mascot { position: absolute; right: 5px; bottom: -7px; z-index: 0; width: 94px; opacity: .84; }
+}
 @media (max-width: 720px) {
   .main-content.has-fanpage-layout-one,
   .main-content.has-fanpage-home-kawaii { width: min(100% - 28px, 680px); }
@@ -441,6 +508,8 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
   #fanPageView.fanpage-layout-1 .profile-stock-price { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .startup-mark { animation: none; }
+  .startup-mascot img { transition: none; }
   #fanPageView.fanpage-layout-1 .fanpage-kawaii-sparkles { animation: none; }
   #fanPageView.fanpage-layout-1 .fanpage-kawaii-mascot,
   #fanPageView.fanpage-layout-1 .fanpage-kawaii-mascot img { transition: none; }

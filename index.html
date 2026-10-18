@@ -12,17 +12,23 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
   <link rel="stylesheet" href="style.css?v=20261017-quick-remote-drag">
-  <link rel="stylesheet" href="fanpage-layouts.css?v=20261018-home-kawaii">
+  <link rel="stylesheet" href="fanpage-layouts.css?v=20261018-home-loading">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
     <div class="startup-card">
-      <div class="startup-mark" aria-hidden="true">✳</div>
-      <p class="eyebrow">STREAMER SERIES</p>
-      <h1 id="startupTitle">페이지를 준비하고 있어요</h1>
-      <p id="startupMessage">로그인 상태와 인증된 스트리머 정보를 확인하고 있습니다.</p>
-      <div class="startup-progress" aria-hidden="true"><span></span></div>
-      <button class="button button-primary hidden" id="retryButton" type="button">다시 불러오기</button>
+      <div class="startup-copy">
+        <div class="startup-mark" aria-hidden="true">✳</div>
+        <p class="eyebrow">STREAMER SERIES</p>
+        <h1 id="startupTitle">페이지를 준비하고 있어요</h1>
+        <p id="startupMessage">로그인 상태와 인증된 스트리머 정보를 확인하고 있습니다.</p>
+        <div class="startup-progress" aria-hidden="true"><span></span></div>
+        <button class="button button-primary hidden" id="retryButton" type="button">다시 불러오기</button>
+      </div>
+      <div class="startup-mascot" aria-hidden="true">
+        <img class="startup-mascot-idle" src="assets/fanpage-kawaii/moon-bunny-idle.png" alt="" decoding="async">
+        <img class="startup-mascot-wink" src="assets/fanpage-kawaii/moon-bunny-wink.png" alt="" decoding="async">
+      </div>
     </div>
   </div>
 
