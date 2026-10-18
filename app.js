@@ -79,9 +79,9 @@ function setButtonClickVolume(value) {
   return buttonClickVolume;
 }
 let modalOpenGeneration = 0;
-function playUiSound(audio) {
+function playUiSound(audio, volumeMultiplier = 1) {
   if (buttonClickVolume <= 0) return;
-  audio.volume = buttonClickVolume / 100;
+  audio.volume = Math.min(1, buttonClickVolume / 100 * volumeMultiplier);
   audio.currentTime = 0;
   const playback = audio.play();
   if (playback && typeof playback.catch === 'function') playback.catch(() => {});
@@ -97,6 +97,11 @@ function isSaveOrCompleteButton(button) {
     button.textContent || '', button.getAttribute('aria-label') || '', button.title || '',
   ].join(' '));
 }
+function isCompleteButton(button) {
+  return /완료|done|complete/i.test([
+    button.textContent || '', button.getAttribute('aria-label') || '', button.title || '',
+  ].join(' '));
+}
 function isCatPawCloseButton(button) {
   return button.classList.contains('profile-settings-close')
     && document.body.matches('.fanpage-layout-one-active, .fanpage-home-kawaii-active');
@@ -109,6 +114,7 @@ document.addEventListener('click', (event) => {
   queueMicrotask(() => {
     if (modalOpenGeneration !== openGeneration) return;
     if (isCatPawCloseButton(button)) playUiSound(catPawCloseAudio);
+    else if (isCompleteButton(button)) playUiSound(saveButtonAudio, 1.2);
     else playUiSound(isSaveOrCompleteButton(button) ? saveButtonAudio : buttonClickAudio);
   });
 }, true);
