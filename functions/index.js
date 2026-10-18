@@ -3758,7 +3758,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     const subscription = subscriptionSnapshot.val() || {};
     const isSubscribed = (Number(subscription.expiresAt) || 0) > Date.now();
     if (includePremiumMetrics && !admin && !isSubscribed) {
-      throw new HttpsError('permission-denied', '평균 대비 상승폭은 구독 계정에서 이용할 수 있습니다.');
+      throw new HttpsError('permission-denied', '같은 날 스트리머 비교는 구독 계정에서 이용할 수 있습니다.');
     }
     const tier = viewerStatsTier(request.auth, {
       isAdmin: admin,
