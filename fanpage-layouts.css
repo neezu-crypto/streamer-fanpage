@@ -425,6 +425,7 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 .messenger-link-description,
 #fanPageView.fanpage-layout-1 .messenger-link-note { color: #81758b; }
 #fanPageView.fanpage-layout-1 .fan-character-ogq-pair { overflow: hidden; border-radius: 24px; }
+#fanPageView.fanpage-layout-1 .fan-character-ogq-pair + .fanpage-design-one-grid { margin-top: 22px; }
 #fanPageView.fanpage-layout-1 .fan-character-ogq-pair > .fan-character-card { border: 0; border-radius: 0; box-shadow: none; }
 #fanPageView.fanpage-layout-1 .fan-character-ogq-pair > .fan-feature-ogq-panel { border: 0; border-radius: 0; background: #fffefd; box-shadow: none; }
 
