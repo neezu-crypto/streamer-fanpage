@@ -889,8 +889,8 @@
 .main-content.has-fanpage-view{display:flex;flex-direction:column}
 .fanpage-view{flex:1}
 .fanpage-view.has-top-banner{padding-top:0}
-#fanPageView.has-owner-top-banner{padding-top:0}
-#fanPageView.fanpage-layout-1.has-owner-top-banner{padding-top:0}
+#fanPageView.has-account-top-banner{padding-top:0}
+#fanPageView.fanpage-layout-1.has-account-top-banner{padding-top:0}
 .fanpage-view.has-bottom-banner{padding-bottom:0}
 .fan-banner-bottom{margin-top:22px}
 .site-shell.has-bottom-banner{min-height:0}
@@ -900,7 +900,7 @@ body.fanpage-bottom-banner-active{min-height:0}
 #fanPageView.has-bottom-banner{padding-bottom:0}
 #fanPageView.fanpage-layout-1.has-bottom-banner{padding-bottom:0}
 .topbar.topbar-with-banner{height:42px;min-height:42px;padding:0 clamp(14px,4vw,54px)}
-.topbar.topbar-owner-banner-hidden{display:none}
+.topbar.topbar-account-banner-hidden{display:none}
 .topbar-with-banner .brand{gap:7px}
 .topbar-with-banner .brand-symbol{font-size:20px}
 .topbar-with-banner .brand strong{font-size:15px}

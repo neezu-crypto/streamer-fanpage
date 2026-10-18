@@ -152,6 +152,13 @@ function renderAuthControls() {
   updateDesignFeedbackEligibility();
 }
 
+function hasRecognizedFanpageAccount(user = auth.currentUser) {
+  if (!user) return false;
+  const googleLinked = user.providerData.some((provider) => provider.providerId === 'google.com');
+  const kakaoLinked = localStorage.getItem(KAKAO_LINKED_UID_KEY) === user.uid;
+  return !user.isAnonymous || googleLinked || kakaoLinked || verifiedStreamerUid === user.uid;
+}
+
 function updateDesignFeedbackEligibility() {
   const submit = $('submitDesignFeedback');
   if (!submit) return;
@@ -818,7 +825,7 @@ function setVisibleView(page) {
     stockPriceUnsubscribe = null;
   }
   if (!page) stockPriceSparklineRequest += 1;
-  document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-owner-banner-hidden');
+  document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-account-banner-hidden');
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
@@ -2124,8 +2131,8 @@ function renderFanPage(page) {
   currentPage = page;
   const view = $('fanPageView');
   view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2');
-  view.classList.remove('has-owner-top-banner');
-  document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-owner-banner-hidden');
+  view.classList.remove('has-account-top-banner');
+  document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-account-banner-hidden');
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active');
   const layoutDesign = page.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
@@ -2227,9 +2234,9 @@ function renderFanPage(page) {
     const topbar = document.querySelector('.topbar');
     topbar.classList.add('topbar-with-banner');
     view.classList.add('has-top-banner');
-    if (page.isStreamerOwner) {
-      topbar.classList.add('topbar-owner-banner-hidden');
-      view.classList.add('has-owner-top-banner');
+    if (page.isStreamerOwner || hasRecognizedFanpageAccount()) {
+      topbar.classList.add('topbar-account-banner-hidden');
+      view.classList.add('has-account-top-banner');
     }
     view.append(topBanner);
   }
