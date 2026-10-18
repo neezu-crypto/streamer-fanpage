@@ -268,7 +268,6 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 .fanpage-kawaii-mascot-wink { position: absolute; inset: 0; opacity: 0; }
 .fanpage-kawaii-mascot.is-winking .fanpage-kawaii-mascot-idle { opacity: 0; }
 .fanpage-kawaii-mascot.is-winking .fanpage-kawaii-mascot-wink { opacity: 1; }
-.fanpage-kawaii-mascot-hint { position: absolute; right: -7px; bottom: 21px; padding: 7px 11px; border: 1px solid #fff; border-radius: 99px; background: #fff; color: #71647b; box-shadow: 0 4px 0 #cbb9d344; font-size: 10px; font-weight: 800; white-space: nowrap; }
 .fanpage-kawaii-sparkles { position: absolute; right: 37%; top: 23%; color: #fff; font-size: clamp(17px, 2vw, 25px); letter-spacing: .65em; text-shadow: 0 2px 4px #ad91b866; animation: fanpage-kawaii-bob 3.4s ease-in-out infinite; }
 @keyframes fanpage-kawaii-bob { 50% { transform: translateY(-7px) rotate(8deg); } }
 
@@ -483,7 +482,6 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
   .fanpage-kawaii-actions { gap: 7px; }
   .fanpage-kawaii-actions .button { min-height: 39px; padding: 0 13px; font-size: 11px; }
   .fanpage-kawaii-mascot-wrap { right: 1px; bottom: -24px; width: 156px; }
-  .fanpage-kawaii-mascot-hint { right: 2px; bottom: 24px; font-size: 9px; }
   .fanpage-kawaii-sparkles { right: 13%; top: 46%; }
   #fanPageView.fanpage-layout-1 .profile-board { grid-template-columns: 1fr; gap: 16px; padding: 58px 18px 19px; border-radius: 23px; }
   #fanPageView.fanpage-layout-1 .profile-tab { font-size: 16px; }
@@ -516,7 +514,6 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
   .fanpage-kawaii-hero { min-height: 350px; padding-right: 17px; }
   .fanpage-kawaii-copy h1 { max-width: 330px; font-size: 35px; }
   .fanpage-kawaii-mascot-wrap { right: -3px; width: 133px; }
-  .fanpage-kawaii-mascot-hint { right: 5px; font-size: 8px; }
   #fanPageView.fanpage-layout-1 .profile-stock-card { grid-template-columns: minmax(0, 1fr) 46px auto 10px; gap: 5px; padding: 10px; }
   #fanPageView.fanpage-layout-1 .profile-stock-chart { width: 46px; }
   #fanPageView.fanpage-layout-1 .profile-stock-price { font-size: 15px; }

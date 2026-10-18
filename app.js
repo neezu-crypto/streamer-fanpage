@@ -818,7 +818,7 @@ function setVisibleView(page) {
     stockPriceUnsubscribe = null;
   }
   if (!page) stockPriceSparklineRequest += 1;
-  document.querySelector('.topbar').classList.remove('topbar-with-banner');
+  document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-owner-banner-hidden');
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
@@ -2102,9 +2102,7 @@ function renderKawaiiWelcome(page) {
     const hasHover = window.matchMedia('(hover: hover)').matches;
     setMascotMood(hasHover || !mascot.classList.contains('is-winking'));
   });
-  const hint = document.createElement('span'); hint.className = 'fanpage-kawaii-mascot-hint';
-  hint.textContent = '살짝 눌러 인사해 봐요!';
-  mascotWrap.append(halo, mascot, hint);
+  mascotWrap.append(halo, mascot);
   const sparkles = document.createElement('span'); sparkles.className = 'fanpage-kawaii-sparkles';
   sparkles.setAttribute('aria-hidden', 'true'); sparkles.textContent = '✦  ✧  ♡';
   hero.append(copy, mascotWrap, sparkles);
@@ -2126,6 +2124,8 @@ function renderFanPage(page) {
   currentPage = page;
   const view = $('fanPageView');
   view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2');
+  view.classList.remove('has-owner-top-banner');
+  document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-owner-banner-hidden');
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active');
   const layoutDesign = page.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
@@ -2224,8 +2224,13 @@ function renderFanPage(page) {
   section.append(details, stockCard, actions);
   const topBanner = renderBannerSection(page, 'top');
   if (topBanner) {
-    document.querySelector('.topbar').classList.add('topbar-with-banner');
+    const topbar = document.querySelector('.topbar');
+    topbar.classList.add('topbar-with-banner');
     view.classList.add('has-top-banner');
+    if (page.isStreamerOwner) {
+      topbar.classList.add('topbar-owner-banner-hidden');
+      view.classList.add('has-owner-top-banner');
+    }
     view.append(topBanner);
   }
   if (!page.isOwner) view.append(back);
