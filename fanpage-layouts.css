@@ -344,6 +344,62 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(input, textarea, select):focus { border-color: var(--kawaii-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--kawaii-accent), transparent 85%); }
 #fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(input, textarea)::placeholder { color: #a39aa9; }
 
+/* Live preview includes its own legacy dark surfaces, so theme its inner card explicitly. */
+#fanPageView.fanpage-layout-1 .live-preview-card {
+  border-color: #e2d8e9;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fffefd, #f8f5ff 78%, #f3f7ff);
+  box-shadow: 0 4px 0 #e8ddeb, 0 10px 24px #75608012;
+}
+#fanPageView.fanpage-layout-1 .live-preview-details {
+  background: linear-gradient(145deg, #fffefd, #f8f5ff);
+}
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .live-preview-details {
+  background: linear-gradient(145deg, #fff, #f0f5ff);
+}
+#fanPageView.fanpage-layout-1 .live-thumbnail-fallback { color: #665b70; }
+#fanPageView.fanpage-layout-1 .live-badge {
+  border: 1px solid #e67ba2;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffabc7, #ed7fa5);
+  color: #fff;
+  box-shadow: 0 3px 0 #d66c91, 0 5px 12px #78546a20;
+}
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .live-badge {
+  border-color: #789be0;
+  background: linear-gradient(180deg, #d7e4ff, #a9c5ff);
+  color: #283d69;
+  box-shadow: 0 3px 0 #789be0, 0 5px 12px #536f9a20;
+}
+#fanPageView.fanpage-layout-1 .live-status-label {
+  width: fit-content;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid #b6dfc4;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #effbf2, #e1f5e7);
+  color: #286342;
+  font-size: 10px;
+  font-weight: 800;
+}
+#fanPageView.fanpage-layout-1 .live-broadcast-title { color: #51465d; font-weight: 700; }
+#fanPageView.fanpage-layout-1 .live-viewer-count,
+#fanPageView.fanpage-layout-1 .live-stale-note { color: #766b80; }
+#fanPageView.fanpage-layout-1 .live-offline-card,
+#fanPageView.fanpage-layout-1 .live-state-message {
+  border-color: #e4d9e8;
+  background: linear-gradient(135deg, #fffefd, #f8f5ff);
+  color: #51465d;
+  box-shadow: 0 3px 0 #ece2ed;
+}
+#fanPageView.fanpage-layout-1 .live-offline-mark {
+  border-color: #d8c9e6;
+  background: #f3edff;
+  color: #665487;
+}
+#fanPageView.fanpage-layout-1 .live-offline-copy strong { color: #51465d; }
+#fanPageView.fanpage-layout-1 .live-offline-copy span { color: #766b80; }
+
 /* Media tiles keep a darker image stage so thumbnails and captions stay legible. */
 #fanPageView.fanpage-layout-1 :is(.fan-gallery-card, .vod-card) { border-color: #e4d9e7; background: #fff; color: #51465d; box-shadow: 0 3px 0 #ece2ed; }
 #fanPageView.fanpage-layout-1 .fan-gallery-card-details { color: #81758b; }
