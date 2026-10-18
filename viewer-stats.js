@@ -382,7 +382,7 @@ function renderSubscriptionDialogStatus(message = '') {
   }
   submit.textContent = subscriptionState.subscribed ? '신청 등록 · 30일 연장' : '구독 신청 등록';
   if (subscriptionState.isAdmin) {
-    status.textContent = '관리자 권한으로 기간별 최고 순간과 평균 대비 상승폭을 포함한 모든 구독 기능을 이용할 수 있어요.';
+    status.textContent = '관리자 권한으로 기간별 최고 순간과 같은 날 스트리머 비교를 포함한 모든 분석 기능을 이용할 수 있어요.';
   } else if (message) {
     status.textContent = message;
   } else if (!subscriptionState.accountProtected) {
@@ -817,37 +817,6 @@ function showStatsLinks(card, stats) {
   lowest.rel = 'noopener noreferrer';
   lowest.textContent = '최저 ' + Number(stats.lowest.viewers).toLocaleString('ko-KR') + '명 · ' + formatClock(stats.lowest.second);
   card._statsActions.append(highest, lowest);
-  const uplift = document.createElement('div');
-  uplift.className = 'viewer-premium-uplift';
-  if (subscriptionState.subscribed && Number.isFinite(Number(stats.averageViewers))) {
-    const average = Math.max(0, Number(stats.averageViewers));
-    const increase = Math.max(0, Number(stats.highest.viewers) - average);
-    const rate = average > 0 ? Math.round((increase / average) * 100) : null;
-    const viewersMetric = document.createElement('span');
-    const viewersLabel = document.createElement('small');
-    viewersLabel.textContent = '평균 대비 순증';
-    const viewersValue = document.createElement('strong');
-    viewersValue.textContent = '+' + Math.round(increase).toLocaleString('ko-KR') + '명';
-    viewersMetric.append(viewersLabel, viewersValue);
-    const rateMetric = document.createElement('span');
-    const rateLabel = document.createElement('small');
-    rateLabel.textContent = '평균 대비 상승률';
-    const rateValue = document.createElement('strong');
-    rateValue.textContent = rate === null ? '계산 불가' : '+' + rate.toLocaleString('ko-KR') + '%';
-    rateMetric.append(rateLabel, rateValue);
-    const baseline = document.createElement('small');
-    baseline.className = 'viewer-premium-baseline';
-    baseline.textContent = '방송 중간 구간 평균 ' + average.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '명 기준';
-    uplift.append(viewersMetric, rateMetric, baseline);
-  } else {
-    const locked = document.createElement('button');
-    locked.type = 'button';
-    locked.className = 'viewer-premium-locked';
-    locked.textContent = '구독 전용 · 평균 대비 상승폭 2종 보기';
-    locked.addEventListener('click', openSubscriptionDialog);
-    uplift.append(locked);
-  }
-  card._statsActions.append(uplift);
   card.dataset.statsState = 'ready';
   if (vodSortMode === 'peak-desc' || vodSortMode === 'peak-asc') sortLoadedVodCards();
 }
@@ -995,7 +964,7 @@ function loadVodStats(
   vod,
   streamerId,
   shouldStart = () => true,
-  includePremiumMetrics = subscriptionState.subscribed,
+  includePremiumMetrics = false,
   onWaiting = null,
 ) {
   const key = String(streamerId).toLowerCase() + ':' + String(vod.id) + (includePremiumMetrics ? ':premium' : '');
@@ -1306,7 +1275,6 @@ function renderComparisonResults(request, comparisons) {
     metrics.append(
       comparisonMetric('최고 시청자', peak.toLocaleString('ko-KR') + '명', true),
       comparisonMetric('방송 평균', average.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '명'),
-      comparisonMetric('평균 대비 순증', (uplift >= 0 ? '+' : '−') + Math.abs(uplift).toLocaleString('ko-KR') + '명'),
       comparisonMetric('평균 대비 상승률', upliftRate === null ? '계산 불가' : (upliftRate >= 0 ? '+' : '−') + Math.abs(upliftRate).toLocaleString('ko-KR') + '%'),
     );
     const bar = document.createElement('div');
@@ -1370,7 +1338,7 @@ async function loadComparisonResults(request) {
     if (!isCurrentComparisonRequest(request)) return;
     renderComparisonResults(request, comparisons);
     pendingComparisonRequest = null;
-    setComparisonStatus('비교 결과를 불러왔어요. 각 스트리머의 당일 최고 시청자 수와 평균 대비 상승폭을 확인할 수 있습니다.');
+    setComparisonStatus('비교 결과를 불러왔어요. 각 스트리머의 당일 최고 시청자 수와 평균 대비 상승률을 확인할 수 있습니다.');
   } catch (error) {
     if (!isCurrentComparisonRequest(request)) return;
     if (error && error.code === 'functions/permission-denied') {
@@ -1500,7 +1468,7 @@ function enqueueStats(card, vod, loadToken) {
   if (!selectedStreamer || card.dataset.statsState !== 'idle') return;
   card.dataset.statsState = 'queued';
   const streamerId = selectedStreamer.soopId;
-  const includePremiumMetrics = subscriptionState.subscribed;
+  const includePremiumMetrics = false;
   loadVodStats(
     vod,
     streamerId,
@@ -1794,7 +1762,7 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
             item.vod,
             streamerId,
             () => isCurrentPeriodScan(scanToken, loadToken),
-            true,
+            false,
             () => {
               $('viewerPeriodStatus').textContent = '현재 이용자가 많아 집계 시간이 길어지고 있습니다. 분석을 계속 진행하고 있어요.';
             },
