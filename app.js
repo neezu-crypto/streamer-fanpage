@@ -81,9 +81,9 @@ function setButtonClickVolume(value) {
   return buttonClickVolume;
 }
 let modalOpenGeneration = 0;
-function playUiSound(audio, volumeOffsetPercent = 0, startOffsetSeconds = 0) {
+function playUiSound(audio, volumeOffsetPercent = 0, startOffsetSeconds = 0, volumeMultiplier = 1) {
   if (buttonClickVolume <= 0) return;
-  audio.volume = Math.min(1, (buttonClickVolume + volumeOffsetPercent) / 100);
+  audio.volume = Math.min(1, ((buttonClickVolume + volumeOffsetPercent) * volumeMultiplier) / 100);
   audio.currentTime = startOffsetSeconds;
   const playback = audio.play();
   if (playback && typeof playback.catch === 'function') playback.catch(() => {});
@@ -116,7 +116,7 @@ document.addEventListener('click', (event) => {
   queueMicrotask(() => {
     if (modalOpenGeneration !== openGeneration) return;
     if (isCatPawCloseButton(button)) playUiSound(catPawCloseAudio, 0, 0.05);
-    else if (isCompleteButton(button)) playUiSound(saveButtonAudio, 10);
+    else if (isCompleteButton(button)) playUiSound(saveButtonAudio, 10, 0, 2);
     else playUiSound(isSaveOrCompleteButton(button) ? saveButtonAudio : buttonClickAudio);
   });
 }, true);
