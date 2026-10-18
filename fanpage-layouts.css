@@ -37,7 +37,7 @@ body.fanpage-home-kawaii-active .auth-button {
 body.fanpage-layout-one-active .auth-button:hover,
 body.fanpage-home-kawaii-active .auth-button:hover { border-color: #ee86aa; background: #fff2f7; }
 body.fanpage-layout-one-active .account-dialog,
-body.fanpage-home-kawaii-active .account-dialog { color-scheme: dark; }
+body.fanpage-home-kawaii-active .account-dialog { color-scheme: light; }
 body.fanpage-layout-one-active .footer,
 body.fanpage-home-kawaii-active .footer {
   border-top-color: #eadfeb;
@@ -396,14 +396,6 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 .roulette-item-type { border-color: color-mix(in srgb, var(--kawaii-accent), transparent 65%); color: var(--kawaii-accent-deep); }
 #fanPageView.fanpage-layout-1 .roulette-item-meter { background: #eee6ef; }
 
-/* Dialogs are mounted inside the themed page, so restore their dark-panel text tokens. */
-#fanPageView.fanpage-layout-1 .account-dialog {
-  --text: #f4f0f6;
-  --muted: #c0b7c8;
-  --line: #ffffff20;
-  color: var(--text);
-}
-
 #fanPageView.fanpage-layout-1 .calendar-mode-switch { border-color: #e5dbe8; background: #fff8fc; }
 #fanPageView.fanpage-layout-1 :is(.calendar-mode-button, .calendar-nav-button, .calendar-today-button, .calendar-refresh-button) { color: #665b70; }
 #fanPageView.fanpage-layout-1 .calendar-period { color: #51465d; }
@@ -625,4 +617,146 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 @media (max-width: 560px) {
   #fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog) { border-radius: 20px; }
   #fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog) .vod-player-card { padding: 15px; }
+}
+
+/* Keep every fanpage account/editor modal in the active layout's visual system,
+   including dialogs appended to document.body rather than #fanPageView. */
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog {
+  --text: #51465d;
+  --muted: #81758b;
+  --line: #eadfeb;
+  --pink: #ee86aa;
+  --lav: #b8a6ed;
+  --dialog-accent: #ee86aa;
+  --dialog-accent-strong: #d86f98;
+  --dialog-accent-soft: #ffe3ed;
+  color-scheme: light;
+  color: var(--text);
+  border-color: #eadfeb;
+  border-radius: 23px;
+  background: linear-gradient(145deg, #fffefd, #fff8fc);
+  box-shadow: 0 9px 0 #dcc9df88, 0 26px 72px #44344e30;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog::backdrop {
+  background: #51465d55;
+  backdrop-filter: blur(6px);
+}
+body.fanpage-theme-sora-active .account-dialog .button-primary {
+  border-color: #6387D1;
+  background: #6387D1;
+  color: #1d2a49;
+}
+body.fanpage-theme-sora-active .account-dialog .button-primary:hover { border-color: #7898dc; background: #7898dc; }
+body.fanpage-theme-sora-active .account-dialog :is(input, textarea, select):focus { border-color: #6387D1; box-shadow: 0 0 0 3px #6387D124; }
+body.fanpage-theme-sora-active .account-dialog .profile-layout-option:has(input:checked) { border-color: #6387D1; background: #6387D114; }
+body.fanpage-theme-sora-active .account-dialog :is(.upbo-item-batch-names, .upbo-editor-form .profile-editor-field input, .upbo-editor-form .profile-editor-field textarea):focus,
+body.fanpage-theme-sora-active .account-dialog .calendar-editor-form .profile-editor-field select:focus { border-color: #6387D1; box-shadow: 0 0 0 3px #6387D124; }
+body.fanpage-theme-sora-active .account-dialog .design-feedback-sender { border-color: #6387D155; background: linear-gradient(110deg, #6387D114, #fffafd); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(h2, h3, h4),
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .profile-editor-field,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .verification-form label,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .profile-layout-choice legend,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .upbo-editor-check,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .design-feedback-card form label { color: var(--text); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .account-dialog-card > p:not(.eyebrow),
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.profile-editor-hint, .edit-footer small, .calendar-editor-note, .upbo-editor-note, .upbo-item-preview-status, .upbo-item-batch-status, .upbo-editor-footer small, .design-feedback-intro, .design-feedback-context, .design-feedback-status, .admin-stats-status, .admin-stats-note, .admin-viewer-usage-note, .admin-viewer-usage-heading > span, .admin-viewer-usage-streamers-heading span, .admin-viewer-subscription-status) { color: var(--muted) !important; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .eyebrow,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .design-feedback-sender-label { color: var(--dialog-accent-strong); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
+  border-color: #e1d6e6;
+  background: #fff;
+  color: #51465d;
+  color-scheme: light;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus {
+  border-color: var(--dialog-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dialog-accent), transparent 85%);
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(input, textarea)::placeholder { color: #a39aa9; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--dialog-accent); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button:not(.button-primary) {
+  border-color: #e3d7e6;
+  background: #fff;
+  color: #51465d;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button:not(.button-primary):hover { border-color: var(--dialog-accent); background: #fff3f8; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button-primary {
+  border-color: var(--dialog-accent);
+  background: var(--dialog-accent);
+  color: #fff;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button-primary:hover {
+  border-color: var(--dialog-accent-strong);
+  background: var(--dialog-accent-strong);
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .streamer-verify-choice {
+  border-color: color-mix(in srgb, var(--dialog-accent), transparent 65%);
+  background: color-mix(in srgb, var(--dialog-accent), transparent 91%);
+  color: var(--dialog-accent-strong);
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .profile-editor-heading h2 { color: var(--text); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .profile-layout-choice { border-color: #e8deea; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .profile-layout-option { border-color: #e8deea; background: #fffafd; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .profile-layout-option:has(input:checked) { border-color: var(--dialog-accent); background: color-mix(in srgb, var(--dialog-accent), white 92%); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .profile-layout-option-copy strong { color: #51465d; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .profile-layout-option-copy small { color: #81758b; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog #verificationNote { border-color: #e3d7e6 !important; background: #fffafd; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog #verificationNote a { color: var(--dialog-accent-strong); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .verification-status {
+  border: 1px solid #e8deea;
+  background: #fff8fc;
+  color: #665b70 !important;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .design-feedback-sender {
+  border-color: color-mix(in srgb, var(--dialog-accent), transparent 72%);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--dialog-accent), transparent 92%), #fffafd);
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .design-feedback-sender-copy strong,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .design-feedback-sender-copy span:not(.design-feedback-sender-label) { color: #51465d; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .design-feedback-sender-badge { color: #43815b; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .design-feedback-status.is-error { color: #a74d6b !important; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .banner-settings-editor { border-color: #e8deea; background: #fffafd; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .banner-settings-heading strong { color: #51465d; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .calendar-editor-note,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .upbo-editor-note { border: 1px solid #e8deea; background: #fff8fc; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .upbo-editor-section { border-top-color: #e8deea; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .upbo-editor-row,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .upbo-item-batch-row { border-color: #e8deea; background: #fffafd; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.upbo-item-preview, .upbo-image-preview-stage, .upbo-item-batch-preview) { border-color: #e3d7e7; background: #f7f4fa; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .upbo-item-batch-name { color: #51465d; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .upbo-item-batch-number { color: #81758b; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .upbo-item-batch-status.is-error { color: #a74d6b !important; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-stats-dialog-card { color: #51465d; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-stats-tile, .admin-stat-card, .admin-viewer-usage-tile, .admin-viewer-subscription-row, .admin-stat-metric, .admin-viewer-usage-action, .admin-viewer-usage-tier, .admin-viewer-usage-streamer) {
+  border-color: #e8deea;
+  background: #fffafd;
+  color: #51465d;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-stats-tile span, .admin-stats-status, .admin-stats-list-heading span, .admin-stats-note, .admin-viewer-usage-heading > span, .admin-viewer-usage-note, .admin-viewer-usage-tile span, .admin-viewer-usage-action, .admin-viewer-usage-tier, .admin-viewer-usage-streamers-heading span, .admin-viewer-usage-streamer-identity small, .admin-viewer-subscription-identity small, .admin-viewer-subscription-status) { color: #81758b !important; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-stats-list-heading, .admin-viewer-usage-streamers-heading, .admin-viewer-usage-streamer-identity strong, .admin-viewer-subscription-identity strong, .admin-stats-tile strong, .admin-viewer-usage-tile strong) { color: #51465d; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-viewer-usage, .admin-viewer-subscriptions) { border-color: color-mix(in srgb, var(--dialog-accent), transparent 72%); background: linear-gradient(135deg, color-mix(in srgb, var(--dialog-accent), transparent 94%), #fffafd); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-viewer-subscription-empty, .admin-viewer-usage-streamers-empty, .admin-stats-empty) { border-color: #e8deea; background: #fff8fc; color: #81758b; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-stat-name small,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-stat-metric small { color: #81758b; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-usage-chart span,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-stat-sparkline span { background: linear-gradient(180deg, var(--dialog-accent), var(--dialog-accent-strong)); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-viewer-usage-action strong, .admin-viewer-usage-tier strong, .admin-viewer-usage-streamer-count, .admin-viewer-usage-streamer-rank) { color: var(--dialog-accent-strong); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-feedback { border-color: #e8deea; background: #fffafd; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-feedback-item { border-color: #e8deea; background: #fff; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-feedback-category { border-color: color-mix(in srgb, var(--dialog-accent), transparent 65%); color: var(--dialog-accent-strong); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-feedback-content { color: #5d5267; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-feedback-meta { color: #81758b; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-feedback-empty { border-color: #e8deea; background: #fff8fc; color: #81758b; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-stats-list, .admin-viewer-usage-streamers, .admin-viewer-subscription-list) { scrollbar-color: #cbb5d0 #f8eff8; }
+body.fanpage-theme-sora-active .account-dialog {
+  --pink: #6387D1;
+  --lav: #CADBFF;
+  --dialog-accent: #6387D1;
+  --dialog-accent-strong: #4e70b6;
+  --dialog-accent-soft: #CADBFF;
+}
+body.fanpage-theme-sora-active .account-dialog .button-primary { color: #1d2a49; }
+#fanPageView.fanpage-theme-sora .vod-player-footer .button-primary { color: #1d2a49; }
+@media (max-width: 560px) {
+  body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog { border-radius: 20px; }
 }
