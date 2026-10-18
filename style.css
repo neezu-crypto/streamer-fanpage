@@ -76,6 +76,10 @@
 .profile-settings-close{width:36px;height:36px;padding:0;font-size:22px}
 .profile-editor-footer{gap:12px}
 .profile-editor-footer-actions{display:flex;align-items:center;gap:8px}
+.profile-editor-save.is-loading{gap:8px;cursor:wait;white-space:nowrap}
+.profile-editor-save.is-loading::before{content:"";width:13px;height:13px;flex:0 0 13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:profile-save-spin .72s linear infinite}
+@keyframes profile-save-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.profile-editor-save.is-loading::before{animation:none;border-right-color:currentColor;border-top-color:transparent}}
 @media(max-width:720px){.profile-settings-dialog{width:calc(100% - 20px);max-height:calc(100dvh - 20px)}.profile-settings-dialog .account-dialog-card{padding:20px}.profile-editor-footer{align-items:flex-start;flex-direction:column}.profile-editor-footer-actions{width:100%;justify-content:flex-end}}
 
 /* Streamer Gallery preview */

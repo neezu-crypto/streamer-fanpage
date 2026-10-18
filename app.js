@@ -2400,9 +2400,12 @@ function renderFanPage(page) {
     const footerActions = document.createElement('div'); footerActions.className = 'profile-editor-footer-actions';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
     cancel.addEventListener('click', () => editorDialog.close());
-    const save = document.createElement('button'); save.type = 'button'; save.className = 'button button-primary'; save.textContent = '프로필 저장';
+    const save = document.createElement('button'); save.type = 'button'; save.className = 'button button-primary profile-editor-save'; save.textContent = '프로필 저장';
     save.addEventListener('click', async () => {
       save.disabled = true;
+      save.classList.add('is-loading');
+      save.setAttribute('aria-busy', 'true');
+      save.textContent = '저장 중…';
       try {
         const value = (key) => inputMap[key].value.trim();
         const readBannerUrls = (editor) => [...new Set(editor.values().map(normalizeBannerImageUrl).filter(Boolean))];
@@ -2430,7 +2433,14 @@ function renderFanPage(page) {
         renderFanPage(currentPage);
         showToast('프로필을 저장했어요.');
       } catch (error) { showToast(error.message || '저장하지 못했어요.'); }
-      finally { save.disabled = false; }
+      finally {
+        if (save.isConnected) {
+          save.disabled = false;
+          save.classList.remove('is-loading');
+          save.removeAttribute('aria-busy');
+          save.textContent = '프로필 저장';
+        }
+      }
     });
     footerActions.append(cancel, save);
     footer.append(note, footerActions); editor.append(grid, footer); editorDialog.append(editor);
