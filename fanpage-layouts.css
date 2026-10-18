@@ -1,5 +1,6 @@
 /* Layout 1: a soft, pastel comic-book inspired fanpage. Layout 2 keeps style.css as-is. */
-body.fanpage-layout-one-active {
+body.fanpage-layout-one-active,
+body.fanpage-home-kawaii-active {
   color-scheme: light;
   background:
     radial-gradient(circle at 1px 1px, #edc8d51c 1px, transparent 1.5px) 0 0 / 27px 27px,
@@ -8,32 +9,122 @@ body.fanpage-layout-one-active {
     #fffaf7;
   color: #51465d;
 }
-body.fanpage-layout-one-active .topbar {
+body.fanpage-layout-one-active .topbar,
+body.fanpage-home-kawaii-active .topbar {
   border-bottom-color: #eadfeb;
   background: #fffaf7eF;
   color: #51465d;
   box-shadow: 0 5px 24px #7560800a;
 }
 body.fanpage-layout-one-active .brand,
-body.fanpage-layout-one-active .brand strong { color: #51465d; }
+body.fanpage-layout-one-active .brand strong,
+body.fanpage-home-kawaii-active .brand,
+body.fanpage-home-kawaii-active .brand strong { color: #51465d; }
 body.fanpage-layout-one-active .brand small,
 body.fanpage-layout-one-active .topbar-caption,
-body.fanpage-layout-one-active .account-status { color: #887d91; }
-body.fanpage-layout-one-active .brand-symbol { color: var(--pink); filter: drop-shadow(0 2px 5px #ee86aa55); }
-body.fanpage-layout-one-active .auth-button {
+body.fanpage-layout-one-active .account-status,
+body.fanpage-home-kawaii-active .brand small,
+body.fanpage-home-kawaii-active .topbar-caption,
+body.fanpage-home-kawaii-active .account-status { color: #887d91; }
+body.fanpage-layout-one-active .brand-symbol,
+body.fanpage-home-kawaii-active .brand-symbol { color: var(--pink); filter: drop-shadow(0 2px 5px #ee86aa55); }
+body.fanpage-layout-one-active .auth-button,
+body.fanpage-home-kawaii-active .auth-button {
   border-color: #e5d8e8;
   background: #fff;
   color: #5b5067;
 }
-body.fanpage-layout-one-active .auth-button:hover { border-color: #ee86aa; background: #fff2f7; }
-body.fanpage-layout-one-active .account-dialog { color-scheme: dark; }
-body.fanpage-layout-one-active .footer {
+body.fanpage-layout-one-active .auth-button:hover,
+body.fanpage-home-kawaii-active .auth-button:hover { border-color: #ee86aa; background: #fff2f7; }
+body.fanpage-layout-one-active .account-dialog,
+body.fanpage-home-kawaii-active .account-dialog { color-scheme: dark; }
+body.fanpage-layout-one-active .footer,
+body.fanpage-home-kawaii-active .footer {
   border-top-color: #eadfeb;
   color: #887d91;
 }
 body.fanpage-layout-one-active .footer-policy-links a,
-body.fanpage-layout-one-active .footer-feedback-link { border-bottom-color: #d8c8dc; }
-.main-content.has-fanpage-layout-one { width: min(1220px, calc(100% - 48px)); }
+body.fanpage-layout-one-active .footer-feedback-link,
+body.fanpage-home-kawaii-active .footer-policy-links a,
+body.fanpage-home-kawaii-active .footer-feedback-link { border-bottom-color: #d8c8dc; }
+body.fanpage-home-kawaii-active .devbar { border-bottom-color: #eadfeb; background: #fff6faeF; color: #887d91; }
+body.fanpage-home-kawaii-active .devbar-brand { color: #d86f98; }
+body.fanpage-home-kawaii-active .devbar-links a { color: #887d91; }
+body.fanpage-home-kawaii-active .devbar-links a:hover { color: #51465d; }
+.main-content.has-fanpage-layout-one,
+.main-content.has-fanpage-home-kawaii { width: min(1220px, calc(100% - 48px)); }
+
+/* The initial search page shares the friendly pastel language of layout 1. */
+body.fanpage-home-kawaii-active .home-view { padding: clamp(38px, 6vw, 78px) 0 66px; }
+body.fanpage-home-kawaii-active .hero-copy {
+  position: relative;
+  isolation: isolate;
+  max-width: 1120px;
+  min-height: 350px;
+  margin: 0 auto 24px;
+  padding: clamp(47px, 6vw, 72px) 32px 52px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 34px;
+  background: linear-gradient(118deg, #ffe3ed 0%, #f7eaff 54%, #e3edff 100%);
+  box-shadow: 0 8px 0 #dcc9df99, 0 20px 55px #75608016;
+}
+body.fanpage-home-kawaii-active .hero-copy::before,
+body.fanpage-home-kawaii-active .hero-copy::after {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+body.fanpage-home-kawaii-active .hero-copy::before {
+  top: -230px;
+  right: 17%;
+  width: 430px;
+  height: 430px;
+  border: 1px solid #fff9;
+  box-shadow: 0 0 0 25px #ffffff29, 0 0 0 54px #ffffff1d;
+}
+body.fanpage-home-kawaii-active .hero-copy::after { right: -95px; bottom: -255px; width: 400px; height: 400px; background: #ffffff38; }
+body.fanpage-home-kawaii-active .hero-copy > :not(.home-mascot) { position: relative; z-index: 1; }
+body.fanpage-home-kawaii-active .hero-copy .eyebrow { color: #9b7298; }
+body.fanpage-home-kawaii-active .hero-copy h1 { color: #51465d; }
+body.fanpage-home-kawaii-active .hero-copy h1 span { color: #d86f98; }
+body.fanpage-home-kawaii-active .hero-subtitle { color: #71647b; font-weight: 600; }
+body.fanpage-home-kawaii-active .home-mascot { position: absolute; right: 4%; bottom: -2px; z-index: 0; width: clamp(150px, 22vw, 245px); pointer-events: none; }
+body.fanpage-home-kawaii-active .home-mascot img { display: block; width: 100%; height: auto; transition: opacity .18s ease, transform .24s ease; }
+body.fanpage-home-kawaii-active .home-mascot-wink { position: absolute; inset: 0; opacity: 0; }
+body.fanpage-home-kawaii-active .hero-copy:hover .home-mascot-idle { opacity: 0; transform: scale(.98); }
+body.fanpage-home-kawaii-active .hero-copy:hover .home-mascot-wink { opacity: 1; transform: scale(1.02); }
+body.fanpage-home-kawaii-active .search-panel {
+  position: relative;
+  z-index: 2;
+  max-width: 850px;
+  padding: 25px;
+  border: 1px solid #eadfeb;
+  border-radius: 24px;
+  background: #fffefd;
+  box-shadow: 0 14px 38px #75608014;
+}
+body.fanpage-home-kawaii-active .search-panel > label { color: #51465d; }
+body.fanpage-home-kawaii-active .search-field { border-color: #e6dce8; background: #fffafd; }
+body.fanpage-home-kawaii-active .search-field:focus-within { border-color: #ee86aa; box-shadow: 0 0 0 4px #ee86aa20; }
+body.fanpage-home-kawaii-active .search-field input { color: #51465d; }
+body.fanpage-home-kawaii-active .search-field input::placeholder,
+body.fanpage-home-kawaii-active .search-hint { color: #968b9b; }
+body.fanpage-home-kawaii-active .streamer-card,
+body.fanpage-home-kawaii-active .recent-card { border-color: #eadfeb; background: #fff; color: #51465d; box-shadow: 0 4px 12px #7560800a; }
+body.fanpage-home-kawaii-active .streamer-card:hover,
+body.fanpage-home-kawaii-active .recent-card:hover { border-color: #eea1bb; background: #fff5f9; box-shadow: 0 8px 18px #ee86aa1b; }
+body.fanpage-home-kawaii-active .streamer-card-copy span,
+body.fanpage-home-kawaii-active .recent-card small,
+body.fanpage-home-kawaii-active .section-note { color: #887d91; }
+body.fanpage-home-kawaii-active .search-empty,
+body.fanpage-home-kawaii-active .empty-state { color: #887d91; }
+body.fanpage-home-kawaii-active .recent-section { max-width: 1020px; margin-top: 50px; }
+body.fanpage-home-kawaii-active .section-heading h2 { color: #51465d; }
+body.fanpage-home-kawaii-active .section-heading .eyebrow { color: #d86f98; }
+body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: linear-gradient(135deg, #ffe3ed, #e3edff); }
 #fanPageView.fanpage-layout-1 {
   --kawaii-accent: #ee86aa;
   --kawaii-accent-deep: #d86f98;
@@ -292,7 +383,18 @@ body.fanpage-layout-one-active .footer-feedback-link { border-bottom-color: #d8c
   #fanPageView.fanpage-layout-1 .profile-board { grid-template-columns: minmax(240px, .9fr) minmax(300px, 1.1fr); }
 }
 @media (max-width: 720px) {
-  .main-content.has-fanpage-layout-one { width: min(100% - 28px, 680px); }
+  .main-content.has-fanpage-layout-one,
+  .main-content.has-fanpage-home-kawaii { width: min(100% - 28px, 680px); }
+  body.fanpage-home-kawaii-active .home-view { padding: 30px 0 42px; }
+  body.fanpage-home-kawaii-active .hero-copy { min-height: 330px; margin-bottom: 19px; padding: 38px 20px 108px; border-radius: 27px; }
+  body.fanpage-home-kawaii-active .hero-copy h1 { font-size: clamp(34px, 8vw, 48px); }
+  body.fanpage-home-kawaii-active .hero-subtitle { max-width: 390px; margin: 12px auto 0; font-size: 13px; line-height: 1.7; }
+  body.fanpage-home-kawaii-active .home-mascot { right: 3%; bottom: -20px; width: 132px; opacity: .9; }
+  body.fanpage-home-kawaii-active .search-panel { padding: 18px; border-radius: 20px; }
+  body.fanpage-home-kawaii-active .recent-section { margin-top: 35px; }
+  body.fanpage-home-kawaii-active .recent-grid { gap: 9px; }
+  body.fanpage-home-kawaii-active .recent-card { padding: 10px; }
+  body.fanpage-home-kawaii-active .recent-card .avatar { width: 34px; height: 34px; flex-basis: 34px; }
   #fanPageView.fanpage-layout-1 { padding: 22px 0 38px; }
   .fanpage-kawaii-hero { display: block; min-height: 330px; margin-bottom: 22px; padding: 27px 22px 145px; border-radius: 26px; }
   .fanpage-kawaii-copy h1 { max-width: 430px; font-size: clamp(34px, 9vw, 49px); }
@@ -325,6 +427,11 @@ body.fanpage-layout-one-active .footer-feedback-link { border-bottom-color: #d8c
   .profile-layout-options { grid-template-columns: 1fr; }
 }
 @media (max-width: 420px) {
+  body.fanpage-home-kawaii-active .hero-copy { min-height: 350px; padding-inline: 14px; }
+  body.fanpage-home-kawaii-active .hero-copy h1 { font-size: 35px; }
+  body.fanpage-home-kawaii-active .hero-subtitle { max-width: 300px; font-size: 12px; }
+  body.fanpage-home-kawaii-active .home-mascot { right: 0; width: 115px; }
+  body.fanpage-home-kawaii-active .recent-grid { grid-template-columns: 1fr; }
   .fanpage-kawaii-hero { min-height: 350px; padding-right: 17px; }
   .fanpage-kawaii-copy h1 { max-width: 330px; font-size: 35px; }
   .fanpage-kawaii-mascot-wrap { right: -3px; width: 133px; }
@@ -337,4 +444,5 @@ body.fanpage-layout-one-active .footer-feedback-link { border-bottom-color: #d8c
   #fanPageView.fanpage-layout-1 .fanpage-kawaii-sparkles { animation: none; }
   #fanPageView.fanpage-layout-1 .fanpage-kawaii-mascot,
   #fanPageView.fanpage-layout-1 .fanpage-kawaii-mascot img { transition: none; }
+  body.fanpage-home-kawaii-active .home-mascot img { transition: none; }
 }
