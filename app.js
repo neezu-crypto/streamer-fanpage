@@ -74,6 +74,8 @@ function readButtonClickVolume() {
   }
 }
 let buttonClickVolume = readButtonClickVolume();
+let uiAudioContext = null;
+const uiAudioGainNodes = new WeakMap();
 function setButtonClickVolume(value) {
   const volume = Number(value);
   buttonClickVolume = Number.isFinite(volume) ? Math.max(0, Math.min(100, volume)) : DEFAULT_BUTTON_CLICK_VOLUME;
@@ -83,7 +85,32 @@ function setButtonClickVolume(value) {
 let modalOpenGeneration = 0;
 function playUiSound(audio, volumeOffsetPercent = 0, startOffsetSeconds = 0, volumeMultiplier = 1) {
   if (buttonClickVolume <= 0) return;
-  audio.volume = Math.min(1, ((buttonClickVolume + volumeOffsetPercent) * volumeMultiplier) / 100);
+  const volumePercent = Math.max(0, (buttonClickVolume + volumeOffsetPercent) * volumeMultiplier);
+  let gainNode = uiAudioGainNodes.get(audio);
+  if (volumePercent > 100 || gainNode) {
+    try {
+      const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+      if (!uiAudioContext && AudioContextConstructor) uiAudioContext = new AudioContextConstructor();
+      if (uiAudioContext) {
+        if (!gainNode) {
+          const sourceNode = uiAudioContext.createMediaElementSource(audio);
+          gainNode = uiAudioContext.createGain();
+          sourceNode.connect(gainNode);
+          gainNode.connect(uiAudioContext.destination);
+          uiAudioGainNodes.set(audio, gainNode);
+        }
+        audio.volume = 1;
+        gainNode.gain.value = volumePercent / 100;
+        if (uiAudioContext.state === 'suspended') uiAudioContext.resume().catch(() => {});
+      } else {
+        audio.volume = Math.min(1, volumePercent / 100);
+      }
+    } catch (_) {
+      audio.volume = Math.min(1, volumePercent / 100);
+    }
+  } else {
+    audio.volume = volumePercent / 100;
+  }
   audio.currentTime = startOffsetSeconds;
   const playback = audio.play();
   if (playback && typeof playback.catch === 'function') playback.catch(() => {});
