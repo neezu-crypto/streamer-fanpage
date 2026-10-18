@@ -526,3 +526,103 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
   #fanPageView.fanpage-layout-1 .fanpage-kawaii-mascot img { transition: none; }
   body.fanpage-home-kawaii-active .home-mascot img { transition: none; }
 }
+
+/* Player dialogs follow the selected pastel fanpage theme. The embedded players
+   remain their providers' own UI, while the surrounding modal and comments match. */
+#fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog) {
+  --text: #51465d;
+  --muted: #81758b;
+  --line: #eadfeb;
+  color-scheme: light;
+  color: var(--text);
+  border-color: #eadfeb;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #fffefd, #fff8fc);
+  box-shadow: 0 12px 0 #dcc9df88, 0 28px 80px #44344e33;
+}
+#fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog)::backdrop {
+  background: #51465d55;
+  backdrop-filter: blur(6px);
+}
+#fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog) .vod-player-card { padding: 24px; }
+#fanPageView.fanpage-layout-1 .vod-player-heading h2 { color: #51465d; }
+#fanPageView.fanpage-layout-1 .vod-player-heading .button {
+  border-color: #e3d7e6;
+  background: #fff;
+  color: #51465d;
+}
+#fanPageView.fanpage-layout-1 .vod-player-heading .button:hover { border-color: var(--kawaii-accent); background: #fff3f8; }
+#fanPageView.fanpage-layout-1 .vod-player-frame { box-shadow: 0 4px 14px #44344e18; }
+#fanPageView.fanpage-layout-1 .vod-player-footer p { color: #81758b; }
+#fanPageView.fanpage-layout-1 .vod-player-footer .button-primary {
+  border-color: var(--kawaii-accent);
+  background: var(--kawaii-accent);
+  color: #fff;
+}
+#fanPageView.fanpage-layout-1 .vod-player-footer .button-primary:hover {
+  border-color: var(--kawaii-accent-deep);
+  background: var(--kawaii-accent-deep);
+}
+#fanPageView.fanpage-layout-1 .vod-comments-panel { border-top-color: #e8deea; }
+#fanPageView.fanpage-layout-1 .vod-comments-heading h3,
+#fanPageView.fanpage-layout-1 .vod-comment-nickname,
+#fanPageView.fanpage-layout-1 .vod-comment-composer-identity strong,
+#fanPageView.fanpage-layout-1 .vod-comment-profile-editor > strong { color: #51465d; }
+#fanPageView.fanpage-layout-1 .vod-comments-heading p,
+#fanPageView.fanpage-layout-1 .vod-comment-meta,
+#fanPageView.fanpage-layout-1 .vod-comment-input-count { color: #81758b; }
+#fanPageView.fanpage-layout-1 .vod-comments-tabs { border-bottom-color: #e8deea; }
+#fanPageView.fanpage-layout-1 .vod-comments-tabs button { color: #81758b; }
+#fanPageView.fanpage-layout-1 .vod-comments-tabs button.is-active { border-bottom-color: var(--kawaii-accent); color: #51465d; }
+#fanPageView.fanpage-layout-1 .vod-comments-status {
+  border-color: #e3d7e6;
+  background: #fff8fc;
+  color: #81758b;
+}
+#fanPageView.fanpage-layout-1 .vod-comments-status.is-error { border-color: #e8a4b6; color: #a74d6b; }
+#fanPageView.fanpage-layout-1 .vod-comment-item { border-bottom-color: #eee6ef; }
+#fanPageView.fanpage-layout-1 .vod-comment-avatar {
+  border-color: #e3d7e6;
+  background: linear-gradient(135deg, var(--kawaii-soft), var(--kawaii-lilac));
+  color: var(--kawaii-accent-deep);
+}
+#fanPageView.fanpage-layout-1 .vod-comment-content { color: #5d5267; }
+#fanPageView.fanpage-layout-1 :is(.vod-comment-delete, .vod-comment-profile-edit) {
+  border-color: #e3d7e6;
+  background: #fff;
+  color: #665b70;
+}
+#fanPageView.fanpage-layout-1 :is(.vod-comment-delete, .vod-comment-profile-edit):hover {
+  border-color: var(--kawaii-accent);
+  color: var(--kawaii-accent-deep);
+}
+#fanPageView.fanpage-layout-1 .vod-comment-composer {
+  border-color: #e8deea;
+  background: #fffafd;
+}
+#fanPageView.fanpage-layout-1 .vod-comment-profile-required { color: #a74d6b; }
+#fanPageView.fanpage-layout-1 :is(.vod-comment-input, .vod-comment-profile-fields input) {
+  border-color: #e1d6e6;
+  background: #fff;
+  color: #51465d;
+}
+#fanPageView.fanpage-layout-1 :is(.vod-comment-input, .vod-comment-profile-fields input):focus {
+  border-color: var(--kawaii-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kawaii-accent), transparent 85%);
+}
+#fanPageView.fanpage-layout-1 :is(.vod-comment-input, .vod-comment-profile-fields input)::placeholder { color: #a39aa9; }
+#fanPageView.fanpage-layout-1 .vod-comment-profile-editor {
+  border-color: color-mix(in srgb, var(--kawaii-accent), transparent 68%);
+  background: color-mix(in srgb, var(--kawaii-accent), transparent 94%);
+}
+#fanPageView.fanpage-layout-1 .vod-comment-profile-editor > p,
+#fanPageView.fanpage-layout-1 .vod-comment-profile-fields label { color: #766b80; }
+#fanPageView.fanpage-layout-1 .vod-comment-profile-actions .button-primary {
+  border-color: var(--kawaii-accent);
+  background: var(--kawaii-accent);
+  color: #fff;
+}
+@media (max-width: 560px) {
+  #fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog) { border-radius: 20px; }
+  #fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog) .vod-player-card { padding: 15px; }
+}
