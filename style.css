@@ -980,14 +980,13 @@ body.fanpage-bottom-banner-active{min-height:0}
 .fan-sound-settings-actions .button{min-width:96px}
 @media(max-width:520px){.fan-sound-settings-card{padding:20px}.fan-sound-settings-actions .button{min-width:0;flex:1}}
 @media(min-width:1280px){
-  .fan-quick-header{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+  .fan-quick-header{gap:6px;padding:9px 6px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
   .fan-quick-remote.is-dragging .fan-quick-header{cursor:grabbing}
-  .fan-quick-header strong::before{content:"⠿";margin-right:6px;color:#b9afc3;font-size:15px;vertical-align:-1px}
+  .fan-quick-header strong{flex:0 0 auto;white-space:nowrap;font-size:11px}
+  .fan-quick-header strong::before{content:none}
   .fan-quick-remote{right:auto;left:max(8px,calc((100vw - 1060px)/2 - 116px));top:50%;transform:translateY(-50%)}
   .fan-quick-toggle{display:none}
   .fan-quick-panel{width:112px;max-height:70dvh}
-  .fan-quick-header{padding:9px 8px}
-  .fan-quick-header strong{font-size:12px}
   .fan-quick-close{display:none}
   .fan-quick-body{grid-template-columns:minmax(0,1fr) 14px;gap:3px;padding:7px 6px 8px}
   .fan-quick-links{gap:2px}
