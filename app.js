@@ -2117,7 +2117,7 @@ function renderKawaiiWelcome(page) {
   return hero;
 }
 
-function renderFanPage(page) {
+function renderFanPage(page, options = {}) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
   if (fanPageQuickNavCleanup) {
@@ -2318,9 +2318,22 @@ function renderFanPage(page) {
   loadCalendar(page.streamer.id);
   loadUpboBoard(page.streamer.id);
 
-  if (page.isOwner) {
+  if (page.isOwner && options.preservedSettingsDialog) {
+    view.append(options.preservedSettingsDialog);
+    if (options.reopenSettingsDialog) options.preservedSettingsDialog.showModal();
+  } else if (page.isOwner) {
     const editorDialog = document.createElement('dialog');
     editorDialog.id = 'profileSettingsDialog'; editorDialog.className = 'account-dialog profile-settings-dialog';
+    const committedLayoutDesign = layoutDesign;
+    let layoutPreviewChanged = false;
+    let rebuildingForLayoutPreview = false;
+    let profileSettingsSaved = false;
+    editorDialog.addEventListener('close', () => {
+      if (rebuildingForLayoutPreview || profileSettingsSaved || !layoutPreviewChanged) return;
+      currentPage.profile = { ...(currentPage.profile || {}), layoutDesign: committedLayoutDesign };
+      layoutPreviewChanged = false;
+      renderFanPage(currentPage);
+    });
     const editor = document.createElement('div'); editor.className = 'account-dialog-card profile-editor';
     const headingRow = document.createElement('div'); headingRow.className = 'profile-editor-heading';
     const heading = document.createElement('h2'); heading.textContent = '팬페이지 설정';
@@ -2337,6 +2350,27 @@ function renderFanPage(page) {
       const option = document.createElement('label'); option.className = 'profile-layout-option';
       const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'layoutDesign'; radio.value = String(value);
       radio.checked = layoutDesign === value;
+      radio.addEventListener('change', () => {
+        if (!radio.checked) return;
+        const selectedLayout = Number(radio.value);
+        const activeLayout = currentPage.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
+        if (selectedLayout === activeLayout) return;
+        currentPage.profile = { ...(currentPage.profile || {}), layoutDesign: selectedLayout };
+        layoutPreviewChanged = selectedLayout !== committedLayoutDesign;
+        const dialogScrollTop = editorDialog.scrollTop;
+        rebuildingForLayoutPreview = true;
+        editorDialog.close();
+        try {
+          renderFanPage(currentPage, {
+            preservedSettingsDialog: editorDialog,
+            reopenSettingsDialog: true,
+          });
+        } finally {
+          rebuildingForLayoutPreview = false;
+        }
+        editorDialog.scrollTop = dialogScrollTop;
+        radio.focus({ preventScroll: true });
+      });
       const copy = document.createElement('span'); copy.className = 'profile-layout-option-copy';
       const optionTitle = document.createElement('strong'); optionTitle.textContent = titleText;
       const optionDescription = document.createElement('small'); optionDescription.textContent = descriptionText;
@@ -2428,6 +2462,8 @@ function renderFanPage(page) {
         });
         currentPage.intro = result.data.page.intro;
         currentPage.profile = result.data.page.profile;
+        profileSettingsSaved = true;
+        layoutPreviewChanged = false;
         youtubeStates.delete(currentPage.streamer.id);
         cafeStates.delete(currentPage.streamer.id);
         rouletteStates.delete(currentPage.streamer.id);
