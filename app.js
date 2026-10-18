@@ -50,6 +50,7 @@ const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
 const MAX_LOADED_VIDEO_ITEMS = 500;
 const MAX_BANNER_IMAGE_ITEMS = 20;
 const MAX_UPBO_ITEMS = 100;
+const DEFAULT_FANPAGE_LAYOUT = 1;
 const PROFILE_QUICK_EDIT_FIELDS = {
   birthday: { label: '생일', maxLength: 20, placeholder: '예: 02.11' },
   mbti: { label: 'MBTI', maxLength: 8, placeholder: '예: INFJ' },
@@ -819,6 +820,9 @@ function setVisibleView(page) {
   if (!page) stockPriceSparklineRequest += 1;
   document.querySelector('.topbar').classList.remove('topbar-with-banner');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
+  const usesKawaiiLayout = !!page && page.profile?.layoutDesign !== 2;
+  $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
+  document.body.classList.toggle('fanpage-layout-one-active', usesKawaiiLayout);
   $('homeView').classList.toggle('hidden', !!page);
   $('fanPageView').classList.toggle('hidden', !page);
   $('devbar').classList.toggle('hidden', !!page);
@@ -2051,6 +2055,57 @@ function openProfileQuickEdit(page, field, target) {
   if (editor instanceof HTMLInputElement) editor.select();
 }
 
+function renderKawaiiWelcome(page) {
+  const hero = document.createElement('section');
+  hero.className = 'fanpage-kawaii-hero';
+  hero.setAttribute('aria-labelledby', 'kawaiiWelcomeTitle');
+  const copy = document.createElement('div'); copy.className = 'fanpage-kawaii-copy';
+  const eyebrow = document.createElement('p'); eyebrow.className = 'fanpage-kawaii-eyebrow';
+  eyebrow.textContent = 'A COZY LITTLE CORNER FOR FANS';
+  const title = document.createElement('h1'); title.id = 'kawaiiWelcomeTitle';
+  title.append(document.createTextNode(`오늘도 ${page.streamer.nickname}와`), document.createElement('br'));
+  const titleAccent = document.createElement('span'); titleAccent.textContent = '같이 놀아요!'; title.append(titleAccent);
+  const description = document.createElement('p'); description.className = 'fanpage-kawaii-description';
+  description.textContent = '방송 일정과 다시보기, 팬들의 추억을 한곳에서 만나 보세요.';
+  const actions = document.createElement('div'); actions.className = 'fanpage-kawaii-actions';
+  const galleryLink = document.createElement('a'); galleryLink.className = 'button button-primary';
+  galleryLink.href = '#fanGallerySection'; galleryLink.textContent = '팬 갤러리 둘러보기 ↓';
+  const scheduleLink = document.createElement('a'); scheduleLink.className = 'button';
+  scheduleLink.href = '#calendarSection'; scheduleLink.textContent = '방송 일정 보기';
+  actions.append(galleryLink, scheduleLink); copy.append(eyebrow, title, description, actions);
+
+  const mascotWrap = document.createElement('div'); mascotWrap.className = 'fanpage-kawaii-mascot-wrap';
+  const halo = document.createElement('span'); halo.className = 'fanpage-kawaii-mascot-halo'; halo.setAttribute('aria-hidden', 'true');
+  const mascot = document.createElement('button'); mascot.type = 'button'; mascot.className = 'fanpage-kawaii-mascot';
+  mascot.setAttribute('aria-label', '달토끼 캐릭터 표정 바꾸기'); mascot.setAttribute('aria-pressed', 'false');
+  const idle = document.createElement('img'); idle.className = 'fanpage-kawaii-mascot-idle';
+  idle.src = 'assets/fanpage-kawaii/moon-bunny-idle.png'; idle.alt = '별 머리핀을 한 작은 크림색 달토끼';
+  idle.loading = 'lazy'; idle.decoding = 'async';
+  const wink = document.createElement('img'); wink.className = 'fanpage-kawaii-mascot-wink';
+  wink.src = 'assets/fanpage-kawaii/moon-bunny-wink.png'; wink.alt = ''; wink.setAttribute('aria-hidden', 'true');
+  wink.loading = 'lazy'; wink.decoding = 'async';
+  mascot.append(idle, wink);
+  const setMascotMood = (isWinking) => {
+    mascot.classList.toggle('is-winking', isWinking);
+    mascot.setAttribute('aria-pressed', String(isWinking));
+  };
+  mascot.addEventListener('pointerenter', (event) => { if (event.pointerType !== 'touch') setMascotMood(true); });
+  mascot.addEventListener('pointerleave', (event) => { if (event.pointerType !== 'touch') setMascotMood(false); });
+  mascot.addEventListener('focus', () => setMascotMood(true));
+  mascot.addEventListener('blur', () => setMascotMood(false));
+  mascot.addEventListener('click', () => {
+    const hasHover = window.matchMedia('(hover: hover)').matches;
+    setMascotMood(hasHover || !mascot.classList.contains('is-winking'));
+  });
+  const hint = document.createElement('span'); hint.className = 'fanpage-kawaii-mascot-hint';
+  hint.textContent = '살짝 눌러 인사해 봐요!';
+  mascotWrap.append(halo, mascot, hint);
+  const sparkles = document.createElement('span'); sparkles.className = 'fanpage-kawaii-sparkles';
+  sparkles.setAttribute('aria-hidden', 'true'); sparkles.textContent = '✦  ✧  ♡';
+  hero.append(copy, mascotWrap, sparkles);
+  return hero;
+}
+
 function renderFanPage(page) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
@@ -2065,7 +2120,12 @@ function renderFanPage(page) {
   stockPriceSparklineRequest += 1;
   currentPage = page;
   const view = $('fanPageView');
-  view.classList.remove('has-top-banner', 'has-bottom-banner');
+  view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2');
+  const layoutDesign = page.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
+  const usesKawaiiLayout = layoutDesign === 1;
+  $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
+  document.body.classList.toggle('fanpage-layout-one-active', usesKawaiiLayout);
+  view.classList.add(`fanpage-layout-${layoutDesign}`);
   view.classList.toggle('fanpage-theme-sora', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   view.replaceChildren();
   const back = document.createElement('a');
@@ -2075,6 +2135,7 @@ function renderFanPage(page) {
   const profile = page.profile || {};
   const section = document.createElement('section');
   section.className = 'profile-board';
+  section.id = 'profileBoard';
   const label = document.createElement('div');
   label.className = 'profile-tab';
   label.textContent = 'PROFILE';
@@ -2159,6 +2220,7 @@ function renderFanPage(page) {
     view.append(topBanner);
   }
   if (!page.isOwner) view.append(back);
+  if (layoutDesign === 1) view.append(renderKawaiiWelcome(page));
   view.append(section);
   let fanCharacterCard = null;
   if (String(page.streamer.id || '').toLowerCase() === 'yuhatty') {
@@ -2182,28 +2244,39 @@ function renderFanPage(page) {
     character.append(characterCopy, characterImage);
     fanCharacterCard = character;
   }
+  let featuredPair = null;
   if (fanCharacterCard) {
-    const featuredPair = document.createElement('div');
+    featuredPair = document.createElement('div');
     featuredPair.className = 'fan-character-ogq-pair';
     featuredPair.append(fanCharacterCard, renderOgqSection(page, true));
-    view.append(featuredPair);
   }
-  view.append(renderUpboSection(page));
+  const upboSection = renderUpboSection(page);
   const rouletteSection = renderRouletteSection(page);
-  if (rouletteSection) view.append(rouletteSection);
   const messengerSection = renderMessengerSection(page);
-  if (messengerSection) view.append(messengerSection);
-  view.append(renderLiveSection(page));
-  view.append(renderVodSection(page));
+  const liveSection = renderLiveSection(page);
+  const vodSection = renderVodSection(page);
   const youtubeSection = renderYouTubeSection(page);
-  if (youtubeSection) view.append(youtubeSection);
-  view.append(renderSongbookSection(page));
-  if (!fanCharacterCard) view.append(renderOgqSection(page));
+  const songbookSection = renderSongbookSection(page);
+  const ogqSection = fanCharacterCard ? null : renderOgqSection(page);
   const cafeSection = renderCafeSection(page);
-  if (cafeSection) view.append(cafeSection);
-  view.append(renderCalendarSection(page));
+  const calendarSection = renderCalendarSection(page);
   const gallerySection = renderGallerySection(page);
-  view.append(gallerySection);
+  const contentSections = [upboSection, rouletteSection, messengerSection, liveSection, vodSection,
+    youtubeSection, songbookSection, ogqSection, cafeSection, calendarSection, gallerySection].filter(Boolean);
+  if (featuredPair) view.append(featuredPair);
+  if (layoutDesign === 1) {
+    const grid = document.createElement('div'); grid.className = 'fanpage-design-one-grid';
+    const mainColumn = document.createElement('div'); mainColumn.className = 'fanpage-design-one-column fanpage-design-one-main-column';
+    const sideColumn = document.createElement('aside'); sideColumn.className = 'fanpage-design-one-column fanpage-design-one-side-column';
+    [gallerySection, liveSection, vodSection, cafeSection, calendarSection]
+      .filter(Boolean).forEach((contentSection) => mainColumn.append(contentSection));
+    [upboSection, rouletteSection, messengerSection, youtubeSection, songbookSection, ogqSection]
+      .filter(Boolean).forEach((contentSection) => sideColumn.append(contentSection));
+    grid.append(mainColumn, sideColumn);
+    view.append(grid);
+  } else {
+    contentSections.forEach((contentSection) => view.append(contentSection));
+  }
   const bottomBanner = renderBannerSection(page, 'bottom');
   if (bottomBanner) {
     view.classList.add('has-bottom-banner');
@@ -2229,6 +2302,22 @@ function renderFanPage(page) {
     const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close'; close.setAttribute('aria-label', '설정 닫기'); close.textContent = '×';
     close.addEventListener('click', () => editorDialog.close());
     headingRow.append(heading, close); editor.append(headingRow);
+    const layoutChoice = document.createElement('fieldset'); layoutChoice.className = 'profile-layout-choice';
+    const layoutLegend = document.createElement('legend'); layoutLegend.textContent = '페이지 레이아웃';
+    const layoutOptions = document.createElement('div'); layoutOptions.className = 'profile-layout-options';
+    [
+      [1, '디자인 1 · 파스텔 만화풍', '포근한 파스텔 컬러와 캐릭터가 있는 새 기본 디자인'],
+      [2, '디자인 2 · 기존 팬페이지', '현재 사용하던 어두운 톤의 팬페이지 레이아웃'],
+    ].forEach(([value, titleText, descriptionText]) => {
+      const option = document.createElement('label'); option.className = 'profile-layout-option';
+      const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'layoutDesign'; radio.value = String(value);
+      radio.checked = layoutDesign === value;
+      const copy = document.createElement('span'); copy.className = 'profile-layout-option-copy';
+      const optionTitle = document.createElement('strong'); optionTitle.textContent = titleText;
+      const optionDescription = document.createElement('small'); optionDescription.textContent = descriptionText;
+      copy.append(optionTitle, optionDescription); option.append(radio, copy); layoutOptions.append(option);
+    });
+    layoutChoice.append(layoutLegend, layoutOptions); editor.append(layoutChoice);
     const fields = [
       ['birthday', '생일', 20], ['mbti', 'MBTI', 8], ['major', '전공', 50], ['debutDate', '데뷔일', 20],
       ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160],
@@ -2305,6 +2394,7 @@ function renderFanPage(page) {
             contents: value('contents').split(',').map((item) => item.trim()).filter(Boolean),
             scheduleText: value('scheduleText'), rouletteUrl: value('rouletteUrl'),
             youtubeChannelUrl: value('youtubeChannelUrl'), cafeUrl: value('cafeUrl'), ogqEmoticonUrl: value('ogqEmoticonUrl'),
+            layoutDesign: Number(editor.querySelector('input[name="layoutDesign"]:checked')?.value || DEFAULT_FANPAGE_LAYOUT),
             topBannerImageUrls, bottomBannerImageUrls,
           },
         });
@@ -2663,6 +2753,7 @@ function profileForLinkSave(source, field, value) {
     contents: Array.isArray(profile.contents) ? profile.contents.filter((item) => typeof item === 'string').slice(0, 8) : [],
     scheduleText: String(profile.scheduleText || ''), rouletteUrl: String(profile.rouletteUrl || ''),
     ogqEmoticonUrl: String(profile.ogqEmoticonUrl || ''),
+    layoutDesign: profile.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT,
     topBannerImageUrls: Array.isArray(profile.topBannerImageUrls) ? profile.topBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerImageUrls: Array.isArray(profile.bottomBannerImageUrls) ? profile.bottomBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
   };
