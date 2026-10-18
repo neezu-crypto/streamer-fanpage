@@ -54,7 +54,9 @@ const DEFAULT_FANPAGE_LAYOUT = 1;
 const BUTTON_CLICK_SOUND_STORAGE_KEY = 'streamerFanPage.buttonClickVolume';
 const DEFAULT_BUTTON_CLICK_VOLUME = 20;
 const buttonClickAudio = new Audio(new URL('./assets/sounds/button-click.mp3', import.meta.url).href);
+const modalOpenAudio = new Audio(new URL('./assets/sounds/modal-open.mp3', import.meta.url).href);
 buttonClickAudio.preload = 'auto';
+modalOpenAudio.preload = 'auto';
 function readButtonClickVolume() {
   try {
     const stored = localStorage.getItem(BUTTON_CLICK_SOUND_STORAGE_KEY);
@@ -72,14 +74,28 @@ function setButtonClickVolume(value) {
   try { localStorage.setItem(BUTTON_CLICK_SOUND_STORAGE_KEY, String(buttonClickVolume)); } catch (_) { /* volume still applies for this visit */ }
   return buttonClickVolume;
 }
+let modalOpenGeneration = 0;
+function playUiSound(audio) {
+  if (buttonClickVolume <= 0) return;
+  audio.volume = buttonClickVolume / 100;
+  audio.currentTime = 0;
+  const playback = audio.play();
+  if (playback && typeof playback.catch === 'function') playback.catch(() => {});
+}
+function showFanPageModal(dialog) {
+  if (!(dialog instanceof HTMLDialogElement) || dialog.open) return;
+  dialog.showModal();
+  modalOpenGeneration += 1;
+  playUiSound(modalOpenAudio);
+}
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
   const button = event.target.closest('button');
-  if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' || button.hasAttribute('data-no-click-sound') || buttonClickVolume <= 0) return;
-  buttonClickAudio.volume = buttonClickVolume / 100;
-  buttonClickAudio.currentTime = 0;
-  const playback = buttonClickAudio.play();
-  if (playback && typeof playback.catch === 'function') playback.catch(() => {});
+  if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' || button.hasAttribute('data-no-click-sound')) return;
+  const openGeneration = modalOpenGeneration;
+  queueMicrotask(() => {
+    if (modalOpenGeneration === openGeneration) playUiSound(buttonClickAudio);
+  });
 }, true);
 const PROFILE_QUICK_EDIT_FIELDS = {
   birthday: { label: '생일', maxLength: 20, placeholder: '예: 02.11' },
@@ -314,7 +330,7 @@ function confirmAccountSwitch() {
     dialog.addEventListener('cancel', cancelEscape);
     $('cancelAccountSwitch').onclick = () => finish(false);
     $('confirmAccountSwitch').onclick = () => finish(true);
-    dialog.showModal();
+    showFanPageModal(dialog);
   });
 }
 
@@ -1312,7 +1328,7 @@ function openUpboImagePreview(imageUrl, titleText) {
   image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
   stage.append(image); card.append(heading, stage); dialog.append(card);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  document.body.append(dialog); dialog.showModal(); close.focus();
+  document.body.append(dialog); showFanPageModal(dialog); close.focus();
 }
 
 function bindUpboPreviewZoom(image, getUrl, getTitle) {
@@ -1661,7 +1677,7 @@ function openUpboItemEditor(page, existingItem = null) {
     }
   });
   dialog.append(form); dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  document.body.append(dialog); dialog.showModal(); name.field.focus();
+  document.body.append(dialog); showFanPageModal(dialog); name.field.focus();
 }
 
 async function deleteUpboItem(page, item) {
@@ -1739,7 +1755,7 @@ function openUpboSubmissionEditor(page, entry, isRecord = false) {
     }
   });
   dialog.append(form); dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  document.body.append(dialog); dialog.showModal();
+  document.body.append(dialog); showFanPageModal(dialog);
 }
 
 async function deleteUpboSubmission(page, entry) {
@@ -1911,7 +1927,7 @@ function openUpboTopicEditor(page, existingTopic = null) {
       state.saving = false; save.disabled = false; save.textContent = '저장'; refreshUpboSection(page.streamer.id);
     }
   });
-  document.body.append(dialog); dialog.showModal();
+  document.body.append(dialog); showFanPageModal(dialog);
 }
 
 function openUpboViewerEditor(page, topic, existingViewer = null) {
@@ -1964,7 +1980,7 @@ function openUpboViewerEditor(page, topic, existingViewer = null) {
       state.saving = false; save.disabled = false; refreshUpboSection(page.streamer.id);
     }
   });
-  document.body.append(dialog); dialog.showModal();
+  document.body.append(dialog); showFanPageModal(dialog);
 }
 
 async function deleteUpboViewer(page, topicId, viewer) {
@@ -2255,7 +2271,7 @@ function renderFanPage(page, options = {}) {
   }
   if (page.isOwner) {
     const edit = document.createElement('button'); edit.id = 'profileSettingsButton'; edit.type = 'button'; edit.className = 'button'; edit.textContent = '⚙ 설정';
-    edit.addEventListener('click', () => $('profileSettingsDialog').showModal());
+    edit.addEventListener('click', () => showFanPageModal($('profileSettingsDialog')));
     actions.append(edit);
   }
   section.append(label, identity, facts);
@@ -2350,7 +2366,7 @@ function renderFanPage(page, options = {}) {
 
   if (page.isOwner && options.preservedSettingsDialog) {
     view.append(options.preservedSettingsDialog);
-    if (options.reopenSettingsDialog) options.preservedSettingsDialog.showModal();
+    if (options.reopenSettingsDialog) showFanPageModal(options.preservedSettingsDialog);
   } else if (page.isOwner) {
     const editorDialog = document.createElement('dialog');
     editorDialog.id = 'profileSettingsDialog'; editorDialog.className = 'account-dialog profile-settings-dialog';
@@ -2566,17 +2582,17 @@ function createFanPageQuickRemote(view) {
   soundClose.addEventListener('click', () => soundDialog.close());
   soundHeading.append(soundTitle, soundClose);
   const soundDescription = document.createElement('p'); soundDescription.className = 'fan-sound-settings-description';
-  soundDescription.textContent = '버튼을 누를 때 재생되는 클릭음의 크기를 조절해요. 0%로 끌 수 있고, 이 브라우저에 저장돼요.';
+  soundDescription.textContent = '버튼 클릭음과 모달 열림음의 크기를 함께 조절해요. 0%로 끌 수 있고, 이 브라우저에 저장돼요.';
   const soundVolumeRow = document.createElement('div'); soundVolumeRow.className = 'fan-sound-volume-row';
   const soundVolumeLabel = document.createElement('label'); soundVolumeLabel.htmlFor = 'fanButtonClickVolume';
-  soundVolumeLabel.textContent = '버튼 클릭 볼륨';
+  soundVolumeLabel.textContent = '효과음 볼륨';
   const soundVolumeValue = document.createElement('output'); soundVolumeValue.className = 'fan-sound-volume-value';
   soundVolumeValue.htmlFor = 'fanButtonClickVolume';
   const soundVolume = document.createElement('input'); soundVolume.type = 'range';
   soundVolume.id = 'fanButtonClickVolume'; soundVolume.className = 'fan-sound-volume-range';
   soundVolume.min = '0'; soundVolume.max = '100'; soundVolume.step = '5';
   soundVolume.value = String(buttonClickVolume);
-  soundVolume.setAttribute('aria-label', '버튼 클릭 효과음 볼륨');
+  soundVolume.setAttribute('aria-label', '버튼 클릭 및 모달 열림 효과음 볼륨');
   soundVolumeValue.textContent = `${buttonClickVolume}%`;
   soundVolume.addEventListener('input', () => {
     const volume = setButtonClickVolume(soundVolume.value);
@@ -2594,7 +2610,7 @@ function createFanPageQuickRemote(view) {
   soundActions.append(soundReset, soundDone);
   soundCard.append(soundHeading, soundDescription, soundVolumeRow, soundVolume, soundActions);
   soundDialog.append(soundCard);
-  soundSettingsButton.addEventListener('click', () => soundDialog.showModal());
+  soundSettingsButton.addEventListener('click', () => showFanPageModal(soundDialog));
   const body = document.createElement('div'); body.className = 'fan-quick-body';
   const nav = document.createElement('nav'); nav.className = 'fan-quick-links'; nav.setAttribute('aria-label', '팬페이지 영역');
   const navButtons = sections.map((section, index) => {
@@ -4504,7 +4520,7 @@ function openFanPageScheduleDialog(selectedDate) {
   const form = dialog.querySelector('form');
   form.reset();
   form.querySelector('[name="date"]').value = selectedDate || localDateKey(new Date());
-  dialog.showModal();
+  showFanPageModal(dialog);
 }
 
 function selectCalendarDate(streamerId, state, date) {
@@ -4704,7 +4720,7 @@ function openVodPlayer(vod) {
   $('vodPlayerTitle').textContent = vod.title || '방송 다시보기';
   $('vodPlayerExternalLink').href = `https://vod.sooplive.com/player/${id}`;
   $('vodPlayerFrame').src = `https://vod.sooplive.com/player/${id}/embed?autoPlay=false&mutePlay=true&showChat=true`;
-  $('vodPlayerDialog').showModal();
+  showFanPageModal($('vodPlayerDialog'));
   vodCommentState = {
     streamerId: currentPage.streamer.id,
     vodId: String(vod.id),
@@ -4791,7 +4807,7 @@ function renderCommentProfileEditor() {
     note.textContent = '게스트 세션에서는 프로필을 저장할 수 없어요. Google·카카오 로그인 또는 스트리머 인증을 완료해 주세요.';
     const login = document.createElement('button'); login.type = 'button'; login.className = 'button button-primary';
     login.textContent = '로그인 / 인증';
-    login.addEventListener('click', () => $('loginChoiceDialog').showModal());
+    login.addEventListener('click', () => showFanPageModal($('loginChoiceDialog')));
     wrap.append(title, note, login);
     return wrap;
   }
@@ -4821,7 +4837,7 @@ function renderCommentProfileEditor() {
     save.disabled = true;
     try {
       if (!canSaveCommentProfile()) {
-        $('loginChoiceDialog').showModal();
+        showFanPageModal($('loginChoiceDialog'));
         return;
       }
       const result = await callCommentProfileSave({ nickname: nickname.value.trim(), soopId: soopId.value.trim() });
@@ -5053,7 +5069,7 @@ function openYouTubePlayer(video) {
   $('youtubePlayerTitle').textContent = video.title || 'YouTube 영상';
   $('youtubePlayerExternalLink').href = `https://www.youtube.com/watch?v=${id}`;
   $('youtubePlayerFrame').src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
-  $('youtubePlayerDialog').showModal();
+  showFanPageModal($('youtubePlayerDialog'));
 }
 
 function replaceVodSectionIfCurrent(streamerId) {
@@ -5194,7 +5210,7 @@ async function loadApp() {
       if (auth.currentUser && auth.currentUser.isAnonymous
         && localStorage.getItem(KAKAO_LINKED_UID_KEY) !== auth.currentUser.uid
         && verifiedStreamerUid !== auth.currentUser.uid) {
-        window.setTimeout(() => $('loginChoiceDialog').showModal(), 120);
+        window.setTimeout(() => showFanPageModal($('loginChoiceDialog')), 120);
       }
     }
   } catch (error) { showStartupError(error); }
@@ -5207,13 +5223,13 @@ $('retryButton').addEventListener('click', () => {
   }
   loadApp();
 });
-$('openLoginOptions').addEventListener('click', () => $('loginChoiceDialog').showModal());
+$('openLoginOptions').addEventListener('click', () => showFanPageModal($('loginChoiceDialog')));
 $('closeLoginChoices').addEventListener('click', () => $('loginChoiceDialog').close());
 $('choiceGoogleLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithGoogle(); });
 $('choiceKakaoLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithKakao(); });
 $('openStreamerVerification').addEventListener('click', () => {
   $('loginChoiceDialog').close();
-  $('streamerVerifyDialog').showModal();
+  showFanPageModal($('streamerVerifyDialog'));
 });
 $('closeStreamerVerification').addEventListener('click', () => $('streamerVerifyDialog').close());
 $('checkStreamerVerification').addEventListener('click', () => submitOrCheckStreamerVerification(true));
@@ -5225,7 +5241,7 @@ $('streamerVerificationForm').addEventListener('submit', (event) => {
 $('logoutButton').addEventListener('click', logout);
 $('openAdminStats').addEventListener('click', () => {
   if (!isAdminUser) return;
-  $('adminStatsDialog').showModal();
+  showFanPageModal($('adminStatsDialog'));
   loadAdminStats();
   loadAdminDesignFeedback();
 });
@@ -5243,7 +5259,7 @@ $('openDesignFeedback').addEventListener('click', () => {
   $('designFeedbackStatus').textContent = '';
   $('designFeedbackStatus').classList.remove('is-error');
   $('designFeedbackForm').reset();
-  $('designFeedbackDialog').showModal();
+  showFanPageModal($('designFeedbackDialog'));
   updateDesignFeedbackEligibility();
 });
 $('closeDesignFeedback').addEventListener('click', () => $('designFeedbackDialog').close());
