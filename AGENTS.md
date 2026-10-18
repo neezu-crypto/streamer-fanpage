@@ -23,3 +23,32 @@
 - 새 함수는 프로젝트+리전에서 이름이 겹치지 않는지 `firebase functions:list --project soop-stock-market`으로 확인하고 함수명을 지정해 배포한다. 현재 관리자 통계 callable은 `streamerFanPageAdminStats`, 룰렛 callable은 `streamerFanPageRoulette`, 업보 callable은 `streamerFanPageUpbo`, 노래책 callable은 `streamerFanPageSongbook`, 시청 통계 callable은 `streamerFanPageViewerStats`, 시청 통계 작업자는 `streamerFanPageViewerStatsWorker`, 정리 스케줄러는 `streamerFanPageViewerStatsJobCleanup`, 후원 광고·관리 callable은 `streamerFanPageSponsorAds`, `streamerFanPageAdminSponsorAds`이며, VOD 댓글 callable은 `streamerFanPageCommentProfileSave`, `streamerFanPageVodComments`, `streamerFanPageVodCommentAdd`, `streamerFanPageVodCommentDelete`다. 페이지뷰 writer는 기존 `streamerFanPageBootstrap`에서 호출한다. 전체 Functions 배포는 금지한다.
 - 이 저장소에는 `database.rules.json`을 추가하지 않는다. 팬페이지 내용·최근 방문은 callable을 통하지만, 상단 devbar 링크는 기존 공개 읽기 경로인 `devbarLinks`를 브라우저에서 직접 읽는다. RTDB 규칙을 변경할 필요가 생기면 공통 지침에 따라 여섯 사본 모두를 동기화한다.
 - 새 시리즈 등록은 `admin-center/functions/index.js`의 `GAME_CATALOG`에 포함한다.
+
+## 3. 팬페이지 레이아웃·디자인 테마 추가 기준
+
+새 레이아웃이나 시각 테마를 추가할 때는 일부 화면만 먼저 바꾸지 말고 아래 적용 범위를 한 번에 점검한다. 현재 레이아웃은 스트리머별 `profile.layoutDesign`으로 선택되며 기본값은 디자인 1, `2`는 기존 팬페이지 디자인이다. 저장된 값으로 공개 페이지도 같은 레이아웃을 렌더링해야 한다. 설정창에서 고른 레이아웃은 즉시 미리보기로 반영하고 저장 없이 닫으면 원래 설정으로 되돌린다.
+
+### 구현 원칙
+
+- 공통 구조와 동작은 재사용하고, 새 레이아웃의 스타일은 `fanpage-layouts.css`에 `#fanPageView.fanpage-layout-{번호}` 범위로 작성한다. `style.css`의 디자인 2 기본값을 새 테마에 전역 적용하지 않는다. 문서의 `<link>` 순서는 기본 `style.css` 다음 테마 스타일이며, CSS가 바뀌면 `index.html`의 테마 CSS 버전 쿼리도 갱신한다.
+- 레이아웃 루트에서 배경, 카드 표면, 기본/보조 글자색, 테두리, 강조색, 그림자, 모서리, 입력 포커스 색을 CSS 변수로 정의한다. 구성 요소마다 임의의 고정 색을 반복하지 말고 변수에서 파생해 테마 전체가 같이 바뀌게 한다. 스트리머별 개별 테마(현재 유하띠의 파랑)는 일반 레이아웃 토큰 위에 별도 modifier로 겹쳐 적용한다.
+- 기본 `style.css`의 어두운 색이 남기 쉬운 중첩 요소와 동적 생성 요소를 개별 점검한다. 바깥 카드만 바꿔 놓고 안쪽 카드·제목·상태 문구를 이전 테마 색으로 두지 않는다. 특히 라이브 미리보기의 정보 패널, 방송 제목, 방송 중/종료·오류 상태와 LIVE 뱃지는 `fanpage-layouts.css`에서 명시적으로 테마화한다.
+- 프로필의 보기·수정 상태를 함께 맞춘다. 프로필 카드, 정보 행, 인라인 빠른 수정 입력창·저장/취소 버튼, 프로필 설정 모달의 필드·레이아웃 선택·저장 상태가 같은 팔레트를 사용해야 한다.
+- 모든 모달을 목록화해 테마를 적용한다. 고정 HTML 모달뿐 아니라 JavaScript가 만드는 VOD/YouTube 플레이어, 댓글 프로필 편집, 일정 편집, 업보 항목·신청 검토, 룰렛 등 동적 모달도 배경, 제목, 설명, 입력, 탭, 빈 상태, 오류/로딩 메시지, 버튼과 닫기 동작을 확인한다. 모달 바깥 클릭으로 닫히지 않는 기존 동작은 보존한다.
+- 버튼 역할별로 동일한 체계를 쓴다: 주요 저장/이동, 항목 추가·선택, 외부 링크, 새로고침 같은 보조 동작을 구분하고 기본·hover·pressed·focus-visible·disabled 상태를 정의한다. 디자인 1의 말랑한 젤리 버튼과 고양이 발바닥 닫기 버튼을 새 레이아웃에 그대로 강제하지 않는다. 발바닥 버튼을 쓰는 테마는 이미지가 안 뜨는 경우에도 보이는 닫기 표시, 접근성 이름, hover 툴팁, 터치 가능한 크기를 유지한다.
+- 페이지 전체에서 상단/하단 배너, 프로필, 팬 캐릭터·OGQ, 갤러리, 업보, 룰렛, 라이브, 메신저, 다시보기·댓글, YouTube, 노래책, 카페, 캘린더, 푸터까지 누락 없이 확인한다. 각 카드의 중첩 표면, 텍스트 대비, 배지, 구분선, 링크, 입력 요소를 포함한다.
+- 의미가 있는 상태 표시의 대비를 확보한다. 인증 스트리머 뱃지처럼 작은 글자도 배경에 묻히지 않게 색상 대비·크기·굵기를 확인한다. LIVE, offline, 빈 목록, loading, stale data, 오류, 성공, 비활성 버튼도 각각 구분할 수 있어야 한다.
+- 데스크톱과 모바일에서 그리드 전환, 줄바꿈, 긴 스트리머 이름/방송 제목, 배너, 버튼 배열, 모달 스크롤과 닫기 버튼 위치를 확인한다. 터치 환경에도 hover 없이 상태와 버튼 기능을 알 수 있어야 한다.
+
+### 현재 디자인 1에서 확정한 기준
+
+- 파스텔 만화풍의 밝은 카드와 높은 글자 대비, 스트리머별 강조색(유하띠 파랑)을 사용한다.
+- 프로필 인라인 수정 영역은 파스텔 패널·흰 입력창·강조 테두리로 바꾸고, 인증 뱃지는 진한 글자와 선명한 민트 표면으로 표시한다.
+- 라이브 카드 안쪽 정보 패널, 방송 제목, 상태 뱃지, offline/loading/error 상태도 바깥 카드와 같은 테마로 표시한다. 미리보기 이미지만 별도 이미지 면으로 둔다.
+- 젤리 버튼은 주요/추가/외부/보조 동작을 구분하고 눌림 상태를 제공한다. 모달 닫기 발바닥은 장식 이미지가 로드되지 않아도 ×가 보이는 fallback을 둔다.
+
+### 완료 전 점검
+
+- 스트리머별 저장 레이아웃이 서로 독립적인지, 새로고침 후에도 유지되는지 확인한다. 설정 미리보기·저장·저장하지 않고 닫기 흐름도 확인한다.
+- 새 디자인과 디자인 2를 각각 공개 방문자 및 인증 스트리머 화면에서 확인한다. 데스크톱/모바일, 일반 화면/모든 모달, loading·빈 상태·오류·방송 중·방송 종료 상태를 육안으로 점검한다.
+- 선택자와 상태 클래스가 실제 DOM에 존재하는지 확인하고 `git diff --check`, 변경한 JavaScript의 `node --check` 등 해당 정적 검증을 수행한다. 서버 코드를 바꾸지 않은 테마 작업에는 Functions 배포를 하지 않고, Pages 정적 자산이면 배포 완료와 실제 CSS/자산 응답을 확인한다.
