@@ -612,7 +612,7 @@
 .messenger-link-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .messenger-link-text{min-width:0}
 .messenger-link-text .eyebrow{margin:0 0 4px;font-size:9px}
-.messenger-link-text h2{margin:0;font:20px var(--display)}
+.messenger-link-text h2{margin:0;font:20px var(--display);word-break:keep-all}
 .messenger-link-description{margin:5px 0 0;color:#cfc8d4;font-size:12px;line-height:1.5}
 .messenger-link-note{margin:3px 0 0;color:#928a9a;font-size:10px;line-height:1.5}
 .messenger-link-button{flex:none;min-width:164px;min-height:42px;white-space:nowrap}
