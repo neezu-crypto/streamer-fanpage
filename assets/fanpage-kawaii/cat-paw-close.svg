@@ -35,7 +35,5 @@
       <ellipse cx="38.5" cy="9.7" rx="1.4" ry="2.4" transform="rotate(-18 38.5 9.7)"/>
       <ellipse cx="50.2" cy="17.3" rx="1.5" ry="2.5" transform="rotate(-20 50.2 17.3)"/>
     </g>
-    <path d="m27.5 39 9 9m0-9-9 9" stroke="#fff9fc" stroke-linecap="round" stroke-width="4.4"/>
-    <path d="m27.5 39 9 9m0-9-9 9" stroke="#70465e" stroke-linecap="round" stroke-width="2.7"/>
   </g>
 </svg>
