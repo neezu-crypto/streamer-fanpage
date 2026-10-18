@@ -286,6 +286,18 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 .profile-avatar { border-color: #fff; box-shadow: 0 0 0 3px var(--kawaii-soft), 0 8px 22px #76617b22; }
 #fanPageView.fanpage-layout-1 .profile-name { color: #51465d; }
 #fanPageView.fanpage-layout-1 .profile-handle { color: #81758b; }
+#fanPageView.fanpage-layout-1 .profile-identity .verified-tag {
+  margin-top: 13px;
+  padding: 7px 12px;
+  border: 1px solid #79bd92;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e8faef, #d3f0de);
+  color: #205f3d;
+  box-shadow: 0 3px 0 #b9dfc7, inset 0 1px 0 #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
 #fanPageView.fanpage-layout-1 .profile-fact { background: #fff; color: #51465d; box-shadow: 0 4px 0 #e7dce8; }
 #fanPageView.fanpage-layout-1 .profile-fact span { background: linear-gradient(110deg, var(--kawaii-soft), #f0e7ff); color: #5b526c; }
 #fanPageView.fanpage-layout-1 .profile-fact:nth-child(2) span { background: linear-gradient(110deg, #e7efff, #dceaff); }
