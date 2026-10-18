@@ -742,12 +742,12 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog
 }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(input, textarea)::placeholder { color: #a39aa9; }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(input[type="checkbox"], input[type="radio"], input[type="range"]) { accent-color: var(--dialog-accent); }
-body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button:not(.button-primary) {
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button:not(.button-primary):not(.profile-settings-close) {
   border-color: #e3d7e6;
   background: #fff;
   color: #51465d;
 }
-body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button:not(.button-primary):hover { border-color: var(--dialog-accent); background: #fff3f8; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button:not(.button-primary):not(.profile-settings-close):hover { border-color: var(--dialog-accent); background: #fff3f8; }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button-primary {
   border-color: var(--dialog-accent);
   background: var(--dialog-accent);
