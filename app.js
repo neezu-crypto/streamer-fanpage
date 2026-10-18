@@ -2387,16 +2387,20 @@ function renderFanPage(page, options = {}) {
 
   if (page.isOwner && options.preservedSettingsDialog) {
     view.append(options.preservedSettingsDialog);
-    if (options.reopenSettingsDialog) showFanPageModal(options.preservedSettingsDialog);
+    if (options.reopenSettingsDialog) options.preservedSettingsDialog.showModal();
   } else if (page.isOwner) {
     const editorDialog = document.createElement('dialog');
     editorDialog.id = 'profileSettingsDialog'; editorDialog.className = 'account-dialog profile-settings-dialog';
     const committedLayoutDesign = layoutDesign;
     let layoutPreviewChanged = false;
-    let rebuildingForLayoutPreview = false;
+    let ignoredPreviewCloseEvents = 0;
     let profileSettingsSaved = false;
     editorDialog.addEventListener('close', () => {
-      if (rebuildingForLayoutPreview || profileSettingsSaved || !layoutPreviewChanged) return;
+      if (ignoredPreviewCloseEvents > 0) {
+        ignoredPreviewCloseEvents -= 1;
+        return;
+      }
+      if (profileSettingsSaved || !layoutPreviewChanged) return;
       currentPage.profile = { ...(currentPage.profile || {}), layoutDesign: committedLayoutDesign };
       layoutPreviewChanged = false;
       renderFanPage(currentPage);
@@ -2425,16 +2429,14 @@ function renderFanPage(page, options = {}) {
         currentPage.profile = { ...(currentPage.profile || {}), layoutDesign: selectedLayout };
         layoutPreviewChanged = selectedLayout !== committedLayoutDesign;
         const dialogScrollTop = editorDialog.scrollTop;
-        rebuildingForLayoutPreview = true;
-        editorDialog.close();
-        try {
-          renderFanPage(currentPage, {
-            preservedSettingsDialog: editorDialog,
-            reopenSettingsDialog: true,
-          });
-        } finally {
-          rebuildingForLayoutPreview = false;
+        if (editorDialog.open) {
+          ignoredPreviewCloseEvents += 1;
+          editorDialog.close();
         }
+        renderFanPage(currentPage, {
+          preservedSettingsDialog: editorDialog,
+          reopenSettingsDialog: true,
+        });
         editorDialog.scrollTop = dialogScrollTop;
         radio.focus({ preventScroll: true });
       });
