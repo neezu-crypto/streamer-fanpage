@@ -2142,11 +2142,17 @@ function renderKawaiiWelcome(page) {
   const description = document.createElement('p'); description.className = 'fanpage-kawaii-description';
   description.textContent = '방송 일정과 다시보기, 팬들의 추억을 한곳에서 만나 보세요.';
   const actions = document.createElement('div'); actions.className = 'fanpage-kawaii-actions';
-  const galleryLink = document.createElement('a'); galleryLink.className = 'button button-primary';
-  galleryLink.href = '#fanGallerySection'; galleryLink.textContent = '팬 갤러리 둘러보기 ↓';
-  const scheduleLink = document.createElement('a'); scheduleLink.className = 'button';
-  scheduleLink.href = '#calendarSection'; scheduleLink.textContent = '방송 일정 보기';
-  actions.append(galleryLink, scheduleLink); copy.append(eyebrow, title, description, actions);
+  const galleryButton = document.createElement('button'); galleryButton.type = 'button';
+  galleryButton.className = 'button button-primary'; galleryButton.textContent = '팬 갤러리 둘러보기 ↓';
+  galleryButton.addEventListener('click', () => {
+    document.getElementById('fanGallerySection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  const scheduleButton = document.createElement('button'); scheduleButton.type = 'button';
+  scheduleButton.className = 'button'; scheduleButton.textContent = '방송 일정 보기';
+  scheduleButton.addEventListener('click', () => {
+    document.getElementById('calendarSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  actions.append(galleryButton, scheduleButton); copy.append(eyebrow, title, description, actions);
 
   const mascotWrap = document.createElement('div'); mascotWrap.className = 'fanpage-kawaii-mascot-wrap';
   const halo = document.createElement('span'); halo.className = 'fanpage-kawaii-mascot-halo'; halo.setAttribute('aria-hidden', 'true');
