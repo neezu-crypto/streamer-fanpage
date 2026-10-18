@@ -79,9 +79,9 @@ function setButtonClickVolume(value) {
   return buttonClickVolume;
 }
 let modalOpenGeneration = 0;
-function playUiSound(audio, volumeMultiplier = 1) {
+function playUiSound(audio, volumeOffsetPercent = 0) {
   if (buttonClickVolume <= 0) return;
-  audio.volume = Math.min(1, buttonClickVolume / 100 * volumeMultiplier);
+  audio.volume = Math.min(1, (buttonClickVolume + volumeOffsetPercent) / 100);
   audio.currentTime = 0;
   const playback = audio.play();
   if (playback && typeof playback.catch === 'function') playback.catch(() => {});
@@ -114,7 +114,7 @@ document.addEventListener('click', (event) => {
   queueMicrotask(() => {
     if (modalOpenGeneration !== openGeneration) return;
     if (isCatPawCloseButton(button)) playUiSound(catPawCloseAudio);
-    else if (isCompleteButton(button)) playUiSound(saveButtonAudio, 1.2);
+    else if (isCompleteButton(button)) playUiSound(saveButtonAudio, 10);
     else playUiSound(isSaveOrCompleteButton(button) ? saveButtonAudio : buttonClickAudio);
   });
 }, true);
