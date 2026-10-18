@@ -757,6 +757,313 @@ body.fanpage-theme-sora-active .account-dialog {
 }
 body.fanpage-theme-sora-active .account-dialog .button-primary { color: #1d2a49; }
 #fanPageView.fanpage-theme-sora .vod-player-footer .button-primary { color: #1d2a49; }
+
+/* Layout 1 button study: soft jelly surfaces, tactile press, and paw-shaped modal close. */
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) {
+  --jelly-accent: #ee86aa;
+  --jelly-accent-deep: #d86f98;
+  --jelly-accent-ink: #633953;
+  --jelly-cool: #a9c5ff;
+  --jelly-cool-deep: #789be9;
+  --jelly-cool-ink: #344c82;
+  --jelly-lilac: #d2c4ff;
+  --jelly-lilac-deep: #a995e7;
+  --jelly-lilac-ink: #4f436f;
+  --jelly-cream: #fff5d7;
+  --jelly-cream-deep: #e9c86e;
+  --jelly-cream-ink: #685632;
+}
+body.fanpage-theme-sora-active {
+  --jelly-accent: #a9c5ff;
+  --jelly-accent-deep: #789be9;
+  --jelly-accent-ink: #344c82;
+  --jelly-cool: #ffb4d2;
+  --jelly-cool-deep: #ef7fb4;
+  --jelly-cool-ink: #633953;
+}
+
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .button,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .auth-button {
+  border: 1px solid #ded6ea;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff 0%, #fffafd 58%, #f5f1fa 100%);
+  color: #5b5067;
+  box-shadow: 0 4px 0 #dfd8e8, 0 7px 12px #75608014, inset 0 2px 0 #fff;
+  font-weight: 750;
+  transition: transform .2s cubic-bezier(.2, 1.7, .45, 1), box-shadow .2s ease, filter .2s ease, border-color .2s ease, background .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .button:not(.profile-settings-close) {
+  min-height: 42px;
+  padding: 9px 16px;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) :is(.button, .auth-button):hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+  filter: saturate(1.06);
+  border-color: color-mix(in srgb, var(--jelly-accent), white 38%);
+  box-shadow: 0 7px 0 #dfd8e8, 0 10px 16px #7560801c, inset 0 2px 0 #fff;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) :is(.button, .auth-button):active:not(:disabled) {
+  transform: translateY(3px) scale(.985, .96);
+  box-shadow: 0 1px 0 #dfd8e8, 0 3px 6px #75608012, inset 0 3px 6px #77628512;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) :is(.button, .auth-button):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--jelly-accent), transparent 48%);
+  outline-offset: 3px;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) :is(.button, .auth-button):disabled {
+  box-shadow: 0 2px 0 #dfd8e8;
+  filter: saturate(.62);
+}
+
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .button-primary {
+  border-color: color-mix(in srgb, var(--jelly-accent-deep), white 35%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-accent), white 38%) 0%, var(--jelly-accent) 58%, color-mix(in srgb, var(--jelly-accent), var(--jelly-accent-deep) 14%) 100%);
+  color: var(--jelly-accent-ink);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--jelly-accent-deep), white 22%), 0 8px 14px #75608020, inset 0 2px 0 #ffffffd9, inset 0 -2px 3px #b85d8b16;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .button-primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--jelly-accent-deep), white 22%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-accent), white 48%) 0%, var(--jelly-accent) 58%, color-mix(in srgb, var(--jelly-accent), var(--jelly-accent-deep) 14%) 100%);
+  box-shadow: 0 8px 0 color-mix(in srgb, var(--jelly-accent-deep), white 22%), 0 12px 18px #75608025, inset 0 2px 0 #ffffffeb;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .button-primary:active:not(:disabled) {
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--jelly-accent-deep), white 22%), 0 3px 7px #75608018, inset 0 3px 7px #6d42501c;
+}
+
+/* Keep the jelly styles above older, more specific layout and dialog button rules. */
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .button:not(.button-primary):not(.profile-settings-close),
+body.fanpage-layout-one-active .account-dialog .button:not(.button-primary):not(.profile-settings-close),
+body.fanpage-home-kawaii-active .account-dialog .button:not(.button-primary):not(.profile-settings-close) {
+  border: 1px solid #ded6ea;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff 0%, #fffafd 58%, #f5f1fa 100%);
+  color: #5b5067;
+  box-shadow: 0 4px 0 #dfd8e8, 0 7px 12px #75608014, inset 0 2px 0 #fff;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .button-primary,
+body.fanpage-layout-one-active .account-dialog .button-primary,
+body.fanpage-home-kawaii-active .account-dialog .button-primary,
+body.fanpage-home-kawaii-active .button-primary {
+  border: 1px solid color-mix(in srgb, var(--jelly-accent-deep), white 35%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-accent), white 38%) 0%, var(--jelly-accent) 58%, color-mix(in srgb, var(--jelly-accent), var(--jelly-accent-deep) 14%) 100%);
+  color: var(--jelly-accent-ink);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--jelly-accent-deep), white 22%), 0 8px 14px #75608020, inset 0 2px 0 #ffffffd9, inset 0 -2px 3px #b85d8b16;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) .button:not(.button-primary):not(.profile-settings-close),
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .button:not(.button-primary):not(.profile-settings-close):hover,
+body.fanpage-layout-one-active .account-dialog .button:not(.button-primary):not(.profile-settings-close):hover,
+body.fanpage-home-kawaii-active .account-dialog .button:not(.button-primary):not(.profile-settings-close):hover {
+  border-color: color-mix(in srgb, var(--jelly-accent), white 38%);
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .button.upbo-small-button:not(.button-primary) {
+  min-height: 37px;
+  padding: 7px 13px;
+  font-size: 11px;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .button-primary:hover:not(:disabled),
+body.fanpage-layout-one-active .account-dialog .button-primary:hover:not(:disabled),
+body.fanpage-home-kawaii-active .account-dialog .button-primary:hover:not(:disabled),
+body.fanpage-home-kawaii-active .button-primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--jelly-accent-deep), white 22%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-accent), white 48%) 0%, var(--jelly-accent) 58%, color-mix(in srgb, var(--jelly-accent), var(--jelly-accent-deep) 14%) 100%);
+}
+
+/* Cool jelly is reserved for add/select actions; lilac for gentle external links. */
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.banner-settings-add, .upbo-add-topic, .upbo-add-item-inline, .calendar-add-button),
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.banner-settings-add, .upbo-add-topic, .upbo-add-item-inline, .calendar-add-button):hover {
+  border-color: color-mix(in srgb, var(--jelly-cool-deep), white 35%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-cool), white 38%), var(--jelly-cool) 58%, color-mix(in srgb, var(--jelly-cool), var(--jelly-cool-deep) 14%));
+  color: var(--jelly-cool-ink);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--jelly-cool-deep), white 22%), 0 8px 14px #75608018, inset 0 2px 0 #ffffffdc;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.banner-settings-add, .upbo-add-topic, .upbo-add-item-inline, .calendar-add-button):hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 0 color-mix(in srgb, var(--jelly-cool-deep), white 22%), 0 11px 17px #75608020, inset 0 2px 0 #fff;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.banner-settings-add, .upbo-add-topic, .upbo-add-item-inline, .calendar-add-button),
+body.fanpage-layout-one-active .account-dialog :is(.banner-settings-add, .upbo-add-topic, .upbo-add-item-inline, .calendar-add-button) {
+  border-color: color-mix(in srgb, var(--jelly-cool-deep), white 35%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-cool), white 38%), var(--jelly-cool) 58%, color-mix(in srgb, var(--jelly-cool), var(--jelly-cool-deep) 14%));
+  color: var(--jelly-cool-ink);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--jelly-cool-deep), white 22%), 0 8px 14px #75608018, inset 0 2px 0 #ffffffdc;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .button-primary:is(.upbo-add-topic, .upbo-add-item-inline, .calendar-add-button):hover:not(:disabled),
+body.fanpage-layout-one-active .account-dialog .button-primary:is(.banner-settings-add, .upbo-add-topic, .upbo-add-item-inline, .calendar-add-button):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--jelly-cool-deep), white 22%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-cool), white 46%), var(--jelly-cool) 58%, color-mix(in srgb, var(--jelly-cool), var(--jelly-cool-deep) 14%));
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .button:is(.banner-settings-add, .upbo-add-topic, .upbo-add-item-inline, .calendar-add-button):hover:not(:disabled),
+body.fanpage-layout-one-active .account-dialog .button:is(.banner-settings-add, .upbo-add-topic, .upbo-add-item-inline, .calendar-add-button):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--jelly-cool-deep), white 22%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-cool), white 46%), var(--jelly-cool) 58%, color-mix(in srgb, var(--jelly-cool), var(--jelly-cool-deep) 14%));
+  color: var(--jelly-cool-ink);
+  box-shadow: 0 8px 0 color-mix(in srgb, var(--jelly-cool-deep), white 22%), 0 11px 17px #75608020, inset 0 2px 0 #fff;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.roulette-open-link, .live-station-link, .youtube-channel-link, .ogq-open-link) {
+  border-color: color-mix(in srgb, var(--jelly-lilac-deep), white 38%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-lilac), white 35%), var(--jelly-lilac) 100%);
+  color: var(--jelly-lilac-ink);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--jelly-lilac-deep), white 25%), 0 7px 11px #75608014, inset 0 2px 0 #ffffffd9;
+}
+
+/* Cream jelly keeps small utility controls distinct from large call-to-action buttons. */
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close) {
+  border-color: color-mix(in srgb, var(--jelly-cream-deep), white 42%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fffdf6, var(--jelly-cream));
+  color: var(--jelly-cream-ink);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), 0 5px 9px #75608012, inset 0 2px 0 #fff;
+  transition: transform .2s cubic-bezier(.2, 1.7, .45, 1), box-shadow .2s ease, background .2s ease;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close):hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), 0 8px 12px #75608018, inset 0 2px 0 #fff;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab) {
+  border-radius: 999px;
+  box-shadow: 0 3px 0 #e5dce9, inset 0 2px 0 #fff;
+  transition: transform .2s cubic-bezier(.2, 1.7, .45, 1), box-shadow .2s ease, background .2s ease, border-color .2s ease;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.roulette-open-link, .live-station-link, .youtube-channel-link, .ogq-open-link) {
+  border-color: color-mix(in srgb, var(--jelly-lilac-deep), white 38%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-lilac), white 35%), var(--jelly-lilac) 100%);
+  color: var(--jelly-lilac-ink);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--jelly-lilac-deep), white 25%), 0 7px 11px #75608014, inset 0 2px 0 #ffffffd9;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(.roulette-open-link, .live-station-link, .youtube-channel-link, .ogq-open-link):hover {
+  border-color: color-mix(in srgb, var(--jelly-lilac-deep), white 25%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-lilac), white 42%), var(--jelly-lilac) 100%);
+  color: var(--jelly-lilac-ink);
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab) {
+  border-radius: 999px;
+  box-shadow: 0 3px 0 #e5dce9, inset 0 2px 0 #fff;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-button.is-active, .fan-gallery-tabs button.is-active, .upbo-topic-tab.is-active) {
+  border-color: color-mix(in srgb, var(--jelly-accent-deep), white 30%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-accent), white 32%), var(--jelly-accent));
+  color: var(--jelly-accent-ink);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--jelly-accent-deep), white 22%), inset 0 2px 0 #ffffffdc;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close) {
+  border-color: color-mix(in srgb, var(--jelly-cream-deep), white 42%);
+  background: linear-gradient(180deg, #fffdf6, var(--jelly-cream));
+  color: var(--jelly-cream-ink);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), 0 5px 9px #75608012, inset 0 2px 0 #fff;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--jelly-cream-deep), white 30%);
+  background: linear-gradient(180deg, #fffefa, color-mix(in srgb, var(--jelly-cream), white 12%));
+  color: var(--jelly-cream-ink);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), 0 8px 12px #75608018, inset 0 2px 0 #fff;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close):active:not(:disabled) {
+  transform: translateY(2px) scale(.96);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), inset 0 2px 4px #77628512;
+}
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab):active {
+  transform: translateY(2px) scale(.97);
+  box-shadow: 0 1px 0 #e5dce9, inset 0 2px 4px #77628512;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-mode-button.is-active, .fan-gallery-tabs button.is-active, .upbo-topic-tab.is-active) {
+  border-color: color-mix(in srgb, var(--jelly-accent-deep), white 30%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-accent), white 32%), var(--jelly-accent));
+  color: var(--jelly-accent-ink);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--jelly-accent-deep), white 22%), inset 0 2px 0 #ffffffdc;
+}
+
+/* Replace the modal × with the paw jelly art on layout 1 only. The X remains in the SVG for clarity. */
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close {
+  position: relative;
+  z-index: 2;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 14px;
+  background: transparent url("assets/fanpage-kawaii/cat-paw-close.svg") center / contain no-repeat;
+  color: transparent;
+  box-shadow: none;
+  font-size: 0;
+  line-height: 0;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close:hover:not(:disabled) {
+  transform: translateY(-2px) rotate(-4deg) scale(1.07);
+  border: 0;
+  background-color: transparent;
+  box-shadow: none;
+  filter: saturate(1.06) drop-shadow(0 5px 4px #aa76972b);
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close:active:not(:disabled) {
+  transform: translateY(3px) scale(.94, .88);
+  box-shadow: none;
+  filter: drop-shadow(0 1px 2px #aa769722);
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--jelly-accent), transparent 42%);
+  outline-offset: 2px;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close::after {
+  position: absolute;
+  right: calc(100% + 7px);
+  top: 50%;
+  padding: 5px 9px;
+  border: 1px solid #eadfeb;
+  border-radius: 999px;
+  background: #fffefd;
+  color: #51465d;
+  box-shadow: 0 3px 0 #dfd8e8, 0 6px 12px #75608018;
+  content: "닫기";
+  font: 700 11px/1.2 var(--font);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(4px, -50%);
+  transition: opacity .16s ease, transform .16s ease;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close:hover::after,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .auth-button.google-button {
+  border-color: #dedce4;
+  background: linear-gradient(180deg, #fff, #f3f1f6);
+  color: #29232d;
+  box-shadow: 0 4px 0 #dedbe3, 0 7px 12px #75608012, inset 0 2px 0 #fff;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .auth-button.kakao-button {
+  border-color: #e6d100;
+  background: linear-gradient(180deg, #fff27a, #fee500 72%, #ebd300);
+  color: #2e2810;
+  box-shadow: 0 4px 0 #d9c500, 0 7px 12px #75608012, inset 0 2px 0 #fff8b0;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .search-field .clear-search {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #eee2c1;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fffdf6, var(--jelly-cream));
+  color: var(--jelly-cream-ink);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), inset 0 2px 0 #fff;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .search-field .clear-search:active {
+  transform: translateY(2px) scale(.94);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), inset 0 2px 4px #77628512;
+}
+@media(max-width:560px) {
+  body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close { width: 40px; min-width: 40px; height: 40px; min-height: 40px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) :is(.button, .auth-button, .profile-settings-close, .calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close, .calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab) { transition-duration: .01ms; }
+}
+
 @media (max-width: 560px) {
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog { border-radius: 20px; }
 }
