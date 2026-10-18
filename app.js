@@ -113,7 +113,7 @@ document.addEventListener('click', (event) => {
   const openGeneration = modalOpenGeneration;
   queueMicrotask(() => {
     if (modalOpenGeneration !== openGeneration) return;
-    if (isCatPawCloseButton(button)) playUiSound(catPawCloseAudio, 0, 0.3);
+    if (isCatPawCloseButton(button)) playUiSound(catPawCloseAudio, 0, 0.05);
     else if (isCompleteButton(button)) playUiSound(saveButtonAudio, 10);
     else playUiSound(isSaveOrCompleteButton(button) ? saveButtonAudio : buttonClickAudio);
   });
