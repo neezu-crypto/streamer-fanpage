@@ -819,6 +819,8 @@ function setVisibleView(page) {
   }
   if (!page) stockPriceSparklineRequest += 1;
   document.querySelector('.topbar').classList.remove('topbar-with-banner');
+  $('siteShell').classList.remove('has-bottom-banner');
+  document.body.classList.remove('fanpage-bottom-banner-active');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
   const usesKawaiiLayout = !!page && page.profile?.layoutDesign !== 2;
   const usesKawaiiHome = !page;
@@ -2124,6 +2126,8 @@ function renderFanPage(page) {
   currentPage = page;
   const view = $('fanPageView');
   view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2');
+  $('siteShell').classList.remove('has-bottom-banner');
+  document.body.classList.remove('fanpage-bottom-banner-active');
   const layoutDesign = page.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
   const usesKawaiiLayout = layoutDesign === 1;
   $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
@@ -2285,6 +2289,8 @@ function renderFanPage(page) {
   const bottomBanner = renderBannerSection(page, 'bottom');
   if (bottomBanner) {
     view.classList.add('has-bottom-banner');
+    $('siteShell').classList.add('has-bottom-banner');
+    document.body.classList.add('fanpage-bottom-banner-active');
     view.append(bottomBanner);
   }
   if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
