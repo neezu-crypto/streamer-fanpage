@@ -984,18 +984,29 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settin
   min-height: 42px;
   padding: 0;
   overflow: visible;
-  border: 0;
-  border-radius: 14px;
-  background: transparent url("assets/fanpage-kawaii/cat-paw-close.svg") center / contain no-repeat;
+  border: 1px solid #e7c7d9;
+  border-radius: 50%;
+  background: #fff0f6 url("assets/fanpage-kawaii/cat-paw-close.svg") center / contain no-repeat;
   color: transparent;
   box-shadow: none;
   font-size: 0;
   line-height: 0;
 }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close::before {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #70465e;
+  content: "×";
+  font: 800 19px/1 var(--font);
+  text-shadow: 0 1px 0 #fff;
+  pointer-events: none;
+}
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close:hover:not(:disabled) {
   transform: translateY(-2px) rotate(-4deg) scale(1.07);
-  border: 0;
-  background-color: transparent;
+  border-color: #dca9c3;
+  background-color: #ffe8f2;
   box-shadow: none;
   filter: saturate(1.06) drop-shadow(0 5px 4px #aa76972b);
 }
@@ -1022,6 +1033,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settin
   font: 700 11px/1.2 var(--font);
   white-space: nowrap;
   opacity: 0;
+  z-index: 3;
   pointer-events: none;
   transform: translate(4px, -50%);
   transition: opacity .16s ease, transform .16s ease;
