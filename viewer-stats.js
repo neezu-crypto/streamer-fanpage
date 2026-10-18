@@ -1478,11 +1478,6 @@ function enqueueStats(card, vod, loadToken) {
   )
     .then((stats) => {
       if (!card.isConnected || loadToken !== activeLoadToken) return;
-      if (includePremiumMetrics !== subscriptionState.subscribed) {
-        card.dataset.statsState = 'idle';
-        enqueueStats(card, vod, loadToken);
-        return;
-      }
       showStatsLinks(card, stats);
     })
     .catch(async (error) => {
