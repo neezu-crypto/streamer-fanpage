@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f6fa">
-  <meta name="description" content="스트리머 고점체크: SOOP 다시보기 시청 통계를 확인하고 같은 날 두 스트리머의 고점을 비교합니다.">
+  <meta name="description" content="스트리머 고점체크: SOOP 다시보기 시청 통계를 확인하고 키워드로 여러 스트리머의 고점을 비교합니다.">
   <title>스트리머 고점체크</title>
   <script src="input-privacy.js?v=20261016-input-privacy"></script>
   <link rel="icon" type="image/svg+xml" href="viewer-stats-icon.svg">
@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261016-profile-quick-edit">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261018-sponsor-rails">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261019-keyword-compare">
   <link rel="stylesheet" href="viewer-sponsors.css?v=20261018-30day-policy">
 </head>
 <body class="viewer-stats-page">
@@ -77,7 +77,7 @@
       <section class="viewer-stats-hero">
         <p class="eyebrow">SOOP VIEWER ANALYTICS</p>
         <h1>방송의 흐름을<br><span>숫자로 확인하세요</span></h1>
-        <p>다시보기별 최고·최저 시청 순간과 같은 날 두 스트리머 비교, 기간별 최고 기록을 한곳에서 확인할 수 있습니다.</p>
+        <p>다시보기별 최고·최저 시청 순간과 기간별 기록을 확인하고, 같은 날 또는 키워드별로 스트리머 고점을 비교할 수 있습니다.</p>
       </section>
 
       <section class="viewer-search-panel" aria-labelledby="viewerSearchTitle">
@@ -199,6 +199,77 @@
             <div class="viewer-comparison-results hidden" id="viewerComparisonResults" aria-live="polite"></div>
           </div>
         </details>
+
+        <details class="viewer-keyword-comparison-panel viewer-collapsible-panel" aria-labelledby="viewerKeywordComparisonTitle">
+          <summary class="viewer-collapsible-summary">
+            <span class="viewer-collapsible-title"><span class="eyebrow">KEYWORD PEAK COMPARISON</span><strong id="viewerKeywordComparisonTitle">키워드로 여러 스트리머 고점 비교</strong></span>
+            <span class="viewer-keyword-comparison-count" id="viewerKeywordComparisonCount">2~5명 선택</span>
+          </summary>
+          <div class="viewer-collapsible-content">
+            <p class="viewer-keyword-comparison-intro">스트리머를 2~5명 고르고 키워드를 입력하면, 각 방송국의 다시보기 검색 결과에서 최고 시청자 수를 비교합니다.</p>
+            <label class="viewer-keyword-comparison-label" for="viewerKeywordComparisonKeyword">다시보기 키워드</label>
+            <input class="viewer-keyword-comparison-keyword" id="viewerKeywordComparisonKeyword" type="search" maxlength="80" autocomplete="off" placeholder="예: 합방, 신작 게임, 노래">
+            <p class="viewer-keyword-comparison-limit">각 스트리머의 최신 검색 결과 최대 10개를 분석해요. 분석량을 제한해 결과가 오래 걸리거나 브라우저가 멈추는 일을 줄입니다.</p>
+            <div class="viewer-keyword-comparison-pickers" id="viewerKeywordComparisonPickers">
+              <div class="viewer-keyword-picker" data-keyword-slot="0">
+                <label class="viewer-comparison-label" for="viewerKeywordSearch0"><span>01</span>첫 번째 스트리머</label>
+                <form class="viewer-comparison-search-form" id="viewerKeywordSearchForm0" autocomplete="off">
+                  <input id="viewerKeywordSearch0" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
+                  <button class="button" type="submit" id="viewerKeywordSearchButton0">검색</button>
+                </form>
+                <div class="viewer-comparison-search-results" id="viewerKeywordSearchResults0" role="listbox" aria-label="첫 번째 스트리머 검색 결과"></div>
+                <div class="viewer-comparison-selected hidden" id="viewerKeywordSelected0"></div>
+                <p class="viewer-keyword-picker-status" id="viewerKeywordPickerStatus0" role="status" aria-live="polite">닉네임이나 SOOP ID를 검색하세요.</p>
+              </div>
+              <div class="viewer-keyword-picker" data-keyword-slot="1">
+                <label class="viewer-comparison-label" for="viewerKeywordSearch1"><span>02</span>두 번째 스트리머</label>
+                <form class="viewer-comparison-search-form" id="viewerKeywordSearchForm1" autocomplete="off">
+                  <input id="viewerKeywordSearch1" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
+                  <button class="button" type="submit" id="viewerKeywordSearchButton1">검색</button>
+                </form>
+                <div class="viewer-comparison-search-results" id="viewerKeywordSearchResults1" role="listbox" aria-label="두 번째 스트리머 검색 결과"></div>
+                <div class="viewer-comparison-selected hidden" id="viewerKeywordSelected1"></div>
+                <p class="viewer-keyword-picker-status" id="viewerKeywordPickerStatus1" role="status" aria-live="polite">첫 번째와 다른 스트리머를 선택하세요.</p>
+              </div>
+              <div class="viewer-keyword-picker" data-keyword-slot="2">
+                <label class="viewer-comparison-label" for="viewerKeywordSearch2"><span>03</span>세 번째 스트리머 · 선택</label>
+                <form class="viewer-comparison-search-form" id="viewerKeywordSearchForm2" autocomplete="off">
+                  <input id="viewerKeywordSearch2" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
+                  <button class="button" type="submit" id="viewerKeywordSearchButton2">검색</button>
+                </form>
+                <div class="viewer-comparison-search-results" id="viewerKeywordSearchResults2" role="listbox" aria-label="세 번째 스트리머 검색 결과"></div>
+                <div class="viewer-comparison-selected hidden" id="viewerKeywordSelected2"></div>
+                <p class="viewer-keyword-picker-status" id="viewerKeywordPickerStatus2" role="status" aria-live="polite">선택 사항이에요.</p>
+              </div>
+              <div class="viewer-keyword-picker" data-keyword-slot="3">
+                <label class="viewer-comparison-label" for="viewerKeywordSearch3"><span>04</span>네 번째 스트리머 · 선택</label>
+                <form class="viewer-comparison-search-form" id="viewerKeywordSearchForm3" autocomplete="off">
+                  <input id="viewerKeywordSearch3" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
+                  <button class="button" type="submit" id="viewerKeywordSearchButton3">검색</button>
+                </form>
+                <div class="viewer-comparison-search-results" id="viewerKeywordSearchResults3" role="listbox" aria-label="네 번째 스트리머 검색 결과"></div>
+                <div class="viewer-comparison-selected hidden" id="viewerKeywordSelected3"></div>
+                <p class="viewer-keyword-picker-status" id="viewerKeywordPickerStatus3" role="status" aria-live="polite">선택 사항이에요.</p>
+              </div>
+              <div class="viewer-keyword-picker" data-keyword-slot="4">
+                <label class="viewer-comparison-label" for="viewerKeywordSearch4"><span>05</span>다섯 번째 스트리머 · 선택</label>
+                <form class="viewer-comparison-search-form" id="viewerKeywordSearchForm4" autocomplete="off">
+                  <input id="viewerKeywordSearch4" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
+                  <button class="button" type="submit" id="viewerKeywordSearchButton4">검색</button>
+                </form>
+                <div class="viewer-comparison-search-results" id="viewerKeywordSearchResults4" role="listbox" aria-label="다섯 번째 스트리머 검색 결과"></div>
+                <div class="viewer-comparison-selected hidden" id="viewerKeywordSelected4"></div>
+                <p class="viewer-keyword-picker-status" id="viewerKeywordPickerStatus4" role="status" aria-live="polite">선택 사항이에요.</p>
+              </div>
+            </div>
+            <p class="viewer-keyword-comparison-status" id="viewerKeywordComparisonStatus" role="status" aria-live="polite">키워드와 스트리머 2명 이상을 선택해 주세요.</p>
+            <div class="viewer-comparison-actions">
+              <button class="button" id="viewerKeywordComparisonClear" type="button" disabled>선택 초기화</button>
+              <button class="button button-primary" id="viewerKeywordComparisonRun" type="button" disabled>고점 비교</button>
+            </div>
+            <div class="viewer-keyword-comparison-results hidden" id="viewerKeywordComparisonResults" aria-live="polite"></div>
+          </div>
+        </details>
       </section>
 
       <section class="viewer-empty" id="viewerEmpty" aria-live="polite">
@@ -220,7 +291,7 @@
       <p class="eyebrow">30-DAY PASS</p>
       <h2 id="viewerSubscriptionDialogTitle">고점체크 구독</h2>
       <div class="viewer-subscription-offer" id="viewerSubscriptionOffer">
-        <p>별풍선 33개로 30일 이용 · 무료 체험과 자동 결제 없이, 기간별 최고 순간과 같은 날 두 스트리머의 다시보기 비교를 확인하세요.</p>
+        <p>별풍선 33개로 30일 이용 · 무료 체험과 자동 결제 없이, 기간별 최고 순간·같은 날 비교·키워드로 여러 스트리머의 고점을 비교하세요.</p>
         <p>구독 신청은 Google·Kakao 계정 연결 또는 스트리머 인증이 필요해요.</p>
       </div>
       <div id="viewerSubscriptionPurchaseInfo">
@@ -305,6 +376,6 @@
       <p class="viewer-sponsor-dialog-status" id="sponsorRequestStatus" role="status" aria-live="polite"></p>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261019-stats-loop-fix"></script>
+  <script type="module" src="viewer-stats.js?v=20261019-keyword-compare"></script>
 </body>
 </html>

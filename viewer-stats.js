@@ -97,6 +97,7 @@ async function loadDevbarLinks() {
 const MAX_CONCURRENT_STATS_REQUESTS = 3;
 const MAX_PERIOD_SCAN_PAGES = 200;
 const VIEWER_VOD_PAGE_SIZE = 60;
+const MAX_KEYWORD_COMPARE_VODS_PER_STREAMER = 10;
 const VIEWER_STATS_EXCLUDED_EDGE_SECONDS = 5 * 60;
 const VIEWER_STATS_INSUFFICIENT_WINDOW_CODE = 'insufficient-analysis-window';
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
@@ -134,6 +135,14 @@ let comparisonRunning = false;
 let comparisonGateWaiting = false;
 let comparisonStatusMessage = '스트리머 2명과 날짜를 선택해 주세요.';
 let comparisonStatusIsError = false;
+let keywordComparisonSelection = [null, null, null, null, null];
+let keywordComparisonSearchRequestSequence = [0, 0, 0, 0, 0];
+let pendingKeywordComparisonRequest = null;
+let keywordComparisonRequestSequence = 0;
+let keywordComparisonRunning = false;
+let keywordComparisonGateWaiting = false;
+let keywordComparisonStatusMessage = '키워드와 스트리머 2명 이상을 선택해 주세요.';
+let keywordComparisonStatusIsError = false;
 let subscriptionState = {
   loaded: false,
   accountProtected: false,
@@ -290,7 +299,7 @@ function scheduleSubscriptionStatusRefresh() {
   );
 }
 
-async function refreshSubscriptionStatus({ resumeComparison = true } = {}) {
+async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywordComparison = true } = {}) {
   const token = ++subscriptionRefreshToken;
   try {
     await getAuthReady();
@@ -333,8 +342,18 @@ async function refreshSubscriptionStatus({ resumeComparison = true } = {}) {
         : '선택한 스트리머와 날짜는 유지돼요. 새 탭에서 로그인한 뒤 이 화면으로 돌아와 주세요.');
       renderComparisonSelection();
     }
+    if (pendingKeywordComparisonRequest && !subscriptionState.isAdmin && !subscriptionState.subscribed) {
+      keywordComparisonGateWaiting = true;
+      setKeywordComparisonStatus(subscriptionState.accountProtected
+        ? subscriptionState.pending
+          ? `구독 신청 승인 대기 중이에요. ${subscriptionState.pendingBalloonCost}개 후원을 확인하면 선택한 스트리머의 키워드 고점 비교 결과가 자동으로 열립니다.`
+          : '로그인이 확인됐어요. 별풍선 33개 구독을 신청하면 승인 후 키워드 고점 비교 결과가 자동으로 열립니다.'
+        : '선택한 키워드와 스트리머는 유지돼요. 로그인한 뒤 이 화면으로 돌아와 주세요.');
+      renderKeywordComparisonSelection();
+    }
     if ($('viewerSubscriptionDialog').open) renderSubscriptionDialogStatus();
     if (resumeComparison) resumePendingComparisonIfReady();
+    if (resumeKeywordComparison) resumePendingKeywordComparisonIfReady();
     return true;
   } catch (error) {
     if (token !== subscriptionRefreshToken) return;
@@ -360,9 +379,12 @@ function renderSubscriptionDialogStatus(message = '') {
   const autoVerificationReady = !!subscriptionState.pendingDonorSoopId;
   const donationCompleted = subscriptionState.pendingDonationCompletedAt > 0;
   const pendingBalloonCost = Number(subscriptionState.pendingBalloonCost) || 33;
-  const comparisonContext = !!pendingComparisonRequest;
+  const keywordComparisonContext = !!pendingKeywordComparisonRequest;
+  const comparisonContext = !!pendingComparisonRequest || keywordComparisonContext;
   offer.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.subscribed || !!hasPending);
-  $('viewerSubscriptionDialogTitle').textContent = comparisonContext ? '비교 결과 확인' : '고점체크 구독';
+  $('viewerSubscriptionDialogTitle').textContent = comparisonContext
+    ? keywordComparisonContext ? '키워드 비교 결과 확인' : '비교 결과 확인'
+    : '고점체크 구독';
   $('viewerSubscriptionDialog').querySelector('.eyebrow').textContent = comparisonContext ? 'RESULT ACCESS' : '30-DAY PASS';
   purchaseInfo.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
   donationStep.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !hasPending);
@@ -382,19 +404,21 @@ function renderSubscriptionDialogStatus(message = '') {
   }
   submit.textContent = subscriptionState.subscribed ? '신청 등록 · 30일 연장' : '구독 신청 등록';
   if (subscriptionState.isAdmin) {
-    status.textContent = '관리자 권한으로 기간별 최고 순간과 같은 날 스트리머 비교를 포함한 모든 분석 기능을 이용할 수 있어요.';
+    status.textContent = '관리자 권한으로 기간별 최고 순간과 스트리머 비교를 포함한 모든 분석 기능을 이용할 수 있어요.';
   } else if (message) {
     status.textContent = message;
   } else if (!subscriptionState.accountProtected) {
     status.textContent = comparisonContext
-      ? '비교 대상은 유지됩니다. Google·Kakao 로그인 또는 스트리머 인증 후 구독을 신청할 수 있어요.'
+      ? '선택한 비교 조건은 유지됩니다. Google·Kakao 로그인 또는 스트리머 인증 후 구독을 신청할 수 있어요.'
       : '익명 계정은 구독 권한을 구매할 수 없어요. Google·Kakao 로그인 또는 스트리머 인증 후 이용해 주세요.';
   } else if (hasPending) {
     if (!autoVerificationReady) {
       status.textContent = '이전 방식으로 접수된 신청입니다. 관리자가 후원 내역을 수동 확인하며, 자동 확인을 원하면 신청을 취소하고 다시 등록해 주세요.';
     } else if (donationCompleted) {
       status.textContent = comparisonContext
-        ? '후원 알림 자동 확인 중이에요. 일치하면 선택한 날짜의 비교 결과가 자동으로 열립니다.'
+        ? keywordComparisonContext
+          ? '후원 알림 자동 확인 중이에요. 일치하면 키워드 고점 비교 결과가 자동으로 열립니다.'
+          : '후원 알림 자동 확인 중이에요. 일치하면 선택한 날짜의 비교 결과가 자동으로 열립니다.'
         : '후원 알림을 자동 대조하고 있어요. 확인되면 이 계정에 30일 이용권이 적용됩니다.';
     } else {
       status.textContent = `신청이 등록됐어요. 운영자 방송국에 ${pendingBalloonCost}개 후원한 뒤 ‘후원 완료 · 자동 확인 시작’을 눌러 주세요.`;
@@ -403,7 +427,9 @@ function renderSubscriptionDialogStatus(message = '') {
     status.textContent = formatSubscriptionDate(subscriptionState.expiresAt) + '까지 구독 중이에요. 미리 갱신해도 남은 기간에 30일이 더해집니다.';
   } else {
     status.textContent = comparisonContext
-      ? '후원자 SOOP 정보를 입력해 신청을 등록하고 후원 완료를 알리면, 후원 알림이 일치할 때 비교 결과가 자동으로 열립니다.'
+      ? keywordComparisonContext
+        ? '후원자 SOOP 정보를 입력해 신청을 등록하고 후원 완료를 알리면, 키워드 고점 비교 결과가 자동으로 열립니다.'
+        : '후원자 SOOP 정보를 입력해 신청을 등록하고 후원 완료를 알리면, 비교 결과가 자동으로 열립니다.'
       : '별풍선 후원 알림이 신청 정보와 일치하면 30일 이용권이 자동 승인됩니다. 확인할 수 없거나 신청이 겹치면 관리자가 수동 확인합니다.';
   }
 }
@@ -611,6 +637,222 @@ async function searchComparisonStreamer(index, query) {
     }
   } finally {
     if (requestId === comparisonSearchRequestSequence[index]) button.disabled = false;
+  }
+}
+
+function keywordComparisonSelectionKey() {
+  return keywordComparisonSelection.map((streamer) => String(streamer && streamer.soopId || '').toLowerCase()).join('|')
+    + ':' + String($('viewerKeywordComparisonKeyword').value || '').trim();
+}
+
+function isCurrentKeywordComparisonRequest(request) {
+  return !!request
+    && request.id === keywordComparisonRequestSequence
+    && request.selectionKey === keywordComparisonSelectionKey();
+}
+
+function setKeywordComparisonStatus(message, isError = false) {
+  keywordComparisonStatusMessage = message;
+  keywordComparisonStatusIsError = isError;
+  const status = $('viewerKeywordComparisonStatus');
+  status.textContent = message;
+  status.classList.toggle('is-error', isError);
+}
+
+function setKeywordPickerStatus(index, message, isError = false) {
+  const status = $('viewerKeywordPickerStatus' + index);
+  status.textContent = message;
+  status.classList.toggle('is-error', isError);
+}
+
+function invalidateKeywordComparisonResult() {
+  keywordComparisonRequestSequence += 1;
+  pendingKeywordComparisonRequest = null;
+  keywordComparisonRunning = false;
+  keywordComparisonGateWaiting = false;
+  $('viewerKeywordComparisonResults').replaceChildren();
+  $('viewerKeywordComparisonResults').classList.add('hidden');
+}
+
+function renderKeywordComparisonSelection() {
+  const selectedCount = keywordComparisonSelection.filter(Boolean).length;
+  const keywordInput = $('viewerKeywordComparisonKeyword');
+  keywordInput.disabled = keywordComparisonRunning;
+  keywordComparisonSelection.forEach((streamer, index) => {
+    const search = $('viewerKeywordSearch' + index);
+    const searchButton = $('viewerKeywordSearchButton' + index);
+    const results = $('viewerKeywordSearchResults' + index);
+    const selected = $('viewerKeywordSelected' + index);
+    const picker = search.closest('.viewer-keyword-picker');
+    const slotDisabled = keywordComparisonRunning || (!streamer && selectedCount >= 5);
+    search.disabled = slotDisabled;
+    searchButton.disabled = slotDisabled || searchButton.dataset.searching === 'true';
+    picker.classList.toggle('is-selected', !!streamer);
+    selected.replaceChildren();
+    selected.classList.toggle('hidden', !streamer);
+    if (streamer) {
+      const avatar = document.createElement('img');
+      avatar.alt = '';
+      avatar.src = streamer.avatarUrl || '';
+      avatar.addEventListener('error', () => { avatar.hidden = true; }, { once: true });
+      const copy = document.createElement('span');
+      copy.className = 'viewer-comparison-selected-copy';
+      const name = document.createElement('strong');
+      name.textContent = streamer.nickname || streamer.soopId;
+      const id = document.createElement('span');
+      id.textContent = 'SOOP ID · ' + streamer.soopId;
+      copy.append(name, id);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'viewer-comparison-remove';
+      remove.dataset.keywordRemove = String(index);
+      remove.setAttribute('aria-label', (index + 1) + '번 스트리머 선택 해제');
+      remove.textContent = '×';
+      remove.disabled = keywordComparisonRunning;
+      selected.append(avatar, copy, remove);
+    }
+    if (slotDisabled && !streamer) results.replaceChildren();
+  });
+  const keyword = String(keywordInput.value || '').trim();
+  $('viewerKeywordComparisonCount').textContent = selectedCount + ' / 5명 선택';
+  $('viewerKeywordComparisonClear').disabled = (selectedCount === 0 && !keyword) || keywordComparisonRunning;
+  $('viewerKeywordComparisonRun').disabled = selectedCount < 2 || selectedCount > 5 || !keyword
+    || keywordComparisonRunning || keywordComparisonGateWaiting;
+  $('viewerKeywordComparisonRun').textContent = keywordComparisonRunning
+    ? '고점 분석 중…'
+    : keywordComparisonGateWaiting
+      ? '로그인·구독 확인 후 자동 진행'
+      : '고점 비교';
+  $('viewerKeywordComparisonStatus').textContent = keywordComparisonStatusMessage;
+  $('viewerKeywordComparisonStatus').classList.toggle('is-error', keywordComparisonStatusIsError);
+}
+
+function renderKeywordComparisonSearchResults(index, streamers) {
+  const results = $('viewerKeywordSearchResults' + index);
+  results.replaceChildren();
+  streamers.forEach((streamer, streamerIndex) => {
+    const button = document.createElement('button');
+    button.className = 'viewer-comparison-search-result';
+    button.type = 'button';
+    button.setAttribute('role', 'option');
+    button.dataset.keywordStreamerIndex = String(streamerIndex);
+    const avatar = document.createElement('img');
+    avatar.alt = '';
+    avatar.loading = 'lazy';
+    avatar.src = streamer.avatarUrl || '';
+    avatar.addEventListener('error', () => { avatar.hidden = true; }, { once: true });
+    const copy = document.createElement('span');
+    copy.className = 'viewer-comparison-search-copy';
+    const name = document.createElement('strong');
+    name.textContent = streamer.nickname || streamer.soopId;
+    const favorites = document.createElement('span');
+    favorites.className = 'viewer-comparison-search-popularity';
+    favorites.textContent = Number.isFinite(streamer.favoriteCount)
+      ? '즐겨찾기 ' + streamer.favoriteCount.toLocaleString('ko-KR') + '개'
+      : '즐겨찾기 수 확인 불가';
+    const id = document.createElement('span');
+    id.textContent = 'SOOP ID · ' + streamer.soopId;
+    copy.append(name, favorites, id);
+    const select = document.createElement('span');
+    select.className = 'viewer-comparison-search-select';
+    select.textContent = (streamerIndex + 1) + '위 · 선택';
+    button.append(avatar, copy, select);
+    results.append(button);
+  });
+  results._streamers = streamers;
+}
+
+function selectKeywordComparisonStreamer(index, streamer) {
+  const soopId = String(streamer && streamer.soopId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(soopId)) {
+    setKeywordPickerStatus(index, 'SOOP ID를 확인하지 못했어요. 다른 검색어를 입력해 주세요.', true);
+    return;
+  }
+  const duplicate = keywordComparisonSelection.findIndex((selected, selectedIndex) => selectedIndex !== index
+    && selected && String(selected.soopId).toLowerCase() === soopId);
+  if (duplicate >= 0) {
+    setKeywordPickerStatus(index, '이미 선택한 스트리머예요. 다른 스트리머를 골라 주세요.', true);
+    return;
+  }
+  keywordComparisonSelection[index] = { ...streamer, soopId };
+  $('viewerKeywordSearch' + index).value = '';
+  $('viewerKeywordSearchResults' + index).replaceChildren();
+  $('viewerKeywordSearchResults' + index)._streamers = [];
+  invalidateKeywordComparisonResult();
+  setKeywordPickerStatus(index, '선택됐어요.');
+  const count = keywordComparisonSelection.filter(Boolean).length;
+  setKeywordComparisonStatus(count >= 2 && $('viewerKeywordComparisonKeyword').value.trim()
+    ? '비교할 준비가 됐어요. 최신 키워드 다시보기에서 각 스트리머의 최고 시청자를 찾습니다.'
+    : '키워드와 스트리머 2명 이상을 선택해 주세요.');
+  renderKeywordComparisonSelection();
+}
+
+function clearKeywordComparisonStreamer(index) {
+  keywordComparisonSearchRequestSequence[index] += 1;
+  keywordComparisonSelection[index] = null;
+  $('viewerKeywordSearchResults' + index).replaceChildren();
+  $('viewerKeywordSearchResults' + index)._streamers = [];
+  invalidateKeywordComparisonResult();
+  setKeywordPickerStatus(index, index < 2 ? '닉네임이나 SOOP ID를 검색하세요.' : '선택 사항이에요.');
+  setKeywordComparisonStatus(keywordComparisonSelection.filter(Boolean).length >= 2 && $('viewerKeywordComparisonKeyword').value.trim()
+    ? '비교할 준비가 됐어요. 다시 고점 비교를 눌러 주세요.'
+    : '키워드와 스트리머 2명 이상을 선택해 주세요.');
+  renderKeywordComparisonSelection();
+}
+
+async function searchKeywordComparisonStreamer(index, query) {
+  const cleanQuery = String(query || '').trim();
+  if (!cleanQuery) {
+    setKeywordPickerStatus(index, '닉네임, SOOP 아이디 또는 방송국 주소를 입력해 주세요.', true);
+    return;
+  }
+  const requestId = ++keywordComparisonSearchRequestSequence[index];
+  const button = $('viewerKeywordSearchButton' + index);
+  const idFromInput = parseSoopId(cleanQuery);
+  const searchQuery = idFromInput || cleanQuery;
+  button.dataset.searching = 'true';
+  button.disabled = true;
+  setKeywordPickerStatus(index, '스트리머를 찾고 있어요…');
+  renderKeywordComparisonSearchResults(index, []);
+  try {
+    await getAuthReady();
+    const response = await callViewerStats({ action: 'search', query: searchQuery, sortByFavorites: true });
+    if (requestId !== keywordComparisonSearchRequestSequence[index]) return;
+    const candidates = Array.isArray(response.data && response.data.streamers) ? response.data.streamers.slice() : [];
+    const isStationUrl = /^https?:\/\//i.test(cleanQuery) && Boolean(idFromInput);
+    if (idFromInput && !candidates.some((item) => String(item.soopId).toLowerCase() === idFromInput)
+      && (isStationUrl || candidates.length === 0)) {
+      candidates.unshift(streamerForId(idFromInput));
+    }
+    const exactIdMatches = idFromInput
+      ? candidates.filter((item) => String(item.soopId).toLowerCase() === idFromInput)
+      : [];
+    if (exactIdMatches.length === 1) {
+      selectKeywordComparisonStreamer(index, exactIdMatches[0]);
+      return;
+    }
+    if (candidates.length === 1) {
+      selectKeywordComparisonStreamer(index, candidates[0]);
+      return;
+    }
+    renderKeywordComparisonSearchResults(index, candidates);
+    const resultMessage = !candidates.length
+      ? '검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.'
+      : response.data && response.data.favoritesSorted
+        ? response.data.hasMore
+          ? '즐겨찾기 수 기준 상위 3명 · 비교할 스트리머를 선택해 주세요.'
+          : '즐겨찾기 수가 많은 순으로 ' + candidates.length.toLocaleString('ko-KR') + '명 · 비교할 스트리머를 선택해 주세요.'
+        : '즐겨찾기 순위를 불러오지 못했어요. 아래 결과에서 스트리머를 선택해 주세요.';
+    setKeywordPickerStatus(index, resultMessage, !candidates.length);
+  } catch (error) {
+    if (requestId === keywordComparisonSearchRequestSequence[index]) {
+      setKeywordPickerStatus(index, viewerStatsErrorMessage(error, '스트리머 검색에 실패했어요.'), true);
+    }
+  } finally {
+    if (requestId === keywordComparisonSearchRequestSequence[index]) {
+      button.dataset.searching = 'false';
+      renderKeywordComparisonSelection();
+    }
   }
 }
 
@@ -1455,6 +1697,387 @@ async function runComparison() {
   }
 }
 
+function keywordComparisonSlotIndex(streamer) {
+  return keywordComparisonSelection.findIndex((selected) => selected
+    && String(selected.soopId).toLowerCase() === String(streamer && streamer.soopId || '').toLowerCase());
+}
+
+async function findKeywordComparisonVods(streamer, request) {
+  if (!isCurrentKeywordComparisonRequest(request)) return null;
+  const slotIndex = keywordComparisonSlotIndex(streamer);
+  if (slotIndex >= 0) setKeywordPickerStatus(slotIndex, (streamer.nickname || streamer.soopId) + ' · 키워드 다시보기 검색 중…');
+  const response = await callViewerStats({
+    action: 'vods',
+    streamerId: streamer.soopId,
+    page: 1,
+    keyword: request.keyword,
+  });
+  if (!isCurrentKeywordComparisonRequest(request)) return null;
+  const data = response.data || {};
+  const vods = Array.isArray(data.vods) ? data.vods : [];
+  const totalMatches = Math.max(0, Number(data.total) || 0);
+  if (!vods.length) {
+    throw new Error((streamer.nickname || streamer.soopId) + '의 다시보기에서 “' + request.keyword + '” 키워드 검색 결과가 없어요.');
+  }
+  const selectedVods = vods.slice(0, MAX_KEYWORD_COMPARE_VODS_PER_STREAMER);
+  if (slotIndex >= 0) {
+    setKeywordPickerStatus(slotIndex, (streamer.nickname || streamer.soopId) + ' · 검색 결과 '
+      + totalMatches.toLocaleString('ko-KR') + '개 중 최신 ' + selectedVods.length.toLocaleString('ko-KR') + '개 분석 예정');
+  }
+  return { streamer, vods: selectedVods, totalMatches };
+}
+
+async function analyzeKeywordComparisonVods(request, vodGroups) {
+  const resultsByStreamer = new Map();
+  const tasks = [];
+  vodGroups.forEach((group) => {
+    const excludedShortVodCount = group.vods.filter((vod) => {
+      const durationMs = Number(vod && vod.durationMs);
+      return Number.isFinite(durationMs) && durationMs > 0
+        && Math.floor(durationMs / 1000) <= VIEWER_STATS_EXCLUDED_EDGE_SECONDS * 2;
+    }).length;
+    resultsByStreamer.set(String(group.streamer.soopId).toLowerCase(), {
+      ...group,
+      best: null,
+      completed: 0,
+      excludedShortVodCount,
+    });
+    group.vods.forEach((vod) => {
+      const durationMs = Number(vod && vod.durationMs);
+      if (Number.isFinite(durationMs) && durationMs > 0
+        && Math.floor(durationMs / 1000) <= VIEWER_STATS_EXCLUDED_EDGE_SECONDS * 2) return;
+      tasks.push({ streamer: group.streamer, vod });
+    });
+  });
+  if (!tasks.length) throw new Error('키워드에 맞는 다시보기가 모두 10분 이하라 분석할 수 없어요.');
+
+  let cursor = 0;
+  let finished = 0;
+  let failure = null;
+  const updateProgress = () => {
+    vodGroups.forEach((group) => {
+      const slotIndex = keywordComparisonSlotIndex(group.streamer);
+      const result = resultsByStreamer.get(String(group.streamer.soopId).toLowerCase());
+      if (slotIndex < 0 || !result) return;
+      setKeywordPickerStatus(slotIndex, (group.streamer.nickname || group.streamer.soopId) + ' · '
+        + result.completed.toLocaleString('ko-KR') + ' / ' + group.vods.length.toLocaleString('ko-KR')
+        + '개 분석 완료' + (result.excludedShortVodCount ? ' · 10분 이하 '
+          + result.excludedShortVodCount.toLocaleString('ko-KR') + '개 제외' : ''));
+    });
+    setKeywordComparisonStatus('키워드 다시보기 ' + finished.toLocaleString('ko-KR') + ' / '
+      + tasks.length.toLocaleString('ko-KR') + '개 분석 중 · 최대 3개씩 처리합니다.');
+  };
+  updateProgress();
+  const worker = async () => {
+    while (isCurrentKeywordComparisonRequest(request) && !failure && cursor < tasks.length) {
+      const task = tasks[cursor++];
+      const result = resultsByStreamer.get(String(task.streamer.soopId).toLowerCase());
+      try {
+        const stats = await loadVodStats(
+          task.vod,
+          task.streamer.soopId,
+          () => isCurrentKeywordComparisonRequest(request),
+          true,
+          () => setKeywordComparisonStatus('현재 이용자가 많아 집계 시간이 길어지고 있습니다. 키워드 고점 분석을 계속 진행하고 있어요.'),
+        );
+        if (!isCurrentKeywordComparisonRequest(request)) return;
+        const peak = Number(stats.highest && stats.highest.viewers);
+        const second = Number(stats.highest && stats.highest.second);
+        if (!Number.isFinite(peak) || !Number.isFinite(second)) {
+          throw new Error((task.vod.title || '다시보기') + '의 최고 시청자 통계를 확인할 수 없어요.');
+        }
+        if (!result.best || peak > Number(result.best.stats.highest.viewers)) result.best = { vod: task.vod, stats };
+        result.completed += 1;
+        finished += 1;
+        updateProgress();
+      } catch (error) {
+        if (!isCurrentKeywordComparisonRequest(request)) return;
+        if (error && error.code === 'viewer-stats/insufficient-analysis-window') {
+          result.excludedShortVodCount += 1;
+          finished += 1;
+          updateProgress();
+          continue;
+        }
+        failure = { streamer: task.streamer, error };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT_STATS_REQUESTS, tasks.length) }, () => worker()));
+  if (!isCurrentKeywordComparisonRequest(request)) return null;
+  if (failure) {
+    const name = failure.streamer.nickname || failure.streamer.soopId;
+    throw new Error(name + '의 키워드 다시보기 통계를 모두 불러오지 못했어요. '
+      + (failure.error && failure.error.message || '잠시 후 다시 시도해 주세요.'));
+  }
+  const results = [];
+  for (const group of vodGroups) {
+    const item = resultsByStreamer.get(String(group.streamer.soopId).toLowerCase());
+    if (!item.best) {
+      throw new Error((group.streamer.nickname || group.streamer.soopId)
+        + '의 검색 결과에서 분석 가능한 다시보기를 찾지 못했어요. 10분 초과 영상을 확인해 주세요.');
+    }
+    results.push({
+      streamer: item.streamer,
+      vod: item.best.vod,
+      stats: item.best.stats,
+      totalMatches: item.totalMatches,
+      analyzedCount: item.completed,
+      excludedShortVodCount: item.excludedShortVodCount,
+    });
+  }
+  return results;
+}
+
+function renderKeywordComparisonResults(request, comparisons) {
+  const results = $('viewerKeywordComparisonResults');
+  results.replaceChildren();
+  const ordered = comparisons.slice().sort((a, b) => Number(b.stats.highest.viewers) - Number(a.stats.highest.viewers));
+  const peaks = ordered.map((result) => Math.max(0, Number(result.stats.highest.viewers) || 0));
+  const maxPeak = Math.max(1, ...peaks);
+  const winner = ordered[0];
+  const runnerUpPeak = peaks.length > 1 ? peaks[1] : 0;
+  const summary = document.createElement('div');
+  summary.className = 'viewer-comparison-summary';
+  const summaryText = document.createElement('span');
+  summaryText.textContent = '“' + request.keyword + '” 검색 결과 중 고점이 가장 높은 스트리머';
+  const summaryValue = document.createElement('strong');
+  summaryValue.textContent = (winner.streamer.nickname || winner.streamer.soopId) + ' · '
+    + Number(winner.stats.highest.viewers).toLocaleString('ko-KR') + '명'
+    + (peaks.length > 1 ? ' · 다음 순위보다 +' + Math.max(0, peaks[0] - runnerUpPeak).toLocaleString('ko-KR') + '명' : '');
+  summary.append(summaryText, summaryValue);
+
+  const heading = document.createElement('div');
+  heading.className = 'viewer-comparison-results-heading';
+  const title = document.createElement('h3');
+  title.textContent = '키워드 다시보기 최고 시청자 비교';
+  const meta = document.createElement('span');
+  meta.textContent = '“' + request.keyword + '” · ' + comparisons.length + '명 · 시작/종료 전 5분 제외';
+  heading.append(title, meta);
+
+  const grid = document.createElement('div');
+  grid.className = 'viewer-keyword-result-grid';
+  ordered.forEach((result, index) => {
+    const { streamer, vod, stats, totalMatches, analyzedCount, excludedShortVodCount } = result;
+    const peak = Math.max(0, Number(stats.highest.viewers) || 0);
+    const card = document.createElement('article');
+    card.className = 'viewer-comparison-result-card viewer-keyword-result-card' + (index === 0 ? ' is-leading' : '');
+    const thumbnail = document.createElement('a');
+    thumbnail.className = 'viewer-comparison-result-thumb' + (vod.thumbnailUrl ? '' : ' is-missing');
+    thumbnail.href = playbackUrl(vod.id, stats.highest.second);
+    thumbnail.target = '_blank';
+    thumbnail.rel = 'noopener noreferrer';
+    thumbnail.setAttribute('aria-label', (vod.title || '다시보기') + ' 고점부터 재생');
+    if (vod.thumbnailUrl) {
+      const image = document.createElement('img');
+      image.src = vod.thumbnailUrl;
+      image.alt = (vod.title || '다시보기') + ' 썸네일';
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      image.addEventListener('error', () => {
+        image.remove();
+        thumbnail.classList.add('is-missing');
+      }, { once: true });
+      thumbnail.append(image);
+    }
+    const body = document.createElement('div');
+    body.className = 'viewer-comparison-result-body';
+    const name = document.createElement('h4');
+    name.textContent = (index + 1) + '위 · ' + (streamer.nickname || streamer.soopId);
+    const vodTitle = document.createElement('p');
+    vodTitle.className = 'viewer-comparison-result-vod';
+    vodTitle.textContent = vod.title || '제목 없음';
+    const vodMeta = document.createElement('p');
+    vodMeta.className = 'viewer-comparison-result-vod-meta';
+    vodMeta.textContent = '방송일 ' + formatVodDate(vod.regDate) + ' · 검색 결과 ' + totalMatches.toLocaleString('ko-KR')
+      + '개 중 최신 ' + analyzedCount.toLocaleString('ko-KR') + '개 분석'
+      + (excludedShortVodCount ? ' · 10분 이하 ' + excludedShortVodCount.toLocaleString('ko-KR') + '개 제외' : '');
+    const metrics = document.createElement('div');
+    metrics.className = 'viewer-comparison-result-metrics viewer-keyword-result-metrics';
+    metrics.append(
+      comparisonMetric('최고 시청자', peak.toLocaleString('ko-KR') + '명', true),
+      comparisonMetric('고점 시각', formatClock(stats.highest.second)),
+      comparisonMetric('분석한 다시보기', analyzedCount.toLocaleString('ko-KR') + '개'),
+    );
+    const bar = document.createElement('div');
+    bar.className = 'viewer-comparison-bar';
+    bar.setAttribute('role', 'img');
+    bar.setAttribute('aria-label', '선택한 스트리머 중 최고 시청자 수 비율 ' + Math.round((peak / maxPeak) * 100) + '%');
+    const fill = document.createElement('span');
+    fill.style.setProperty('--comparison-bar', Math.max(3, Math.round((peak / maxPeak) * 100)) + '%');
+    bar.append(fill);
+    const play = document.createElement('a');
+    play.className = 'viewer-comparison-play';
+    play.href = playbackUrl(vod.id, stats.highest.second);
+    play.target = '_blank';
+    play.rel = 'noopener noreferrer';
+    play.textContent = '고점 ' + formatClock(stats.highest.second) + ' · ' + peak.toLocaleString('ko-KR') + '명부터 재생 ↗';
+    body.append(name, vodTitle, vodMeta, metrics, bar, play);
+    card.append(thumbnail, body);
+    grid.append(card);
+  });
+  results.append(heading, summary, grid);
+  results.classList.remove('hidden');
+}
+
+function showKeywordComparisonError(error) {
+  const results = $('viewerKeywordComparisonResults');
+  results.replaceChildren();
+  const message = document.createElement('p');
+  message.className = 'viewer-comparison-error';
+  message.textContent = viewerStatsErrorMessage(error, '키워드 비교를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  results.append(message);
+  results.classList.remove('hidden');
+}
+
+async function loadKeywordComparisonResults(request) {
+  if (!isCurrentKeywordComparisonRequest(request)) return;
+  keywordComparisonRunning = true;
+  keywordComparisonGateWaiting = false;
+  setKeywordComparisonStatus('각 스트리머의 최신 키워드 다시보기에서 고점 통계를 확인하고 있어요.');
+  renderKeywordComparisonSelection();
+  if ($('viewerSubscriptionDialog').open) $('viewerSubscriptionDialog').close();
+  const results = $('viewerKeywordComparisonResults');
+  results.replaceChildren();
+  const loading = document.createElement('p');
+  loading.className = 'viewer-keyword-comparison-loading';
+  loading.textContent = '키워드 검색 결과를 찾고 최고 시청자를 계산하는 중…';
+  results.append(loading);
+  results.classList.remove('hidden');
+  try {
+    const groups = await Promise.all(request.streamers.map((streamer) => findKeywordComparisonVods(streamer, request)));
+    if (!isCurrentKeywordComparisonRequest(request)) return;
+    const comparisons = await analyzeKeywordComparisonVods(request, groups);
+    if (!isCurrentKeywordComparisonRequest(request)) return;
+    renderKeywordComparisonResults(request, comparisons);
+    pendingKeywordComparisonRequest = null;
+    setKeywordComparisonStatus('비교가 끝났어요. 검색 결과마다 최신 10개까지 분석한 뒤 최고 고점 순으로 표시합니다.');
+  } catch (error) {
+    if (!isCurrentKeywordComparisonRequest(request)) return;
+    if (error && error.code === 'functions/permission-denied') {
+      pendingKeywordComparisonRequest = request;
+      keywordComparisonRunning = false;
+      keywordComparisonGateWaiting = true;
+      const refreshed = await refreshSubscriptionStatus({ resumeComparison: false, resumeKeywordComparison: false });
+      if (!isCurrentKeywordComparisonRequest(request)) return;
+      if (refreshed && !subscriptionState.isAdmin && !subscriptionState.subscribed) {
+        setKeywordComparisonStatus('구독을 확인하지 못했어요. 선택한 키워드와 스트리머는 유지됩니다.');
+        renderKeywordComparisonSelection();
+        openSubscriptionDialog();
+        return;
+      }
+      pendingKeywordComparisonRequest = null;
+      keywordComparisonGateWaiting = false;
+      showKeywordComparisonError(new Error('서버에서 구독 권한을 확인하지 못했어요. 상태를 새로고침한 뒤 다시 시도해 주세요.'));
+      setKeywordComparisonStatus('구독 권한 확인에 실패했어요. 잠시 후 다시 시도해 주세요.', true);
+      return;
+    }
+    pendingKeywordComparisonRequest = null;
+    showKeywordComparisonError(error);
+    setKeywordComparisonStatus(viewerStatsErrorMessage(error, '비교 통계를 모두 불러오지 못했어요. 선택한 조건을 유지해 다시 시도할 수 있습니다.'), true);
+  } finally {
+    if (request.id === keywordComparisonRequestSequence) {
+      keywordComparisonRunning = false;
+      renderKeywordComparisonSelection();
+    }
+  }
+}
+
+function resumePendingKeywordComparisonIfReady() {
+  const request = pendingKeywordComparisonRequest;
+  if (!request || keywordComparisonRunning || (!subscriptionState.isAdmin && !subscriptionState.subscribed)) return;
+  if (!isCurrentKeywordComparisonRequest(request)) {
+    pendingKeywordComparisonRequest = null;
+    keywordComparisonGateWaiting = false;
+    renderKeywordComparisonSelection();
+    return;
+  }
+  keywordComparisonGateWaiting = false;
+  keywordComparisonRunning = true;
+  void loadKeywordComparisonResults(request);
+}
+
+async function runKeywordComparison() {
+  const keyword = String($('viewerKeywordComparisonKeyword').value || '').trim();
+  const streamers = keywordComparisonSelection.filter(Boolean);
+  if (!keyword) {
+    setKeywordComparisonStatus('다시보기 키워드를 입력해 주세요.', true);
+    renderKeywordComparisonSelection();
+    return;
+  }
+  if (streamers.length < 2 || streamers.length > 5) {
+    setKeywordComparisonStatus('비교할 스트리머를 2~5명 선택해 주세요.', true);
+    renderKeywordComparisonSelection();
+    return;
+  }
+  const uniqueIds = new Set(streamers.map((streamer) => String(streamer.soopId).toLowerCase()));
+  if (uniqueIds.size !== streamers.length) {
+    setKeywordComparisonStatus('서로 다른 스트리머를 선택해 주세요.', true);
+    renderKeywordComparisonSelection();
+    return;
+  }
+  invalidateKeywordComparisonResult();
+  const request = {
+    id: keywordComparisonRequestSequence,
+    keyword,
+    streamers,
+    selectionKey: keywordComparisonSelectionKey(),
+  };
+  pendingKeywordComparisonRequest = request;
+  keywordComparisonRunning = true;
+  setKeywordComparisonStatus('비교 결과를 열 수 있는 계정인지 확인하고 있어요.');
+  renderKeywordComparisonSelection();
+  try {
+    await getAuthReady();
+    const response = await callViewerSubscription({ action: 'periodAccess' });
+    if (!isCurrentKeywordComparisonRequest(request)) return;
+    const access = response.data || {};
+    subscriptionState.isAdmin = access.isAdmin === true;
+    subscriptionState.accountProtected = subscriptionState.accountProtected || subscriptionState.isAdmin;
+    subscriptionState.subscribed = true;
+    subscriptionState.expiresAt = Number(access.expiresAt) || subscriptionState.expiresAt;
+    subscriptionState.loaded = true;
+    renderSubscriptionControls();
+    scheduleSubscriptionStatusRefresh();
+    keywordComparisonRunning = false;
+    resumePendingKeywordComparisonIfReady();
+  } catch (error) {
+    if (!isCurrentKeywordComparisonRequest(request)) return;
+    if (!error || error.code !== 'functions/permission-denied') {
+      pendingKeywordComparisonRequest = null;
+      keywordComparisonRunning = false;
+      keywordComparisonGateWaiting = false;
+      setKeywordComparisonStatus(viewerStatsErrorMessage(error, '구독 권한을 확인하지 못했어요. 다시 시도해 주세요.'), true);
+      renderKeywordComparisonSelection();
+      return;
+    }
+    const refreshed = await refreshSubscriptionStatus({ resumeComparison: false, resumeKeywordComparison: false });
+    if (!isCurrentKeywordComparisonRequest(request)) return;
+    if (!refreshed) {
+      pendingKeywordComparisonRequest = null;
+      keywordComparisonRunning = false;
+      keywordComparisonGateWaiting = false;
+      setKeywordComparisonStatus('로그인·구독 상태를 확인하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.', true);
+      renderKeywordComparisonSelection();
+      return;
+    }
+    if (subscriptionState.isAdmin || subscriptionState.subscribed) {
+      keywordComparisonRunning = false;
+      resumePendingKeywordComparisonIfReady();
+      return;
+    }
+    keywordComparisonRunning = false;
+    keywordComparisonGateWaiting = true;
+    setKeywordComparisonStatus(subscriptionState.accountProtected
+      ? subscriptionState.pending
+        ? '구독 신청 승인 대기 중이에요. 승인되면 키워드 고점 비교 결과가 자동으로 열립니다.'
+        : '선택한 키워드와 스트리머는 유지됩니다. 로그인 계정에 구독을 신청해 주세요.'
+      : '선택한 키워드와 스트리머는 유지됩니다. 로그인한 뒤 구독 신청을 진행해 주세요.');
+    renderKeywordComparisonSelection();
+    renderSubscriptionDialogStatus();
+    openSubscriptionDialog();
+  }
+}
+
 function cancelQueuedStatsRequests() {
   const queued = statsQueue;
   statsQueue = [];
@@ -2036,6 +2659,59 @@ const comparisonTodayParts = new Intl.DateTimeFormat('en-US', {
 const comparisonToday = Object.fromEntries(comparisonTodayParts.map((part) => [part.type, part.value]));
 $('viewerComparisonDate').max = comparisonToday.year + '-' + comparisonToday.month + '-' + comparisonToday.day;
 renderComparisonSelection();
+
+for (let index = 0; index < 5; index += 1) {
+  $('viewerKeywordSearchForm' + index).addEventListener('submit', (event) => {
+    event.preventDefault();
+    searchKeywordComparisonStreamer(index, $('viewerKeywordSearch' + index).value);
+  });
+  $('viewerKeywordSearch' + index).addEventListener('input', () => {
+    keywordComparisonSearchRequestSequence[index] += 1;
+    $('viewerKeywordSearchButton' + index).dataset.searching = 'false';
+    $('viewerKeywordSearchResults' + index).replaceChildren();
+    $('viewerKeywordSearchResults' + index)._streamers = [];
+    if (keywordComparisonSelection[index]) clearKeywordComparisonStreamer(index);
+    else renderKeywordComparisonSelection();
+  });
+  $('viewerKeywordSearchResults' + index).addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-keyword-streamer-index]');
+    if (!button) return;
+    const streamers = $('viewerKeywordSearchResults' + index)._streamers || [];
+    const streamer = streamers[Number(button.dataset.keywordStreamerIndex)];
+    if (streamer) selectKeywordComparisonStreamer(index, streamer);
+  });
+  $('viewerKeywordSelected' + index).addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-keyword-remove]');
+    if (button) clearKeywordComparisonStreamer(Number(button.dataset.keywordRemove));
+  });
+}
+
+$('viewerKeywordComparisonKeyword').addEventListener('input', () => {
+  invalidateKeywordComparisonResult();
+  setKeywordComparisonStatus(keywordComparisonSelection.filter(Boolean).length >= 2
+    ? '키워드가 바뀌었어요. 다시 고점 비교를 눌러 주세요.'
+    : '키워드와 스트리머 2명 이상을 선택해 주세요.');
+  renderKeywordComparisonSelection();
+});
+
+$('viewerKeywordComparisonRun').addEventListener('click', runKeywordComparison);
+$('viewerKeywordComparisonClear').addEventListener('click', () => {
+  if (keywordComparisonRunning) return;
+  keywordComparisonSelection = [null, null, null, null, null];
+  keywordComparisonSearchRequestSequence = keywordComparisonSearchRequestSequence.map((value) => value + 1);
+  for (let index = 0; index < 5; index += 1) {
+    $('viewerKeywordSearch' + index).value = '';
+    $('viewerKeywordSearchButton' + index).dataset.searching = 'false';
+    $('viewerKeywordSearchResults' + index).replaceChildren();
+    $('viewerKeywordSearchResults' + index)._streamers = [];
+    setKeywordPickerStatus(index, index < 2 ? '닉네임이나 SOOP ID를 검색하세요.' : '선택 사항이에요.');
+  }
+  $('viewerKeywordComparisonKeyword').value = '';
+  invalidateKeywordComparisonResult();
+  setKeywordComparisonStatus('키워드와 스트리머 2명 이상을 선택해 주세요.');
+  renderKeywordComparisonSelection();
+});
+renderKeywordComparisonSelection();
 
 $('viewerPeriodScanButton').addEventListener('click', () => {
   runPeriodPeakScan({ forceRefresh: $('viewerPeriodScanButton').dataset.hasResult === 'true' });

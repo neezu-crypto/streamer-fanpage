@@ -1180,3 +1180,161 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
     padding: 12px;
   }
 }
+
+/* Subscriber keyword comparison across two to five streamer VOD libraries. */
+.viewer-keyword-comparison-panel {
+  margin: 16px 0 28px;
+  padding: 20px;
+  border: 1px solid #cfd8e5;
+  border-top: 3px solid #a53660;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 2px 7px #17243a08;
+}
+.viewer-keyword-comparison-count {
+  flex: none;
+  padding: 7px 10px;
+  border: 1px solid #cbd5e3;
+  border-radius: 2px;
+  background: #f3f6fa;
+  color: #52627a;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.viewer-keyword-comparison-intro {
+  margin: 0 0 14px;
+  color: #53637b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.viewer-keyword-comparison-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #33435b;
+  font-size: 12px;
+  font-weight: 800;
+}
+.viewer-keyword-comparison-keyword {
+  width: min(100%, 520px);
+  height: 43px;
+  padding: 0 11px;
+  border: 1px solid #cbd5e3;
+  border-radius: 2px;
+  background: #fff;
+  color: #17243a;
+  font: inherit;
+  font-size: 13px;
+}
+.viewer-keyword-comparison-keyword:focus {
+  outline: 2px solid #486bd633;
+  border-color: #7188d1;
+}
+.viewer-keyword-comparison-keyword:disabled {
+  background: #f4f6fa;
+  color: #75839a;
+}
+.viewer-keyword-comparison-limit {
+  margin: 7px 0 0;
+  color: #75839a;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.viewer-keyword-comparison-pickers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.viewer-keyword-picker {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #dbe2ec;
+  border-radius: 2px;
+  background: #f8fafc;
+}
+.viewer-keyword-picker.is-selected {
+  border-color: #bcc9e8;
+  background: #f5f7fc;
+}
+.viewer-keyword-picker .viewer-comparison-label {
+  margin-top: 0;
+}
+.viewer-keyword-picker-status,
+.viewer-keyword-comparison-status {
+  min-height: 18px;
+  margin: 8px 0 0;
+  color: #66758c;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.viewer-keyword-picker-status.is-error,
+.viewer-keyword-comparison-status.is-error {
+  color: #ad3154;
+}
+.viewer-keyword-picker input:disabled,
+.viewer-keyword-picker .button:disabled {
+  opacity: .62;
+  cursor: not-allowed;
+}
+.viewer-keyword-picker .viewer-comparison-selected {
+  margin-top: 7px;
+}
+.viewer-keyword-comparison-status {
+  margin: 12px 0;
+  font-size: 12px;
+}
+.viewer-keyword-comparison-results {
+  margin-top: 17px;
+  padding-top: 17px;
+  border-top: 1px solid #e5e9f0;
+}
+.viewer-keyword-comparison-loading {
+  margin: 0;
+  color: #53637b;
+  font-size: 13px;
+}
+.viewer-keyword-result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.viewer-keyword-result-card.is-leading {
+  border-top: 3px solid #c74372;
+}
+.viewer-keyword-result-card .viewer-comparison-result-vod-meta {
+  min-height: 36px;
+}
+.viewer-keyword-result-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media(max-width:960px) {
+  .viewer-keyword-comparison-pickers,
+  .viewer-keyword-result-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media(max-width:620px) {
+  .viewer-keyword-comparison-panel {
+    margin: 14px 0 22px;
+    padding: 14px;
+  }
+  .viewer-keyword-comparison-pickers,
+  .viewer-keyword-result-grid {
+    grid-template-columns: 1fr;
+  }
+  .viewer-keyword-comparison-keyword {
+    width: 100%;
+    height: 45px;
+  }
+  .viewer-keyword-comparison-count {
+    padding: 6px 7px;
+    font-size: 10px;
+  }
+  .viewer-keyword-result-metrics .viewer-comparison-result-metric {
+    padding: 8px 6px;
+  }
+  .viewer-keyword-result-metrics .viewer-comparison-result-metric strong {
+    font-size: 13px;
+  }
+}
