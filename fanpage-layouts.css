@@ -1,0 +1,340 @@
+/* Layout 1: a soft, pastel comic-book inspired fanpage. Layout 2 keeps style.css as-is. */
+body.fanpage-layout-one-active {
+  color-scheme: light;
+  background:
+    radial-gradient(circle at 1px 1px, #edc8d51c 1px, transparent 1.5px) 0 0 / 27px 27px,
+    radial-gradient(ellipse at 18% 0%, #ffe8f0 0, transparent 34%),
+    radial-gradient(ellipse at 86% 30%, #eaf1ff 0, transparent 32%),
+    #fffaf7;
+  color: #51465d;
+}
+body.fanpage-layout-one-active .topbar {
+  border-bottom-color: #eadfeb;
+  background: #fffaf7eF;
+  color: #51465d;
+  box-shadow: 0 5px 24px #7560800a;
+}
+body.fanpage-layout-one-active .brand,
+body.fanpage-layout-one-active .brand strong { color: #51465d; }
+body.fanpage-layout-one-active .brand small,
+body.fanpage-layout-one-active .topbar-caption,
+body.fanpage-layout-one-active .account-status { color: #887d91; }
+body.fanpage-layout-one-active .brand-symbol { color: var(--pink); filter: drop-shadow(0 2px 5px #ee86aa55); }
+body.fanpage-layout-one-active .auth-button {
+  border-color: #e5d8e8;
+  background: #fff;
+  color: #5b5067;
+}
+body.fanpage-layout-one-active .auth-button:hover { border-color: #ee86aa; background: #fff2f7; }
+body.fanpage-layout-one-active .account-dialog { color-scheme: dark; }
+body.fanpage-layout-one-active .footer {
+  border-top-color: #eadfeb;
+  color: #887d91;
+}
+body.fanpage-layout-one-active .footer-policy-links a,
+body.fanpage-layout-one-active .footer-feedback-link { border-bottom-color: #d8c8dc; }
+.main-content.has-fanpage-layout-one { width: min(1220px, calc(100% - 48px)); }
+#fanPageView.fanpage-layout-1 {
+  --kawaii-accent: #ee86aa;
+  --kawaii-accent-deep: #d86f98;
+  --kawaii-soft: #ffe3ed;
+  --kawaii-blue: #e3edff;
+  --kawaii-lilac: #f0e8ff;
+  --kawaii-lemon: #fff3cb;
+  --text: #51465d;
+  --muted: #887d91;
+  --line: #eadfeb;
+  --pink: var(--kawaii-accent);
+  --lav: #b8a6ed;
+  width: 100%;
+  padding: 28px 0 48px;
+  color: var(--text);
+  background: transparent;
+}
+#fanPageView.fanpage-layout-1.fanpage-theme-sora {
+  --kawaii-accent: #6387D1;
+  --kawaii-accent-deep: #4e70b6;
+  --kawaii-soft: #CADBFF;
+  --kawaii-blue: #e8efff;
+  --kawaii-lilac: #eef1ff;
+  --kawaii-lemon: #f4f0d8;
+  --pink: #6387D1;
+  --lav: #CADBFF;
+  --line: #dbe4f8;
+}
+#fanPageView.fanpage-layout-1 .back-link { color: #786a83; }
+#fanPageView.fanpage-layout-1 .back-link:hover { color: var(--kawaii-accent-deep); }
+
+.fanpage-kawaii-hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, .44fr);
+  align-items: center;
+  min-height: 300px;
+  margin: 0 0 27px;
+  padding: clamp(30px, 5vw, 58px) clamp(26px, 5.5vw, 70px);
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 32px;
+  background: linear-gradient(118deg, #ffe3eb 0%, #f7eaff 54%, #e3edff 100%);
+  box-shadow: 0 8px 0 #dcc9df99, 0 20px 55px #75608016;
+}
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .fanpage-kawaii-hero {
+  background: linear-gradient(118deg, #e5edff 0%, #f1edff 55%, #e8f6ff 100%);
+  box-shadow: 0 8px 0 #c9d5f099, 0 20px 55px #536f9a18;
+}
+.fanpage-kawaii-hero::before,
+.fanpage-kawaii-hero::after {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+.fanpage-kawaii-hero::before {
+  top: -220px;
+  right: 12%;
+  width: 430px;
+  height: 430px;
+  border: 1px solid #fff9;
+  box-shadow: 0 0 0 25px #ffffff29, 0 0 0 54px #ffffff1d;
+}
+.fanpage-kawaii-hero::after { right: -90px; bottom: -240px; width: 390px; height: 390px; background: #ffffff38; }
+.fanpage-kawaii-copy { position: relative; z-index: 2; max-width: 700px; }
+.fanpage-kawaii-eyebrow { margin: 0 0 11px; color: #9b7298; font-size: 10px; font-weight: 900; letter-spacing: .19em; }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .fanpage-kawaii-eyebrow { color: #5879bd; }
+.fanpage-kawaii-copy h1 { margin: 0; color: #51465d; font: clamp(35px, 5.2vw, 58px)/1.18 var(--display); letter-spacing: -.025em; overflow-wrap: anywhere; }
+.fanpage-kawaii-copy h1 span { color: var(--kawaii-accent-deep); }
+.fanpage-kawaii-description { max-width: 550px; margin: 15px 0 20px; color: #71647b; font-size: 15px; font-weight: 600; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fanpage-kawaii-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.fanpage-kawaii-actions .button { min-height: 43px; padding: 0 17px; border-radius: 999px; }
+.fanpage-kawaii-actions .button-primary { background: var(--kawaii-accent); box-shadow: 0 4px 0 color-mix(in srgb, var(--kawaii-accent-deep), transparent 42%); }
+.fanpage-kawaii-mascot-wrap { position: absolute; right: clamp(25px, 7vw, 84px); bottom: -5px; display: grid; width: clamp(155px, 22vw, 235px); justify-items: center; }
+.fanpage-kawaii-mascot-halo { position: absolute; top: 8%; width: 88%; aspect-ratio: 1; border: 1px dashed #fff; border-radius: 50%; background: radial-gradient(circle, #ffffff66, #ffffff08 70%); }
+.fanpage-kawaii-mascot { position: relative; width: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; filter: drop-shadow(0 10px 8px #796a8822); transition: transform .22s; -webkit-tap-highlight-color: transparent; }
+.fanpage-kawaii-mascot:hover,
+.fanpage-kawaii-mascot:focus-visible { transform: translateY(-6px) rotate(2deg); }
+.fanpage-kawaii-mascot:focus-visible { outline: 3px solid var(--kawaii-accent); outline-offset: 3px; border-radius: 40%; }
+.fanpage-kawaii-mascot img { display: block; width: 100%; height: auto; transition: opacity .18s; }
+.fanpage-kawaii-mascot-wink { position: absolute; inset: 0; opacity: 0; }
+.fanpage-kawaii-mascot.is-winking .fanpage-kawaii-mascot-idle { opacity: 0; }
+.fanpage-kawaii-mascot.is-winking .fanpage-kawaii-mascot-wink { opacity: 1; }
+.fanpage-kawaii-mascot-hint { position: absolute; right: -7px; bottom: 21px; padding: 7px 11px; border: 1px solid #fff; border-radius: 99px; background: #fff; color: #71647b; box-shadow: 0 4px 0 #cbb9d344; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.fanpage-kawaii-sparkles { position: absolute; right: 37%; top: 23%; color: #fff; font-size: clamp(17px, 2vw, 25px); letter-spacing: .65em; text-shadow: 0 2px 4px #ad91b866; animation: fanpage-kawaii-bob 3.4s ease-in-out infinite; }
+@keyframes fanpage-kawaii-bob { 50% { transform: translateY(-7px) rotate(8deg); } }
+
+#fanPageView.fanpage-layout-1 .profile-board {
+  grid-template-columns: minmax(260px, .9fr) minmax(340px, 1.1fr);
+  gap: 21px 34px;
+  margin: 0 0 24px;
+  padding: 58px clamp(22px, 4vw, 48px) 26px;
+  border: 2px solid #fff;
+  border-radius: 28px;
+  background: linear-gradient(145deg, #fffefd, #fff9fc 70%, #f5f7ff);
+  box-shadow: 0 8px 0 #dcc9df88, 0 19px 50px #75608015;
+}
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .profile-board { background: linear-gradient(145deg, #fff, #f5f8ff 72%, #f1efff); box-shadow: 0 8px 0 #c9d5f099, 0 19px 50px #536f9a16; }
+#fanPageView.fanpage-layout-1 .profile-tab { top: -1px; left: -1px; padding: 10px 18px 11px; border: 1px solid #fff; border-radius: 23px 0 21px 0; background: var(--kawaii-lemon); color: #64586e; font-size: 17px; }
+#fanPageView.fanpage-layout-1 .profile-avatar { border-color: #fff; box-shadow: 0 0 0 3px var(--kawaii-soft), 0 8px 22px #76617b22; }
+#fanPageView.fanpage-layout-1 .profile-name { color: #51465d; }
+#fanPageView.fanpage-layout-1 .profile-handle { color: #81758b; }
+#fanPageView.fanpage-layout-1 .profile-fact { background: #fff; color: #51465d; box-shadow: 0 4px 0 #e7dce8; }
+#fanPageView.fanpage-layout-1 .profile-fact span { background: linear-gradient(110deg, var(--kawaii-soft), #f0e7ff); color: #5b526c; }
+#fanPageView.fanpage-layout-1 .profile-fact:nth-child(2) span { background: linear-gradient(110deg, #e7efff, #dceaff); }
+#fanPageView.fanpage-layout-1 .profile-fact:nth-child(3) span { background: linear-gradient(110deg, #f2eaff, #e5dcff); }
+#fanPageView.fanpage-layout-1 .profile-fact:nth-child(4) span { background: linear-gradient(110deg, #e3f6eb, #d5f0e3); }
+#fanPageView.fanpage-layout-1 .profile-about { color: #64596e; }
+#fanPageView.fanpage-layout-1 .profile-about strong { color: var(--kawaii-accent-deep); }
+#fanPageView.fanpage-layout-1 .profile-details { border-top-color: #d9ccdf; }
+#fanPageView.fanpage-layout-1 .profile-detail-label { color: var(--kawaii-accent-deep); }
+#fanPageView.fanpage-layout-1 .profile-detail-value { color: #5d5267; }
+#fanPageView.fanpage-layout-1 .profile-detail.profile-editable:hover { background: #f7eff8; }
+#fanPageView.fanpage-layout-1 .profile-stock-card { border-color: #e8cfe0; background: linear-gradient(110deg, #fff0f6, #f4f0ff); color: #51465d; }
+#fanPageView.fanpage-layout-1 .profile-stock-card:hover { border-color: var(--kawaii-accent); background: linear-gradient(110deg, #ffe7f0, #efebff); }
+#fanPageView.fanpage-layout-1 .profile-stock-meta { color: #81758b; }
+#fanPageView.fanpage-layout-1 .profile-stock-module { align-items: stretch; }
+#fanPageView.fanpage-layout-1 .profile-stock-attendance { border-color: color-mix(in srgb, var(--kawaii-accent), white 38%); background: #fff4f8; color: #64566e; }
+#fanPageView.fanpage-layout-1 .profile-stock-attendance:hover { background: var(--kawaii-soft); }
+#fanPageView.fanpage-layout-1 .profile-actions .button { border-color: #e5d8e8; background: #fff; color: #51465d; }
+#fanPageView.fanpage-layout-1 .profile-actions .button:hover { border-color: var(--kawaii-accent); background: #fff2f7; }
+#fanPageView.fanpage-layout-1 .profile-actions .button-primary { border-color: var(--kawaii-accent); background: var(--kawaii-accent); color: #fff; }
+#fanPageView.fanpage-layout-1 .profile-editable:focus-visible { outline-color: var(--kawaii-accent); }
+
+.fanpage-design-one-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .85fr); align-items: start; gap: 22px; }
+.fanpage-design-one-column { display: grid; align-content: start; gap: 20px; min-width: 0; }
+#fanPageView.fanpage-layout-1 .fanpage-design-one-column > :is(.content-card, .live-section, .messenger-link-section) { min-width: 0; margin: 0; }
+#fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section, .fan-character-ogq-pair) {
+  border: 1px solid #eadfeb;
+  border-radius: 24px;
+  background: #fffefd;
+  box-shadow: 0 6px 0 #e4d6e788, 0 15px 35px #75608012;
+  color: var(--text);
+}
+#fanPageView.fanpage-layout-1.fanpage-theme-sora :is(.content-card, .live-section, .messenger-link-section, .fan-character-ogq-pair) { border-color: #dbe4f8; box-shadow: 0 6px 0 #cdd8ed88, 0 15px 35px #536f9a12; }
+#fanPageView.fanpage-layout-1 .content-card { padding: 22px; }
+#fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(h2, h3, h4, h5, strong) { color: var(--text); }
+#fanPageView.fanpage-layout-1 .content-card :is(.upbo-subtitle, .roulette-description, .songbook-description, .youtube-status, .youtube-empty-state, .calendar-owner-hint, .fan-gallery-subtitle, .fan-gallery-count, .vod-count, .vod-refresh-status, .upbo-topic-copy p, .upbo-viewer-total, .upbo-request-note, .upbo-item-batch-status, .upbo-empty-copy p, .upbo-empty-copy strong, .profile-link-empty-state, .cafe-more-link) { color: #81758b; }
+#fanPageView.fanpage-layout-1 .eyebrow { color: var(--kawaii-accent-deep); }
+#fanPageView.fanpage-layout-1 .content-card .button,
+#fanPageView.fanpage-layout-1 .live-section .button,
+#fanPageView.fanpage-layout-1 .messenger-link-section .button { border-color: #e3d7e6; background: #fff; color: #51465d; }
+#fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) .button:hover { border-color: var(--kawaii-accent); background: #fff3f8; }
+#fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) .button-primary { border-color: var(--kawaii-accent); background: var(--kawaii-accent); color: #fff; }
+#fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(input, textarea, select) { border-color: #e1d6e6; background: #fff; color: #51465d; }
+#fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(input, textarea, select):focus { border-color: var(--kawaii-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--kawaii-accent), transparent 85%); }
+#fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(input, textarea)::placeholder { color: #a39aa9; }
+
+/* Media tiles keep a darker image stage so thumbnails and captions stay legible. */
+#fanPageView.fanpage-layout-1 :is(.fan-gallery-card, .vod-card) { border-color: #e4d9e7; background: #fff; color: #51465d; box-shadow: 0 3px 0 #ece2ed; }
+#fanPageView.fanpage-layout-1 .fan-gallery-card-details { color: #81758b; }
+#fanPageView.fanpage-layout-1 .fan-gallery-stats { color: #665b70; }
+#fanPageView.fanpage-layout-1 .vod-title { color: #51465d; }
+#fanPageView.fanpage-layout-1 .vod-metadata { color: #81758b; }
+#fanPageView.fanpage-layout-1 .songbook-row { border-color: #e8deea; background: #fffafd; }
+#fanPageView.fanpage-layout-1 .songbook-entry { color: #51465d; }
+#fanPageView.fanpage-layout-1 .songbook-entry-details strong { color: #51465d; }
+#fanPageView.fanpage-layout-1 .songbook-entry-details > span,
+#fanPageView.fanpage-layout-1 .songbook-owner-hint { color: #81758b; }
+#fanPageView.fanpage-layout-1 .songbook-empty-state,
+#fanPageView.fanpage-layout-1 .youtube-status,
+#fanPageView.fanpage-layout-1 .upbo-status,
+#fanPageView.fanpage-layout-1 .upbo-inline-empty,
+#fanPageView.fanpage-layout-1 .upbo-empty,
+#fanPageView.fanpage-layout-1 .youtube-empty-state,
+#fanPageView.fanpage-layout-1 .vod-empty-state { border-color: #e7dce9; background: #fff8fc; color: #81758b; }
+#fanPageView.fanpage-layout-1 .upbo-empty-copy strong,
+#fanPageView.fanpage-layout-1 .upbo-choice-copy strong,
+#fanPageView.fanpage-layout-1 .upbo-choice-copy small,
+#fanPageView.fanpage-layout-1 .upbo-cart-item-toggle,
+#fanPageView.fanpage-layout-1 .upbo-cart-quantity-label,
+#fanPageView.fanpage-layout-1 .upbo-item-batch-name,
+#fanPageView.fanpage-layout-1 .upbo-topic-tab { color: #51465d; }
+#fanPageView.fanpage-layout-1 :is(.upbo-choice-item, .upbo-cart-item, .upbo-item-row, .upbo-pending-row, .upbo-record-row, .upbo-item-batch-row) { border-color: #e8deea; background: #fffafd; color: #51465d; }
+#fanPageView.fanpage-layout-1 .upbo-choice-item:hover,
+#fanPageView.fanpage-layout-1 .upbo-choice-item.is-selected,
+#fanPageView.fanpage-layout-1 .upbo-cart-item.is-expanded { border-color: var(--kawaii-accent); background: #fff1f7; }
+#fanPageView.fanpage-layout-1 .upbo-choice-image,
+#fanPageView.fanpage-layout-1 .upbo-choice-image-placeholder,
+#fanPageView.fanpage-layout-1 .upbo-item-image,
+#fanPageView.fanpage-layout-1 .upbo-item-preview,
+#fanPageView.fanpage-layout-1 .upbo-item-batch-names { border-color: #e3d7e7; background: #fff; color: #51465d; }
+#fanPageView.fanpage-layout-1 .upbo-choice-preview { border-color: #e5d8e8; background: #fffefd; box-shadow: 0 14px 38px #58446133; }
+#fanPageView.fanpage-layout-1 .upbo-choice-preview-copy :is(strong, p) { color: #51465d; }
+#fanPageView.fanpage-layout-1 .upbo-request-form .profile-editor-field { color: #62576e; }
+#fanPageView.fanpage-layout-1 .upbo-topic-heading,
+#fanPageView.fanpage-layout-1 .upbo-subsection { border-color: #e8deea; }
+#fanPageView.fanpage-layout-1 .upbo-topic-heading { background: linear-gradient(110deg, #fff0f6, #f4f0ff); }
+#fanPageView.fanpage-layout-1 .upbo-request-form :is(input, textarea),
+#fanPageView.fanpage-layout-1 .upbo-cart-quantity-input { border-color: #e1d6e6; background: #fff; color: #51465d; }
+#fanPageView.fanpage-layout-1 .upbo-item-batch-number,
+#fanPageView.fanpage-layout-1 .upbo-item-batch-image-field,
+#fanPageView.fanpage-layout-1 .upbo-item-preview-status { color: #81758b; }
+
+#fanPageView.fanpage-layout-1 .roulette-list-viewport { border-color: #e7dce9; background: #fff; scrollbar-color: #cbb5d0 #f8eff8; }
+#fanPageView.fanpage-layout-1 .roulette-group { border-color: #e8deea; background: #fff; }
+#fanPageView.fanpage-layout-1 .roulette-group-heading { border-color: #e8deea; background: #fff3f8; }
+#fanPageView.fanpage-layout-1 .roulette-donation-count,
+#fanPageView.fanpage-layout-1 .roulette-item-value,
+#fanPageView.fanpage-layout-1 .roulette-item-probability { color: #51465d; }
+#fanPageView.fanpage-layout-1 .roulette-item-count,
+#fanPageView.fanpage-layout-1 .roulette-scroll-note { color: #81758b; }
+#fanPageView.fanpage-layout-1 .roulette-items { background: #e8deea; }
+#fanPageView.fanpage-layout-1 .roulette-item { background: #fff; }
+#fanPageView.fanpage-layout-1 .roulette-item-type { border-color: color-mix(in srgb, var(--kawaii-accent), transparent 65%); color: var(--kawaii-accent-deep); }
+#fanPageView.fanpage-layout-1 .roulette-item-meter { background: #eee6ef; }
+
+#fanPageView.fanpage-layout-1 .calendar-mode-switch { border-color: #e5dbe8; background: #fff8fc; }
+#fanPageView.fanpage-layout-1 :is(.calendar-mode-button, .calendar-nav-button, .calendar-today-button, .calendar-refresh-button) { color: #665b70; }
+#fanPageView.fanpage-layout-1 .calendar-period { color: #51465d; }
+#fanPageView.fanpage-layout-1 .calendar-legend-item,
+#fanPageView.fanpage-layout-1 .calendar-day-detail p { color: #81758b; }
+#fanPageView.fanpage-layout-1 .calendar-grid { border-color: #e6dce8; }
+#fanPageView.fanpage-layout-1 .calendar-weekday { border-color: #e6dce8; background: #fff3f8; color: #766b80; }
+#fanPageView.fanpage-layout-1 .calendar-day { border-color: #e6dce8; background: #fff; color: #51465d; }
+#fanPageView.fanpage-layout-1 .calendar-day.is-outside-month { background: #fbf8fc; color: #aaa1af; }
+#fanPageView.fanpage-layout-1 .calendar-event-chip { background: #f6f0f8; color: #51465d; }
+#fanPageView.fanpage-layout-1 .calendar-event-row,
+#fanPageView.fanpage-layout-1 .calendar-day-detail { border-color: #e6dce8; background: #fffafd; }
+#fanPageView.fanpage-layout-1 .cafe-post-list { border-color: #e7dce9; }
+#fanPageView.fanpage-layout-1 .cafe-post-row { border-color: #eee6ef; color: #51465d; }
+#fanPageView.fanpage-layout-1 .cafe-post-row:hover { background: #fff2f7; color: #44394f; }
+#fanPageView.fanpage-layout-1 .cafe-post-title:before { color: var(--kawaii-accent); }
+#fanPageView.fanpage-layout-1 .messenger-link-section { padding: 22px; background: linear-gradient(120deg, #fff5f9, #f4f1ff); }
+#fanPageView.fanpage-layout-1 .messenger-link-description,
+#fanPageView.fanpage-layout-1 .messenger-link-note { color: #81758b; }
+#fanPageView.fanpage-layout-1 .fan-character-ogq-pair { overflow: hidden; border-radius: 24px; }
+#fanPageView.fanpage-layout-1 .fan-character-ogq-pair > .fan-character-card { border: 0; border-radius: 0; box-shadow: none; }
+#fanPageView.fanpage-layout-1 .fan-character-ogq-pair > .fan-feature-ogq-panel { border: 0; border-radius: 0; background: #fffefd; box-shadow: none; }
+
+#fanPageView.fanpage-layout-1 .fan-quick-panel { border-color: #eadfeb; background: #fffefdF5; color: #51465d; box-shadow: 0 16px 44px #58446122; }
+#fanPageView.fanpage-layout-1 .fan-quick-toggle,
+#fanPageView.fanpage-layout-1 .fan-quick-close { border-color: #eadfeb; background: #fff; color: #51465d; }
+#fanPageView.fanpage-layout-1 .fan-quick-header,
+#fanPageView.fanpage-layout-1 .fan-quick-link:hover,
+#fanPageView.fanpage-layout-1 .fan-quick-link.is-active { border-color: #eadfeb; }
+#fanPageView.fanpage-layout-1 .fan-quick-link { color: #665b70; }
+#fanPageView.fanpage-layout-1 .fan-quick-number { color: #95899c; }
+#fanPageView.fanpage-layout-1 .fan-quick-scroll-thumb { background: var(--kawaii-accent); }
+
+.profile-layout-choice { min-width: 0; margin: 0 0 16px; padding: 14px; border: 1px solid #ffffff18; border-radius: 13px; }
+.profile-layout-choice legend { padding: 0 7px; color: #ded7e2; font-size: 12px; font-weight: 700; }
+.profile-layout-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.profile-layout-option { display: flex; align-items: flex-start; gap: 9px; min-width: 0; padding: 12px; border: 1px solid #ffffff18; border-radius: 11px; background: #ffffff05; cursor: pointer; }
+.profile-layout-option:has(input:checked) { border-color: #f58cac99; background: #f58cac12; }
+.profile-layout-option input { flex: none; margin: 3px 0 0; accent-color: #f58cac; }
+.profile-layout-option-copy { display: grid; gap: 5px; min-width: 0; }
+.profile-layout-option-copy strong { color: #f3edf5; font-size: 12px; }
+.profile-layout-option-copy small { color: #aaa3b1; font-size: 10px; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .fanpage-design-one-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  #fanPageView.fanpage-layout-1 .profile-board { grid-template-columns: minmax(240px, .9fr) minmax(300px, 1.1fr); }
+}
+@media (max-width: 720px) {
+  .main-content.has-fanpage-layout-one { width: min(100% - 28px, 680px); }
+  #fanPageView.fanpage-layout-1 { padding: 22px 0 38px; }
+  .fanpage-kawaii-hero { display: block; min-height: 330px; margin-bottom: 22px; padding: 27px 22px 145px; border-radius: 26px; }
+  .fanpage-kawaii-copy h1 { max-width: 430px; font-size: clamp(34px, 9vw, 49px); }
+  .fanpage-kawaii-description { max-width: 370px; margin: 10px 0 15px; padding-right: 25px; font-size: 13px; }
+  .fanpage-kawaii-actions { gap: 7px; }
+  .fanpage-kawaii-actions .button { min-height: 39px; padding: 0 13px; font-size: 11px; }
+  .fanpage-kawaii-mascot-wrap { right: 1px; bottom: -24px; width: 156px; }
+  .fanpage-kawaii-mascot-hint { right: 2px; bottom: 24px; font-size: 9px; }
+  .fanpage-kawaii-sparkles { right: 13%; top: 46%; }
+  #fanPageView.fanpage-layout-1 .profile-board { grid-template-columns: 1fr; gap: 16px; padding: 58px 18px 19px; border-radius: 23px; }
+  #fanPageView.fanpage-layout-1 .profile-tab { font-size: 16px; }
+  #fanPageView.fanpage-layout-1 .profile-identity { gap: 14px; }
+  #fanPageView.fanpage-layout-1 .profile-avatar { width: 92px; height: 92px; }
+  #fanPageView.fanpage-layout-1 .profile-name { font-size: 34px; }
+  #fanPageView.fanpage-layout-1 .profile-facts { gap: 8px; }
+  #fanPageView.fanpage-layout-1 .profile-fact { min-height: 47px; grid-template-columns: 105px minmax(0, 1fr); }
+  #fanPageView.fanpage-layout-1 .profile-fact span { font-size: 13px; }
+  #fanPageView.fanpage-layout-1 .profile-fact strong { padding: 7px 11px; font-size: 15px; }
+  #fanPageView.fanpage-layout-1 .profile-details { gap: 11px 15px; padding-top: 16px; }
+  #fanPageView.fanpage-layout-1 .profile-detail { grid-template-columns: 1fr; gap: 2px; font-size: 13px; }
+  #fanPageView.fanpage-layout-1 .profile-stock-card { grid-template-columns: minmax(0, 1fr) 62px auto 14px; gap: 7px; padding: 12px; }
+  #fanPageView.fanpage-layout-1 .profile-stock-chart { width: 62px; }
+  #fanPageView.fanpage-layout-1 .profile-stock-copy > strong { font-size: 16px; }
+  #fanPageView.fanpage-layout-1 .profile-stock-price { font-size: 17px; }
+  #fanPageView.fanpage-layout-1 .profile-actions { justify-content: stretch; gap: 7px; }
+  #fanPageView.fanpage-layout-1 .profile-actions .button { flex: 1; min-width: 0; padding: 9px 7px; font-size: 10px; white-space: nowrap; }
+  #fanPageView.fanpage-layout-1 .content-card { padding: 18px 15px; border-radius: 21px; }
+  #fanPageView.fanpage-layout-1 .content-card h2 { font-size: 21px; }
+  #fanPageView.fanpage-layout-1 .fan-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .profile-layout-options { grid-template-columns: 1fr; }
+}
+@media (max-width: 420px) {
+  .fanpage-kawaii-hero { min-height: 350px; padding-right: 17px; }
+  .fanpage-kawaii-copy h1 { max-width: 330px; font-size: 35px; }
+  .fanpage-kawaii-mascot-wrap { right: -3px; width: 133px; }
+  .fanpage-kawaii-mascot-hint { right: 5px; font-size: 8px; }
+  #fanPageView.fanpage-layout-1 .profile-stock-card { grid-template-columns: minmax(0, 1fr) 46px auto 10px; gap: 5px; padding: 10px; }
+  #fanPageView.fanpage-layout-1 .profile-stock-chart { width: 46px; }
+  #fanPageView.fanpage-layout-1 .profile-stock-price { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #fanPageView.fanpage-layout-1 .fanpage-kawaii-sparkles { animation: none; }
+  #fanPageView.fanpage-layout-1 .fanpage-kawaii-mascot,
+  #fanPageView.fanpage-layout-1 .fanpage-kawaii-mascot img { transition: none; }
+}
