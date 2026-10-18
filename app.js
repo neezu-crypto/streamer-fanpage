@@ -835,6 +835,7 @@ function setVisibleView(page) {
   $('mainContent').classList.toggle('has-fanpage-home-kawaii', usesKawaiiHome);
   document.body.classList.toggle('fanpage-layout-one-active', usesKawaiiLayout);
   document.body.classList.toggle('fanpage-home-kawaii-active', usesKawaiiHome);
+  document.body.classList.toggle('fanpage-theme-sora-active', !!page && String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   $('homeView').classList.toggle('hidden', !!page);
   $('fanPageView').classList.toggle('hidden', !page);
   $('devbar').classList.toggle('hidden', !!page);
@@ -2140,6 +2141,7 @@ function renderFanPage(page) {
   $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
   $('mainContent').classList.remove('has-fanpage-home-kawaii');
   document.body.classList.toggle('fanpage-layout-one-active', usesKawaiiLayout);
+  document.body.classList.toggle('fanpage-theme-sora-active', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   document.body.classList.remove('fanpage-home-kawaii-active');
   view.classList.add(`fanpage-layout-${layoutDesign}`);
   view.classList.toggle('fanpage-theme-sora', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
