@@ -382,6 +382,11 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 .roulette-list-viewport { border-color: #e7dce9; background: #fff; scrollbar-color: #cbb5d0 #f8eff8; }
 #fanPageView.fanpage-layout-1 .roulette-group { border-color: #e8deea; background: #fff; }
 #fanPageView.fanpage-layout-1 .roulette-group-heading { border-color: #e8deea; background: #fff3f8; }
+#fanPageView.fanpage-layout-1 .roulette-heading { align-items: stretch; flex-direction: column; gap: 12px; }
+#fanPageView.fanpage-layout-1 .roulette-heading-copy { width: 100%; flex: none; }
+#fanPageView.fanpage-layout-1 .roulette-controls { width: 100%; flex-wrap: wrap; }
+#fanPageView.fanpage-layout-1 .roulette-controls > .button { flex: 1 1 112px; min-width: 0; white-space: normal; }
+#fanPageView.fanpage-layout-1 .roulette-items { grid-template-columns: minmax(0, 1fr); }
 #fanPageView.fanpage-layout-1 .roulette-donation-count,
 #fanPageView.fanpage-layout-1 .roulette-item-value,
 #fanPageView.fanpage-layout-1 .roulette-item-probability { color: #51465d; }
@@ -391,6 +396,14 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 .roulette-item { background: #fff; }
 #fanPageView.fanpage-layout-1 .roulette-item-type { border-color: color-mix(in srgb, var(--kawaii-accent), transparent 65%); color: var(--kawaii-accent-deep); }
 #fanPageView.fanpage-layout-1 .roulette-item-meter { background: #eee6ef; }
+
+/* Dialogs are mounted inside the themed page, so restore their dark-panel text tokens. */
+#fanPageView.fanpage-layout-1 .account-dialog {
+  --text: #f4f0f6;
+  --muted: #c0b7c8;
+  --line: #ffffff20;
+  color: var(--text);
+}
 
 #fanPageView.fanpage-layout-1 .calendar-mode-switch { border-color: #e5dbe8; background: #fff8fc; }
 #fanPageView.fanpage-layout-1 :is(.calendar-mode-button, .calendar-nav-button, .calendar-today-button, .calendar-refresh-button) { color: #665b70; }
