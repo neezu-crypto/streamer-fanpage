@@ -51,6 +51,36 @@ const MAX_LOADED_VIDEO_ITEMS = 500;
 const MAX_BANNER_IMAGE_ITEMS = 20;
 const MAX_UPBO_ITEMS = 100;
 const DEFAULT_FANPAGE_LAYOUT = 1;
+const BUTTON_CLICK_SOUND_STORAGE_KEY = 'streamerFanPage.buttonClickVolume';
+const DEFAULT_BUTTON_CLICK_VOLUME = 20;
+const buttonClickAudio = new Audio(new URL('./assets/sounds/button-click.mp3', import.meta.url).href);
+buttonClickAudio.preload = 'auto';
+function readButtonClickVolume() {
+  try {
+    const stored = localStorage.getItem(BUTTON_CLICK_SOUND_STORAGE_KEY);
+    if (stored === null) return DEFAULT_BUTTON_CLICK_VOLUME;
+    const volume = Number(stored);
+    return Number.isFinite(volume) ? Math.max(0, Math.min(100, volume)) : DEFAULT_BUTTON_CLICK_VOLUME;
+  } catch (_) {
+    return DEFAULT_BUTTON_CLICK_VOLUME;
+  }
+}
+let buttonClickVolume = readButtonClickVolume();
+function setButtonClickVolume(value) {
+  const volume = Number(value);
+  buttonClickVolume = Number.isFinite(volume) ? Math.max(0, Math.min(100, volume)) : DEFAULT_BUTTON_CLICK_VOLUME;
+  try { localStorage.setItem(BUTTON_CLICK_SOUND_STORAGE_KEY, String(buttonClickVolume)); } catch (_) { /* volume still applies for this visit */ }
+  return buttonClickVolume;
+}
+document.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element)) return;
+  const button = event.target.closest('button');
+  if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' || button.hasAttribute('data-no-click-sound') || buttonClickVolume <= 0) return;
+  buttonClickAudio.volume = buttonClickVolume / 100;
+  buttonClickAudio.currentTime = 0;
+  const playback = buttonClickAudio.play();
+  if (playback && typeof playback.catch === 'function') playback.catch(() => {});
+}, true);
 const PROFILE_QUICK_EDIT_FIELDS = {
   birthday: { label: '생일', maxLength: 20, placeholder: '예: 02.11' },
   mbti: { label: 'MBTI', maxLength: 8, placeholder: '예: INFJ' },
@@ -2517,9 +2547,54 @@ function createFanPageQuickRemote(view) {
   const panel = document.createElement('div'); panel.className = 'fan-quick-panel'; panel.id = 'fanQuickPanel'; panel.hidden = true;
   const header = document.createElement('div'); header.className = 'fan-quick-header';
   const title = document.createElement('strong'); title.textContent = '빠른 이동';
+  const soundSettingsButton = document.createElement('button'); soundSettingsButton.type = 'button';
+  soundSettingsButton.className = 'fan-quick-sound-settings';
+  soundSettingsButton.setAttribute('aria-label', '효과음 볼륨 설정');
+  soundSettingsButton.title = '효과음 볼륨 설정';
+  soundSettingsButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4Z"/><path d="M16 9a5 5 0 0 1 0 6M18.5 6.5a9 9 0 0 1 0 11"/></svg>';
   const close = document.createElement('button'); close.type = 'button'; close.className = 'fan-quick-close';
   close.setAttribute('aria-label', '빠른 이동 리모콘 닫기'); close.textContent = '×';
-  header.append(title, close);
+  header.append(title, soundSettingsButton, close);
+  const soundDialog = document.createElement('dialog');
+  soundDialog.className = 'account-dialog fan-sound-settings-dialog';
+  soundDialog.setAttribute('aria-labelledby', 'fanSoundSettingsTitle');
+  const soundCard = document.createElement('section'); soundCard.className = 'account-dialog-card fan-sound-settings-card';
+  const soundHeading = document.createElement('div'); soundHeading.className = 'fan-sound-settings-heading';
+  const soundTitle = document.createElement('h2'); soundTitle.id = 'fanSoundSettingsTitle'; soundTitle.textContent = '효과음 설정';
+  const soundClose = document.createElement('button'); soundClose.type = 'button'; soundClose.className = 'button profile-settings-close';
+  soundClose.setAttribute('aria-label', '효과음 설정 닫기'); soundClose.textContent = '×';
+  soundClose.addEventListener('click', () => soundDialog.close());
+  soundHeading.append(soundTitle, soundClose);
+  const soundDescription = document.createElement('p'); soundDescription.className = 'fan-sound-settings-description';
+  soundDescription.textContent = '버튼을 누를 때 재생되는 클릭음의 크기를 조절해요. 0%로 끌 수 있고, 이 브라우저에 저장돼요.';
+  const soundVolumeRow = document.createElement('div'); soundVolumeRow.className = 'fan-sound-volume-row';
+  const soundVolumeLabel = document.createElement('label'); soundVolumeLabel.htmlFor = 'fanButtonClickVolume';
+  soundVolumeLabel.textContent = '버튼 클릭 볼륨';
+  const soundVolumeValue = document.createElement('output'); soundVolumeValue.className = 'fan-sound-volume-value';
+  soundVolumeValue.htmlFor = 'fanButtonClickVolume';
+  const soundVolume = document.createElement('input'); soundVolume.type = 'range';
+  soundVolume.id = 'fanButtonClickVolume'; soundVolume.className = 'fan-sound-volume-range';
+  soundVolume.min = '0'; soundVolume.max = '100'; soundVolume.step = '5';
+  soundVolume.value = String(buttonClickVolume);
+  soundVolume.setAttribute('aria-label', '버튼 클릭 효과음 볼륨');
+  soundVolumeValue.textContent = `${buttonClickVolume}%`;
+  soundVolume.addEventListener('input', () => {
+    const volume = setButtonClickVolume(soundVolume.value);
+    soundVolumeValue.textContent = `${volume}%`;
+  });
+  soundVolumeRow.append(soundVolumeLabel, soundVolumeValue);
+  const soundActions = document.createElement('div'); soundActions.className = 'fan-sound-settings-actions';
+  const soundReset = document.createElement('button'); soundReset.type = 'button'; soundReset.className = 'button'; soundReset.textContent = '기본값 20%';
+  soundReset.addEventListener('click', () => {
+    soundVolume.value = String(setButtonClickVolume(DEFAULT_BUTTON_CLICK_VOLUME));
+    soundVolumeValue.textContent = `${buttonClickVolume}%`;
+  });
+  const soundDone = document.createElement('button'); soundDone.type = 'button'; soundDone.className = 'button button-primary'; soundDone.textContent = '완료';
+  soundDone.addEventListener('click', () => soundDialog.close());
+  soundActions.append(soundReset, soundDone);
+  soundCard.append(soundHeading, soundDescription, soundVolumeRow, soundVolume, soundActions);
+  soundDialog.append(soundCard);
+  soundSettingsButton.addEventListener('click', () => soundDialog.showModal());
   const body = document.createElement('div'); body.className = 'fan-quick-body';
   const nav = document.createElement('nav'); nav.className = 'fan-quick-links'; nav.setAttribute('aria-label', '팬페이지 영역');
   const navButtons = sections.map((section, index) => {
@@ -2543,8 +2618,9 @@ function createFanPageQuickRemote(view) {
   const rail = document.createElement('span'); rail.className = 'fan-quick-scroll-rail';
   const thumb = document.createElement('span'); thumb.className = 'fan-quick-scroll-thumb';
   scrubber.append(rail, thumb); body.append(nav, scrubber); panel.append(header, body);
+  soundDialog.id = 'fanSoundSettingsDialog';
   toggle.setAttribute('aria-controls', panel.id);
-  remote.append(toggle, panel); view.append(remote);
+  remote.append(toggle, panel); view.append(remote, soundDialog);
 
   let expanded = false;
   let scrollFrame = 0;

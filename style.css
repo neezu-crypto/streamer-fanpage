@@ -952,6 +952,10 @@ body.fanpage-bottom-banner-active{min-height:0}
 .fan-quick-panel[hidden]{display:none!important}
 .fan-quick-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border-bottom:1px solid #ffffff14}
 .fan-quick-header strong{font:14px var(--display)}
+.fan-quick-sound-settings{display:grid;width:30px;height:30px;flex:0 0 30px;place-items:center;padding:0;border:1px solid #ffffff20;border-radius:9px;background:#ffffff08;color:var(--text)}
+.fan-quick-sound-settings svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.7}
+.fan-quick-sound-settings:hover{border-color:#f58cac70;background:#f58cac12}
+.fan-quick-sound-settings:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
 .fan-quick-close{display:grid;width:30px;height:30px;place-items:center;border:1px solid #ffffff20;border-radius:9px;background:#ffffff08;color:var(--text);font-size:19px;line-height:1}
 .fan-quick-body{display:grid;min-height:0;grid-template-columns:minmax(0,1fr) 20px;gap:9px;padding:8px 9px 10px}
 .fan-quick-links{display:grid;align-content:start;gap:3px;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:2px;scrollbar-width:thin;scrollbar-color:#ffffff35 transparent}
@@ -964,6 +968,17 @@ body.fanpage-bottom-banner-active{min-height:0}
 .fan-quick-scroll-rail{position:absolute;top:4px;bottom:4px;left:50%;width:4px;transform:translateX(-50%);border-radius:99px;background:#ffffff17}
 .fan-quick-scroll-thumb{position:absolute;top:4px;left:calc(50% - 7px);width:14px;height:38px;transform:translateY(0);border:1px solid #ffffff52;border-radius:99px;background:var(--pink);box-shadow:0 0 14px color-mix(in srgb,var(--pink),transparent 60%);will-change:transform}
 .fan-quick-scrubber:focus-visible .fan-quick-scroll-thumb,.fan-quick-toggle:focus-visible,.fan-quick-close:focus-visible,.fan-quick-link:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
+.fan-sound-settings-dialog{width:min(390px,calc(100% - 32px))}
+.fan-sound-settings-card{padding:24px}
+.fan-sound-settings-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px}
+.fan-sound-settings-heading h2{margin:0;font:22px var(--display)}
+.fan-sound-settings-description{margin:0 0 22px;color:#b5adba;font-size:12px;line-height:1.7}
+.fan-sound-volume-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;font-size:13px;font-weight:700}
+.fan-sound-volume-value{min-width:48px;padding:5px 9px;border:1px solid #ffffff20;border-radius:99px;background:#ffffff08;color:var(--text);font-size:12px;text-align:center;font-variant-numeric:tabular-nums}
+.fan-sound-volume-range{display:block;width:100%;height:24px;margin:0;accent-color:var(--pink);cursor:pointer}
+.fan-sound-settings-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
+.fan-sound-settings-actions .button{min-width:96px}
+@media(max-width:520px){.fan-sound-settings-card{padding:20px}.fan-sound-settings-actions .button{min-width:0;flex:1}}
 @media(min-width:1280px){
   .fan-quick-header{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
   .fan-quick-remote.is-dragging .fan-quick-header{cursor:grabbing}
