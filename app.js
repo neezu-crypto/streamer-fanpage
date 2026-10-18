@@ -2309,7 +2309,7 @@ function renderFanPage(page, options = {}) {
     const topbar = document.querySelector('.topbar');
     topbar.classList.add('topbar-with-banner');
     view.classList.add('has-top-banner');
-    if (page.isStreamerOwner || hasRecognizedFanpageAccount()) {
+    if (page.isStreamerOwner || hasRecognizedFanpageAccount() || auth.currentUser?.isAnonymous) {
       topbar.classList.add('topbar-account-banner-hidden');
       view.classList.add('has-account-top-banner');
     }
