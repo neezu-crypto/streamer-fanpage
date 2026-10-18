@@ -821,8 +821,11 @@ function setVisibleView(page) {
   document.querySelector('.topbar').classList.remove('topbar-with-banner');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
   const usesKawaiiLayout = !!page && page.profile?.layoutDesign !== 2;
+  const usesKawaiiHome = !page;
   $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
+  $('mainContent').classList.toggle('has-fanpage-home-kawaii', usesKawaiiHome);
   document.body.classList.toggle('fanpage-layout-one-active', usesKawaiiLayout);
+  document.body.classList.toggle('fanpage-home-kawaii-active', usesKawaiiHome);
   $('homeView').classList.toggle('hidden', !!page);
   $('fanPageView').classList.toggle('hidden', !page);
   $('devbar').classList.toggle('hidden', !!page);
@@ -2124,7 +2127,9 @@ function renderFanPage(page) {
   const layoutDesign = page.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
   const usesKawaiiLayout = layoutDesign === 1;
   $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
+  $('mainContent').classList.remove('has-fanpage-home-kawaii');
   document.body.classList.toggle('fanpage-layout-one-active', usesKawaiiLayout);
+  document.body.classList.remove('fanpage-home-kawaii-active');
   view.classList.add(`fanpage-layout-${layoutDesign}`);
   view.classList.toggle('fanpage-theme-sora', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   view.replaceChildren();
