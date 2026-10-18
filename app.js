@@ -57,6 +57,8 @@ const buttonClickAudio = new Audio(new URL('./assets/sounds/button-click.mp3', i
 const modalOpenAudio = new Audio(new URL('./assets/sounds/modal-open.mp3', import.meta.url).href);
 const saveButtonAudio = new Audio(new URL('./assets/sounds/save-button.mp3', import.meta.url).href);
 const catPawCloseAudio = new Audio(new URL('./assets/sounds/cat-paw-close.mp3', import.meta.url).href);
+const catPawCloseArtwork = new Image();
+catPawCloseArtwork.src = new URL('./assets/fanpage-kawaii/cat-paw-close.svg', import.meta.url).href;
 buttonClickAudio.preload = 'auto';
 modalOpenAudio.preload = 'auto';
 saveButtonAudio.preload = 'auto';
@@ -869,6 +871,7 @@ async function waitForPageAssets() {
     .filter((image) => image.loading !== 'lazy' && image.getBoundingClientRect().top < window.innerHeight);
   const criticalAssets = [
     ...(document.fonts && document.fonts.ready ? [document.fonts.ready.catch(() => undefined)] : []),
+    catPawCloseArtwork.decode().catch(() => undefined),
     ...images.map((image) => image.decode().catch(() => undefined)),
   ];
   let timeoutId;
