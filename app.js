@@ -92,8 +92,8 @@ function showFanPageModal(dialog) {
   modalOpenGeneration += 1;
   playUiSound(modalOpenAudio);
 }
-function isSaveButton(button) {
-  return /저장|save/i.test([
+function isSaveOrCompleteButton(button) {
+  return /저장|완료|save|done|complete/i.test([
     button.textContent || '', button.getAttribute('aria-label') || '', button.title || '',
   ].join(' '));
 }
@@ -109,7 +109,7 @@ document.addEventListener('click', (event) => {
   queueMicrotask(() => {
     if (modalOpenGeneration !== openGeneration) return;
     if (isCatPawCloseButton(button)) playUiSound(catPawCloseAudio);
-    else playUiSound(isSaveButton(button) ? saveButtonAudio : buttonClickAudio);
+    else playUiSound(isSaveOrCompleteButton(button) ? saveButtonAudio : buttonClickAudio);
   });
 }, true);
 const PROFILE_QUICK_EDIT_FIELDS = {
