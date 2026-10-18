@@ -741,7 +741,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dialog-accent), transparent 85%);
 }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(input, textarea)::placeholder { color: #a39aa9; }
-body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--dialog-accent); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(input[type="checkbox"], input[type="radio"], input[type="range"]) { accent-color: var(--dialog-accent); }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .button:not(.button-primary) {
   border-color: #e3d7e6;
   background: #fff;
