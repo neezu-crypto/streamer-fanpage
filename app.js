@@ -55,8 +55,10 @@ const BUTTON_CLICK_SOUND_STORAGE_KEY = 'streamerFanPage.buttonClickVolume';
 const DEFAULT_BUTTON_CLICK_VOLUME = 20;
 const buttonClickAudio = new Audio(new URL('./assets/sounds/button-click.mp3', import.meta.url).href);
 const modalOpenAudio = new Audio(new URL('./assets/sounds/modal-open.mp3', import.meta.url).href);
+const saveButtonAudio = new Audio(new URL('./assets/sounds/save-button.mp3', import.meta.url).href);
 buttonClickAudio.preload = 'auto';
 modalOpenAudio.preload = 'auto';
+saveButtonAudio.preload = 'auto';
 function readButtonClickVolume() {
   try {
     const stored = localStorage.getItem(BUTTON_CLICK_SOUND_STORAGE_KEY);
@@ -88,13 +90,19 @@ function showFanPageModal(dialog) {
   modalOpenGeneration += 1;
   playUiSound(modalOpenAudio);
 }
+function isSaveButton(button) {
+  return /저장|save/i.test([
+    button.textContent || '', button.getAttribute('aria-label') || '', button.title || '',
+  ].join(' '));
+}
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
   const button = event.target.closest('button');
   if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' || button.hasAttribute('data-no-click-sound')) return;
   const openGeneration = modalOpenGeneration;
   queueMicrotask(() => {
-    if (modalOpenGeneration === openGeneration) playUiSound(buttonClickAudio);
+    if (modalOpenGeneration !== openGeneration) return;
+    playUiSound(isSaveButton(button) ? saveButtonAudio : buttonClickAudio);
   });
 }, true);
 const PROFILE_QUICK_EDIT_FIELDS = {
@@ -2582,7 +2590,7 @@ function createFanPageQuickRemote(view) {
   soundClose.addEventListener('click', () => soundDialog.close());
   soundHeading.append(soundTitle, soundClose);
   const soundDescription = document.createElement('p'); soundDescription.className = 'fan-sound-settings-description';
-  soundDescription.textContent = '버튼 클릭음과 모달 열림음의 크기를 함께 조절해요. 0%로 끌 수 있고, 이 브라우저에 저장돼요.';
+  soundDescription.textContent = '버튼 클릭음, 저장음, 모달 열림음의 크기를 함께 조절해요. 0%로 끌 수 있고, 이 브라우저에 저장돼요.';
   const soundVolumeRow = document.createElement('div'); soundVolumeRow.className = 'fan-sound-volume-row';
   const soundVolumeLabel = document.createElement('label'); soundVolumeLabel.htmlFor = 'fanButtonClickVolume';
   soundVolumeLabel.textContent = '효과음 볼륨';
@@ -2592,7 +2600,7 @@ function createFanPageQuickRemote(view) {
   soundVolume.id = 'fanButtonClickVolume'; soundVolume.className = 'fan-sound-volume-range';
   soundVolume.min = '0'; soundVolume.max = '100'; soundVolume.step = '5';
   soundVolume.value = String(buttonClickVolume);
-  soundVolume.setAttribute('aria-label', '버튼 클릭 및 모달 열림 효과음 볼륨');
+  soundVolume.setAttribute('aria-label', '버튼 클릭, 저장 및 모달 열림 효과음 볼륨');
   soundVolumeValue.textContent = `${buttonClickVolume}%`;
   soundVolume.addEventListener('input', () => {
     const volume = setButtonClickVolume(soundVolume.value);
