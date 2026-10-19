@@ -2363,6 +2363,8 @@ function openCompetitionHistoryDialog(page, existingEntry = null) {
   title.textContent = existingEntry ? '대회 이력 수정' : '대회 이력 추가';
   const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
   close.setAttribute('aria-label', '대회 이력 창 닫기'); close.textContent = '×'; close.addEventListener('click', () => dialog.close());
+  const isTouchLayout = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  if (isTouchLayout) close.autofocus = true;
   heading.append(title, close);
 
   const fields = document.createElement('div'); fields.className = 'competition-history-form-grid';
@@ -2433,7 +2435,7 @@ function openCompetitionHistoryDialog(page, existingEntry = null) {
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   document.body.append(dialog);
   showFanPageModal(dialog);
-  eventName.querySelector('input').focus();
+  if (!isTouchLayout) eventName.querySelector('input').focus();
 }
 
 async function saveCompetitionHistory(page, entries, successMessage = '대회 이력을 저장했어요.') {
