@@ -10,6 +10,8 @@ const CACHE_SCHEMA_VERSION = 1;
 const STATIC_SCHEMA_VERSION = 1;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const VOD_ID_PATTERN = /^\d{1,20}$/;
+const RTDB_REQUEST_TIMEOUT_MS = 60 * 1000;
+const RTDB_READ_CONCURRENCY = 8;
 
 function validPoint(point) {
   return point && Number.isFinite(Number(point.second)) && Number(point.second) >= 0
@@ -67,15 +69,54 @@ async function readPersistentCache() {
     return JSON.parse(input);
   }
 
-  const { applicationDefault, initializeApp } = require('firebase-admin/app');
-  const { getDatabase } = require('firebase-admin/database');
-  const app = initializeApp({
-    credential: applicationDefault(),
-    databaseURL: DATABASE_URL,
-    projectId: PROJECT_ID,
-  }, 'viewer-stats-static-export');
-  const snapshot = await getDatabase(app).ref(SOURCE_PATH).get();
-  return snapshot.val() || {};
+  const { applicationDefault } = require('firebase-admin/app');
+  const credential = applicationDefault();
+  console.log('Requesting a read-only token for the RTDB export.');
+  const { access_token: accessToken } = await credential.getAccessToken();
+  if (!accessToken) throw new Error('Google Cloud did not return an access token.');
+
+  async function readRtdbJson(pathname, query = {}) {
+    const url = new URL(encodeURI(pathname + '.json'), DATABASE_URL + '/');
+    Object.entries(query).forEach(([key, value]) => url.searchParams.set(key, value));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), RTDB_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: 'Bearer ' + accessToken },
+        signal: controller.signal,
+      });
+      const body = await response.text();
+      if (!response.ok) {
+        throw new Error('RTDB request failed (' + response.status + '): ' + body.slice(0, 500));
+      }
+      return body ? JSON.parse(body) : null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  console.log('Listing streamer keys in the persistent VOD stats cache.');
+  const streamerKeys = await readRtdbJson(SOURCE_PATH, { shallow: 'true' });
+  const streamerIds = Object.keys(streamerKeys && typeof streamerKeys === 'object' ? streamerKeys : {})
+    .map((streamerId) => String(streamerId).trim().toLowerCase())
+    .filter((streamerId) => SOOP_ID_PATTERN.test(streamerId));
+  console.log('Found ' + streamerIds.length + ' streamer cache entries; reading them in small batches.');
+
+  const cache = {};
+  let cursor = 0;
+  let completed = 0;
+  const workerCount = Math.min(RTDB_READ_CONCURRENCY, streamerIds.length);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (cursor < streamerIds.length) {
+      const streamerId = streamerIds[cursor++];
+      cache[streamerId] = await readRtdbJson(SOURCE_PATH + '/' + encodeURIComponent(streamerId));
+      completed += 1;
+      if (completed % 25 === 0 || completed === streamerIds.length) {
+        console.log('Read ' + completed + ' / ' + streamerIds.length + ' streamer cache entries.');
+      }
+    }
+  }));
+  return cache;
 }
 
 async function writeSnapshots(outputDirectory, snapshots) {
