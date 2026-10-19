@@ -221,8 +221,10 @@
 .admin-viewer-usage-heading h3{margin:0;font:17px var(--display)}
 .admin-viewer-usage-heading>span,.admin-viewer-usage-note{color:#a69cab;font-size:10px}
 .admin-viewer-usage-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.admin-viewer-data-heading{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:16px 0 8px;color:#e9e2ed;font-size:11px}
-.admin-viewer-data-heading span{color:#a69cab;font-size:10px}
+.admin-viewer-data-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 0 8px;color:#e9e2ed;font-size:11px}
+.admin-viewer-data-range{display:flex;align-items:center;gap:6px;color:#a69cab;font-size:10px;white-space:nowrap}
+.admin-viewer-data-range select{min-height:30px;padding:4px 24px 4px 8px;border:1px solid #ffffff20;border-radius:7px;background:#111018;color:#e9e2ed;font:10px var(--font)}
+.admin-viewer-data-range select:focus-visible{outline:2px solid #f58cac;outline-offset:2px}
 .admin-viewer-data-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
 .admin-viewer-data-tile{min-width:0;padding:9px 10px;border:1px solid #ffffff10;border-radius:8px;background:#00000020}
 .admin-viewer-data-tile span,.admin-viewer-data-tile strong,.admin-viewer-data-tile small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -287,6 +289,7 @@
 .admin-stat-sparkline span{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#f58cac,#b76b88);opacity:.85}
 .admin-stats-empty{grid-column:1/-1}
 @media(max-width:720px){.admin-stats-dialog-card{padding:17px}.admin-stats-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-stats-list{max-height:38vh;grid-template-columns:1fr}}
+@media(max-width:520px){.admin-viewer-data-heading{align-items:flex-start;flex-wrap:wrap}.admin-viewer-data-range{margin-left:auto}}
 @media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage,.admin-viewer-subscriptions{padding:11px}.admin-viewer-usage-actions,.admin-viewer-usage-streamers{grid-template-columns:1fr}.admin-viewer-usage-tier-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-viewer-usage-queue-grid{grid-template-columns:1fr}.admin-viewer-data-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-viewer-data-costs{grid-template-columns:1fr}.admin-viewer-usage-streamers{max-height:25vh}.admin-viewer-usage-action{font-size:11px}.admin-viewer-subscription-row{align-items:stretch;flex-direction:column}.admin-viewer-subscription-actions{display:grid;grid-template-columns:1fr 1fr}.admin-viewer-subscription-actions .button{width:100%}}
 
 /* Scrollable replay area and SOOP schedule calendar */
