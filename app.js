@@ -83,6 +83,9 @@ function setButtonClickVolume(value) {
   return buttonClickVolume;
 }
 let modalOpenGeneration = 0;
+let activePointerSoundActivation = null;
+let pendingPointerSoundActivation = null;
+let lastCalendarPointerPress = null;
 function playUiSound(audio, volumeOffsetPercent = 0, startOffsetSeconds = 0, volumeMultiplier = 1) {
   if (buttonClickVolume <= 0) return;
   const volumePercent = Math.max(0, (buttonClickVolume + volumeOffsetPercent) * volumeMultiplier);
@@ -133,7 +136,7 @@ function showFanPageModal(dialog) {
     initialFocus.focus({ preventScroll: true });
   }
   modalOpenGeneration += 1;
-  playUiSound(modalOpenAudio);
+  if (activePointerSoundActivation?.soundType !== 'modal') playUiSound(modalOpenAudio);
 }
 function isSaveOrCompleteButton(button) {
   return /저장|완료|save|done|complete/i.test([
@@ -149,16 +152,97 @@ function isCatPawCloseButton(button) {
   return button.classList.contains('profile-settings-close')
     && document.body.matches('.fanpage-layout-one-active, .fanpage-home-kawaii-active');
 }
-document.addEventListener('click', (event) => {
-  if (!(event.target instanceof Element)) return;
-  const button = event.target.closest('button');
+function getUiSoundTarget(target) {
+  return target instanceof Element ? target.closest('button, [role="button"]') : null;
+}
+function isModalOpenTrigger(button) {
+  const directTriggers = [
+    '#profileSettingsButton', '#openAdminStats', '#openLoginOptions', '#openDesignFeedback',
+    '#openStreamerVerification', '.search-empty-verify', '.fan-quick-sound-settings',
+    '.upbo-add-topic', '.upbo-add-item-inline', '.competition-history-add',
+    '.calendar-add-button', '.vod-card', '.upbo-image-zoomable',
+  ].join(',');
+  if (button.matches(directTriggers)) return true;
+  const label = (button.textContent || '').trim();
+  if (button.closest('.upbo-row-actions') && /^(수정|검토·등록)$/.test(label)) return true;
+  if (button.closest('.competition-history-item-actions') && label === '수정') return true;
+  if (button.closest('.vod-comment-profile-editor') && label === '로그인 / 인증') return true;
+  if (button.closest('.vod-comment-profile-actions') && /프로필 저장/.test(label) && !canSaveCommentProfile()) return true;
+  return false;
+}
+function playButtonPressSound(button, { calendarDoublePress = false } = {}) {
+  if (isCatPawCloseButton(button)) {
+    playUiSound(catPawCloseAudio, 0, 0.05);
+  } else if (calendarDoublePress || isModalOpenTrigger(button)) {
+    playUiSound(modalOpenAudio);
+  } else if (isCompleteButton(button)) {
+    playUiSound(saveButtonAudio, 10, 0, 2);
+  } else {
+    playUiSound(isSaveOrCompleteButton(button) ? saveButtonAudio : buttonClickAudio);
+  }
+}
+document.addEventListener('pointerdown', (event) => {
+  if (event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  const button = getUiSoundTarget(event.target);
   if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' || button.hasAttribute('data-no-click-sound')) return;
+  const now = performance.now();
+  const isCalendarDay = button.classList.contains('calendar-day-can-add');
+  const calendarDoublePress = isCalendarDay
+    && lastCalendarPointerPress?.button === button
+    && now - lastCalendarPointerPress.time < 650;
+  lastCalendarPointerPress = isCalendarDay ? { button, time: now } : null;
+  const activation = {
+    button,
+    soundType: calendarDoublePress || isModalOpenTrigger(button) ? 'modal' : 'button',
+    calendarDoublePress,
+    time: now,
+  };
+  pendingPointerSoundActivation = activation;
+  playButtonPressSound(button, { calendarDoublePress });
+  window.setTimeout(() => {
+    if (pendingPointerSoundActivation === activation) pendingPointerSoundActivation = null;
+    if (activePointerSoundActivation === activation) activePointerSoundActivation = null;
+  }, 60000);
+}, true);
+document.addEventListener('pointercancel', (event) => {
+  const button = getUiSoundTarget(event.target);
+  if (pendingPointerSoundActivation?.button === button) pendingPointerSoundActivation = null;
+  if (activePointerSoundActivation?.button === button) activePointerSoundActivation = null;
+}, true);
+document.addEventListener('dblclick', (event) => {
+  const button = getUiSoundTarget(event.target);
+  const activation = activePointerSoundActivation;
+  if (activation?.calendarDoublePress && activation.button === button) {
+    queueMicrotask(() => {
+      if (activePointerSoundActivation === activation) activePointerSoundActivation = null;
+    });
+  }
+}, true);
+document.addEventListener('click', (event) => {
+  const button = getUiSoundTarget(event.target);
+  if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' || button.hasAttribute('data-no-click-sound')) return;
+  if (event.detail > 0) {
+    const activation = pendingPointerSoundActivation;
+    if (activation?.button === button && performance.now() - activation.time < 60000) {
+      activePointerSoundActivation = activation;
+      pendingPointerSoundActivation = null;
+      // Keep the second calendar press active through the browser's following dblclick event.
+      window.setTimeout(() => {
+        if (activePointerSoundActivation === activation) activePointerSoundActivation = null;
+      }, activation.calendarDoublePress ? 800 : 0);
+    } else {
+      activePointerSoundActivation = null;
+      const openGeneration = modalOpenGeneration;
+      queueMicrotask(() => {
+        if (modalOpenGeneration === openGeneration) playButtonPressSound(button);
+      });
+    }
+    return;
+  }
   const openGeneration = modalOpenGeneration;
   queueMicrotask(() => {
     if (modalOpenGeneration !== openGeneration) return;
-    if (isCatPawCloseButton(button)) playUiSound(catPawCloseAudio, 0, 0.05);
-    else if (isCompleteButton(button)) playUiSound(saveButtonAudio, 10, 0, 2);
-    else playUiSound(isSaveOrCompleteButton(button) ? saveButtonAudio : buttonClickAudio);
+    playButtonPressSound(button);
   });
 }, true);
 const PROFILE_QUICK_EDIT_FIELDS = {
@@ -2891,7 +2975,7 @@ function createFanPageQuickRemote(view) {
   soundClose.addEventListener('click', () => soundDialog.close());
   soundHeading.append(soundTitle, soundClose);
   const soundDescription = document.createElement('p'); soundDescription.className = 'fan-sound-settings-description';
-  soundDescription.textContent = '버튼 클릭음, 저장음, 모달 열림음, 발바닥 닫기음의 크기를 함께 조절해요. 0%로 끌 수 있고, 이 브라우저에 저장돼요.';
+  soundDescription.textContent = '버튼 누름음, 저장음, 모달 열림음, 발바닥 닫기음의 크기를 함께 조절해요. 0%로 끌 수 있고, 이 브라우저에 저장돼요.';
   const soundVolumeRow = document.createElement('div'); soundVolumeRow.className = 'fan-sound-volume-row';
   const soundVolumeLabel = document.createElement('label'); soundVolumeLabel.htmlFor = 'fanButtonClickVolume';
   soundVolumeLabel.textContent = '효과음 볼륨';
@@ -2901,7 +2985,7 @@ function createFanPageQuickRemote(view) {
   soundVolume.id = 'fanButtonClickVolume'; soundVolume.className = 'fan-sound-volume-range';
   soundVolume.min = '0'; soundVolume.max = '100'; soundVolume.step = '5';
   soundVolume.value = String(buttonClickVolume);
-  soundVolume.setAttribute('aria-label', '버튼 클릭, 저장, 모달 열림 및 발바닥 닫기 효과음 볼륨');
+  soundVolume.setAttribute('aria-label', '버튼 누름, 저장, 모달 열림 및 발바닥 닫기 효과음 볼륨');
   soundVolumeValue.textContent = `${buttonClickVolume}%`;
   soundVolume.addEventListener('input', () => {
     const volume = setButtonClickVolume(soundVolume.value);
