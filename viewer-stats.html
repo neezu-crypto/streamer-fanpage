@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261019-all-modals-mobile">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261019-mobile-modals">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261019-on-demand-stats">
   <link rel="stylesheet" href="viewer-sponsors.css?v=20261019-mobile-left-rail">
 </head>
 <body class="viewer-stats-page">
@@ -130,7 +130,7 @@
             <span class="viewer-list-note">1분 단위 · 시작/종료 5분 제외</span>
           </div>
         </div>
-        <p class="viewer-vod-sort-hint">정렬은 불러온 다시보기에 적용돼요. 시청자순은 분석된 영상이 위에 오고, 나머지는 최신 날짜순으로 표시됩니다.</p>
+        <p class="viewer-vod-sort-hint">날짜 정렬은 불러온 목록에 적용돼요. 시청자순은 분석된 영상이 위에 표시됩니다. 통계는 카드의 분석 버튼을 누른 영상만 계산하고, 완료된 결과는 모든 이용자가 재사용합니다.</p>
         <form class="viewer-vod-search-form" id="viewerVodSearchForm">
           <label class="viewer-vod-search-label" for="viewerVodSearchInput">다시보기 키워드 검색</label>
           <div class="viewer-vod-search-row">
@@ -376,6 +376,6 @@
       <p class="viewer-sponsor-dialog-status" id="sponsorRequestStatus" role="status" aria-live="polite"></p>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261019-direct-public-vod"></script>
+  <script type="module" src="viewer-stats.js?v=20261019-on-demand-stats"></script>
 </body>
 </html>

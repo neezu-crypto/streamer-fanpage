@@ -123,7 +123,6 @@ let hasMoreVods = false;
 let vodTotal = 0;
 let activeStatsRequests = 0;
 let statsQueue = [];
-let statsObserver = null;
 let periodScanToken = 0;
 let vodPagesByNumber = new Map();
 let vodPagesStreamerId = '';
@@ -275,15 +274,6 @@ function renderSubscriptionControls() {
     : '구독 전용 분석';
 }
 
-function refreshExistingVodCardAccess() {
-  const cards = $('viewerVodGrid').querySelectorAll('.viewer-vod-card');
-  cards.forEach((card) => {
-    if (card.dataset.statsState !== 'ready' && card.dataset.statsState !== 'error') return;
-    card.dataset.statsState = 'idle';
-    enqueueStats(card, card._vod, card._loadToken);
-  });
-}
-
 function scheduleSubscriptionStatusRefresh() {
   window.clearTimeout(subscriptionRefreshTimer);
   if (subscriptionState.pending) {
@@ -327,7 +317,6 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
     renderSubscriptionControls();
     scheduleSubscriptionStatusRefresh();
     if (previousAccess !== subscriptionState.subscribed) {
-      refreshExistingVodCardAccess();
       if (selectedStreamer) {
         periodScanToken += 1;
         $('viewerPeriodScanButton').disabled = false;
@@ -990,11 +979,6 @@ function createVodCard(vod, loadToken) {
   open.target = '_blank';
   open.rel = 'noopener noreferrer';
   open.setAttribute('aria-label', (vod.title || '다시보기') + ' 재생');
-  open.setAttribute('aria-disabled', 'true');
-  open.tabIndex = -1;
-  open.addEventListener('click', (event) => {
-    if (card.dataset.statsState !== 'ready' && card.dataset.statsState !== 'error') event.preventDefault();
-  });
 
   const thumbnail = document.createElement('span');
   thumbnail.className = 'viewer-vod-thumb' + (vod.thumbnailUrl ? '' : ' is-missing');
@@ -1031,23 +1015,26 @@ function createVodCard(vod, loadToken) {
   copy.append(title, meta);
   open.append(thumbnail, copy);
 
-  const mainAction = document.createElement('a');
+  const mainAction = document.createElement('button');
   mainAction.className = 'viewer-vod-main-action';
-  mainAction.href = playbackUrl(vod.id, null);
-  mainAction.target = '_blank';
-  mainAction.rel = 'noopener noreferrer';
-  mainAction.textContent = '시청자 통계 계산 중…';
-  mainAction.setAttribute('aria-disabled', 'true');
-  mainAction.tabIndex = -1;
-  mainAction.addEventListener('click', (event) => {
-    if (card.dataset.statsState !== 'ready' && card.dataset.statsState !== 'error') event.preventDefault();
+  mainAction.type = 'button';
+  mainAction.textContent = '시청자 통계 분석하기';
+  mainAction.setAttribute('aria-label', (vod.title || '다시보기') + ' 시청자 통계 분석하기');
+  mainAction.addEventListener('click', () => {
+    const playback = mainAction.dataset.playbackUrl;
+    if (playback) {
+      window.open(playback, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (card.dataset.statsState !== 'idle') return;
+    enqueueStats(card, card._vod, card._loadToken);
   });
   const statsActions = document.createElement('div');
   statsActions.className = 'viewer-stat-actions';
-  const loading = document.createElement('span');
-  loading.className = 'viewer-stat-state';
-  loading.textContent = '그래프를 불러오고 있어요.';
-  statsActions.append(loading);
+  const status = document.createElement('span');
+  status.className = 'viewer-stat-state';
+  status.textContent = '분석 전';
+  statsActions.append(status);
   card.append(open, mainAction, statsActions);
   card._vod = vod;
   card._loadToken = loadToken;
@@ -1063,12 +1050,10 @@ function showStatsLinks(card, stats) {
   const lowestUrl = playbackUrl(card._vod.id, stats.lowest.second);
   card._openLink.href = highestUrl;
   card._openLink.setAttribute('aria-label', (card._vod.title || '다시보기') + ' 최고 시청 순간 재생');
-  card._openLink.removeAttribute('aria-disabled');
-  card._openLink.tabIndex = 0;
-  card._mainAction.href = highestUrl;
+  card._mainAction.dataset.playbackUrl = highestUrl;
+  card._mainAction.disabled = false;
   card._mainAction.textContent = '최고 시청 순간 보기 · ' + formatClock(stats.highest.second) + ' ↗';
-  card._mainAction.removeAttribute('aria-disabled');
-  card._mainAction.tabIndex = 0;
+  card._mainAction.setAttribute('aria-label', (card._vod.title || '다시보기') + ' 최고 시청 순간 재생');
   card._statsActions.replaceChildren();
   const highest = document.createElement('a');
   highest.className = 'viewer-stat-link';
@@ -1152,12 +1137,8 @@ async function waitForViewerStatsJob(jobId, job) {
 function showStatsError(card, error, loadToken) {
   if (!card.isConnected || loadToken !== activeLoadToken) return;
   card.dataset.statsState = 'error';
-  card._mainAction.href = playbackUrl(card._vod.id, null);
-  card._mainAction.textContent = 'SOOP에서 다시보기 열기 ↗';
-  card._openLink.removeAttribute('aria-disabled');
-  card._openLink.tabIndex = 0;
-  card._mainAction.removeAttribute('aria-disabled');
-  card._mainAction.tabIndex = 0;
+  card._mainAction.disabled = true;
+  card._mainAction.textContent = '통계를 계산하지 못했어요';
   card._statsActions.replaceChildren();
   const message = document.createElement('span');
   message.className = 'viewer-stat-state';
@@ -1175,15 +1156,14 @@ function showStatsError(card, error, loadToken) {
     retry.textContent = '다시 시도';
     retry.addEventListener('click', () => {
       card.dataset.statsState = 'idle';
-      card._openLink.setAttribute('aria-disabled', 'true');
-      card._openLink.tabIndex = -1;
-      card._mainAction.setAttribute('aria-disabled', 'true');
-      card._mainAction.tabIndex = -1;
+      card._mainAction.disabled = false;
+      card._mainAction.textContent = '시청자 통계 분석하기';
+      delete card._mainAction.dataset.playbackUrl;
       card._statsActions.replaceChildren();
-      const loading = document.createElement('span');
-      loading.className = 'viewer-stat-state';
-      loading.textContent = '그래프를 다시 불러오고 있어요.';
-      card._statsActions.append(loading);
+      const status = document.createElement('span');
+      status.className = 'viewer-stat-state';
+      status.textContent = '다시 요청하면 통계를 확인해요.';
+      card._statsActions.append(status);
       enqueueStats(card, card._vod, loadToken);
     }, { once: true });
     card._statsActions.append(retry);
@@ -2193,6 +2173,14 @@ function cancelQueuedStatsRequests() {
 function enqueueStats(card, vod, loadToken) {
   if (!selectedStreamer || card.dataset.statsState !== 'idle') return;
   card.dataset.statsState = 'queued';
+  card._mainAction.disabled = true;
+  card._mainAction.textContent = '통계 분석 요청 중…';
+  card._statsActions.replaceChildren();
+  const status = document.createElement('span');
+  status.className = 'viewer-stat-state';
+  status.setAttribute('role', 'status');
+  status.textContent = '요청한 영상의 통계를 확인하고 있어요.';
+  card._statsActions.append(status);
   const streamerId = selectedStreamer.soopId;
   const includePremiumMetrics = false;
   loadVodStats(
@@ -2217,11 +2205,6 @@ function enqueueStats(card, vod, loadToken) {
       }
       showStatsError(card, error, loadToken);
     });
-}
-
-function observeVodCard(card) {
-  if (statsObserver) statsObserver.observe(card);
-  else enqueueStats(card, card._vod, card._loadToken);
 }
 
 function updateVodHeading() {
@@ -2254,8 +2237,8 @@ async function loadVodPage(loadToken, page) {
         : '이 방송국에 등록된 다시보기가 없어요.';
     } else {
       $('viewerVodStatus').textContent = keyword
-        ? '“' + keyword + '” 검색 결과 ' + vodTotal.toLocaleString('ko-KR') + '개 · 화면에 가까운 영상부터 분석합니다.'
-        : '다시보기별 유저 수 그래프를 불러오고 있어요. 화면에 가까운 영상부터 분석합니다.';
+        ? '“' + keyword + '” 검색 결과 ' + vodTotal.toLocaleString('ko-KR') + '개 · 통계는 직접 요청한 영상만 분석합니다.'
+        : '다시보기 목록을 불러왔어요. 통계는 직접 요청한 영상만 분석합니다.';
     }
     const knownIds = new Set([...$('viewerVodGrid').querySelectorAll('[data-vod-id]')].map((card) => card.dataset.vodId));
     vods.forEach((vod) => {
@@ -2263,7 +2246,6 @@ async function loadVodPage(loadToken, page) {
       knownIds.add(String(vod.id));
       const card = createVodCard(vod, loadToken);
       $('viewerVodGrid').append(card);
-      observeVodCard(card);
     });
     sortLoadedVodCards();
     updateVodHeading();
@@ -2401,7 +2383,6 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
   try {
     const access = await callViewerSubscription({ action: 'periodAccess' });
     if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
-    const previouslySubscribed = subscriptionState.subscribed;
     subscriptionState.isAdmin = access.data && access.data.isAdmin === true;
     if (subscriptionState.isAdmin) subscriptionState.accountProtected = true;
     subscriptionState.subscribed = true;
@@ -2409,7 +2390,6 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
     subscriptionState.loaded = true;
     renderSubscriptionControls();
     scheduleSubscriptionStatusRefresh();
-    if (!previouslySubscribed) refreshExistingVodCardAccess();
   } catch (error) {
     await refreshSubscriptionStatus();
     if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
@@ -2571,7 +2551,6 @@ async function selectStreamer(streamer) {
   nextPage = 1;
   hasMoreVods = false;
   vodTotal = 0;
-  if (statsObserver) statsObserver.disconnect();
   $('viewerVodGrid').replaceChildren();
   $('viewerLoadMore').classList.add('hidden');
   $('viewerPeriodScanButton').disabled = false;
@@ -2596,17 +2575,6 @@ async function selectStreamer(streamer) {
   }
   setSearchHint((streamer.nickname || streamer.soopId) + '의 다시보기를 불러옵니다. 카드나 최고·최저 링크를 누르면 해당 시점부터 재생됩니다.');
   updateVodHeading();
-  if ('IntersectionObserver' in window) {
-    statsObserver = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        statsObserver.unobserve(entry.target);
-        enqueueStats(entry.target, entry.target._vod, entry.target._loadToken);
-      });
-    }, { rootMargin: '480px 0px' });
-  } else {
-    statsObserver = null;
-  }
   await loadVodPage(loadToken, 1);
 }
 
@@ -2682,7 +2650,6 @@ $('viewerVodSearchForm').addEventListener('submit', async (event) => {
   vodListRequestToken += 1;
   const requestToken = vodListRequestToken;
   cancelQueuedStatsRequests();
-  if (statsObserver) statsObserver.disconnect();
   $('viewerVodGrid').replaceChildren();
   vodTotal = 0;
   nextPage = 1;
