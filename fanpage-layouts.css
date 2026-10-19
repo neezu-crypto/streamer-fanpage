@@ -371,6 +371,8 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 .competition-history-link { color: var(--kawaii-accent-deep); }
 #fanPageView.fanpage-layout-1 .competition-history-empty { border-color: #e8deea; background: #fff9fc; color: #81758b; }
 #fanPageView.fanpage-layout-1 .competition-history-form-grid .profile-editor-field input[type="month"] { color-scheme: light; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-history-dialog .competition-history-form-grid input[type="month"] { color-scheme: light; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-history-dialog .competition-history-form-status.is-error { color: #a74d6b !important; }
 #fanPageView.fanpage-layout-1.fanpage-theme-sora .competition-history-item { border-color: #dbe4f8; background: linear-gradient(130deg, #f8faff, #fff 75%); box-shadow: 0 3px 0 #dce5f4; }
 #fanPageView.fanpage-layout-1.fanpage-theme-sora .competition-history-meta .competition-history-date,
 #fanPageView.fanpage-layout-1.fanpage-theme-sora .competition-history-result { border-color: #cbd8f0; background: #eef3ff; color: #536f9a; }
