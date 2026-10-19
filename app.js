@@ -5401,8 +5401,26 @@ async function runSearch() {
   hint.textContent = '인증된 스트리머를 찾고 있어요…';
   try {
     const result = await callSearch({ query });
-    renderList($('searchResults'), result.data.streamers);
-    hint.textContent = result.data.streamers.length ? `검색 결과 ${result.data.streamers.length}명` : '일치하는 인증 스트리머를 찾지 못했어요.';
+    const streamers = Array.isArray(result.data.streamers) ? result.data.streamers : [];
+    if (streamers.length) {
+      renderList($('searchResults'), streamers);
+      hint.textContent = `검색 결과 ${streamers.length}명`;
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'search-empty search-empty-guidance';
+      const title = document.createElement('strong');
+      title.className = 'search-empty-guidance-title';
+      title.textContent = '찾는 스트리머가 없나요?';
+      const description = document.createElement('p');
+      description.textContent = '스트리머 인증을 신청하고 승인되면 본인 팬페이지가 생성돼요.';
+      const verify = document.createElement('button');
+      verify.type = 'button'; verify.className = 'button button-primary search-empty-verify';
+      verify.textContent = '스트리머 인증하기';
+      verify.addEventListener('click', () => showFanPageModal($('streamerVerifyDialog')));
+      empty.append(title, description, verify);
+      $('searchResults').replaceChildren(empty);
+      hint.textContent = '일치하는 인증 스트리머를 찾지 못했어요.';
+    }
   } catch (error) { hint.textContent = error.message || '검색에 실패했어요.'; }
 }
 function showStartupError(error) {
