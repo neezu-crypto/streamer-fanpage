@@ -836,7 +836,13 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog
   color: #51465d;
 }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-heading { color: #51465d; }
-body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-heading span { color: #786c82; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-range { color: #786c82; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-range select {
+  border-color: #e1d6e6;
+  background: #fff;
+  color: #51465d;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-range select:focus-visible { outline-color: var(--dialog-accent-strong); }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-tile {
   border-color: #e8deea;
   background: #fffafd;

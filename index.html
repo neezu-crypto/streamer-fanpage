@@ -12,8 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
   <link rel="preload" as="image" href="assets/fanpage-kawaii/cat-paw-close.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=20261019-roulette-mobile-controls">
-  <link rel="stylesheet" href="fanpage-layouts.css?v=20261020-admin-usage-colors">
+  <link rel="stylesheet" href="style.css?v=20261020-viewer-usage-range">
+  <link rel="stylesheet" href="fanpage-layouts.css?v=20261020-viewer-usage-range">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -208,7 +208,16 @@
           <span>한국 시간 · 최근 30일</span>
         </div>
         <div class="admin-viewer-usage-summary" id="viewerStatsAdminSummary"></div>
-        <div class="admin-viewer-data-heading"><strong>데이터 사용량 · 예상 비용</strong><span id="viewerStatsAdminDataPeriod">최근 30일</span></div>
+        <div class="admin-viewer-data-heading">
+          <strong>데이터 사용량 · 예상 비용</strong>
+          <label class="admin-viewer-data-range" for="viewerStatsAdminDataRange">기간
+            <select id="viewerStatsAdminDataRange" aria-label="사용량과 예상 비용 조회 기간">
+              <option value="today">오늘</option>
+              <option value="last7">최근 7일</option>
+              <option value="last30" selected>최근 30일</option>
+            </select>
+          </label>
+        </div>
         <div class="admin-viewer-data-summary" id="viewerStatsAdminDataSummary"></div>
         <div class="admin-viewer-data-costs" id="viewerStatsAdminCostSummary"></div>
         <p class="admin-viewer-data-note" id="viewerStatsAdminDataNote"></p>
@@ -241,6 +250,6 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261020-viewer-stats-static-export"></script>
+  <script type="module" src="app.js?v=20261020-viewer-usage-range"></script>
 </body>
 </html>

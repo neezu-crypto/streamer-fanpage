@@ -750,9 +750,13 @@ function formatViewerStatsEstimatedUsd(value) {
   const amount = Math.max(0, Number(value) || 0);
   return amount > 0 && amount < 0.0001 ? '<$0.0001' : `~$${amount.toFixed(4)}`;
 }
+let latestViewerStatsAdminUsage = null;
 function renderViewerStatsUsage(usage) {
   const safeUsage = usage && typeof usage === 'object' ? usage : {};
-  $('viewerStatsAdminDataPeriod').textContent = '최근 30일';
+  latestViewerStatsAdminUsage = safeUsage;
+  const rangeSelect = $('viewerStatsAdminDataRange');
+  const selectedRange = ['today', 'last7', 'last30'].includes(rangeSelect.value) ? rangeSelect.value : 'last30';
+  const selectedRangeLabel = { today: '오늘', last7: '최근 7일', last30: '최근 30일' }[selectedRange];
   const totals = safeUsage.totals && typeof safeUsage.totals === 'object' ? safeUsage.totals : {};
   const summary = $('viewerStatsAdminSummary');
   summary.replaceChildren();
@@ -798,6 +802,8 @@ function renderViewerStatsUsage(usage) {
   const todayData = dataUsage.today && typeof dataUsage.today === 'object' ? dataUsage.today : {};
   const last7Data = dataUsage.last7 && typeof dataUsage.last7 === 'object' ? dataUsage.last7 : {};
   const last30Data = dataUsage.last30 && typeof dataUsage.last30 === 'object' ? dataUsage.last30 : {};
+  const dataByRange = { today: todayData, last7: last7Data, last30: last30Data };
+  const selectedData = dataByRange[selectedRange];
   const dataSummary = $('viewerStatsAdminDataSummary');
   dataSummary.replaceChildren();
   [
@@ -821,22 +827,27 @@ function renderViewerStatsUsage(usage) {
       if (key.endsWith('Ms')) return `${((Number(source[key]) || 0) / 1000 / 60).toFixed(1)}분`;
       return formatViewerStatsBytes(source[key]);
     };
-    value.textContent = formattedValue(last30Data);
+    value.textContent = formattedValue(selectedData);
     const detail = document.createElement('small');
-    detail.textContent = `오늘 ${formattedValue(todayData)} · 7일 ${formattedValue(last7Data)}`;
+    const otherRanges = selectedRange === 'today'
+      ? [['7일', last7Data], ['30일', last30Data]]
+      : selectedRange === 'last7'
+        ? [['오늘', todayData], ['30일', last30Data]]
+        : [['오늘', todayData], ['7일', last7Data]];
+    detail.textContent = `${otherRanges[0][0]} ${formattedValue(otherRanges[0][1])} · ${otherRanges[1][0]} ${formattedValue(otherRanges[1][1])}`;
     tile.append(title, value, detail); dataSummary.append(tile);
   });
 
   const costs = dataUsage.estimatedCostUsd && typeof dataUsage.estimatedCostUsd === 'object'
     ? dataUsage.estimatedCostUsd
     : {};
-  const last30Cost = costs.last30 && typeof costs.last30 === 'object' ? costs.last30 : {};
+  const selectedCost = costs[selectedRange] && typeof costs[selectedRange] === 'object' ? costs[selectedRange] : {};
   const costSummary = $('viewerStatsAdminCostSummary');
   costSummary.replaceChildren();
   [
-    ['RTDB 다운로드 추정', last30Cost.realtimeDatabaseCost],
-    ['Cloud Functions 실행 추정', last30Cost.functionCost],
-    ['합계 추정', last30Cost.totalCost],
+    ['RTDB 다운로드 추정', selectedCost.realtimeDatabaseCost],
+    ['Cloud Functions 실행 추정', selectedCost.functionCost],
+    ['합계 추정', selectedCost.totalCost],
   ].forEach(([label, amount], index) => {
     const row = document.createElement('div'); row.className = `admin-viewer-data-cost${index === 2 ? ' total' : ''}`;
     const title = document.createElement('span'); title.textContent = label;
@@ -844,7 +855,7 @@ function renderViewerStatsUsage(usage) {
     row.append(title, value); costSummary.append(row);
   });
   $('viewerStatsAdminDataNote').textContent = dataUsage.startedAt
-    ? `계측 시작 ${dataUsage.startedAt} · payload 기준(프로토콜 overhead 제외), 무료 한도·할인 차감 전 USD 추정치입니다. 인터넷 송신·Cloud Tasks·RTDB 저장 비용은 제외합니다. 브라우저의 SOOP 직접 조회와 GitHub Pages 전송은 포함되지 않습니다.`
+    ? `${selectedRangeLabel} 데이터 · 계측 시작 ${dataUsage.startedAt} · payload 기준(프로토콜 overhead 제외), 무료 한도·할인 차감 전 USD 추정치입니다. 인터넷 송신·Cloud Tasks·RTDB 저장 비용은 제외합니다. 브라우저의 SOOP 직접 조회와 GitHub Pages 전송은 포함되지 않습니다.`
     : '데이터·비용 계측은 배포 후부터 시작합니다. 최근 30일 요청 건수는 기존 기록을 표시합니다.';
 
   const tierContainer = $('viewerStatsAdminTiers');
@@ -5770,6 +5781,9 @@ $('openAdminStats').addEventListener('click', () => {
 });
 $('closeAdminStats').addEventListener('click', () => $('adminStatsDialog').close());
 $('refreshAdminStats').addEventListener('click', loadAdminStats);
+$('viewerStatsAdminDataRange').addEventListener('change', () => {
+  if (latestViewerStatsAdminUsage) renderViewerStatsUsage(latestViewerStatsAdminUsage);
+});
 $('refreshDesignFeedback').addEventListener('click', loadAdminDesignFeedback);
 $('openDesignFeedback').addEventListener('click', () => {
   const activeId = routeId().toLowerCase();
