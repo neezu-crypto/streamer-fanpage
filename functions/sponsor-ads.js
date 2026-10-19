@@ -233,14 +233,76 @@ exports.streamerFanPageSponsorAds = onCall({ maxInstances: 20, enforceAppCheck: 
 
     if (action === 'donationComplete') {
       const now = Date.now();
+      // 자동 대조가 먼저 승인한 뒤 브라우저의 상태 폴링이 갱신되기 전에
+      // 사용자가 완료 버튼을 누를 수 있다. 승인/처리 중 상태는 오류로 돌리지 않는다.
+      if (existing.status === 'approved') {
+        const ad = existing.campaignId
+          ? (await db.ref(`${ADS_PATH}/${existing.campaignId}`).get()).val()
+          : null;
+        return {
+          status: 'approved',
+          donationCompletedAt: Math.max(0, Number(existing.donationCompletedAt) || 0),
+          expiresAt: Math.max(0, Number(ad && ad.expiresAt) || Number(existing.approvedUntil) || 0),
+        };
+      }
+      if (existing.status === 'processing') {
+        return {
+          status: 'processing',
+          donationCompletedAt: Math.max(0, Number(existing.donationCompletedAt) || 0),
+        };
+      }
+      if (!isPendingRequest(existing, now)) {
+        throw new HttpsError('failed-precondition', '후원 완료를 등록할 수 있는 대기 신청이 없습니다. 신청 상태를 새로고침해 주세요.');
+      }
       const claimRef = db.ref(`${CLAIMS_PATH}/${requestId}`);
-      const claim = await claimRef.transaction((current) => {
-        if (!current || current.status !== 'pending' || current.soopId !== soopIdFromRecord(existing)) return;
+      const requestSoopId = soopIdFromRecord(existing);
+      const markClaimDonationComplete = () => claimRef.transaction((current) => {
+        if (!current || current.status !== 'pending' || current.soopId !== requestSoopId) return;
         if (Number(current.donationCompletedAt) > 0) return current;
         return { ...current, donationCompletedAt: now };
       });
-      if (!claim.committed && !(claim.snapshot.val() && Number(claim.snapshot.val().donationCompletedAt) > 0)) {
-        throw new HttpsError('failed-precondition', '신청 자리를 확인하지 못했습니다. 운영자에게 문의해 주세요.');
+      let claim = await markClaimDonationComplete();
+      let claimValue = claim.snapshot.val();
+      // 다른 신청 확인/만료 정리와 겹쳐 transaction이 중단됐지만 예약이 여전히
+      // 유효한 경우 한 번 재시도해 순간적인 동시 갱신을 복구한다.
+      if (!claim.committed && claimValue && claimValue.status === 'pending' &&
+          claimValue.soopId === requestSoopId && !Number(claimValue.donationCompletedAt)) {
+        claim = await markClaimDonationComplete();
+        claimValue = claim.snapshot.val();
+      }
+      if (!claim.committed && !(claimValue && claimValue.status === 'pending' &&
+          claimValue.soopId === requestSoopId && Number(claimValue.donationCompletedAt) > 0)) {
+        // 자동 검증이 같은 순간에 승인을 시작했을 수 있으니 최신 상태를 확인하고,
+        // 대기열에 남은 정상 신청에는 기존의 잘못된 '자리 없음' 안내를 하지 않는다.
+        const [latestRequestSnapshot, latestClaimSnapshot] = await Promise.all([
+          requestRef.get(),
+          claimRef.get(),
+        ]);
+        const latestRequest = latestRequestSnapshot.val() || {};
+        const latestClaim = latestClaimSnapshot.val() || {};
+        if (latestRequest.requesterUid === uid && latestRequest.status === 'approved') {
+          const ad = latestRequest.campaignId
+            ? (await db.ref(`${ADS_PATH}/${latestRequest.campaignId}`).get()).val()
+            : null;
+          return {
+            status: 'approved',
+            donationCompletedAt: Math.max(0, Number(latestRequest.donationCompletedAt) || 0),
+            expiresAt: Math.max(0, Number(ad && ad.expiresAt) || Number(latestRequest.approvedUntil) || 0),
+          };
+        }
+        if (latestRequest.requesterUid === uid && latestRequest.status === 'processing') {
+          return {
+            status: 'processing',
+            donationCompletedAt: Math.max(0, Number(latestRequest.donationCompletedAt) || 0),
+          };
+        }
+        console.warn('홍보 신청 후원 완료 예약 확인 실패:', {
+          requestId,
+          requestStatus: String(latestRequest.status || ''),
+          claimStatus: String(latestClaim.status || ''),
+          claimMatchesRequest: latestClaim.soopId === soopIdFromRecord(latestRequest),
+        });
+        throw new HttpsError('failed-precondition', '신청 자리 예약 상태를 확인하지 못했습니다. 신청 상태를 새로고침한 뒤 다시 시도해 주세요.');
       }
       const result = await requestRef.transaction((current) => {
         if (!current || current.requesterUid !== uid || !isPendingRequest(current, now)) return;
@@ -252,7 +314,7 @@ exports.streamerFanPageSponsorAds = onCall({ maxInstances: 20, enforceAppCheck: 
         await claimRef.child('donationCompletedAt').transaction((current) => current === now ? 0 : current);
         throw new HttpsError('failed-precondition', '후원 완료를 등록할 수 있는 대기 신청이 없습니다.');
       }
-      return { donationCompletedAt: Number(saved.donationCompletedAt) || now };
+      return { status: 'pending', donationCompletedAt: Number(saved.donationCompletedAt) || now };
     }
 
     if (Number(existing.donationCompletedAt) > 0) {
