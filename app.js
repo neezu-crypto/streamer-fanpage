@@ -790,7 +790,7 @@ function renderAdminViewerSubscriptionRequests(requests, truncated = false) {
       ? 'SOOP 후원 알림 자동 확인 완료'
       : request.donationCompletedAt
         ? '후원 완료 신호 · ' + new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(request.donationCompletedAt))
-        : request.donorSoopId ? '후원 완료 신호 대기' : '자동 확인 정보 없음';
+        : request.donorSoopId ? '신청 후 자동 감시 중 · 완료 알림 없음' : '자동 확인 정보 없음';
     const requestedAt = document.createElement('small');
     requestedAt.textContent = request.requestedAt
       ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(request.requestedAt))
