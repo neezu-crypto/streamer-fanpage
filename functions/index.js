@@ -4489,7 +4489,16 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
   if (action === 'deleteRecord') {
     const recordId = String(data.recordId || '').trim();
     if (!validUpboId(recordId)) throw new HttpsError('invalid-argument', '확정 기록을 확인해 주세요.');
-    const deletion = await recordsRef.child(recordId).transaction((current) => current ? null : undefined);
+    const recordRef = recordsRef.child(recordId);
+    const existing = normalizeStoredUpboRecord(recordId, (await recordRef.get()).val());
+    if (!existing) throw new HttpsError('not-found', '삭제할 확정 기록을 찾을 수 없습니다.');
+    const releaseTransactionCache = await holdUpboTransactionCache(recordRef);
+    let deletion;
+    try {
+      deletion = await recordRef.transaction((current) => current ? null : undefined);
+    } finally {
+      releaseTransactionCache();
+    }
     if (!deletion.committed) throw new HttpsError('not-found', '삭제할 확정 기록을 찾을 수 없습니다.');
     return { deleted: true, canManage };
   }
@@ -4610,7 +4619,15 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
     const viewerId = String(data.viewerId || '').trim();
     if (!validUpboId(viewerId)) throw new HttpsError('invalid-argument', '시청자 기록을 확인해 주세요.');
     const viewerRef = rootRef.child('viewers').child(topicId).child(viewerId);
-    const deletion = await viewerRef.transaction((current) => current ? null : undefined);
+    const existing = normalizeStoredUpboViewer(viewerId, (await viewerRef.get()).val());
+    if (!existing) throw new HttpsError('not-found', '삭제할 시청자 기록을 찾을 수 없습니다.');
+    const releaseTransactionCache = await holdUpboTransactionCache(viewerRef);
+    let deletion;
+    try {
+      deletion = await viewerRef.transaction((current) => current ? null : undefined);
+    } finally {
+      releaseTransactionCache();
+    }
     if (!deletion.committed) throw new HttpsError('not-found', '삭제할 시청자 기록을 찾을 수 없습니다.');
     await topicRef.child('viewerCount').transaction((current) => Math.max(0, metricCount(current) - 1));
     return { deleted: true, canManage };
