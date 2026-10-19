@@ -1042,7 +1042,7 @@ body.fanpage-bottom-banner-active{min-height:0}
 .competition-history-item-actions .button{min-height:30px;padding:0 9px;font-size:10px}
 .competition-history-item-actions .competition-history-delete{border-color:#f58cac38;color:#f2a6bd}
 .competition-history-empty{display:grid;min-height:86px;place-items:center;margin:0;padding:16px;border:1px dashed #ffffff24;border-radius:13px;background:#ffffff04;color:#aaa1b2;font-size:12px;text-align:center;line-height:1.6}
-.competition-history-dialog{width:min(620px,calc(100% - 28px));max-height:calc(100dvh - 28px);overflow-y:auto}
+.competition-history-dialog{box-sizing:border-box;width:min(620px,calc(100vw - 28px));max-width:calc(100vw - 28px);max-height:calc(100vh - 28px);max-height:calc(100dvh - 28px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
 .competition-history-form{display:grid;gap:14px}
 .competition-history-form .profile-editor-heading{margin-bottom:0}
 .competition-history-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -1062,7 +1062,7 @@ body.fanpage-bottom-banner-active{min-height:0}
   .competition-history-item h3{font-size:14px}
   .competition-history-result{max-width:38%;font-size:10px}
   .competition-history-item-footer{align-items:flex-end}
-  .competition-history-dialog{width:calc(100% - 20px);max-height:calc(100dvh - 20px)}
+  .competition-history-dialog{width:calc(100vw - 20px);max-width:calc(100vw - 20px);max-height:calc(100vh - 24px);max-height:calc(100svh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));margin-block:auto}
   .competition-history-form{padding:20px}
   .competition-history-form-grid{grid-template-columns:1fr}
   .competition-history-field-wide{grid-column:auto}
