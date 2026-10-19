@@ -529,6 +529,32 @@ function renderList(container, items, recent = false, emptyText = '검색 결과
   }
   items.forEach((item) => container.append(streamerCard(item, recent)));
 }
+function renderRegisteredStreamers(streamers) {
+  const section = $('registeredStreamersSection');
+  const grid = $('registeredStreamersGrid');
+  const count = $('registeredStreamersCount');
+  const toggle = $('registeredStreamersToggle');
+  const unique = new Map();
+  (Array.isArray(streamers) ? streamers : []).forEach((streamer) => {
+    if (streamer && typeof streamer.id === 'string' && !unique.has(streamer.id)) unique.set(streamer.id, streamer);
+  });
+  const items = [...unique.values()].sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'));
+  section.classList.toggle('hidden', !items.length);
+  count.textContent = `전체 ${items.length.toLocaleString('ko-KR')}명`;
+  let expanded = false;
+  toggle.classList.toggle('hidden', items.length <= 8);
+  toggle.onclick = () => {
+    expanded = !expanded;
+    renderCards();
+  };
+  function renderCards() {
+    const visibleItems = expanded ? items : items.slice(0, 8);
+    grid.replaceChildren(...visibleItems.map((streamer) => streamerCard(streamer, true)));
+    toggle.textContent = expanded ? '접기' : `전체 보기 (${items.length})`;
+    toggle.setAttribute('aria-expanded', String(expanded));
+  }
+  renderCards();
+}
 function formatStatCount(value) {
   return Math.max(0, Math.floor(Number(value) || 0)).toLocaleString('ko-KR');
 }
@@ -5465,8 +5491,15 @@ async function loadApp() {
     }
     const recentPromise = callRecent().then((value) => value.data.streamers);
     if (!requestedId) {
-      const recent = await recentPromise;
+      const directoryPromise = callSearch({ query: '', includeAll: true })
+        .then((value) => Array.isArray(value.data.streamers) ? value.data.streamers : [])
+        .catch((error) => {
+          console.warn('Could not load the registered streamer directory:', error.message || error);
+          return [];
+        });
+      const [recent, registered] = await Promise.all([recentPromise, directoryPromise]);
       renderList($('recentPages'), recent, true, '최근 방문한 팬페이지가 여기에 표시돼요.');
+      renderRegisteredStreamers(registered);
       setVisibleView(null);
       $('searchInput').value = '';
       $('searchInput').oninput = () => {

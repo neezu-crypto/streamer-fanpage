@@ -3645,22 +3645,23 @@ exports.streamerFanPageScheduleDelete = onCall({ maxInstances: 20 }, async (requ
 
 exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {
   requireAuth(request);
-  const query = String((request.data && request.data.query) || '').trim().toLocaleLowerCase();
+  const data = request.data || {};
+  const query = String(data.query || '').trim().toLocaleLowerCase();
+  const includeAll = data.includeAll === true && query.length === 0;
   if (query.length > 40) throw new HttpsError('invalid-argument', '검색어가 너무 깁니다.');
-  if (query.length < 1) return { streamers: [] };
+  if (query.length < 1 && !includeAll) return { streamers: [] };
   const snap = await db.ref('streamerVerifications').get();
   const byId = new Map();
   Object.entries(snap.val() || {}).forEach(([key, record]) => {
     const streamer = publicStreamer(key, record);
     if (!streamer) return;
-    if (streamer.nickname.toLocaleLowerCase().includes(query) || streamer.soopId.toLocaleLowerCase().includes(query)) {
+    if (includeAll || streamer.nickname.toLocaleLowerCase().includes(query) || streamer.soopId.toLocaleLowerCase().includes(query)) {
       byId.set(streamer.id, streamer);
     }
   });
   const streamers = [...byId.values()]
-    .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'))
-    .slice(0, 30);
-  return { streamers };
+    .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'));
+  return { streamers: includeAll ? streamers : streamers.slice(0, 30) };
 });
 
 exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck: true, timeoutSeconds: 300 }, async (request) => {
