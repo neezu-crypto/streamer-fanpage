@@ -39,6 +39,8 @@ exports.streamerFanPageSponsorAds = streamerFanPageSponsorAds;
 exports.streamerFanPageAdminSponsorAds = streamerFanPageAdminSponsorAds;
 const MAX_INTRO_LENGTH = 700;
 const MAX_BANNER_IMAGE_ITEMS = 20;
+const FANPAGE_COMPETITION_HISTORY_MAX_ITEMS = 30;
+const FANPAGE_COMPETITION_HISTORY_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const RECENT_PAGE_LIMIT = 8;
 const FANPAGE_STATS_DAYS = 30;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
@@ -2888,6 +2890,7 @@ function normalizePage(streamer, value) {
     layoutDesign: sourceProfile.layoutDesign === 2 ? 2 : 1,
     topBannerImageUrls: normalizeBannerImageUrls(sourceProfile.topBannerImageUrls),
     bottomBannerImageUrls: normalizeBannerImageUrls(sourceProfile.bottomBannerImageUrls),
+    competitionHistory: normalizeFanPageCompetitionHistory(sourceProfile.competitionHistory),
   };
   return {
     streamer,
@@ -2895,6 +2898,64 @@ function normalizePage(streamer, value) {
     profile,
     updatedAt: Number.isFinite(page.updatedAt) ? page.updatedAt : null,
   };
+}
+
+function normalizeFanPageCompetitionHistory(value, options = {}) {
+  const strict = options.strict === true;
+  const invalid = () => {
+    if (strict) throw new HttpsError('invalid-argument', '대회 이력 항목을 확인해 주세요.');
+    return null;
+  };
+  if (!Array.isArray(value)) return strict ? invalid() : [];
+  if (strict && value.length > FANPAGE_COMPETITION_HISTORY_MAX_ITEMS) return invalid();
+  const seenIds = new Set();
+  const normalized = [];
+  for (const item of value.slice(0, FANPAGE_COMPETITION_HISTORY_MAX_ITEMS)) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      if (strict) return invalid();
+      continue;
+    }
+    const fields = ['id', 'eventName', 'date', 'category', 'result', 'description', 'link'];
+    if (fields.some((field) => typeof item[field] !== 'string')) {
+      if (strict) return invalid();
+      continue;
+    }
+    const entry = {
+      id: item.id.trim(),
+      eventName: item.eventName.trim(),
+      date: item.date.trim(),
+      category: item.category.trim(),
+      result: item.result.trim(),
+      description: item.description.trim(),
+      link: item.link.trim(),
+    };
+    if (!FANPAGE_COMPETITION_HISTORY_ID_PATTERN.test(entry.id)
+      || seenIds.has(entry.id)
+      || !entry.eventName
+      || entry.eventName.length > 100
+      || entry.date.length > 7
+      || (entry.date && !/^\d{4}-(0[1-9]|1[0-2])$/.test(entry.date))
+      || entry.category.length > 50
+      || entry.result.length > 80
+      || entry.description.length > 500
+      || entry.link.length > 500) {
+      if (strict) return invalid();
+      continue;
+    }
+    if (entry.link) {
+      try {
+        const parsed = new URL(entry.link);
+        if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) throw new Error('invalid url');
+        entry.link = parsed.href;
+      } catch (_) {
+        if (strict) return invalid();
+        entry.link = '';
+      }
+    }
+    seenIds.add(entry.id);
+    normalized.push(entry);
+  }
+  return normalized;
 }
 
 function fanPageVodCommentsRef(streamerId, vodId) {
@@ -4552,6 +4613,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       || (Object.prototype.hasOwnProperty.call(profile, 'bottomBannerImageUrls') && (!Array.isArray(profile.bottomBannerImageUrls)
         || profile.bottomBannerImageUrls.length > MAX_BANNER_IMAGE_ITEMS
         || profile.bottomBannerImageUrls.some((url) => typeof url !== 'string' || url.length > 2048)))
+      || (Object.prototype.hasOwnProperty.call(profile, 'competitionHistory') && !Array.isArray(profile.competitionHistory))
       || !Array.isArray(profile.contents)
       || profile.contents.length > 8
       || stringFields.some((field) => profile[field].length > ({ birthday: 20, mbti: 8, major: 50, debutDate: 20, fanNickname: 30, fandomName: 30, scheduleText: 120, rouletteUrl: 300 })[field])
@@ -4562,6 +4624,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       throw new HttpsError('invalid-argument', '프로필 항목을 확인해 주세요.');
     }
     const hasYouTubeUrl = Object.prototype.hasOwnProperty.call(profile, 'youtubeChannelUrl');
+    const hasCompetitionHistory = Object.prototype.hasOwnProperty.call(profile, 'competitionHistory');
     const previousProfile = (await pageRef(targetStreamer.streamer.id).child('profile').get()).val() || {};
     const previousRouletteUrl = parseWeFlabRouletteUrl(previousProfile.rouletteUrl) || '';
     let rouletteUrl = profile.rouletteUrl.trim();
@@ -4630,6 +4693,10 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
         : (previousProfile.layoutDesign === 2 ? 2 : 1),
       topBannerImageUrls: cleanBannerImageUrls(topBannerImageUrlsInput),
       bottomBannerImageUrls: cleanBannerImageUrls(bottomBannerImageUrlsInput),
+      competitionHistory: normalizeFanPageCompetitionHistory(
+        hasCompetitionHistory ? profile.competitionHistory : previousProfile.competitionHistory,
+        { strict: hasCompetitionHistory },
+      ),
     };
     clearYouTubeCache = hasYouTubeUrl;
     clearCafeCache = Object.prototype.hasOwnProperty.call(profile, 'cafeUrl') && previousCafeUrl !== (cafe ? cafe.url : '');

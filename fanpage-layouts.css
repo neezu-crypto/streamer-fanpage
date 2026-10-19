@@ -344,6 +344,26 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(input, textarea, select):focus { border-color: var(--kawaii-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--kawaii-accent), transparent 85%); }
 #fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(input, textarea)::placeholder { color: #a39aa9; }
 
+#fanPageView.fanpage-layout-1 .competition-history-subtitle,
+#fanPageView.fanpage-layout-1 .competition-history-count { color: #81758b; }
+#fanPageView.fanpage-layout-1 .competition-history-item {
+  border-color: #eadfeb;
+  border-radius: 16px;
+  background: linear-gradient(130deg, #fffafd, #fff 75%);
+  box-shadow: 0 3px 0 #eee2ee;
+}
+#fanPageView.fanpage-layout-1 .competition-history-meta > * { border-color: #e8deea; background: #fff; color: #81758b; }
+#fanPageView.fanpage-layout-1 .competition-history-meta .competition-history-date { border-color: #f1c3d3; background: #fff2f7; color: #c26083; }
+#fanPageView.fanpage-layout-1 .competition-history-result { border-color: #efbfd0; background: #fff1f6; color: #bf5c7d; }
+#fanPageView.fanpage-layout-1 .competition-history-description { color: #6f6479; }
+#fanPageView.fanpage-layout-1 .competition-history-link { color: var(--kawaii-accent-deep); }
+#fanPageView.fanpage-layout-1 .competition-history-empty { border-color: #e8deea; background: #fff9fc; color: #81758b; }
+#fanPageView.fanpage-layout-1 .competition-history-form-grid .profile-editor-field input[type="month"] { color-scheme: light; }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .competition-history-item { border-color: #dbe4f8; background: linear-gradient(130deg, #f8faff, #fff 75%); box-shadow: 0 3px 0 #dce5f4; }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .competition-history-meta .competition-history-date,
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .competition-history-result { border-color: #cbd8f0; background: #eef3ff; color: #536f9a; }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .competition-history-link { color: #5376be; }
+
 /* Live preview includes its own legacy dark surfaces, so theme its inner card explicitly. */
 #fanPageView.fanpage-layout-1 .live-preview-card {
   border-color: #e2d8e9;

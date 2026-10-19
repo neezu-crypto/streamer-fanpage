@@ -1016,3 +1016,56 @@ body.fanpage-bottom-banner-active{min-height:0}
   .fan-quick-toggle{width:38px;height:38px}
   .fan-quick-panel{width:min(210px,calc(100vw - 54px));max-height:62dvh}
 }
+
+/* Competition history card */
+.competition-history-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px}
+.competition-history-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.competition-history-heading h2{margin:0;font:23px var(--display)}
+.competition-history-subtitle{margin:5px 0 0;color:#b6adbc;font-size:12px}
+.competition-history-heading-actions{display:flex;align-items:center;gap:12px}
+.competition-history-count{color:#bcb3c2;font-size:11px;white-space:nowrap}
+.competition-history-add{min-height:35px;padding:0 12px;font-size:10px;white-space:nowrap}
+.competition-history-list{display:grid;gap:10px}
+.competition-history-item{min-width:0;padding:15px 16px;border:1px solid #ffffff16;border-radius:14px;background:linear-gradient(130deg,#ffffff08,#ffffff03)}
+.competition-history-item-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.competition-history-item-copy{min-width:0}
+.competition-history-item h3{margin:0;font:16px var(--display);overflow-wrap:anywhere}
+.competition-history-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.competition-history-meta>*{padding:4px 8px;border:1px solid #ffffff1b;border-radius:99px;background:#ffffff08;color:#c4bacb;font-size:10px;line-height:1.2}
+.competition-history-meta .competition-history-date{border-color:#f58cac42;background:#f58cac0d;color:#f1b4c8}
+.competition-history-result{flex:none;max-width:42%;padding:6px 10px;border:1px solid #f58cac55;border-radius:99px;background:#f58cac16;color:#ffc1d3;font-size:11px;font-weight:800;text-align:center;overflow-wrap:anywhere}
+.competition-history-description{margin:11px 0 0;color:#c5bdca;font-size:12px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.competition-history-item-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.competition-history-link{color:#f5a9c1;font-size:11px;font-weight:700;text-decoration:none}
+.competition-history-link:hover{text-decoration:underline}
+.competition-history-item-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
+.competition-history-item-actions .button{min-height:30px;padding:0 9px;font-size:10px}
+.competition-history-item-actions .competition-history-delete{border-color:#f58cac38;color:#f2a6bd}
+.competition-history-empty{display:grid;min-height:86px;place-items:center;margin:0;padding:16px;border:1px dashed #ffffff24;border-radius:13px;background:#ffffff04;color:#aaa1b2;font-size:12px;text-align:center;line-height:1.6}
+.competition-history-dialog{width:min(620px,calc(100% - 28px));max-height:calc(100dvh - 28px);overflow-y:auto}
+.competition-history-form{display:grid;gap:14px}
+.competition-history-form .profile-editor-heading{margin-bottom:0}
+.competition-history-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.competition-history-field-wide{grid-column:1/-1}
+.competition-history-form-grid .profile-editor-field input[type="month"]{color-scheme:dark}
+.competition-history-form-grid .profile-editor-field textarea{min-height:94px;resize:vertical;line-height:1.55}
+.competition-history-note{margin:0;padding:11px 12px;border-radius:9px;background:#ffffff06;color:#b6adbc;font-size:11px;line-height:1.6}
+.competition-history-form-status{display:none;margin:0;color:#ffb3c8;font-size:11px;line-height:1.5}
+.competition-history-form-status.is-error{display:block}
+.competition-history-form-footer{align-items:center;margin-top:0}
+.competition-history-form-footer small{color:#928a9a;font-size:10px}
+@media(max-width:560px){
+  .competition-history-heading{align-items:flex-start;flex-direction:column;gap:11px}
+  .competition-history-heading-actions{width:100%;justify-content:space-between}
+  .competition-history-item{padding:13px}
+  .competition-history-item-heading{gap:8px}
+  .competition-history-item h3{font-size:14px}
+  .competition-history-result{max-width:38%;font-size:10px}
+  .competition-history-item-footer{align-items:flex-end}
+  .competition-history-dialog{width:calc(100% - 20px);max-height:calc(100dvh - 20px)}
+  .competition-history-form{padding:20px}
+  .competition-history-form-grid{grid-template-columns:1fr}
+  .competition-history-field-wide{grid-column:auto}
+  .competition-history-form-footer{align-items:flex-start;flex-direction:column}
+  .competition-history-form-footer .profile-editor-footer-actions{width:100%;justify-content:flex-end}
+}
