@@ -890,6 +890,9 @@
 /* Banner artwork spans the viewport edge to edge while keeping its intrinsic ratio. */
 .fan-banner-section{position:relative;left:50%;width:100vw;max-width:none;margin:18px 0 0 -50vw;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
 .fan-banner-top{margin-top:0;margin-bottom:18px}
+.fan-banner-bottom-grid-2x3{overflow:hidden;border-radius:4px}
+.fan-banner-list-grid-2x3{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:clamp(58px,10vw,138px);gap:1px;padding:1px;background:#fff9}
+.fan-banner-list-grid-2x3 .fan-banner-image{width:100%;height:100%;min-height:0;object-fit:cover}
 .main-content.has-fanpage-view{display:flex;flex-direction:column}
 .fanpage-view{flex:1}
 .fanpage-view.has-top-banner{padding-top:0}
@@ -924,6 +927,8 @@ body.fanpage-bottom-banner-active{min-height:0}
 .banner-settings-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
 .banner-settings-row input{width:100%;min-width:0;height:40px;padding:0 11px;border:1px solid #ffffff20;border-radius:9px;outline:0;background:#111018;color:var(--text);font:13px var(--font)}
 .banner-settings-row input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.banner-settings-layout-field select{width:100%;min-height:42px;padding:10px 11px;border:1px solid #ffffff20;border-radius:10px;background:#111018;color:var(--text);outline:none;font:13px var(--font)}
+.banner-settings-layout-field select:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
 .banner-settings-editor .profile-editor-hint{line-height:1.5}
 #fanPageView.fanpage-theme-sora .banner-settings-editor{border-color:#6387D155;background:#6387D10f}
 #fanPageView.fanpage-theme-sora .banner-settings-row input:focus{border-color:#6387D1;box-shadow:0 0 0 3px #6387D124}

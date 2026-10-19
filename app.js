@@ -2862,10 +2862,24 @@ function renderFanPage(page, options = {}) {
     bannerEditors.topBannerImageUrls = createBannerSettingsEditor(
       'topBannerImageUrls', '상단 배너 이미지', profile.topBannerImageUrls || [],
     );
+    const bottomBannerLayoutField = document.createElement('label');
+    bottomBannerLayoutField.className = 'profile-editor-field profile-editor-wide banner-settings-layout-field';
+    bottomBannerLayoutField.textContent = '하단 배너 배치 방식';
+    const bottomBannerLayout = document.createElement('select');
+    bottomBannerLayout.name = 'bottomBannerLayout';
+    [
+      ['stacked', '기존 방식 · 이미지 세로 배치'],
+      ['grid-2x3', '2×3 배치 · 2열 × 3행'],
+    ].forEach(([value, labelText]) => {
+      const option = document.createElement('option'); option.value = value; option.textContent = labelText;
+      bottomBannerLayout.append(option);
+    });
+    bottomBannerLayout.value = profile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked';
+    bottomBannerLayoutField.append(bottomBannerLayout);
     bannerEditors.bottomBannerImageUrls = createBannerSettingsEditor(
-      'bottomBannerImageUrls', '하단 배너 이미지', profile.bottomBannerImageUrls || [],
+      'bottomBannerImageUrls', '하단 배너 이미지', profile.bottomBannerImageUrls || [], { layoutSelect: bottomBannerLayout },
     );
-    grid.append(bannerEditors.topBannerImageUrls.element, bannerEditors.bottomBannerImageUrls.element);
+    grid.append(bannerEditors.topBannerImageUrls.element, bottomBannerLayoutField, bannerEditors.bottomBannerImageUrls.element);
     const introLabel = document.createElement('label'); introLabel.className = 'profile-editor-field profile-editor-wide'; introLabel.textContent = 'ABOUT 문구';
     const introInput = document.createElement('textarea'); introInput.name = 'intro'; introInput.maxLength = 700; introInput.value = page.intro || '';
     introLabel.append(introInput); grid.append(introLabel);
@@ -2896,6 +2910,7 @@ function renderFanPage(page, options = {}) {
             youtubeChannelUrl: value('youtubeChannelUrl'), cafeUrl: value('cafeUrl'), ogqEmoticonUrl: value('ogqEmoticonUrl'),
             layoutDesign: Number(editor.querySelector('input[name="layoutDesign"]:checked')?.value || DEFAULT_FANPAGE_LAYOUT),
             topBannerImageUrls, bottomBannerImageUrls,
+            bottomBannerLayout: bottomBannerLayout.value === 'grid-2x3' ? 'grid-2x3' : 'stacked',
             competitionHistory: Array.isArray(currentPage.profile?.competitionHistory) ? currentPage.profile.competitionHistory : [],
           },
         });
@@ -3244,7 +3259,7 @@ function normalizeBannerImageUrl(value) {
   return parsed.href;
 }
 
-function createBannerSettingsEditor(field, labelText, sourceUrls) {
+function createBannerSettingsEditor(field, labelText, sourceUrls, options = {}) {
   const wrapper = document.createElement('div');
   wrapper.className = 'profile-editor-field profile-editor-wide banner-settings-editor';
   const heading = document.createElement('div'); heading.className = 'banner-settings-heading';
@@ -3252,22 +3267,35 @@ function createBannerSettingsEditor(field, labelText, sourceUrls) {
   const add = document.createElement('button'); add.type = 'button'; add.className = 'button banner-settings-add'; add.textContent = '+ 이미지 추가';
   heading.append(label, add);
   const rows = document.createElement('div'); rows.className = 'banner-settings-rows';
+  const note = document.createElement('small'); note.className = 'profile-editor-hint';
   const urls = Array.isArray(sourceUrls) ? sourceUrls.filter((url) => typeof url === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [];
-  const addRow = (value = '') => {
-    if (rows.children.length >= MAX_BANNER_IMAGE_ITEMS) return;
+  const gridLimit = 6;
+  const updateLayout = () => {
+    const useGrid = options.layoutSelect?.value === 'grid-2x3';
+    [...rows.children].forEach((row, index) => { row.hidden = useGrid && index >= gridLimit; });
+    add.disabled = rows.children.length >= (useGrid ? gridLimit : MAX_BANNER_IMAGE_ITEMS);
+    note.textContent = useGrid
+      ? `2×3 배치는 위에서부터 최대 ${gridLimit}장만 표시해요. 기존에 추가한 나머지 이미지는 기존 방식으로 바꾸면 다시 표시됩니다.`
+      : `배너 규격은 약 2045×298px이며, 상단·하단 각각 최대 ${MAX_BANNER_IMAGE_ITEMS}개까지 등록할 수 있어요.`;
+  };
+  const addRow = (value = '', isExisting = false) => {
+    const maxRows = options.layoutSelect?.value === 'grid-2x3' ? gridLimit : MAX_BANNER_IMAGE_ITEMS;
+    if (!isExisting && rows.children.length >= maxRows) return;
     const row = document.createElement('div'); row.className = 'banner-settings-row';
     const input = document.createElement('input'); input.type = 'url'; input.maxLength = 2048;
     input.placeholder = 'https://이미지주소'; input.value = value; input.autocomplete = 'url'; input.setAttribute('aria-label', `${labelText} 이미지 주소`);
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button banner-settings-remove';
     remove.textContent = '삭제'; remove.setAttribute('aria-label', `${labelText} 주소 삭제`);
-    remove.addEventListener('click', () => row.remove());
+    remove.addEventListener('click', () => { row.remove(); updateLayout(); });
     row.append(input, remove); rows.append(row);
-    add.disabled = rows.children.length >= MAX_BANNER_IMAGE_ITEMS;
+    updateLayout();
   };
-  urls.forEach((url) => addRow(url));
+  urls.forEach((url) => addRow(url, true));
   add.addEventListener('click', () => addRow());
-  const note = document.createElement('small'); note.className = 'profile-editor-hint';
-  note.textContent = `배너 규격은 약 2045×298px이며, 상단·하단 각각 최대 ${MAX_BANNER_IMAGE_ITEMS}개까지 등록할 수 있어요.`;
+  if (options.layoutSelect) {
+    options.layoutSelect.addEventListener('change', updateLayout);
+  }
+  updateLayout();
   wrapper.append(heading, rows, note);
   return {
     element: wrapper,
@@ -3278,17 +3306,18 @@ function createBannerSettingsEditor(field, labelText, sourceUrls) {
 function renderBannerSection(page, position) {
   const isTop = position === 'top';
   const field = isTop ? 'topBannerImageUrls' : 'bottomBannerImageUrls';
+  const useGridLayout = !isTop && page.profile?.bottomBannerLayout === 'grid-2x3';
   const storedUrls = page.profile && page.profile[field];
   const urls = Array.isArray(storedUrls) ? storedUrls.map((url) => {
     try { return normalizeBannerImageUrl(url); } catch (_) { return ''; }
-  }).filter(Boolean).slice(0, MAX_BANNER_IMAGE_ITEMS) : [];
+  }).filter(Boolean).slice(0, useGridLayout ? 6 : MAX_BANNER_IMAGE_ITEMS) : [];
   if (!urls.length) return null;
 
   const section = document.createElement('section');
-  section.className = `fan-banner-section fan-banner-${position}`;
+  section.className = `fan-banner-section fan-banner-${position}${useGridLayout ? ' fan-banner-bottom-grid-2x3' : ''}`;
   section.id = `${position}BannerSection`;
   section.setAttribute('aria-label', `${page.streamer.nickname} ${isTop ? '상단' : '하단'} 배너`);
-  const list = document.createElement('div'); list.className = 'fan-banner-list';
+  const list = document.createElement('div'); list.className = `fan-banner-list${useGridLayout ? ' fan-banner-list-grid-2x3' : ''}`;
   urls.forEach((url, index) => {
     const image = document.createElement('img'); image.className = 'fan-banner-image';
     image.src = url; image.alt = `${page.streamer.nickname} ${isTop ? '상단' : '하단'} 배너 ${index + 1}`;
@@ -3312,6 +3341,7 @@ function profileForLinkSave(source, field, value) {
     layoutDesign: profile.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT,
     topBannerImageUrls: Array.isArray(profile.topBannerImageUrls) ? profile.topBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerImageUrls: Array.isArray(profile.bottomBannerImageUrls) ? profile.bottomBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
+    bottomBannerLayout: profile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked',
     competitionHistory: Array.isArray(profile.competitionHistory) ? profile.competitionHistory.slice(0, 30) : [],
   };
   saved[field] = value;
