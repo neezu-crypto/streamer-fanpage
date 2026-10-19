@@ -835,6 +835,26 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog
   background: #fffafd;
   color: #51465d;
 }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-heading { color: #51465d; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-heading span { color: #786c82; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-tile {
+  border-color: #e8deea;
+  background: #fffafd;
+  color: #51465d;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-tile span,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-tile small,
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-note { color: #786c82; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-tile strong { color: #a54268; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-cost {
+  background: #fff3f7;
+  color: #5d5267;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-cost strong { color: #a54268; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-viewer-data-cost.total {
+  border-color: #e7b5c8;
+  background: #ffedf3;
+}
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-stats-tile span, .admin-stats-status, .admin-stats-list-heading span, .admin-stats-note, .admin-viewer-usage-heading > span, .admin-viewer-usage-note, .admin-viewer-usage-tile span, .admin-viewer-usage-action, .admin-viewer-usage-tier, .admin-viewer-usage-streamers-heading span, .admin-viewer-usage-streamer-identity small, .admin-viewer-subscription-identity small, .admin-viewer-subscription-status) { color: #81758b !important; }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-stats-list-heading, .admin-viewer-usage-streamers-heading, .admin-viewer-usage-streamer-identity strong, .admin-viewer-subscription-identity strong, .admin-stats-tile strong, .admin-viewer-usage-tile strong) { color: #51465d; }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-viewer-usage, .admin-viewer-subscriptions) { border-color: color-mix(in srgb, var(--dialog-accent), transparent 72%); background: linear-gradient(135deg, color-mix(in srgb, var(--dialog-accent), transparent 94%), #fffafd); }
