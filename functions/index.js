@@ -237,11 +237,12 @@ async function recordViewerStatsTelemetry(telemetry) {
   ];
   const runtimeMs = Math.ceil(Math.max(0, Number(telemetry.runtimeMs) || 0) / 100) * 100;
   const isWorker = telemetry.source === 'worker';
+  const isCallable = telemetry.source === 'callable';
   const values = {
     calls: 1,
     runtimeMs,
-    callableCalls: isWorker ? 0 : 1,
-    callableRuntimeMs: isWorker ? 0 : runtimeMs,
+    callableCalls: isCallable ? 1 : 0,
+    callableRuntimeMs: isCallable ? runtimeMs : 0,
     workerCalls: isWorker ? 1 : 0,
     workerRuntimeMs: isWorker ? runtimeMs : 0,
     requestBytes: Math.max(0, Number(telemetry.requestBytes) || 0),
