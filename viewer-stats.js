@@ -398,9 +398,9 @@ function renderSubscriptionDialogStatus(message = '') {
   if (!autoVerificationReady) {
     donationHelp.textContent = '이 신청은 자동 확인에 필요한 SOOP 아이디 정보가 없어요. 후원 내역은 관리자가 수동 확인합니다.';
   } else if (donationCompleted) {
-    donationHelp.textContent = '후원 완료 시각도 전달했어요. 관리자 브라우저가 SOOP 알림을 대조 중이며, 한 신청만 조건에 맞으면 30일 이용권이 자동 적용됩니다. 확인할 수 없으면 관리자가 직접 확인합니다.';
+    donationHelp.textContent = '후원 완료 알림을 전달했어요. 자동 감시는 신청 등록 때부터 진행 중이며, 입력한 SOOP 아이디와 별풍선 수량이 유일하게 일치하면 30일 이용권이 자동 적용됩니다.';
   } else {
-    donationHelp.textContent = `신청 후 24시간 동안 자동 감시해요. 신청에 입력한 SOOP 계정으로 별풍선 ${pendingBalloonCost}개를 후원해 주세요. 후원 완료 알리기를 누르면 시각 대조가 더 정확해져요. 누르지 않아도 신청 뒤 후원이 명확히 확인되면 자동 승인됩니다.`;
+    donationHelp.textContent = `신청 후 24시간 동안 자동 감시해요. 신청에 입력한 SOOP 계정으로 별풍선 ${pendingBalloonCost}개를 후원해 주세요. 후원 완료 알리기는 선택이며, 누르지 않아도 SOOP 아이디와 수량이 유일하게 일치하면 자동 승인됩니다.`;
   }
   submit.textContent = subscriptionState.subscribed ? '신청 등록 · 30일 연장' : '구독 신청 등록';
   if (subscriptionState.isAdmin) {
@@ -417,11 +417,11 @@ function renderSubscriptionDialogStatus(message = '') {
     } else if (donationCompleted) {
       status.textContent = comparisonContext
         ? keywordComparisonContext
-          ? '후원 알림 자동 확인 중이에요. 일치하면 키워드 고점 비교 결과가 자동으로 열립니다.'
-          : '후원 알림 자동 확인 중이에요. 일치하면 선택한 날짜의 비교 결과가 자동으로 열립니다.'
-        : '후원 알림을 자동 대조하고 있어요. 확인되면 이 계정에 30일 이용권이 적용됩니다.';
+          ? '후원 알림 자동 확인 중이에요. 신청한 SOOP 아이디와 수량이 유일하게 일치하면 키워드 고점 비교 결과가 자동으로 열립니다.'
+          : '후원 알림 자동 확인 중이에요. 신청한 SOOP 아이디와 수량이 유일하게 일치하면 선택한 날짜의 비교 결과가 자동으로 열립니다.'
+        : '후원 알림을 자동 대조하고 있어요. 신청한 SOOP 아이디와 수량이 유일하게 일치하면 이 계정에 30일 이용권이 적용됩니다.';
     } else {
-      status.textContent = `신청이 등록되어 24시간 자동 감시 중이에요. 운영자 방송국에 ${pendingBalloonCost}개 후원해 주세요. 완료 알리기는 선택이며, 누르면 후원 시각 대조에 도움이 됩니다.`;
+      status.textContent = `신청이 등록되어 24시간 자동 감시 중이에요. 운영자 방송국에 ${pendingBalloonCost}개 후원해 주세요. 완료 알리기는 선택이며, SOOP 아이디와 수량이 유일하게 일치하면 자동 승인됩니다.`;
     }
   } else if (subscriptionState.subscribed) {
     status.textContent = formatSubscriptionDate(subscriptionState.expiresAt) + '까지 구독 중이에요. 미리 갱신해도 남은 기간에 30일이 더해집니다.';
@@ -430,7 +430,7 @@ function renderSubscriptionDialogStatus(message = '') {
       ? keywordComparisonContext
         ? '후원자 SOOP 정보를 입력해 신청을 등록하면 자동 감시가 시작돼요. 완료 알리기는 선택이며, 확인되면 키워드 고점 비교 결과가 자동으로 열립니다.'
         : '후원자 SOOP 정보를 입력해 신청을 등록하면 자동 감시가 시작돼요. 완료 알리기는 선택이며, 확인되면 비교 결과가 자동으로 열립니다.'
-      : '신청하면 24시간 자동 감시가 시작됩니다. 별풍선 후원 알림이 신청 이후로 명확히 확인되면 30일 이용권이 자동 승인됩니다. 확인할 수 없거나 신청이 겹치면 관리자가 수동 확인합니다.';
+      : '신청하면 24시간 자동 감시가 시작됩니다. 입력한 SOOP 아이디와 별풍선 수량이 유일하게 일치하면 30일 이용권이 자동 승인됩니다. 여러 신청이 겹치면 관리자가 수동 확인합니다.';
   }
 }
 
@@ -2765,7 +2765,7 @@ $('viewerSubscriptionForm').addEventListener('submit', async (event) => {
     await refreshSubscriptionStatus();
     renderSubscriptionDialogStatus(result.action === 'already-pending'
       ? '이미 대기 중인 신청이 있어요. 현재 신청 정보를 확인해 주세요.'
-      : '신청을 등록했어요. 이제 운영자 방송국에 33개 후원한 뒤 자동 확인을 시작해 주세요.');
+      : '신청을 등록했어요. 자동 감시는 이미 시작됐습니다. 운영자 방송국에 33개를 후원해 주세요.');
     if (result.action === 'pending' || result.action === 'already-pending') {
       $('viewerSubscriptionNickname').value = '';
       $('viewerSubscriptionSoopId').value = '';
@@ -2786,9 +2786,9 @@ $('viewerSubscriptionDonationComplete').addEventListener('click', async (event) 
   try {
     await callViewerSubscription({ action: 'donationComplete', requestId: subscriptionState.pendingRequestId });
     await refreshSubscriptionStatus();
-    renderSubscriptionDialogStatus('후원 완료 시각을 전달했어요. 알림이 일치하면 자동 승인됩니다.');
+    renderSubscriptionDialogStatus('후원 완료 알림을 전달했어요. SOOP 아이디와 수량이 유일하게 일치하면 자동 승인됩니다.');
   } catch (error) {
-    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '자동 확인을 시작하지 못했어요. 신청 상태를 새로고침해 주세요.'));
+    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '후원 완료 알림을 전달하지 못했어요. 신청 등록 후 자동 감시는 계속 진행됩니다.'));
   } finally {
     button.disabled = false;
     renderSubscriptionDialogStatus();
