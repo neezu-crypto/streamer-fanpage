@@ -130,6 +130,9 @@ body.fanpage-home-kawaii-active .search-empty-guidance {
 }
 body.fanpage-home-kawaii-active .search-empty-guidance-title { color: #51465d; font: 17px var(--display); }
 body.fanpage-home-kawaii-active .search-empty-guidance > p { color: #81758b; }
+body.fanpage-home-kawaii-active .registered-section { max-width: 1020px; margin: 36px auto 0; }
+body.fanpage-home-kawaii-active .registered-streamers-toggle { border-color: #e3d7e6; background: #fff; color: #51465d; }
+body.fanpage-home-kawaii-active .registered-streamers-toggle:hover:not(:disabled) { border-color: #ee86aa; background: #fff2f7; }
 body.fanpage-home-kawaii-active .recent-section { max-width: 1020px; margin-top: 50px; }
 body.fanpage-home-kawaii-active .section-heading h2 { color: #51465d; }
 body.fanpage-home-kawaii-active .section-heading .eyebrow { color: #d86f98; }
@@ -560,6 +563,7 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
   body.fanpage-home-kawaii-active .hero-subtitle { max-width: 390px; margin: 12px auto 0; font-size: 13px; line-height: 1.7; }
   body.fanpage-home-kawaii-active .home-mascot { right: 3%; bottom: -20px; width: 132px; opacity: .9; }
   body.fanpage-home-kawaii-active .search-panel { padding: 18px; border-radius: 20px; }
+  body.fanpage-home-kawaii-active .registered-section { margin-top: 28px; }
   body.fanpage-home-kawaii-active .recent-section { margin-top: 35px; }
   body.fanpage-home-kawaii-active .recent-grid { gap: 9px; }
   body.fanpage-home-kawaii-active .recent-card { padding: 10px; }

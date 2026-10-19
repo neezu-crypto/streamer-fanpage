@@ -1074,3 +1074,8 @@ body.fanpage-bottom-banner-active{min-height:0}
 .search-empty-guidance-title{color:#eee8f2;font:16px var(--display)}
 .search-empty-guidance>p{margin:0;color:#aaa2b1;font-size:12px;line-height:1.6}
 .search-empty-verify{min-height:40px;margin-top:3px}
+.registered-section{max-width:1020px;margin:36px auto 0}
+.registered-section-actions{display:flex;align-items:center;gap:10px}
+.registered-streamers-toggle{min-height:33px;padding:6px 11px;font-size:10px}
+.registered-streamers-grid{margin-top:0}
+@media(max-width:720px){.registered-section{margin-top:28px}.registered-section-actions{gap:7px}.registered-streamers-toggle{min-height:31px;padding:5px 9px;font-size:9px}}

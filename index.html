@@ -12,8 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
   <link rel="preload" as="image" href="assets/fanpage-kawaii/cat-paw-close.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=20261019-no-streamer-verify-cta">
-  <link rel="stylesheet" href="fanpage-layouts.css?v=20261019-no-streamer-verify-cta">
+  <link rel="stylesheet" href="style.css?v=20261019-registered-directory">
+  <link rel="stylesheet" href="fanpage-layouts.css?v=20261019-registered-directory">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -79,6 +79,13 @@
           <div class="search-field"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" maxlength="40" placeholder="닉네임 또는 SOOP 아이디" autocomplete="off"><button id="clearSearch" class="clear-search hidden" type="button" aria-label="검색어 지우기">×</button></div>
           <p class="search-hint" id="searchHint">인증 스트리머의 닉네임이나 방송국 아이디를 입력해 주세요.</p>
           <div id="searchResults" class="streamer-grid" aria-live="polite"></div>
+        </section>
+        <section class="registered-section hidden" id="registeredStreamersSection" aria-labelledby="registeredStreamersTitle">
+          <div class="section-heading">
+            <div><p class="eyebrow">STREAMER DIRECTORY</p><h2 id="registeredStreamersTitle">현재 등록된 스트리머</h2></div>
+            <div class="registered-section-actions"><span class="section-note" id="registeredStreamersCount"></span><button class="button registered-streamers-toggle hidden" id="registeredStreamersToggle" type="button" aria-controls="registeredStreamersGrid" aria-expanded="false">전체 보기</button></div>
+          </div>
+          <div class="recent-grid registered-streamers-grid" id="registeredStreamersGrid"></div>
         </section>
         <section class="recent-section" aria-labelledby="recentTitle">
           <div class="section-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2 id="recentTitle">최근 방문한 팬페이지</h2></div><span class="section-note">최근 8개</span></div>
@@ -227,6 +234,6 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261019-no-streamer-verify-cta"></script>
+  <script type="module" src="app.js?v=20261019-registered-directory"></script>
 </body>
 </html>
