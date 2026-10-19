@@ -2891,6 +2891,7 @@ function normalizePage(streamer, value) {
     layoutDesign: sourceProfile.layoutDesign === 2 ? 2 : 1,
     topBannerImageUrls: normalizeBannerImageUrls(sourceProfile.topBannerImageUrls),
     bottomBannerImageUrls: normalizeBannerImageUrls(sourceProfile.bottomBannerImageUrls),
+    bottomBannerLayout: sourceProfile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked',
     competitionHistory: normalizeFanPageCompetitionHistory(sourceProfile.competitionHistory),
   };
   return {
@@ -4609,6 +4610,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       || (Object.prototype.hasOwnProperty.call(profile, 'cafeUrl') && typeof profile.cafeUrl !== 'string')
       || (Object.prototype.hasOwnProperty.call(profile, 'ogqEmoticonUrl') && typeof profile.ogqEmoticonUrl !== 'string')
       || (Object.prototype.hasOwnProperty.call(profile, 'layoutDesign') && ![1, 2].includes(profile.layoutDesign))
+      || (Object.prototype.hasOwnProperty.call(profile, 'bottomBannerLayout') && !['stacked', 'grid-2x3'].includes(profile.bottomBannerLayout))
       || (Object.prototype.hasOwnProperty.call(profile, 'topBannerImageUrls') && (!Array.isArray(profile.topBannerImageUrls)
         || profile.topBannerImageUrls.length > MAX_BANNER_IMAGE_ITEMS
         || profile.topBannerImageUrls.some((url) => typeof url !== 'string' || url.length > 2048)))
@@ -4695,6 +4697,9 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
         : (previousProfile.layoutDesign === 2 ? 2 : 1),
       topBannerImageUrls: cleanBannerImageUrls(topBannerImageUrlsInput),
       bottomBannerImageUrls: cleanBannerImageUrls(bottomBannerImageUrlsInput),
+      bottomBannerLayout: Object.prototype.hasOwnProperty.call(profile, 'bottomBannerLayout')
+        ? profile.bottomBannerLayout
+        : (previousProfile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked'),
       competitionHistory: normalizeFanPageCompetitionHistory(
         hasCompetitionHistory ? profile.competitionHistory : previousProfile.competitionHistory,
         { strict: hasCompetitionHistory },
