@@ -102,6 +102,7 @@ const MAX_KEYWORD_COMPARE_VODS_PER_STREAMER = 10;
 const VIEWER_STATS_EXCLUDED_EDGE_SECONDS = 5 * 60;
 const VIEWER_STATS_INSUFFICIENT_WINDOW_CODE = 'insufficient-analysis-window';
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
+const VIEWER_STATS_STATIC_CACHE_SCHEMA_VERSION = 1;
 const SOOP_PUBLIC_VOD_API = 'https://chapi.sooplive.com/api';
 try { window.localStorage.removeItem('streamerFanPage.viewerStats.recentStreamers.v1'); } catch (_) {}
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
@@ -160,6 +161,7 @@ let subscriptionState = {
 };
 const viewerStatsMemoryCache = new Map();
 const viewerStatsInProgress = new Map();
+const viewerStatsStaticCache = new Map();
 const sponsorLiveStatusCache = new Map();
 const SPONSOR_PENDING_REQUEST_KEY = 'streamerFanPage.sponsor.pendingRequest.v1';
 let sponsorRequestId = '';
@@ -968,7 +970,57 @@ function renderSearchResults(streamers) {
   results._streamers = streamers;
 }
 
-function createVodCard(vod, loadToken) {
+function readStaticVodStats(streamerId, vodId) {
+  const normalizedStreamerId = String(streamerId || '').trim().toLowerCase();
+  const normalizedVodId = String(vodId || '').trim();
+  if (!SOOP_ID_PATTERN.test(normalizedStreamerId) || !/^\d{1,20}$/.test(normalizedVodId)) {
+    return Promise.resolve(null);
+  }
+
+  let cachePromise = viewerStatsStaticCache.get(normalizedStreamerId);
+  if (!cachePromise) {
+    const fileUrl = new URL(
+      './static-data/viewer-stats/' + encodeURIComponent(normalizedStreamerId) + '.json',
+      document.baseURI,
+    );
+    cachePromise = fetch(fileUrl, { cache: 'no-cache' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => payload
+        && Number(payload.schemaVersion) === VIEWER_STATS_STATIC_CACHE_SCHEMA_VERSION
+        && String(payload.streamerId || '').toLowerCase() === normalizedStreamerId
+        && payload.vods && typeof payload.vods === 'object'
+        ? payload.vods
+        : null)
+      .catch(() => null);
+    viewerStatsStaticCache.set(normalizedStreamerId, cachePromise);
+  }
+
+  return cachePromise.then((vods) => {
+    const stats = vods && vods[normalizedVodId];
+    const validPoint = (point) => point
+      && Number.isFinite(Number(point.second)) && Number(point.second) >= 0
+      && Number.isFinite(Number(point.viewers)) && Number(point.viewers) >= 0;
+    if (!stats || !validPoint(stats.highest) || !validPoint(stats.lowest)) return null;
+    return {
+      streamerId: normalizedStreamerId,
+      vodId: normalizedVodId,
+      highest: { second: Number(stats.highest.second), viewers: Number(stats.highest.viewers) },
+      lowest: { second: Number(stats.lowest.second), viewers: Number(stats.lowest.viewers) },
+      checkedAt: Number(stats.checkedAt) || 0,
+    };
+  });
+}
+
+function hydrateVodCardFromStaticCache(card, streamerId, loadToken) {
+  readStaticVodStats(streamerId, card._vod.id).then((stats) => {
+    if (!stats || !card.isConnected || loadToken !== activeLoadToken
+      || !selectedStreamer || selectedStreamer.soopId !== streamerId
+      || card.dataset.statsState !== 'idle') return;
+    showStatsLinks(card, stats);
+  });
+}
+
+function createVodCard(vod, loadToken, streamerId) {
   const card = document.createElement('article');
   card.className = 'viewer-vod-card';
   card.dataset.vodId = String(vod.id);
@@ -1041,6 +1093,7 @@ function createVodCard(vod, loadToken) {
   card._openLink = open;
   card._mainAction = mainAction;
   card._statsActions = statsActions;
+  if (streamerId) hydrateVodCardFromStaticCache(card, streamerId, loadToken);
   return card;
 }
 
@@ -2244,7 +2297,7 @@ async function loadVodPage(loadToken, page) {
     vods.forEach((vod) => {
       if (!vod || !/^\d{1,20}$/.test(String(vod.id || '')) || knownIds.has(String(vod.id))) return;
       knownIds.add(String(vod.id));
-      const card = createVodCard(vod, loadToken);
+      const card = createVodCard(vod, loadToken, selectedStreamer.soopId);
       $('viewerVodGrid').append(card);
     });
     sortLoadedVodCards();

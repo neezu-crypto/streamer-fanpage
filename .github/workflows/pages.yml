@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
 
 permissions:
   contents: read
@@ -23,12 +25,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/977788925900/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: fanpage-static-exporter@soop-stock-market.iam.gserviceaccount.com
+          project_id: soop-stock-market
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install export dependencies
+        run: npm ci --prefix functions
+      - name: Export analyzed VOD summaries
+        run: node functions/export-viewer-stats.js
       - name: Configure Pages
         uses: actions/configure-pages@v5
+      - name: Prepare Pages directory
+        run: |
+          mkdir -p _site
+          git ls-files -z | tar --null -T - -cf - | tar -xf - -C _site
+          mkdir -p _site/static-data/viewer-stats
+          cp -a static-data/viewer-stats/. _site/static-data/viewer-stats/
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
