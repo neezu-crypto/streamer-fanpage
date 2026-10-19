@@ -58,8 +58,8 @@
 
 ### 고점체크 데이터 사용량 계측
 
-- 고점체크 callable·작업자의 요청/응답 payload, SOOP 서버 요청/응답 body, 추적 가능한 고점체크 RTDB 읽기/쓰기 payload 및 실행 시간을 `streamerFanPageViewerStatsLimits/{uidHash}/recentUsageByDay/{YYYY-MM-DD}`에 최근 30일 집계로 기록한다. 검색어와 원본 UID는 저장하지 않는다. 작업자 실행은 `worker` 집계 키를 사용한다.
-- `streamerFanPageAdminStats`만 집계값을 반환하고 사이트 관리자 화면에서 최근 30일 데이터량과 USD 예상 비용을 표시한다. 비용은 RTDB 다운로드와 Cloud Functions 2세대(us-central1, 1 vCPU, 256 MiB) 실행료의 총액 추정이며, 공유 무료 한도·할인·인터넷 송신·Cloud Tasks·RTDB 저장 비용은 제외한다. 브라우저가 SOOP에서 직접 가져오는 목록, GitHub Actions 정적 파일 생성의 RTDB 읽기, GitHub Pages 전송량은 이 집계에 포함하지 않는다. RTDB/외부 API의 payload 크기는 전송 프로토콜 overhead를 포함하지 않는다.
+- 고점체크 callable·작업자의 요청/응답 payload, SOOP 서버 요청/응답 body, 추적 가능한 고점체크 RTDB 읽기/쓰기 payload 및 실행 시간을 `streamerFanPageViewerStatsLimits/{uidHash}/recentUsageByDay/{YYYY-MM-DD}`에 최근 30일 집계로 기록한다. 검색어와 원본 UID는 저장하지 않는다. 작업자 실행은 `worker` 집계 키를 사용한다. GitHub Actions 정적 변환도 RTDB 읽기 payload 크기를 IAM 인증된 전용 reporter로 같은 서버 집계에 전달한다. `fanpage-static-exporter`에는 프로젝트 `roles/reader`와 reporter Cloud Run 서비스에만 `roles/run.invoker`를 부여하며, RTDB 쓰기 권한은 부여하지 않는다.
+- `streamerFanPageAdminStats`만 집계값을 반환하고 사이트 관리자 화면에서 최근 30일 데이터량과 USD 예상 비용을 표시한다. 비용은 RTDB 다운로드와 Cloud Functions 2세대(us-central1, 1 vCPU, 256 MiB) 실행료의 총액 추정이며, 공유 무료 한도·할인·인터넷 송신·Cloud Tasks·RTDB 저장 비용은 제외한다. 브라우저가 SOOP에서 직접 가져오는 목록과 GitHub Pages 전송량은 이 집계에 포함하지 않는다. RTDB/외부 API의 payload 크기는 전송 프로토콜 overhead를 포함하지 않는다.
 - 비용 단가를 바꾸면 `VIEWER_STATS_COST_RATES`와 관리자 안내 문구를 함께 수정한다. 가격 기준일과 Google 공식 가격 페이지를 코드 주석/문서에 기록한다. RTDB 규칙은 변경하지 않는다.
 
 ### 완료 전 점검

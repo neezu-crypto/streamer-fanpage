@@ -809,12 +809,15 @@ function renderViewerStatsUsage(usage) {
     ['고점체크 요청 payload', 'requestBytes'],
     ['서버 함수 호출', 'calls'],
     ['함수 실행', 'runtimeMs'],
+    ['정적 생성 RTDB 읽기', 'staticExportReadBytes'],
+    ['정적 파일 생성', 'staticExportRuns'],
   ].forEach(([label, key]) => {
     const tile = document.createElement('div'); tile.className = 'admin-viewer-data-tile';
     const title = document.createElement('span'); title.textContent = label;
     const value = document.createElement('strong');
     const formattedValue = (source) => {
       if (key === 'calls') return `${formatStatCount(source[key])}회`;
+      if (key === 'staticExportRuns') return `${formatStatCount(source[key])}회`;
       if (key.endsWith('Ms')) return `${((Number(source[key]) || 0) / 1000 / 60).toFixed(1)}분`;
       return formatViewerStatsBytes(source[key]);
     };
@@ -841,7 +844,7 @@ function renderViewerStatsUsage(usage) {
     row.append(title, value); costSummary.append(row);
   });
   $('viewerStatsAdminDataNote').textContent = dataUsage.startedAt
-    ? `계측 시작 ${dataUsage.startedAt} · payload 기준(프로토콜 overhead 제외), 무료 한도·할인 차감 전 USD 추정치입니다. 인터넷 송신·Cloud Tasks·RTDB 저장 비용은 제외합니다. 브라우저의 SOOP 직접 조회, GitHub Actions 정적 파일 생성의 RTDB 읽기, GitHub Pages 전송은 포함되지 않습니다.`
+    ? `계측 시작 ${dataUsage.startedAt} · payload 기준(프로토콜 overhead 제외), 무료 한도·할인 차감 전 USD 추정치입니다. 인터넷 송신·Cloud Tasks·RTDB 저장 비용은 제외합니다. 브라우저의 SOOP 직접 조회와 GitHub Pages 전송은 포함되지 않습니다.`
     : '데이터·비용 계측은 배포 후부터 시작합니다. 최근 30일 요청 건수는 기존 기록을 표시합니다.';
 
   const tierContainer = $('viewerStatsAdminTiers');
