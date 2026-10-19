@@ -739,8 +739,20 @@ function renderAdminStats(data) {
   renderViewerStatsUsage(data && data.viewerStatsUsage);
   renderAdminStatsList(data && data.streamers);
 }
+function formatViewerStatsBytes(value) {
+  const bytes = Math.max(0, Number(value) || 0);
+  if (bytes < 1000) return `${Math.round(bytes)} B`;
+  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} KB`;
+  if (bytes < 1_000_000_000) return `${(bytes / 1_000_000).toFixed(2)} MB`;
+  return `${(bytes / 1_000_000_000).toFixed(2)} GB`;
+}
+function formatViewerStatsEstimatedUsd(value) {
+  const amount = Math.max(0, Number(value) || 0);
+  return amount > 0 && amount < 0.0001 ? '<$0.0001' : `~$${amount.toFixed(4)}`;
+}
 function renderViewerStatsUsage(usage) {
   const safeUsage = usage && typeof usage === 'object' ? usage : {};
+  $('viewerStatsAdminDataPeriod').textContent = '최근 30일';
   const totals = safeUsage.totals && typeof safeUsage.totals === 'object' ? safeUsage.totals : {};
   const summary = $('viewerStatsAdminSummary');
   summary.replaceChildren();
@@ -781,6 +793,56 @@ function renderViewerStatsUsage(usage) {
     const count = document.createElement('strong'); count.textContent = `${formatStatCount(value)}회`;
     row.append(title, count); actionContainer.append(row);
   });
+
+  const dataUsage = safeUsage.dataUsage && typeof safeUsage.dataUsage === 'object' ? safeUsage.dataUsage : {};
+  const todayData = dataUsage.today && typeof dataUsage.today === 'object' ? dataUsage.today : {};
+  const last7Data = dataUsage.last7 && typeof dataUsage.last7 === 'object' ? dataUsage.last7 : {};
+  const last30Data = dataUsage.last30 && typeof dataUsage.last30 === 'object' ? dataUsage.last30 : {};
+  const dataSummary = $('viewerStatsAdminDataSummary');
+  dataSummary.replaceChildren();
+  [
+    ['RTDB 읽기 payload', 'rtdbReadBytes'],
+    ['RTDB 쓰기 payload', 'rtdbWriteBytes'],
+    ['SOOP API 요청 payload', 'soopRequestBytes'],
+    ['SOOP API 응답 payload', 'soopResponseBytes'],
+    ['고점체크 응답 payload', 'responseBytes'],
+    ['고점체크 요청 payload', 'requestBytes'],
+    ['서버 함수 호출', 'calls'],
+    ['함수 실행', 'runtimeMs'],
+  ].forEach(([label, key]) => {
+    const tile = document.createElement('div'); tile.className = 'admin-viewer-data-tile';
+    const title = document.createElement('span'); title.textContent = label;
+    const value = document.createElement('strong');
+    const formattedValue = (source) => {
+      if (key === 'calls') return `${formatStatCount(source[key])}회`;
+      if (key.endsWith('Ms')) return `${((Number(source[key]) || 0) / 1000 / 60).toFixed(1)}분`;
+      return formatViewerStatsBytes(source[key]);
+    };
+    value.textContent = formattedValue(last30Data);
+    const detail = document.createElement('small');
+    detail.textContent = `오늘 ${formattedValue(todayData)} · 7일 ${formattedValue(last7Data)}`;
+    tile.append(title, value, detail); dataSummary.append(tile);
+  });
+
+  const costs = dataUsage.estimatedCostUsd && typeof dataUsage.estimatedCostUsd === 'object'
+    ? dataUsage.estimatedCostUsd
+    : {};
+  const last30Cost = costs.last30 && typeof costs.last30 === 'object' ? costs.last30 : {};
+  const costSummary = $('viewerStatsAdminCostSummary');
+  costSummary.replaceChildren();
+  [
+    ['RTDB 다운로드 추정', last30Cost.realtimeDatabaseCost],
+    ['Cloud Functions 실행 추정', last30Cost.functionCost],
+    ['합계 추정', last30Cost.totalCost],
+  ].forEach(([label, amount], index) => {
+    const row = document.createElement('div'); row.className = `admin-viewer-data-cost${index === 2 ? ' total' : ''}`;
+    const title = document.createElement('span'); title.textContent = label;
+    const value = document.createElement('strong'); value.textContent = formatViewerStatsEstimatedUsd(amount);
+    row.append(title, value); costSummary.append(row);
+  });
+  $('viewerStatsAdminDataNote').textContent = dataUsage.startedAt
+    ? `계측 시작 ${dataUsage.startedAt} · payload 기준(프로토콜 overhead 제외), 무료 한도·할인 차감 전 USD 추정치입니다. 인터넷 송신·Cloud Tasks·RTDB 저장 비용은 제외합니다. 브라우저의 SOOP 직접 조회, GitHub Actions 정적 파일 생성의 RTDB 읽기, GitHub Pages 전송은 포함되지 않습니다.`
+    : '데이터·비용 계측은 배포 후부터 시작합니다. 최근 30일 요청 건수는 기존 기록을 표시합니다.';
 
   const tierContainer = $('viewerStatsAdminTiers');
   tierContainer.replaceChildren();

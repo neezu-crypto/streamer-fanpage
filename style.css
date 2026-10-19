@@ -221,6 +221,19 @@
 .admin-viewer-usage-heading h3{margin:0;font:17px var(--display)}
 .admin-viewer-usage-heading>span,.admin-viewer-usage-note{color:#a69cab;font-size:10px}
 .admin-viewer-usage-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.admin-viewer-data-heading{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:16px 0 8px;color:#e9e2ed;font-size:11px}
+.admin-viewer-data-heading span{color:#a69cab;font-size:10px}
+.admin-viewer-data-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.admin-viewer-data-tile{min-width:0;padding:9px 10px;border:1px solid #ffffff10;border-radius:8px;background:#00000020}
+.admin-viewer-data-tile span,.admin-viewer-data-tile strong,.admin-viewer-data-tile small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-viewer-data-tile span{color:#aaa3b1;font-size:10px}
+.admin-viewer-data-tile strong{margin-top:5px;color:#f6d5e1;font:15px var(--display)}
+.admin-viewer-data-tile small{margin-top:3px;color:#a69cab;font-size:9px}
+.admin-viewer-data-costs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:7px}
+.admin-viewer-data-cost{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-radius:8px;background:#f58cac0d;color:#cfc7d3;font-size:10px}
+.admin-viewer-data-cost strong{color:#f6d5e1;font:13px var(--display);white-space:nowrap}
+.admin-viewer-data-cost.total{border:1px solid #f58cac38;background:#f58cac16}
+.admin-viewer-data-note{margin:8px 0 0;color:#a69cab;font-size:9px;line-height:1.55}
 .admin-viewer-usage-tile{padding:10px 11px;border:1px solid #ffffff12;border-radius:9px;background:#09080d55}
 .admin-viewer-usage-tile span,.admin-viewer-usage-tile strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .admin-viewer-usage-tile span{color:#aaa3b1;font-size:10px}
@@ -274,7 +287,7 @@
 .admin-stat-sparkline span{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#f58cac,#b76b88);opacity:.85}
 .admin-stats-empty{grid-column:1/-1}
 @media(max-width:720px){.admin-stats-dialog-card{padding:17px}.admin-stats-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-stats-list{max-height:38vh;grid-template-columns:1fr}}
-@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage,.admin-viewer-subscriptions{padding:11px}.admin-viewer-usage-actions,.admin-viewer-usage-streamers{grid-template-columns:1fr}.admin-viewer-usage-tier-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-viewer-usage-queue-grid{grid-template-columns:1fr}.admin-viewer-usage-streamers{max-height:25vh}.admin-viewer-usage-action{font-size:11px}.admin-viewer-subscription-row{align-items:stretch;flex-direction:column}.admin-viewer-subscription-actions{display:grid;grid-template-columns:1fr 1fr}.admin-viewer-subscription-actions .button{width:100%}}
+@media(max-width:520px){.admin-stats-toolbar{align-items:stretch;flex-direction:column}.admin-stats-toolbar input,.admin-stats-toolbar .button{width:100%}.admin-stats-heading h2{font-size:21px}.admin-stats-dialog-card{padding:14px}.admin-viewer-usage,.admin-viewer-subscriptions{padding:11px}.admin-viewer-usage-actions,.admin-viewer-usage-streamers{grid-template-columns:1fr}.admin-viewer-usage-tier-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-viewer-usage-queue-grid{grid-template-columns:1fr}.admin-viewer-data-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-viewer-data-costs{grid-template-columns:1fr}.admin-viewer-usage-streamers{max-height:25vh}.admin-viewer-usage-action{font-size:11px}.admin-viewer-subscription-row{align-items:stretch;flex-direction:column}.admin-viewer-subscription-actions{display:grid;grid-template-columns:1fr 1fr}.admin-viewer-subscription-actions .button{width:100%}}
 
 /* Scrollable replay area and SOOP schedule calendar */
 .vod-scrollbox{max-height:min(72vh,680px);overflow-y:auto;overscroll-behavior:contain;padding:0 8px 4px 0;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
