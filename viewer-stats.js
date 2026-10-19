@@ -3292,7 +3292,12 @@ $('sponsorDonationComplete').addEventListener('click', async () => {
   const button = $('sponsorDonationComplete');
   button.disabled = true;
   try {
-    await callSponsorAds({ action: 'donationComplete', requestId: sponsorRequestId });
+    const response = await callSponsorAds({ action: 'donationComplete', requestId: sponsorRequestId });
+    const result = response.data || {};
+    if (result.status === 'approved' || result.status === 'processing') {
+      await refreshSponsorRequestStatus();
+      return;
+    }
     if (sponsorRequestRecord) sponsorRequestRecord.donationCompletedAt = Date.now();
     $('sponsorDonationStatus').textContent = '후원 완료를 접수했어요. SOOP 알림과 신청 정보가 일치하면 자동 승인되고 홍보 카드에 표시됩니다. 확인이 모호하면 운영자가 검토합니다.';
     showSponsorDonationStep(sponsorRequestRecord);
