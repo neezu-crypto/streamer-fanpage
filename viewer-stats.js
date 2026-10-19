@@ -3027,7 +3027,9 @@ async function loadAdminSponsorRequests() {
           await callAdminSponsorAds({ action, requestId: request.requestId });
           await refreshSponsorAds();
         } catch (error) {
-          $('sponsorAdminStatus').textContent = viewerStatsErrorMessage(error, '신청을 처리하지 못했습니다.');
+          const failureMessage = viewerStatsErrorMessage(error, '신청을 처리하지 못했습니다.');
+          await loadAdminSponsorRequests();
+          $('sponsorAdminStatus').textContent = failureMessage;
           button.disabled = false;
         }
       };
