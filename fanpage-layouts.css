@@ -1212,6 +1212,36 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
   body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-editor { gap: 9px; }
   body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-editor-actions { justify-content: flex-end; }
 }
+
+/* Keep the roulette actions compact on phones and clear of the floating page remote. */
+@media(max-width:560px) {
+  body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .roulette-controls {
+    display: grid;
+    width: calc(100% - 52px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .roulette-controls > .button:not(.button-primary):not(.profile-settings-close) {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    padding: 7px 9px;
+    border-radius: 13px;
+    font-size: 11px;
+    line-height: 1.25;
+    white-space: nowrap;
+    box-shadow: 0 2px 0 #dfd8e8, 0 4px 8px #7560800d, inset 0 1px 0 #fff;
+  }
+  body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .roulette-controls > .button:not(.button-primary):not(.profile-settings-close):hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 0 #dfd8e8, 0 5px 9px #75608010, inset 0 1px 0 #fff;
+  }
+  body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .roulette-controls > .button:not(.button-primary):not(.profile-settings-close):active:not(:disabled) {
+    transform: translateY(1px) scale(.99);
+    box-shadow: 0 1px 0 #dfd8e8, inset 0 2px 3px #77628510;
+  }
+}
+
 @media(max-width:560px) {
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close { width: 56px; min-width: 56px; height: 56px; min-height: 56px; }
 }
