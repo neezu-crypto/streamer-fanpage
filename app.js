@@ -1230,7 +1230,15 @@ function renderUpboRequestForm(page, state) {
   const items = state.items.filter((item) => item.active);
   if (!items.length) {
     const empty = document.createElement('p'); empty.className = 'upbo-inline-empty';
-    empty.textContent = state.canManage ? '신청 항목을 추가하면 팬들이 여기서 신청할 수 있어요.' : '아직 신청할 수 있는 항목이 없어요.';
+    if (state.canManage) {
+      empty.textContent = '신청 항목을 추가하면 팬들이 여기서 신청할 수 있어요.';
+    } else {
+      empty.classList.add('upbo-request-empty');
+      const message = document.createElement('span'); message.textContent = '아직 신청할 수 있는 항목이 없어요.';
+      const hint = document.createElement('span'); hint.className = 'upbo-request-empty-hint';
+      hint.textContent = '스트리머에게 신청 항목을 추가해 달라고 요청해 보세요.';
+      empty.append(message, hint);
+    }
     panel.append(empty); return panel;
   }
   const draft = state.requestDraft || (state.requestDraft = { nickname: '', lines: [], activeLineId: '' });
