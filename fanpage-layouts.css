@@ -641,12 +641,12 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
 }
 #fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog) .vod-player-card { padding: 24px; }
 #fanPageView.fanpage-layout-1 .vod-player-heading h2 { color: #51465d; }
-#fanPageView.fanpage-layout-1 .vod-player-heading .button {
+#fanPageView.fanpage-layout-1 .vod-player-heading .button:not(.profile-settings-close) {
   border-color: #e3d7e6;
   background: #fff;
   color: #51465d;
 }
-#fanPageView.fanpage-layout-1 .vod-player-heading .button:hover { border-color: var(--kawaii-accent); background: #fff3f8; }
+#fanPageView.fanpage-layout-1 .vod-player-heading .button:not(.profile-settings-close):hover { border-color: var(--kawaii-accent); background: #fff3f8; }
 #fanPageView.fanpage-layout-1 .vod-player-frame { box-shadow: 0 4px 14px #44344e18; }
 #fanPageView.fanpage-layout-1 .vod-player-footer p { color: #81758b; }
 #fanPageView.fanpage-layout-1 .vod-player-footer .button-primary {
