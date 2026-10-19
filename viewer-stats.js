@@ -3097,7 +3097,7 @@ function showSponsorDonationStep(record) {
   $('sponsorRequestFields').classList.add('hidden');
   $('sponsorDonationStep').classList.remove('hidden');
   $('sponsorRequestTitle').textContent = '후원 신청 확인';
-  $('sponsorRequestIntro').textContent = '후원 알림이 신청 정보와 유일하게 일치하면 자동 승인되어 홍보 카드에 표시됩니다.';
+  $('sponsorRequestIntro').textContent = '신청 후 1시간 동안 후원자 SOOP 아이디와 별풍선 수량을 자동 대조합니다. 두 정보가 유일하게 일치하면 후원 완료 알리기 버튼 없이도 홍보 신청이 자동 승인됩니다.';
   const summary = $('sponsorDonationSummary');
   summary.replaceChildren();
   const rows = [
@@ -3116,13 +3116,15 @@ function showSponsorDonationStep(record) {
     summary.append(cell);
   });
   const completed = Number(record.donationCompletedAt) > 0;
+  const requestedAt = Number(record.requestedAt) || 0;
+  const watchActive = requestedAt > 0 && requestedAt <= Date.now() && Date.now() - requestedAt < 60 * 60 * 1000;
   $('sponsorDonationComplete').classList.toggle('hidden', completed);
   $('sponsorRequestWithdraw').classList.toggle('hidden', completed);
   $('sponsorDonationLink').classList.toggle('hidden', completed);
   $('sponsorRequestDone').classList.toggle('hidden', false);
-  $('sponsorDonationStatus').textContent = completed
-    ? '후원 완료를 접수했습니다. SOOP 알림과 신청 정보가 일치하면 자동 승인되고 홍보 카드에 표시됩니다. 확인이 모호하면 운영자가 검토합니다.'
-    : `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원해 주세요. 알림이 신청 정보와 유일하게 일치하면 자동 승인됩니다. 자동 승인되지 않으면 완료 버튼을 눌러 운영자 수동 확인을 요청해 주세요.`;
+  $('sponsorDonationStatus').textContent = watchActive
+    ? `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원해 주세요. 신청 후 1시간 동안 후원자 아이디와 수량이 유일하게 일치하면 ${completed ? '자동 승인됩니다. 완료 알림 시각은 자동 대조 조건이 아닙니다.' : '완료 알리기 버튼 없이 자동 승인됩니다.'} 일치가 모호하면 운영자가 확인하며, 완료 알리기는 선택입니다.`
+    : `신청 후 1시간 자동 감시가 종료됐습니다. 신청은 취소되지 않았으며 자동 승인은 더 이상 진행되지 않습니다. ${completed ? '후원 완료 알림이 접수되어 운영자 수동 확인 대기 상태입니다.' : '후원 완료 알리기를 선택적으로 눌러 운영자 수동 확인을 요청할 수 있습니다. 알리지 않은 신청은 7일 후 만료됩니다.'}`;
   $('sponsorRequestStatus').textContent = '';
   startSponsorStatusPolling();
 }
@@ -3259,7 +3261,7 @@ $('sponsorRequestForm').addEventListener('submit', async (event) => {
     const response = await callSponsorAds({ action: 'submit', nickname, soopId, donorSoopId, days, rail: sponsorRequestRail });
     const data = response.data || {};
     sponsorRequestId = String(data.requestId || '');
-    sponsorRequestRecord = { requestId: sponsorRequestId, nickname, soopId, donorSoopId, days, balloonCost: Number(data.balloonCost) || days * 10, status: 'pending', donationCompletedAt: 0 };
+    sponsorRequestRecord = { requestId: sponsorRequestId, requestedAt: Number(data.requestedAt) || Date.now(), nickname, soopId, donorSoopId, days, balloonCost: Number(data.balloonCost) || days * 10, status: 'pending', donationCompletedAt: 0 };
     setSavedSponsorRequestId(sponsorRequestId);
     showSponsorDonationStep(sponsorRequestRecord);
   } catch (error) {
@@ -3326,7 +3328,7 @@ $('sponsorDonationComplete').addEventListener('click', async () => {
       return;
     }
     if (sponsorRequestRecord) sponsorRequestRecord.donationCompletedAt = Date.now();
-    $('sponsorDonationStatus').textContent = '후원 완료를 접수했어요. SOOP 알림과 신청 정보가 일치하면 자동 승인되고 홍보 카드에 표시됩니다. 확인이 모호하면 운영자가 검토합니다.';
+    $('sponsorDonationStatus').textContent = '후원 완료 알림을 전달했어요. 자동 감시는 신청 후 1시간까지이며, 자동 확인되지 않으면 운영자가 수동으로 확인합니다.';
     showSponsorDonationStep(sponsorRequestRecord);
   } catch (error) {
     $('sponsorDonationStatus').textContent = viewerStatsErrorMessage(error, '후원 완료를 접수하지 못했습니다.');

@@ -357,7 +357,7 @@
           </label>
         </div>
         <div class="viewer-sponsor-price"><span id="sponsorRequestCostLabel">1일 × 10개</span><strong id="sponsorRequestTotal">10개</strong></div>
-        <p class="viewer-sponsor-notice">신청을 등록한 뒤 운영자 방송국에 별풍선을 후원해 주세요. 후원 완료를 알리면 운영자가 확인하고 승인합니다.</p>
+        <p class="viewer-sponsor-notice">신청 등록 후 1시간 동안 자동 감시합니다. 신청한 후원자 SOOP 아이디와 별풍선 수량이 유일하게 일치하면 완료 알리기 버튼을 누르지 않아도 자동 승인돼요. 1시간이 지나면 자동 승인은 멈추며, 신청은 후원 완료 알리기 후 운영자 수동 확인을 받거나 미알림 상태로 7일 뒤 만료됩니다.</p>
         <div class="viewer-sponsor-actions">
           <button class="button" id="sponsorRequestCancel" type="button">닫기</button>
           <button class="button button-primary" id="sponsorRequestSubmit" type="submit">신청 정보 확인</button>
@@ -369,13 +369,13 @@
         <p class="viewer-sponsor-donation-status" id="sponsorDonationStatus"></p>
         <div class="viewer-sponsor-actions">
           <button class="button" id="sponsorRequestWithdraw" type="button">신청 취소</button>
-          <button class="button button-primary" id="sponsorDonationComplete" type="button">후원 완료했어요</button>
+          <button class="button button-primary" id="sponsorDonationComplete" type="button">후원 완료 알리기 (선택)</button>
           <button class="button hidden" id="sponsorRequestDone" type="button">닫기</button>
         </div>
       </section>
       <p class="viewer-sponsor-dialog-status" id="sponsorRequestStatus" role="status" aria-live="polite"></p>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261019-mobile-modals"></script>
+  <script type="module" src="viewer-stats.js?v=20261019-sponsor-auto-watch"></script>
 </body>
 </html>

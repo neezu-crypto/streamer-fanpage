@@ -233,6 +233,7 @@ exports.streamerFanPageSponsorAds = onCall({ maxInstances: 20, enforceAppCheck: 
         : null;
       return {
         status: String(existing.status || ''),
+        requestedAt: Math.max(0, Number(existing.requestedAt) || 0),
         donationCompletedAt: Math.max(0, Number(existing.donationCompletedAt) || 0),
         expiresAt: Math.max(0, Number(ad && ad.expiresAt) || 0),
         nickname: String(existing.nickname || '').slice(0, 40),
