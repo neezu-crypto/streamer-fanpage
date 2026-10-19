@@ -136,21 +136,24 @@
   </dialog>
   <dialog id="loginChoiceDialog" class="account-dialog">
     <div class="account-dialog-card">
-      <p class="eyebrow">WELCOME TO STREAMER SERIES</p>
-      <h2>로그인 방법을 선택해 주세요</h2>
+      <div class="profile-editor-heading">
+        <div><p class="eyebrow">WELCOME TO STREAMER SERIES</p><h2>로그인 방법을 선택해 주세요</h2></div>
+        <button class="button profile-settings-close" id="closeLoginChoices" type="button" aria-label="로그인 선택 창 닫기">×</button>
+      </div>
       <p>로그인하면 최근 방문한 팬페이지가 계정에 저장됩니다. 다시보기 댓글을 쓰려면 로그인 후 댓글 프로필을 설정해 주세요. 인증 스트리머는 인증 후 본인 팬페이지로 연결돼요.</p>
       <div class="login-choice-actions">
         <button class="auth-button google-button" id="choiceGoogleLogin" type="button">Google로 로그인</button>
         <button class="auth-button kakao-button" id="choiceKakaoLogin" type="button">카카오로 로그인</button>
         <button class="button streamer-verify-choice" id="openStreamerVerification" type="button">스트리머 인증 신청 / 확인</button>
       </div>
-      <div class="account-dialog-actions"><button class="button" id="closeLoginChoices" type="button">닫기</button></div>
     </div>
   </dialog>
   <dialog id="streamerVerifyDialog" class="account-dialog">
     <form class="account-dialog-card verification-form" id="streamerVerificationForm" autocomplete="off" style="max-height:calc(100dvh - 32px);overflow-y:auto;">
-      <p class="eyebrow">STREAMER VERIFICATION</p>
-      <h2>스트리머 인증</h2>
+      <div class="profile-editor-heading">
+        <div><p class="eyebrow">STREAMER VERIFICATION</p><h2>스트리머 인증</h2></div>
+        <button class="button profile-settings-close" id="closeStreamerVerification" type="button" aria-label="스트리머 인증 창 닫기">×</button>
+      </div>
       <p>닉네임과 SOOP 아이디를 입력해 인증을 신청하세요. 신청은 서버에서 확인하며, 승인 후 본인 팬페이지로 자동 연결됩니다.</p>
       <label for="verificationNickname">스트리머 닉네임</label>
       <input id="verificationNickname" name="nickname" maxlength="20" autocomplete="off" required>
@@ -167,18 +170,18 @@
       </div>
       <div class="account-dialog-actions verification-actions">
         <button class="button" id="checkStreamerVerification" type="button">승인 여부 확인</button>
-        <button class="button" id="closeStreamerVerification" type="button">닫기</button>
         <button class="button button-primary" id="submitStreamerVerification" type="submit">인증 신청</button>
       </div>
     </form>
   </dialog>
   <dialog id="accountSwitchDialog" class="account-dialog">
     <div class="account-dialog-card">
-      <p class="eyebrow">ACCOUNT SWITCH</p>
-      <h2>이미 연결된 계정이 있어요</h2>
+      <div class="profile-editor-heading">
+        <div><p class="eyebrow">ACCOUNT SWITCH</p><h2>이미 연결된 계정이 있어요</h2></div>
+        <button class="button profile-settings-close" id="cancelAccountSwitch" type="button" aria-label="계정 전환 창 닫기">×</button>
+      </div>
       <p>기존 계정으로 전환하면 현재 세션에 저장된 최근 방문 기록은 기존 계정과 합쳐지지 않습니다.</p>
       <div class="account-dialog-actions">
-        <button class="button" id="cancelAccountSwitch" type="button">취소</button>
         <button class="button button-primary" id="confirmAccountSwitch" type="button">기존 계정으로 전환</button>
       </div>
     </div>
