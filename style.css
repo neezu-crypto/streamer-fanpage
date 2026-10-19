@@ -1062,12 +1062,17 @@ body.fanpage-bottom-banner-active{min-height:0}
   .competition-history-item h3{font-size:14px}
   .competition-history-result{max-width:38%;font-size:10px}
   .competition-history-item-footer{align-items:flex-end}
-  .competition-history-dialog{width:calc(100vw - 20px);max-width:calc(100vw - 20px);max-height:calc(100vh - 24px);max-height:calc(100svh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));margin-block:auto}
+  .competition-history-dialog{width:calc(100vw - 20px);max-width:calc(100vw - 20px);max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));margin-block:auto}
   .competition-history-form{padding:20px}
   .competition-history-form-grid{grid-template-columns:1fr}
   .competition-history-field-wide{grid-column:auto}
   .competition-history-form-footer{align-items:flex-start;flex-direction:column}
   .competition-history-form-footer .profile-editor-footer-actions{width:100%;justify-content:flex-end}
+}
+
+/* Keep every account/editor dialog inside the mobile visual viewport. */
+@media(max-width:720px){
+  dialog.account-dialog{box-sizing:border-box;max-width:calc(100vw - 20px);max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
 }
 
 .search-empty-guidance{display:flex;flex-direction:column;align-items:center;gap:9px;padding:22px 16px;border:1px dashed #ffffff24;border-radius:14px;background:#ffffff04}

@@ -117,7 +117,21 @@ function playUiSound(audio, volumeOffsetPercent = 0, startOffsetSeconds = 0, vol
 }
 function showFanPageModal(dialog) {
   if (!(dialog instanceof HTMLDialogElement) || dialog.open) return;
+  const isTouchLayout = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  if (isTouchLayout) {
+    const initialFocus = dialog.querySelector(
+      '.profile-settings-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch',
+    ) || dialog;
+    if (initialFocus === dialog) dialog.tabIndex = -1;
+    initialFocus.setAttribute('autofocus', '');
+  }
   dialog.showModal();
+  if (isTouchLayout) {
+    const initialFocus = dialog.querySelector(
+      '.profile-settings-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch',
+    ) || dialog;
+    initialFocus.focus({ preventScroll: true });
+  }
   modalOpenGeneration += 1;
   playUiSound(modalOpenAudio);
 }
@@ -1754,7 +1768,8 @@ function openUpboItemEditor(page, existingItem = null) {
     }
   });
   dialog.append(form); dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  document.body.append(dialog); showFanPageModal(dialog); name.field.focus();
+  document.body.append(dialog); showFanPageModal(dialog);
+  if (!window.matchMedia('(hover: none), (pointer: coarse)').matches) name.field.focus();
 }
 
 async function deleteUpboItem(page, item) {
