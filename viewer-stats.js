@@ -434,10 +434,23 @@ function renderSubscriptionDialogStatus(message = '') {
   }
 }
 
+function showViewerModal(dialog) {
+  if (!(dialog instanceof HTMLDialogElement) || dialog.open) return;
+  const isTouchLayout = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  let initialFocus = null;
+  if (isTouchLayout) {
+    initialFocus = dialog.querySelector('.viewer-subscription-close, .viewer-sponsor-close') || dialog;
+    if (initialFocus === dialog) dialog.tabIndex = -1;
+    initialFocus.setAttribute('autofocus', '');
+  }
+  dialog.showModal();
+  if (initialFocus) initialFocus.focus({ preventScroll: true });
+}
+
 function openSubscriptionDialog() {
   renderSubscriptionDialogStatus();
   const dialog = $('viewerSubscriptionDialog');
-  if (!dialog.open) dialog.showModal();
+  showViewerModal(dialog);
 }
 
 function formatVodDate(value) {
@@ -3166,7 +3179,7 @@ async function openSponsorRequest(button) {
   sponsorRequestRail = button.dataset.sponsorRail === 'right' ? 'right' : 'left';
   sponsorRequestId = getSavedSponsorRequestId();
   $('sponsorRequestStatus').textContent = '';
-  $('sponsorRequestDialog').showModal();
+  showViewerModal($('sponsorRequestDialog'));
   if (sponsorRequestId) {
     await refreshSponsorRequestStatus();
     if (sponsorRequestId && !sponsorRequestRecord) {
@@ -3180,7 +3193,9 @@ async function openSponsorRequest(button) {
     $('sponsorRequestIntro').textContent = '홍보할 스트리머와 후원 계정, 노출 기간을 입력하세요.';
     $('sponsorRequestForm').reset();
     updateSponsorPrice();
-    window.setTimeout(() => $('sponsorRequestNickname').focus(), 0);
+    if (!window.matchMedia('(hover: none), (pointer: coarse)').matches) {
+      window.setTimeout(() => $('sponsorRequestNickname').focus(), 0);
+    }
   }
 }
 
