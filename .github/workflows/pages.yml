@@ -27,6 +27,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Authenticate to Google Cloud
+        id: google-auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/997788925900/locations/global/workloadIdentityPools/github-actions/providers/github
@@ -36,6 +37,21 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: soop-stock-market
+      - name: Get usage reporter URL
+        id: usage-reporter
+        run: |
+          URL="$(gcloud functions describe streamerFanPageViewerStatsExportUsage --gen2 --region us-central1 --project soop-stock-market --format='value(serviceConfig.uri)')"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+      - name: Authenticate for usage report
+        id: usage-reporter-auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/997788925900/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: fanpage-static-exporter@soop-stock-market.iam.gserviceaccount.com
+          token_format: id_token
+          id_token_audience: ${{ steps.usage-reporter.outputs.url }}
+          id_token_include_email: true
+          create_credentials_file: false
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -45,12 +61,10 @@ jobs:
       - name: Export analyzed VOD summaries
         shell: bash
         run: |
-          REPORT_URL="$(gcloud functions describe streamerFanPageViewerStatsExportUsage --gen2 --region us-central1 --project soop-stock-market --format='value(serviceConfig.uri)')"
-          REPORT_TOKEN="$(gcloud auth print-identity-token --impersonate-service-account=fanpage-static-exporter@soop-stock-market.iam.gserviceaccount.com --audiences="$REPORT_URL")"
-          echo "::add-mask::$REPORT_TOKEN"
-          VIEWER_STATS_USAGE_REPORT_URL="$REPORT_URL" \
-            VIEWER_STATS_USAGE_REPORT_TOKEN="$REPORT_TOKEN" \
-            node functions/export-viewer-stats.js
+          node functions/export-viewer-stats.js
+        env:
+          VIEWER_STATS_USAGE_REPORT_URL: ${{ steps.usage-reporter.outputs.url }}
+          VIEWER_STATS_USAGE_REPORT_TOKEN: ${{ steps.usage-reporter-auth.outputs.id_token }}
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Prepare Pages directory
