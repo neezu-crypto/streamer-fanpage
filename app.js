@@ -2220,6 +2220,211 @@ function renderKawaiiWelcome(page) {
   return hero;
 }
 
+function createCompetitionHistoryId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID().replace(/-/g, '');
+  return `event-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function formatCompetitionHistoryDate(value) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(value || ''));
+  return match ? `${Number(match[1])}년 ${Number(match[2])}월` : '';
+}
+
+function renderCompetitionHistorySection(page) {
+  const section = document.createElement('section');
+  section.className = 'competition-history-section content-card';
+  section.id = 'competitionHistorySection';
+
+  const heading = document.createElement('div'); heading.className = 'competition-history-heading';
+  const headingCopy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'TOURNAMENT RECORD';
+  const title = document.createElement('h2'); title.textContent = '대회 이력';
+  const subtitle = document.createElement('p'); subtitle.className = 'competition-history-subtitle';
+  subtitle.textContent = '함께한 대회와 소중한 성과';
+  headingCopy.append(eyebrow, title, subtitle);
+  const headingActions = document.createElement('div'); headingActions.className = 'competition-history-heading-actions';
+  const count = document.createElement('span'); count.className = 'competition-history-count';
+  const add = page.isOwner ? document.createElement('button') : null;
+  if (add) {
+    add.type = 'button'; add.className = 'button button-primary competition-history-add';
+    add.textContent = '+ 대회 이력 추가';
+    add.addEventListener('click', () => openCompetitionHistoryDialog(page));
+  }
+  headingActions.append(count);
+  if (add) headingActions.append(add);
+  heading.append(headingCopy, headingActions);
+
+  const list = document.createElement('div'); list.className = 'competition-history-list';
+  const entries = (Array.isArray(page.profile?.competitionHistory) ? page.profile.competitionHistory : [])
+    .filter((entry) => entry && typeof entry === 'object' && typeof entry.id === 'string' && typeof entry.eventName === 'string')
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || a.eventName.localeCompare(b.eventName, 'ko'));
+  count.textContent = `${entries.length}개`;
+  if (add) {
+    add.disabled = entries.length >= 30;
+    if (add.disabled) add.title = '대회 이력은 최대 30개까지 등록할 수 있어요.';
+  }
+
+  if (!entries.length) {
+    const empty = document.createElement('p'); empty.className = 'competition-history-empty';
+    empty.textContent = page.isOwner ? '대회 이력을 추가해 팬들과 성과를 나눠 보세요.' : '아직 공개된 대회 이력이 없어요.';
+    list.append(empty);
+  } else {
+    entries.forEach((entry) => {
+      const item = document.createElement('article'); item.className = 'competition-history-item';
+      const itemHeading = document.createElement('div'); itemHeading.className = 'competition-history-item-heading';
+      const copy = document.createElement('div'); copy.className = 'competition-history-item-copy';
+      const eventName = document.createElement('h3'); eventName.textContent = entry.eventName;
+      const meta = document.createElement('div'); meta.className = 'competition-history-meta';
+      const dateText = formatCompetitionHistoryDate(entry.date);
+      if (dateText) {
+        const date = document.createElement('span'); date.className = 'competition-history-date'; date.textContent = dateText; meta.append(date);
+      }
+      if (entry.category) {
+        const category = document.createElement('span'); category.className = 'competition-history-category'; category.textContent = entry.category; meta.append(category);
+      }
+      copy.append(eventName);
+      if (meta.childElementCount) copy.append(meta);
+      itemHeading.append(copy);
+      if (entry.result) {
+        const result = document.createElement('span'); result.className = 'competition-history-result'; result.textContent = entry.result;
+        itemHeading.append(result);
+      }
+      item.append(itemHeading);
+      if (entry.description) {
+        const description = document.createElement('p'); description.className = 'competition-history-description';
+        description.textContent = entry.description; item.append(description);
+      }
+      const footer = document.createElement('div'); footer.className = 'competition-history-item-footer';
+      if (entry.link) {
+        const link = document.createElement('a'); link.className = 'competition-history-link';
+        link.href = entry.link; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '대회 정보 보기 ↗';
+        footer.append(link);
+      }
+      if (page.isOwner) {
+        const actions = document.createElement('div'); actions.className = 'competition-history-item-actions';
+        const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'button'; edit.textContent = '수정';
+        edit.addEventListener('click', () => openCompetitionHistoryDialog(page, entry));
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button competition-history-delete'; remove.textContent = '삭제';
+        remove.addEventListener('click', async () => {
+          if (!window.confirm(`“${entry.eventName}” 대회 이력을 삭제할까요?`)) return;
+          remove.disabled = true; remove.textContent = '삭제 중…';
+          try {
+            const nextEntries = entries.filter((candidate) => candidate.id !== entry.id);
+            await saveCompetitionHistory(page, nextEntries, '대회 이력을 삭제했어요.');
+          } catch (error) {
+            showToast(error.message || '대회 이력을 삭제하지 못했어요.');
+            remove.disabled = false; remove.textContent = '삭제';
+          }
+        });
+        actions.append(edit, remove); footer.append(actions);
+      }
+      if (footer.childElementCount) item.append(footer);
+      list.append(item);
+    });
+  }
+  section.append(heading, list);
+  return section;
+}
+
+function openCompetitionHistoryDialog(page, existingEntry = null) {
+  if (!page.isOwner) return;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'account-dialog competition-history-dialog';
+  dialog.setAttribute('aria-labelledby', 'competitionHistoryEditorTitle');
+  const form = document.createElement('form'); form.className = 'account-dialog-card competition-history-form';
+  const heading = document.createElement('div'); heading.className = 'profile-editor-heading';
+  const title = document.createElement('h2'); title.id = 'competitionHistoryEditorTitle';
+  title.textContent = existingEntry ? '대회 이력 수정' : '대회 이력 추가';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
+  close.setAttribute('aria-label', '대회 이력 창 닫기'); close.textContent = '×'; close.addEventListener('click', () => dialog.close());
+  heading.append(title, close);
+
+  const fields = document.createElement('div'); fields.className = 'competition-history-form-grid';
+  const makeField = (labelText, name, options = {}) => {
+    const label = document.createElement('label'); label.className = `profile-editor-field${options.wide ? ' competition-history-field-wide' : ''}`;
+    label.textContent = labelText;
+    const input = options.multiline ? document.createElement('textarea') : document.createElement('input');
+    input.name = name; input.maxLength = options.maxLength || 100;
+    if (options.multiline) { input.rows = 4; input.placeholder = options.placeholder || ''; }
+    else { input.type = options.type || 'text'; input.placeholder = options.placeholder || ''; }
+    if (options.required) input.required = true;
+    input.value = String(existingEntry?.[name] || '');
+    label.append(input);
+    return label;
+  };
+  const eventName = makeField('대회명', 'eventName', { required: true, maxLength: 100, placeholder: '예: SOOP 스트리머 리그' });
+  const date = makeField('시기', 'date', { type: 'month' });
+  const category = makeField('종목 / 대회 종류', 'category', { maxLength: 50, placeholder: '예: 리그 오브 레전드' });
+  const result = makeField('성과', 'result', { maxLength: 80, placeholder: '예: 우승, 4강, 참가' });
+  const description = makeField('설명', 'description', { multiline: true, wide: true, maxLength: 500, placeholder: '대회에서의 활약이나 팬들에게 전하고 싶은 내용을 적어 주세요.' });
+  const link = makeField('대회 정보 링크 (선택)', 'link', { type: 'url', wide: true, maxLength: 500, placeholder: 'https://example.com' });
+  fields.append(eventName, date, category, result, description, link);
+
+  const note = document.createElement('p'); note.className = 'competition-history-note';
+  note.textContent = '대회 이력은 팬페이지에 공개되며 최대 30개까지 등록할 수 있어요.';
+  const status = document.createElement('p'); status.className = 'competition-history-form-status';
+  status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+  const footer = document.createElement('div'); footer.className = 'profile-editor-footer competition-history-form-footer';
+  const hint = document.createElement('small'); hint.textContent = '서버에 안전하게 저장됩니다.';
+  const actions = document.createElement('div'); actions.className = 'profile-editor-footer-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
+  cancel.addEventListener('click', () => dialog.close());
+  const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary competition-history-save';
+  save.textContent = existingEntry ? '변경 저장' : '대회 이력 추가';
+  actions.append(cancel, save); footer.append(hint, actions);
+  form.append(heading, fields, note, status, footer);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity() || save.disabled) return;
+    const entry = {
+      id: existingEntry?.id || createCompetitionHistoryId(),
+      eventName: eventName.querySelector('input').value.trim(),
+      date: date.querySelector('input').value,
+      category: category.querySelector('input').value.trim(),
+      result: result.querySelector('input').value.trim(),
+      description: description.querySelector('textarea').value.trim(),
+      link: link.querySelector('input').value.trim(),
+    };
+    const currentEntries = Array.isArray(page.profile?.competitionHistory) ? page.profile.competitionHistory : [];
+    const nextEntries = existingEntry
+      ? currentEntries.map((candidate) => candidate.id === existingEntry.id ? entry : candidate)
+      : [entry, ...currentEntries];
+    save.disabled = true; save.textContent = '저장 중…'; save.setAttribute('aria-busy', 'true');
+    status.textContent = ''; status.classList.remove('is-error');
+    try {
+      await saveCompetitionHistory(page, nextEntries);
+      dialog.close();
+    } catch (error) {
+      status.textContent = error.message || '대회 이력을 저장하지 못했어요.';
+      status.classList.add('is-error');
+    } finally {
+      if (save.isConnected) {
+        save.disabled = false; save.removeAttribute('aria-busy');
+        save.textContent = existingEntry ? '변경 저장' : '대회 이력 추가';
+      }
+    }
+  });
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  document.body.append(dialog);
+  showFanPageModal(dialog);
+  eventName.querySelector('input').focus();
+}
+
+async function saveCompetitionHistory(page, entries, successMessage = '대회 이력을 저장했어요.') {
+  const result = await callSave({
+    streamerId: page.streamer.id,
+    profile: profileForLinkSave(page.profile, 'competitionHistory', entries),
+  });
+  const isCurrentPage = currentPage?.streamer.id === page.streamer.id;
+  if (isCurrentPage) {
+    currentPage.profile = result.data.page.profile;
+    renderFanPage(currentPage);
+  } else {
+    page.profile = result.data.page.profile;
+  }
+  showToast(successMessage);
+}
+
 function renderFanPage(page, options = {}) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
@@ -2387,14 +2592,15 @@ function renderFanPage(page, options = {}) {
   const cafeSection = renderCafeSection(page);
   const calendarSection = renderCalendarSection(page);
   const gallerySection = renderGallerySection(page);
+  const competitionHistorySection = renderCompetitionHistorySection(page);
   const contentSections = [upboSection, rouletteSection, messengerSection, liveSection, vodSection,
-    youtubeSection, songbookSection, ogqSection, cafeSection, calendarSection, gallerySection].filter(Boolean);
+    youtubeSection, songbookSection, ogqSection, cafeSection, calendarSection, gallerySection, competitionHistorySection].filter(Boolean);
   if (featuredPair) view.append(featuredPair);
   if (layoutDesign === 1) {
     const grid = document.createElement('div'); grid.className = 'fanpage-design-one-grid';
     const mainColumn = document.createElement('div'); mainColumn.className = 'fanpage-design-one-column fanpage-design-one-main-column';
     const sideColumn = document.createElement('aside'); sideColumn.className = 'fanpage-design-one-column fanpage-design-one-side-column';
-    [gallerySection, liveSection, vodSection, cafeSection, calendarSection]
+    [gallerySection, competitionHistorySection, liveSection, vodSection, cafeSection, calendarSection]
       .filter(Boolean).forEach((contentSection) => mainColumn.append(contentSection));
     [upboSection, rouletteSection, messengerSection, youtubeSection, songbookSection, ogqSection]
       .filter(Boolean).forEach((contentSection) => sideColumn.append(contentSection));
@@ -2563,6 +2769,7 @@ function renderFanPage(page, options = {}) {
             youtubeChannelUrl: value('youtubeChannelUrl'), cafeUrl: value('cafeUrl'), ogqEmoticonUrl: value('ogqEmoticonUrl'),
             layoutDesign: Number(editor.querySelector('input[name="layoutDesign"]:checked')?.value || DEFAULT_FANPAGE_LAYOUT),
             topBannerImageUrls, bottomBannerImageUrls,
+            competitionHistory: Array.isArray(currentPage.profile?.competitionHistory) ? currentPage.profile.competitionHistory : [],
           },
         });
         currentPage.intro = result.data.page.intro;
@@ -2978,6 +3185,7 @@ function profileForLinkSave(source, field, value) {
     layoutDesign: profile.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT,
     topBannerImageUrls: Array.isArray(profile.topBannerImageUrls) ? profile.topBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerImageUrls: Array.isArray(profile.bottomBannerImageUrls) ? profile.bottomBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
+    competitionHistory: Array.isArray(profile.competitionHistory) ? profile.competitionHistory.slice(0, 30) : [],
   };
   saved[field] = value;
   return saved;
