@@ -425,6 +425,8 @@
 .upbo-add-item-inline{white-space:nowrap}
 .upbo-viewer-total{color:#928a9a;font-size:12px}
 .upbo-inline-empty{margin:0;padding:13px;border-radius:9px;background:#ffffff04;color:#918a98;font-size:13px;text-align:center}
+.upbo-request-empty{display:grid;justify-items:center;gap:4px;line-height:1.5}
+.upbo-request-empty-hint{color:#a69eac;font-size:11px}
 .upbo-request-form{display:grid;gap:14px}
 .upbo-request-form .profile-editor-field{margin:0;color:#ded7e2;font-size:12px;font-weight:600}
 .upbo-request-form .profile-editor-field input,.upbo-request-form .profile-editor-field textarea{width:100%;min-height:42px;margin-top:6px;padding:9px 10px;border:1px solid #ffffff20;border-radius:9px;background:#111018;color:var(--text);outline:0;font:12px var(--font)}
