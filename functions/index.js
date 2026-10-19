@@ -615,6 +615,34 @@ function upboRootRef(streamerId) {
   return db.ref(`streamerFanPageUpbo/${streamerId}`);
 }
 
+function holdUpboTransactionCache(ref) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timeout;
+    const cleanup = () => {
+      clearTimeout(timeout);
+      ref.off('value', onValue);
+    };
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const onValue = (snapshot) => {
+      if (settled || !snapshot.exists()) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(cleanup);
+    };
+
+    timeout = setTimeout(() => {
+      fail(new HttpsError('unavailable', '신청 상태를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.'));
+    }, 5000);
+    ref.on('value', onValue, fail);
+  });
+}
+
 function validUpboId(value) {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value);
 }
@@ -4369,10 +4397,16 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
     const approvedAt = Date.now();
     const recordId = upboTimestampId(approvedAt);
     const lockId = randomUUID();
-    const claim = await requestRef.transaction((current) => {
-      if (!current || current.status !== 'pending') return undefined;
-      return { ...current, status: 'processing', processingAt: approvedAt, processingId: lockId };
-    });
+    const releaseTransactionCache = await holdUpboTransactionCache(requestRef);
+    let claim;
+    try {
+      claim = await requestRef.transaction((current) => {
+        if (!current || current.status !== 'pending') return undefined;
+        return { ...current, status: 'processing', processingAt: approvedAt, processingId: lockId };
+      });
+    } finally {
+      releaseTransactionCache();
+    }
     if (!claim.committed) throw new HttpsError('failed-precondition', '이미 처리 중이거나 삭제된 신청입니다. 새로고침해 주세요.');
     const record = {
       nickname,
@@ -4402,10 +4436,18 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
     const requestId = String(data.requestId || '').trim();
     if (!validUpboId(requestId)) throw new HttpsError('invalid-argument', '팬 신청을 확인해 주세요.');
     const requestRef = submissionsRef.child(requestId);
-    const deletion = await requestRef.transaction((current) => {
-      if (!current || current.status !== 'pending') return undefined;
-      return null;
-    });
+    const pending = normalizeStoredUpboSubmission(requestId, (await requestRef.get()).val());
+    if (!pending) throw new HttpsError('not-found', '삭제할 팬 신청을 찾을 수 없습니다.');
+    const releaseTransactionCache = await holdUpboTransactionCache(requestRef);
+    let deletion;
+    try {
+      deletion = await requestRef.transaction((current) => {
+        if (!current || current.status !== 'pending') return undefined;
+        return null;
+      });
+    } finally {
+      releaseTransactionCache();
+    }
     if (!deletion.committed) throw new HttpsError('not-found', '삭제할 팬 신청을 찾을 수 없습니다.');
     return { deleted: true, canManage };
   }
