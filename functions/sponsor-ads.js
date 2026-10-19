@@ -57,6 +57,18 @@ async function releaseRequestIndexes(db, requestId, soopId) {
   ]);
 }
 
+async function holdFreshRealtimeSnapshot(ref) {
+  let listener = null;
+  const snapshot = await new Promise((resolve, reject) => {
+    listener = (value) => resolve(value);
+    ref.on('value', listener, (error) => {
+      ref.off('value', listener);
+      reject(error);
+    });
+  });
+  return { snapshot, release: () => ref.off('value', listener) };
+}
+
 async function expirePendingRequest(db, requestId, record) {
   const expiration = await db.ref(`${REQUESTS_PATH}/${requestId}`).transaction((current) => {
     if (!current || current.status !== 'pending' || Number(current.donationCompletedAt) > 0 || Number(current.expiresAt) > Date.now()) return;
@@ -385,13 +397,42 @@ exports.streamerFanPageAdminSponsorAds = onCall({ maxInstances: 10, enforceAppCh
   }
 
   if (action === 'reject') {
-    const result = await requestRef.transaction((current) => {
-      if (!current || current.status !== 'pending') return;
-      return { ...current, status: 'rejected', reviewedAt: now, reviewedBy: adminUid };
-    });
-    if (!result.committed) throw new HttpsError('failed-precondition', '이미 처리된 신청입니다.');
-    await releaseRequestIndexes(db, requestId, soopIdFromRecord(pendingRecord));
-    return { status: 'rejected' };
+    // Keep a live listener attached until the transaction completes. A one-shot
+    // get() can leave a fresh Functions instance's transaction cache empty, which
+    // makes the update callback abort even though the request is still pending.
+    const heldRequest = await holdFreshRealtimeSnapshot(requestRef);
+    try {
+      const currentRequest = heldRequest.snapshot.val();
+      if (currentRequest && currentRequest.status === 'rejected') {
+        await releaseRequestIndexes(db, requestId, soopIdFromRecord(currentRequest));
+        return { status: 'rejected', alreadyProcessed: true };
+      }
+      if (!currentRequest || currentRequest.status !== 'pending') {
+        const status = String(currentRequest && currentRequest.status || 'missing');
+        throw new HttpsError('failed-precondition', `현재 신청 상태가 ${status}입니다. 목록을 새로고침해 주세요.`);
+      }
+      if (!Number(currentRequest.donationCompletedAt) && Number(currentRequest.expiresAt) <= now) {
+        await expirePendingRequest(db, requestId, currentRequest);
+        throw new HttpsError('failed-precondition', '신청이 만료되어 처리할 수 없습니다.');
+      }
+
+      const result = await requestRef.transaction((current) => {
+        if (!current || current.status !== 'pending') return;
+        return { ...current, status: 'rejected', reviewedAt: now, reviewedBy: adminUid };
+      }, undefined, false);
+      const resultValue = result.snapshot.val();
+      if (!result.committed && !(resultValue && resultValue.status === 'rejected')) {
+        console.error('고점체크 홍보 신청 반려 트랜잭션 실패:', {
+          requestId,
+          currentStatus: String(resultValue && resultValue.status || 'missing'),
+        });
+        throw new HttpsError('aborted', '반려 상태를 저장하지 못했습니다. 신청 목록을 새로고침한 뒤 다시 시도해 주세요.');
+      }
+      await releaseRequestIndexes(db, requestId, soopIdFromRecord(currentRequest));
+      return { status: 'rejected' };
+    } finally {
+      heldRequest.release();
+    }
   }
 
   if (!Number(pendingRecord.donationCompletedAt)) {
