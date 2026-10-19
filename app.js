@@ -2539,6 +2539,7 @@ function openCompetitionHistoryDialog(page, existingEntry = null) {
       }
     }
   });
+  dialog.append(form);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   document.body.append(dialog);
   showFanPageModal(dialog);
