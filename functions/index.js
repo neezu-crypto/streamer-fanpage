@@ -45,6 +45,7 @@ const RECENT_PAGE_LIMIT = 8;
 const FANPAGE_STATS_DAYS = 30;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const SOOP_VOD_PAGE_SIZE = 60;
+const VIEWER_VOD_PAGE_SIZE = 30;
 const FANPAGE_VOD_PAGE_SIZE = 24;
 const MAX_LOADED_VIDEO_ITEMS = 500;
 const FANPAGE_VOD_COMMENT_PAGE_SIZE = 50;
@@ -1290,14 +1291,14 @@ async function fetchSoopLiveStatus(soopId) {
   };
 }
 
-async function fetchSoopVodPage(soopId, page, keyword = '') {
+async function fetchSoopVodPage(soopId, page, keyword = '', pageSize = SOOP_VOD_PAGE_SIZE) {
   const url = new URL(`${SOOP_VOD_API}/${encodeURIComponent(soopId)}/vods/review`);
   url.search = new URLSearchParams({
     keyword: String(keyword || '').trim(),
     orderby: 'reg_date',
     page: String(page),
     field: 'title,contents,user_nick,user_id',
-    per_page: String(SOOP_VOD_PAGE_SIZE),
+    per_page: String(pageSize),
     start_date: '',
     end_date: '',
   }).toString();
@@ -3785,7 +3786,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
 
   if (action === 'vods') {
     const page = Number(data.page || 1);
-    if (!Number.isSafeInteger(page) || page < 1 || page > 200) {
+    if (!Number.isSafeInteger(page) || page < 1 || page > 400) {
       throw new HttpsError('invalid-argument', '다시보기 페이지 요청을 확인해 주세요.');
     }
     const keyword = typeof data.keyword === 'string' ? data.keyword.trim() : '';
@@ -3794,7 +3795,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     }
     const tier = await resolveViewerStatsTier(uid, request.auth);
     await enforceViewerStatsRateLimit(uid, action, { streamerId, page, tier });
-    const result = await fetchSoopVodPage(streamerId, page, keyword);
+    const result = await fetchSoopVodPage(streamerId, page, keyword, VIEWER_VOD_PAGE_SIZE);
     const vods = result.rows.map((row) => normalizeSoopVod(row)).filter(Boolean);
     if (vods.length !== result.rows.length) {
       throw new HttpsError('unavailable', 'SOOP 다시보기 응답 일부를 읽지 못했습니다.');
@@ -3805,7 +3806,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
       vods,
       total: result.total,
       page,
-      hasMore: page * SOOP_VOD_PAGE_SIZE < result.total,
+      hasMore: page * VIEWER_VOD_PAGE_SIZE < result.total,
     };
   }
 

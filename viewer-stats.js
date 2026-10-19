@@ -96,8 +96,8 @@ async function loadDevbarLinks() {
 }
 
 const MAX_CONCURRENT_STATS_REQUESTS = 3;
-const MAX_PERIOD_SCAN_PAGES = 200;
-const VIEWER_VOD_PAGE_SIZE = 60;
+const MAX_PERIOD_SCAN_PAGES = 400;
+const VIEWER_VOD_PAGE_SIZE = 30;
 const MAX_KEYWORD_COMPARE_VODS_PER_STREAMER = 10;
 const VIEWER_STATS_EXCLUDED_EDGE_SECONDS = 5 * 60;
 const VIEWER_STATS_INSUFFICIENT_WINDOW_CODE = 'insufficient-analysis-window';
@@ -2304,7 +2304,7 @@ async function fetchRecentYearVods(scanToken, loadToken, yearCutoff) {
       }
     });
 
-    $('viewerPeriodStatus').textContent = '최근 1년 다시보기 목록 확인 중 · ' + Math.min(page * 60, pageData.total).toLocaleString('ko-KR') + '개 확인';
+    $('viewerPeriodStatus').textContent = '최근 1년 다시보기 목록 확인 중 · ' + Math.min(page * VIEWER_VOD_PAGE_SIZE, pageData.total).toLocaleString('ko-KR') + '개 확인';
     if (oldestTimestamp && oldestTimestamp < yearCutoff) {
       reachedYearCutoff = true;
       break;
