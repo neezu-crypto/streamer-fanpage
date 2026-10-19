@@ -7,6 +7,7 @@ const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onTaskDispatched } = require('firebase-functions/v2/tasks');
 const { defineSecret } = require('firebase-functions/params');
+const { AsyncLocalStorage } = require('node:async_hooks');
 const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
 const {
@@ -127,6 +128,219 @@ const VIEWER_STATS_INSUFFICIENT_WINDOW_MESSAGE = '시작과 종료 5분을 제�
 let lastViewerStatsJobCleanupAt = 0;
 let viewerStatsJobCleanupPromise = null;
 const VIEWER_STATS_USAGE_ACTIONS = Object.freeze(['search', 'vods', 'stats']);
+const VIEWER_STATS_DATA_METRIC_KEYS = Object.freeze([
+  'calls', 'runtimeMs', 'callableCalls', 'callableRuntimeMs', 'workerCalls', 'workerRuntimeMs',
+  'requestBytes', 'responseBytes', 'rtdbReadBytes', 'rtdbWriteBytes', 'soopRequestBytes', 'soopResponseBytes',
+]);
+// USD list rates checked 2026-10-20: RTDB $1/GB downloaded; Cloud Run us-central1 active CPU,
+// memory, and request rates. Shared free tiers, discounts, egress, Cloud Tasks, and storage are excluded.
+// Sources: https://firebase.google.com/pricing and https://cloud.google.com/run/pricing
+const VIEWER_STATS_COST_RATES = Object.freeze({
+  realtimeDatabaseUsdPerGb: 1,
+  cloudRunCpuUsdPerVcpuSecond: 0.000024,
+  cloudRunMemoryUsdPerGibSecond: 0.0000025,
+  cloudRunRequestUsdPerMillion: 0.4,
+  functionCpuCount: 1,
+  functionMemoryGib: 0.25,
+});
+const viewerStatsTelemetryStorage = new AsyncLocalStorage();
+const viewerStatsReferenceProxyCache = new WeakMap();
+
+function viewerStatsJsonBytes(value) {
+  if (value === undefined) return 0;
+  try {
+    const serialized = JSON.stringify(value);
+    return typeof serialized === 'string' ? Buffer.byteLength(serialized, 'utf8') : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+function trackViewerStatsTelemetry(metric, bytes) {
+  const telemetry = viewerStatsTelemetryStorage.getStore();
+  if (!telemetry) return;
+  telemetry[metric] = Math.max(0, Number(telemetry[metric]) || 0) + Math.max(0, Number(bytes) || 0);
+}
+
+function trackViewerStatsSoopRequest(url, body = '') {
+  trackViewerStatsTelemetry('soopRequestBytes', Buffer.byteLength(String(url || ''), 'utf8')
+    + Buffer.byteLength(String(body || ''), 'utf8'));
+}
+
+async function viewerStatsSoopResponseText(response) {
+  const text = await response.text();
+  trackViewerStatsTelemetry('soopResponseBytes', Buffer.byteLength(text, 'utf8'));
+  return text;
+}
+
+function trackedViewerStatsRefObject(reference) {
+  if (!reference || typeof reference !== 'object' || typeof reference.get !== 'function') return reference;
+  const cached = viewerStatsReferenceProxyCache.get(reference);
+  if (cached) return cached;
+  const proxy = new Proxy(reference, {
+    get(target, property) {
+      const method = Reflect.get(target, property, target);
+      if (typeof method !== 'function') return method;
+      if (property === 'get') {
+        return async (...args) => {
+          const snapshot = await method.apply(target, args);
+          trackViewerStatsTelemetry('rtdbReadBytes', viewerStatsJsonBytes(snapshot.val()));
+          return snapshot;
+        };
+      }
+      if (property === 'set') {
+        return async (...args) => {
+          trackViewerStatsTelemetry('rtdbWriteBytes', viewerStatsJsonBytes(args[0]));
+          return method.apply(target, args);
+        };
+      }
+      if (property === 'update') {
+        return async (...args) => {
+          trackViewerStatsTelemetry('rtdbWriteBytes', viewerStatsJsonBytes(args[0]));
+          return method.apply(target, args);
+        };
+      }
+      if (property === 'remove') {
+        return async (...args) => {
+          trackViewerStatsTelemetry('rtdbWriteBytes', 4);
+          return method.apply(target, args);
+        };
+      }
+      if (property === 'transaction') {
+        return async (...args) => {
+          const result = await method.apply(target, args);
+          const bytes = viewerStatsJsonBytes(result && result.snapshot && result.snapshot.val());
+          trackViewerStatsTelemetry('rtdbReadBytes', bytes);
+          if (result && result.committed) trackViewerStatsTelemetry('rtdbWriteBytes', bytes);
+          return result;
+        };
+      }
+      return (...args) => trackedViewerStatsRefObject(method.apply(target, args));
+    },
+  });
+  viewerStatsReferenceProxyCache.set(reference, proxy);
+  return proxy;
+}
+
+function viewerStatsRef(path) {
+  return trackedViewerStatsRefObject(db.ref(path));
+}
+
+async function recordViewerStatsTelemetry(telemetry) {
+  if (!telemetry || !telemetry.uidKey || !telemetry.action) return;
+  const dateKey = viewerStatsDayKey();
+  const metricKeys = [
+    'calls', 'runtimeMs', 'callableCalls', 'callableRuntimeMs', 'workerCalls', 'workerRuntimeMs',
+    'requestBytes', 'responseBytes', 'rtdbReadBytes', 'rtdbWriteBytes', 'soopRequestBytes', 'soopResponseBytes',
+  ];
+  const runtimeMs = Math.ceil(Math.max(0, Number(telemetry.runtimeMs) || 0) / 100) * 100;
+  const isWorker = telemetry.source === 'worker';
+  const values = {
+    calls: 1,
+    runtimeMs,
+    callableCalls: isWorker ? 0 : 1,
+    callableRuntimeMs: isWorker ? 0 : runtimeMs,
+    workerCalls: isWorker ? 1 : 0,
+    workerRuntimeMs: isWorker ? runtimeMs : 0,
+    requestBytes: Math.max(0, Number(telemetry.requestBytes) || 0),
+    responseBytes: Math.max(0, Number(telemetry.responseBytes) || 0),
+    rtdbReadBytes: Math.max(0, Number(telemetry.rtdbReadBytes) || 0),
+    rtdbWriteBytes: Math.max(0, Number(telemetry.rtdbWriteBytes) || 0),
+    soopRequestBytes: Math.max(0, Number(telemetry.soopRequestBytes) || 0),
+    soopResponseBytes: Math.max(0, Number(telemetry.soopResponseBytes) || 0),
+  };
+  const reference = db.ref('streamerFanPageViewerStatsLimits/' + telemetry.uidKey + '/recentUsageByDay/' + dateKey);
+  await reference.transaction((current) => {
+    const usageDay = current && typeof current === 'object'
+      ? { ...current }
+      : {};
+    const dataMetrics = usageDay.dataMetrics && typeof usageDay.dataMetrics === 'object'
+      ? { ...usageDay.dataMetrics }
+      : {};
+    const metricValues = { ...values };
+    metricValues.rtdbReadBytes += viewerStatsJsonBytes(current);
+    metricKeys.forEach((key) => {
+      dataMetrics[key] = Math.max(0, Number(dataMetrics[key]) || 0) + metricValues[key];
+    });
+    const actionMetrics = usageDay.dataByAction && typeof usageDay.dataByAction === 'object'
+      ? { ...usageDay.dataByAction }
+      : {};
+    const action = telemetry.action;
+    const actionRecord = actionMetrics[action] && typeof actionMetrics[action] === 'object'
+      ? { ...actionMetrics[action] }
+      : {};
+    metricKeys.forEach((key) => {
+      actionRecord[key] = Math.max(0, Number(actionRecord[key]) || 0) + metricValues[key];
+    });
+    actionMetrics[action] = actionRecord;
+    const writeBytes = viewerStatsJsonBytes({ ...usageDay, dataMetrics, dataByAction: actionMetrics });
+    dataMetrics.rtdbWriteBytes += writeBytes;
+    actionRecord.rtdbWriteBytes += writeBytes;
+    actionMetrics[action] = actionRecord;
+    usageDay.dataMetrics = dataMetrics;
+    usageDay.dataByAction = actionMetrics;
+    return usageDay;
+  });
+}
+
+async function runViewerStatsTelemetry({ uidKey, action, source = 'callable', requestData }, operation) {
+  const telemetry = {
+    uidKey,
+    action: ['search', 'vods', 'stats', 'periodPeaks', 'statsResult', 'cancelStatsJob', 'worker'].includes(action)
+      ? action
+      : 'other',
+    source,
+    requestBytes: source === 'worker' ? 0 : viewerStatsJsonBytes(requestData),
+    responseBytes: 0,
+    rtdbReadBytes: 0,
+    rtdbWriteBytes: 0,
+    soopRequestBytes: 0,
+    soopResponseBytes: 0,
+  };
+  const startedAt = Date.now();
+  return viewerStatsTelemetryStorage.run(telemetry, async () => {
+    try {
+      const result = await operation();
+      telemetry.responseBytes = source === 'worker' ? 0 : viewerStatsJsonBytes(result);
+      return result;
+    } finally {
+      telemetry.runtimeMs = Date.now() - startedAt;
+      await recordViewerStatsTelemetry(telemetry).catch((error) => {
+        console.warn('Could not record viewer stats data usage:', error);
+      });
+    }
+  });
+}
+
+function viewerStatsCostEstimate(dataMetrics) {
+  const metrics = dataMetrics && typeof dataMetrics === 'object' ? dataMetrics : {};
+  const runtimeSeconds = Math.max(0, Number(metrics.runtimeMs) || 0) / 1000;
+  const realtimeDatabaseGb = Math.max(0, Number(metrics.rtdbReadBytes) || 0) / 1_000_000_000;
+  const functionCalls = Math.max(0, Number(metrics.calls) || 0);
+  const functionCost = functionCalls * VIEWER_STATS_COST_RATES.cloudRunRequestUsdPerMillion / 1_000_000
+    + runtimeSeconds * (VIEWER_STATS_COST_RATES.functionCpuCount * VIEWER_STATS_COST_RATES.cloudRunCpuUsdPerVcpuSecond
+      + VIEWER_STATS_COST_RATES.functionMemoryGib * VIEWER_STATS_COST_RATES.cloudRunMemoryUsdPerGibSecond);
+  const realtimeDatabaseCost = realtimeDatabaseGb * VIEWER_STATS_COST_RATES.realtimeDatabaseUsdPerGb;
+  return { functionCost, realtimeDatabaseCost, totalCost: functionCost + realtimeDatabaseCost };
+}
+
+function emptyViewerStatsDataMetrics() {
+  return Object.fromEntries(VIEWER_STATS_DATA_METRIC_KEYS.map((key) => [key, 0]));
+}
+
+function addViewerStatsDataMetrics(target, source) {
+  VIEWER_STATS_DATA_METRIC_KEYS.forEach((key) => {
+    target[key] = Math.max(0, Number(target[key]) || 0) + Math.max(0, Number(source && source[key]) || 0);
+  });
+  return target;
+}
+
+function sumViewerStatsDailyDataMetrics(days) {
+  return (Array.isArray(days) ? days : []).reduce((sum, day) => {
+    addViewerStatsDataMetrics(sum, day && day.dataMetrics);
+    return sum;
+  }, emptyViewerStatsDataMetrics());
+}
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -140,7 +354,7 @@ async function resolveViewerStatsBaseTier(uid, auth) {
     ? String(auth.token.firebase.sign_in_provider || '')
     : '';
   if (signInProvider !== 'anonymous') return 'account';
-  const userSnapshot = await db.ref(`users/${uid}`).get();
+  const userSnapshot = await viewerStatsRef(`users/${uid}`).get();
   const user = userSnapshot.val() || {};
   return viewerStatsTier(auth, {
     isProtectedAccount: user.googleLinked === true || user.kakaoLinked === true || user.streamerVerified === true,
@@ -150,7 +364,7 @@ async function resolveViewerStatsBaseTier(uid, auth) {
 async function resolveViewerStatsTier(uid, auth) {
   const [baseTier, subscriptionSnapshot, isAdmin] = await Promise.all([
     resolveViewerStatsBaseTier(uid, auth),
-    db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+    viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
     isAdminUid(uid),
   ]);
   const subscription = subscriptionSnapshot.val() || {};
@@ -182,7 +396,7 @@ function viewerStatsJobRef(jobId) {
   const match = String(jobId || '').match(/^(\d{4})(\d{2})(\d{2})_([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
   if (!match) throw new HttpsError('invalid-argument', '시청 통계 요청 번호를 확인해 주세요.');
   const dateKey = `${match[1]}-${match[2]}-${match[3]}`;
-  return db.ref(`${VIEWER_STATS_JOBS_PATH}/${dateKey}/${match[4]}`);
+  return viewerStatsRef(`${VIEWER_STATS_JOBS_PATH}/${dateKey}/${match[4]}`);
 }
 
 function viewerStatsQueueRef(tier, queueKey) {
@@ -190,12 +404,12 @@ function viewerStatsQueueRef(tier, queueKey) {
     || !/^\d{13}_\d{8}_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(queueKey || ''))) {
     throw new HttpsError('invalid-argument', '시청 통계 대기열 요청을 확인해 주세요.');
   }
-  return db.ref(`${VIEWER_STATS_QUEUE_PATH}/${tier}/${queueKey}`);
+  return viewerStatsRef(`${VIEWER_STATS_QUEUE_PATH}/${tier}/${queueKey}`);
 }
 
 function viewerStatsWorkerClaimRef(taskId) {
   const claimKey = createHash('sha256').update(String(taskId || '')).digest('hex').slice(0, 40);
-  return db.ref(`${VIEWER_STATS_WORKER_CLAIMS_PATH}/${claimKey}`);
+  return viewerStatsRef(`${VIEWER_STATS_WORKER_CLAIMS_PATH}/${claimKey}`);
 }
 
 function makeViewerStatsQueueKey(createdAt, jobId) {
@@ -203,7 +417,7 @@ function makeViewerStatsQueueKey(createdAt, jobId) {
 }
 
 async function updateViewerStatsQueueMetrics(uidKey, dateKey, updates) {
-  const reference = db.ref(`streamerFanPageViewerStatsLimits/${uidKey}`);
+  const reference = viewerStatsRef(`streamerFanPageViewerStatsLimits/${uidKey}`);
   await reference.transaction((current) => {
     const previous = current && typeof current === 'object' ? current : {};
     const recentUsageByDay = previous.recentUsageByDay && typeof previous.recentUsageByDay === 'object'
@@ -231,17 +445,17 @@ async function cleanupOldViewerStatsJobs(now = Date.now()) {
     try {
       const cutoffTimestamp = now - (3 * 24 * 60 * 60 * 1000);
       const cutoffDateKey = viewerStatsDayKey(cutoffTimestamp);
-      const oldJobsSnapshot = await db.ref(VIEWER_STATS_JOBS_PATH)
+      const oldJobsSnapshot = await viewerStatsRef(VIEWER_STATS_JOBS_PATH)
         .orderByKey()
         .endAt(cutoffDateKey)
         .get();
       const oldJobDays = Object.keys(oldJobsSnapshot.val() || {}).filter((dateKey) => dateKey < cutoffDateKey);
-      await Promise.all(oldJobDays.map((dateKey) => db.ref(`${VIEWER_STATS_JOBS_PATH}/${dateKey}`).remove()));
+      await Promise.all(oldJobDays.map((dateKey) => viewerStatsRef(`${VIEWER_STATS_JOBS_PATH}/${dateKey}`).remove()));
 
       const expiredQueueBefore = now - VIEWER_STATS_JOB_TTL_MS;
       const oldestQueueKey = String(Math.floor(expiredQueueBefore)).padStart(13, '0') + '_\uf8ff';
       await Promise.all(['anonymous', 'account', 'subscriber', 'admin'].map(async (tier) => {
-        const oldQueueSnapshot = await db.ref(`${VIEWER_STATS_QUEUE_PATH}/${tier}`)
+        const oldQueueSnapshot = await viewerStatsRef(`${VIEWER_STATS_QUEUE_PATH}/${tier}`)
           .orderByKey()
           .endAt(oldestQueueKey)
           .get();
@@ -249,11 +463,11 @@ async function cleanupOldViewerStatsJobs(now = Date.now()) {
         await Promise.all(Object.keys(oldQueue).map((queueKey) => viewerStatsQueueRef(tier, queueKey).remove()));
       }));
 
-      const claimsSnapshot = await db.ref(VIEWER_STATS_WORKER_CLAIMS_PATH).get();
+      const claimsSnapshot = await viewerStatsRef(VIEWER_STATS_WORKER_CLAIMS_PATH).get();
       const staleClaims = Object.entries(claimsSnapshot.val() || {})
         .filter(([, claim]) => !claim || Number(claim.claimedAt) < cutoffTimestamp)
         .map(([key]) => key);
-      await Promise.all(staleClaims.map((key) => db.ref(`${VIEWER_STATS_WORKER_CLAIMS_PATH}/${key}`).remove()));
+      await Promise.all(staleClaims.map((key) => viewerStatsRef(`${VIEWER_STATS_WORKER_CLAIMS_PATH}/${key}`).remove()));
       lastViewerStatsJobCleanupAt = now;
     } catch (error) {
       lastViewerStatsJobCleanupAt = now - VIEWER_STATS_JOB_CLEANUP_INTERVAL_MS + 60 * 1000;
@@ -278,7 +492,7 @@ async function enforceViewerStatsRateLimit(uid, action, usageContext = {}) {
     ? String(usageContext.streamerId || '').trim().toLowerCase()
     : '';
   const trackStreamerSelection = SOOP_ID_PATTERN.test(selectedStreamerId);
-  const reference = db.ref(`streamerFanPageViewerStatsLimits/${uidKey}`);
+  const reference = viewerStatsRef(`streamerFanPageViewerStatsLimits/${uidKey}`);
   const result = await reference.transaction((current) => {
     const previous = current && typeof current === 'object' ? current : {};
     const minuteCounts = Number(previous.minuteWindow) === minuteWindow
@@ -417,13 +631,17 @@ async function searchSoopStreamers(query, { sortByFavorites = false } = {}) {
       w: 'webk',
       tab: 'bj',
     }).toString();
+    trackViewerStatsSoopRequest(url);
     const response = await fetch(url, {
       headers: { accept: 'application/json, text/plain, */*' },
       signal: AbortSignal.timeout(8000),
     });
-    if (!response.ok) return [];
+    if (!response.ok) {
+      await viewerStatsSoopResponseText(response);
+      return [];
+    }
 
-    const payload = await response.json();
+    const payload = JSON.parse(await viewerStatsSoopResponseText(response));
     if (Number(payload && payload.RESULT) !== 1 || !Array.isArray(payload.DATA)) return [];
     const streamers = payload.DATA.map((row) => {
       const soopId = String((row && row.user_id) || '').trim();
@@ -502,7 +720,7 @@ async function findVerifiedByUid(uid) {
 }
 
 async function isAdminUid(uid) {
-  const snap = await db.ref(`adminCenter/adminUids/${uid}`).get();
+  const snap = await viewerStatsRef(`adminCenter/adminUids/${uid}`).get();
   return snap.val() === true;
 }
 
@@ -1330,6 +1548,7 @@ async function fetchSoopVodPage(soopId, page, keyword = '', pageSize = SOOP_VOD_
     start_date: '',
     end_date: '',
   }).toString();
+  trackViewerStatsSoopRequest(url);
   let response;
   try {
     response = await fetch(url, {
@@ -1341,12 +1560,13 @@ async function fetchSoopVodPage(soopId, page, keyword = '', pageSize = SOOP_VOD_
     throw new HttpsError('unavailable', 'SOOP 다시보기 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
   }
   if (!response.ok) {
+    await viewerStatsSoopResponseText(response);
     console.error(`SOOP VOD API returned HTTP ${response.status} for page ${page}`);
     throw new HttpsError('unavailable', 'SOOP 다시보기 서버가 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
   }
   let payload;
   try {
-    payload = await response.json();
+    payload = JSON.parse(await viewerStatsSoopResponseText(response));
   } catch (_) {
     throw new HttpsError('unavailable', 'SOOP 다시보기 응답을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.');
   }
@@ -1357,6 +1577,8 @@ async function fetchSoopVodPage(soopId, page, keyword = '', pageSize = SOOP_VOD_
 }
 
 async function postSoopVodStar2Stats(values, titleNo) {
+  const requestBody = new URLSearchParams(values).toString();
+  trackViewerStatsSoopRequest(SOOP_VOD_STAR2_STATS_API, requestBody);
   let response;
   try {
     response = await fetch(SOOP_VOD_STAR2_STATS_API, {
@@ -1368,7 +1590,7 @@ async function postSoopVodStar2Stats(values, titleNo) {
         referer: 'https://vod.sooplive.com/player/' + encodeURIComponent(titleNo),
         'user-agent': 'Mozilla/5.0',
       },
-      body: new URLSearchParams(values),
+      body: requestBody,
       signal: AbortSignal.timeout(15000),
     });
   } catch (error) {
@@ -1376,12 +1598,13 @@ async function postSoopVodStar2Stats(values, titleNo) {
     throw new HttpsError('unavailable', 'SOOP 방송 별별통계를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
   }
   if (!response.ok) {
+    await viewerStatsSoopResponseText(response);
     console.error('SOOP VOD viewer statistics returned HTTP ' + response.status);
     throw new HttpsError('unavailable', 'SOOP 방송 별별통계 서버가 요청을 처리하지 못했습니다.');
   }
   let payload;
   try {
-    payload = JSON.parse(await response.text());
+    payload = JSON.parse(await viewerStatsSoopResponseText(response));
   } catch (_) {
     throw new HttpsError('unavailable', 'SOOP 방송 별별통계 응답을 읽지 못했습니다.');
   }
@@ -1389,6 +1612,8 @@ async function postSoopVodStar2Stats(values, titleNo) {
 }
 
 async function fetchSoopVodViewerCountStats(soopId, titleNo) {
+  const requestBody = new URLSearchParams({ nTitleNo: titleNo, nApiLevel: '11', nPlaylistIdx: '0' }).toString();
+  trackViewerStatsSoopRequest(SOOP_VOD_INFO_API, requestBody);
   let response;
   try {
     response = await fetch(SOOP_VOD_INFO_API, {
@@ -1400,7 +1625,7 @@ async function fetchSoopVodViewerCountStats(soopId, titleNo) {
         referer: 'https://vod.sooplive.com/player/' + encodeURIComponent(titleNo),
         'user-agent': 'Mozilla/5.0',
       },
-      body: new URLSearchParams({ nTitleNo: titleNo, nApiLevel: '11', nPlaylistIdx: '0' }),
+      body: requestBody,
       signal: AbortSignal.timeout(15000),
     });
   } catch (error) {
@@ -1408,11 +1633,12 @@ async function fetchSoopVodViewerCountStats(soopId, titleNo) {
     throw new HttpsError('unavailable', 'SOOP 다시보기 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
   }
   if (!response.ok) {
+    await viewerStatsSoopResponseText(response);
     throw new HttpsError('unavailable', 'SOOP 다시보기 정보 서버가 요청을 처리하지 못했습니다.');
   }
   let infoPayload;
   try {
-    infoPayload = JSON.parse(await response.text());
+    infoPayload = JSON.parse(await viewerStatsSoopResponseText(response));
   } catch (_) {
     throw new HttpsError('unavailable', 'SOOP 다시보기 정보 응답을 읽지 못했습니다.');
   }
@@ -1553,7 +1779,7 @@ function viewerStatsPersistentCacheRef(streamerId, vodId) {
   if (!SOOP_ID_PATTERN.test(normalizedStreamerId) || !/^\d{1,20}$/.test(normalizedVodId)) {
     throw new HttpsError('invalid-argument', '시청 통계 캐시 요청을 확인해 주세요.');
   }
-  return db.ref(`${VIEWER_STATS_PERSISTENT_CACHE_PATH}/${normalizedStreamerId}/${normalizedVodId}`);
+  return viewerStatsRef(`${VIEWER_STATS_PERSISTENT_CACHE_PATH}/${normalizedStreamerId}/${normalizedVodId}`);
 }
 
 function reusableViewerStatsFromCache(record, streamerId, vodId) {
@@ -1684,7 +1910,7 @@ function viewerPeriodCacheRef(streamerId) {
   if (!SOOP_ID_PATTERN.test(normalizedStreamerId)) {
     throw new HttpsError('invalid-argument', '기간별 시청 통계 요청을 확인해 주세요.');
   }
-  return db.ref(`${VIEWER_PERIOD_CACHE_PATH}/${normalizedStreamerId}`);
+  return viewerStatsRef(`${VIEWER_PERIOD_CACHE_PATH}/${normalizedStreamerId}`);
 }
 
 function viewerPeriodLockRef(streamerId) {
@@ -1692,7 +1918,7 @@ function viewerPeriodLockRef(streamerId) {
   if (!SOOP_ID_PATTERN.test(normalizedStreamerId)) {
     throw new HttpsError('invalid-argument', '기간별 시청 통계 요청을 확인해 주세요.');
   }
-  return db.ref(`${VIEWER_PERIOD_LOCK_PATH}/${normalizedStreamerId}`);
+  return viewerStatsRef(`${VIEWER_PERIOD_LOCK_PATH}/${normalizedStreamerId}`);
 }
 
 function viewerPeriodTimestamp(value) {
@@ -1968,7 +2194,7 @@ async function getViewerPeriodPeaks(streamerId, buildOnMiss = false, forceRefres
 }
 
 async function readOldestViewerStatsCandidateForTier(tier, now = Date.now()) {
-  const queueRoot = db.ref(`${VIEWER_STATS_QUEUE_PATH}/${tier}`);
+  const queueRoot = viewerStatsRef(`${VIEWER_STATS_QUEUE_PATH}/${tier}`);
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const snapshot = await queueRoot.orderByKey().limitToFirst(1).get();
     if (!snapshot.exists()) return null;
@@ -2161,7 +2387,11 @@ exports.streamerFanPageViewerStatsWorker = onTaskDispatched({
     maxBackoffSeconds: 60,
     maxDoublings: 3,
   },
-}, async (request) => {
+}, async (request) => runViewerStatsTelemetry({
+  uidKey: 'worker',
+  action: 'worker',
+  source: 'worker',
+}, async () => {
   const wakeJobId = String(request.data && request.data.wakeJobId || '');
   viewerStatsJobRef(wakeJobId);
   const taskId = String(request.id || '');
@@ -2187,7 +2417,7 @@ exports.streamerFanPageViewerStatsWorker = onTaskDispatched({
   if (!claimed) return;
   await processViewerStatsJob(claimed);
   await viewerStatsWorkerClaimRef(taskId).remove();
-});
+}));
 
 async function getViewerStatsJobResult(uid, jobId) {
   const jobRef = viewerStatsJobRef(jobId);
@@ -3680,7 +3910,7 @@ exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => 
   const includeAll = data.includeAll === true && query.length === 0;
   if (query.length > 40) throw new HttpsError('invalid-argument', '검색어가 너무 깁니다.');
   if (query.length < 1 && !includeAll) return { streamers: [] };
-  const snap = await db.ref('streamerVerifications').get();
+  const snap = await viewerStatsRef('streamerVerifications').get();
   const byId = new Map();
   Object.entries(snap.val() || {}).forEach(([key, record]) => {
     const streamer = publicStreamer(key, record);
@@ -3698,6 +3928,11 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
   const uid = requireAuth(request);
   const data = request.data || {};
   const action = String(data.action || '');
+  return runViewerStatsTelemetry({
+    uidKey: viewerStatsUidKey(uid),
+    action,
+    requestData: data,
+  }, async () => {
 
   if (action === 'search') {
     const query = String(data.query || '').trim().toLocaleLowerCase();
@@ -3707,8 +3942,8 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     const tier = await resolveViewerStatsTier(uid, request.auth);
     await enforceViewerStatsRateLimit(uid, action, { tier });
     const [verifiedSnapshot, namesSnapshot, soopResults] = await Promise.all([
-      db.ref('streamerVerifications').get(),
-      db.ref('streamerNames').get(),
+      viewerStatsRef('streamerVerifications').get(),
+      viewerStatsRef('streamerNames').get(),
       searchSoopStreamers(query, { sortByFavorites }),
     ]);
     const byId = new Map();
@@ -3786,7 +4021,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
 
   if (action === 'periodPeaks') {
     const [subscriptionSnapshot, admin, baseTier] = await Promise.all([
-      db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+      viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
       isAdminUid(uid),
       resolveViewerStatsBaseTier(uid, request.auth),
     ]);
@@ -3844,7 +4079,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     if (!/^\d{1,20}$/.test(vodId)) throw new HttpsError('invalid-argument', '다시보기 번호를 확인해 주세요.');
     const includePremiumMetrics = data.includePremiumMetrics === true;
     const [subscriptionSnapshot, admin, baseTier] = await Promise.all([
-      db.ref(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+      viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
       isAdminUid(uid),
       resolveViewerStatsBaseTier(uid, request.auth),
     ]);
@@ -3876,6 +4111,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
   }
 
   throw new HttpsError('invalid-argument', '시청 통계 요청을 확인해 주세요.');
+  });
 });
 
 exports.streamerFanPageViewerStatsJobCleanup = onSchedule({
@@ -3960,6 +4196,8 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     || a.nickname.localeCompare(b.nickname, 'ko'));
 
   const viewerUsageByDate = {};
+  const viewerDataUsageByDate = {};
+  const viewerDataUsageByAction = {};
   const searchedStreamerCounts = {};
   const viewerTierUsage = Object.fromEntries(['anonymous', 'account', 'subscriber', 'admin']
     .map((tier) => [tier, { search: 0, vods: 0, stats: 0, total: 0 }]));
@@ -3994,6 +4232,22 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
         if (!SOOP_ID_PATTERN.test(streamerId)) return;
         searchedStreamerCounts[streamerId] = (searchedStreamerCounts[streamerId] || 0) + metricCount(count);
       });
+      const dataMetrics = actions.dataMetrics && typeof actions.dataMetrics === 'object'
+        ? actions.dataMetrics
+        : null;
+      if (dataMetrics) {
+        const dailyMetrics = viewerDataUsageByDate[date] || (viewerDataUsageByDate[date] = emptyViewerStatsDataMetrics());
+        addViewerStatsDataMetrics(dailyMetrics, dataMetrics);
+      }
+      const dataByAction = actions.dataByAction && typeof actions.dataByAction === 'object'
+        ? actions.dataByAction
+        : {};
+      Object.entries(dataByAction).forEach(([action, metrics]) => {
+        if (!metrics || typeof metrics !== 'object') return;
+        const actionMetrics = viewerDataUsageByAction[action]
+          || (viewerDataUsageByAction[action] = emptyViewerStatsDataMetrics());
+        addViewerStatsDataMetrics(actionMetrics, metrics);
+      });
     });
   });
   const viewerUsageDaily = dateKeys.map((date) => {
@@ -4011,6 +4265,16 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
     vods: totals.vods + day.vods,
     stats: totals.stats + day.stats,
   }), { search: 0, vods: 0, stats: 0 });
+  const viewerDataUsageDaily = dateKeys.map((date) => ({
+    date,
+    dataMetrics: viewerDataUsageByDate[date] || null,
+  }));
+  const viewerDataUsageLast7 = sumViewerStatsDailyDataMetrics(viewerDataUsageDaily.slice(-7));
+  const viewerDataUsageLast30 = sumViewerStatsDailyDataMetrics(viewerDataUsageDaily);
+  const viewerDataUsageToday = viewerDataUsageDaily.at(-1)?.dataMetrics || emptyViewerStatsDataMetrics();
+  const viewerDataUsageStartedAt = viewerDataUsageDaily.find((day) => day.dataMetrics && day.dataMetrics.calls > 0)?.date || null;
+  const viewerDataUsageActionTotals = Object.fromEntries(Object.entries(viewerDataUsageByAction)
+    .map(([action, metrics]) => [action, metrics]));
   const queuedByTier = Object.fromEntries(['anonymous', 'account', 'subscriber', 'admin']
     .map((tier) => [tier, Object.keys(viewerQueueSnap.val() && viewerQueueSnap.val()[tier] || {}).length]));
   viewerQueueMetrics.queuedNow = Object.values(queuedByTier).reduce((total, count) => total + count, 0);
@@ -4052,6 +4316,19 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
       },
       daily: viewerUsageDaily,
       topSearchedStreamers,
+      dataUsage: {
+        startedAt: viewerDataUsageStartedAt,
+        today: viewerDataUsageToday,
+        last7: viewerDataUsageLast7,
+        last30: viewerDataUsageLast30,
+        daily: viewerDataUsageDaily,
+        byAction30: viewerDataUsageActionTotals,
+        estimatedCostUsd: {
+          today: viewerStatsCostEstimate(viewerDataUsageToday),
+          last7: viewerStatsCostEstimate(viewerDataUsageLast7),
+          last30: viewerStatsCostEstimate(viewerDataUsageLast30),
+        },
+      },
     },
     streamers,
   };

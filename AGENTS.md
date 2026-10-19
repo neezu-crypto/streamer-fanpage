@@ -56,6 +56,12 @@
 - [CodePen — Mugsy Mugs](https://codepen.io/Nathaniel-Caruana/pen/pvNdZwR): 사용자가 선호한 활기찬 쇼핑몰형 디자인 레퍼런스. 크림색 바탕, 대형 히어로 일러스트와 제목, 선명한 핑크·라임·하늘색, 굵은 테두리와 오프셋 그림자, 필터 칩·카드 그리드가 특징이다. 팬페이지에 적용할 때는 대표 이미지·갤러리 필터·버튼 스타일을 참고하고 쇼핑몰 장바구니 표현은 가져오지 않는다. 현재 디자인에는 아직 적용하지 않는다.
 - [CodePen — GLAMOUR V1 [PROFILE CODE]](https://codepen.io/mahricodes/pen/EaNZwYG): 사용자가 검토를 요청한 인물 프로필 레퍼런스. 짙은 바깥 배경과 크림·베이지 프로필 면, 세리프와 손글씨 계열 글꼴, 인용문·음악 컨트롤, MAIN/PERSONA/APPEARANCE/RELATIONS 탭이 특징이다. 팬페이지에는 프로필 소개를 강조하는 별도 테마나 프로필 영역에 적합하며, 탭 이름을 소개·방송 정보·콘텐츠·커뮤니티에 맞추고 작은 본문과 모바일 탭의 가독성을 확인한다. 현재 디자인에는 아직 적용하지 않는다.
 
+### 고점체크 데이터 사용량 계측
+
+- 고점체크 callable·작업자의 요청/응답 payload, SOOP 서버 요청/응답 body, 추적 가능한 고점체크 RTDB 읽기/쓰기 payload 및 실행 시간을 `streamerFanPageViewerStatsLimits/{uidHash}/recentUsageByDay/{YYYY-MM-DD}`에 최근 30일 집계로 기록한다. 검색어와 원본 UID는 저장하지 않는다. 작업자 실행은 `worker` 집계 키를 사용한다.
+- `streamerFanPageAdminStats`만 집계값을 반환하고 사이트 관리자 화면에서 최근 30일 데이터량과 USD 예상 비용을 표시한다. 비용은 RTDB 다운로드와 Cloud Functions 2세대(us-central1, 1 vCPU, 256 MiB) 실행료의 총액 추정이며, 공유 무료 한도·할인·인터넷 송신·Cloud Tasks·RTDB 저장 비용은 제외한다. 브라우저가 SOOP에서 직접 가져오는 목록, GitHub Actions 정적 파일 생성의 RTDB 읽기, GitHub Pages 전송량은 이 집계에 포함하지 않는다. RTDB/외부 API의 payload 크기는 전송 프로토콜 overhead를 포함하지 않는다.
+- 비용 단가를 바꾸면 `VIEWER_STATS_COST_RATES`와 관리자 안내 문구를 함께 수정한다. 가격 기준일과 Google 공식 가격 페이지를 코드 주석/문서에 기록한다. RTDB 규칙은 변경하지 않는다.
+
 ### 완료 전 점검
 
 - 스트리머별 저장 레이아웃이 서로 독립적인지, 새로고침 후에도 유지되는지 확인한다. 설정 미리보기·저장·저장하지 않고 닫기 흐름도 확인한다.
