@@ -121,6 +121,15 @@ body.fanpage-home-kawaii-active .recent-card small,
 body.fanpage-home-kawaii-active .section-note { color: #887d91; }
 body.fanpage-home-kawaii-active .search-empty,
 body.fanpage-home-kawaii-active .empty-state { color: #887d91; }
+body.fanpage-home-kawaii-active .search-empty-guidance {
+  border-color: #eadfeb;
+  border-style: solid;
+  border-radius: 17px;
+  background: linear-gradient(135deg, #fff8fb, #f8f6ff);
+  box-shadow: inset 0 1px 0 #fff;
+}
+body.fanpage-home-kawaii-active .search-empty-guidance-title { color: #51465d; font: 17px var(--display); }
+body.fanpage-home-kawaii-active .search-empty-guidance > p { color: #81758b; }
 body.fanpage-home-kawaii-active .recent-section { max-width: 1020px; margin-top: 50px; }
 body.fanpage-home-kawaii-active .section-heading h2 { color: #51465d; }
 body.fanpage-home-kawaii-active .section-heading .eyebrow { color: #d86f98; }
