@@ -3,7 +3,7 @@
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 const { getFunctions: getAdminFunctions } = require('firebase-admin/functions');
-const { HttpsError, onCall } = require('firebase-functions/v2/https');
+const { HttpsError, onCall, onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onTaskDispatched } = require('firebase-functions/v2/tasks');
 const { defineSecret } = require('firebase-functions/params');
@@ -131,6 +131,7 @@ const VIEWER_STATS_USAGE_ACTIONS = Object.freeze(['search', 'vods', 'stats']);
 const VIEWER_STATS_DATA_METRIC_KEYS = Object.freeze([
   'calls', 'runtimeMs', 'callableCalls', 'callableRuntimeMs', 'workerCalls', 'workerRuntimeMs',
   'requestBytes', 'responseBytes', 'rtdbReadBytes', 'rtdbWriteBytes', 'soopRequestBytes', 'soopResponseBytes',
+  'staticExportRuns', 'staticExportReadBytes',
 ]);
 // USD list rates checked 2026-10-20: RTDB $1/GB downloaded; Cloud Run us-central1 active CPU,
 // memory, and request rates. Shared free tiers, discounts, egress, Cloud Tasks, and storage are excluded.
@@ -232,6 +233,7 @@ async function recordViewerStatsTelemetry(telemetry) {
   const metricKeys = [
     'calls', 'runtimeMs', 'callableCalls', 'callableRuntimeMs', 'workerCalls', 'workerRuntimeMs',
     'requestBytes', 'responseBytes', 'rtdbReadBytes', 'rtdbWriteBytes', 'soopRequestBytes', 'soopResponseBytes',
+    'staticExportRuns', 'staticExportReadBytes',
   ];
   const runtimeMs = Math.ceil(Math.max(0, Number(telemetry.runtimeMs) || 0) / 100) * 100;
   const isWorker = telemetry.source === 'worker';
@@ -248,6 +250,8 @@ async function recordViewerStatsTelemetry(telemetry) {
     rtdbWriteBytes: Math.max(0, Number(telemetry.rtdbWriteBytes) || 0),
     soopRequestBytes: Math.max(0, Number(telemetry.soopRequestBytes) || 0),
     soopResponseBytes: Math.max(0, Number(telemetry.soopResponseBytes) || 0),
+    staticExportRuns: telemetry.action === 'staticExport' ? 1 : 0,
+    staticExportReadBytes: Math.max(0, Number(telemetry.staticExportReadBytes) || 0),
   };
   const reference = db.ref('streamerFanPageViewerStatsLimits/' + telemetry.uidKey + '/recentUsageByDay/' + dateKey);
   await reference.transaction((current) => {
@@ -283,19 +287,26 @@ async function recordViewerStatsTelemetry(telemetry) {
   });
 }
 
-async function runViewerStatsTelemetry({ uidKey, action, source = 'callable', requestData }, operation) {
+async function runViewerStatsTelemetry({
+  uidKey,
+  action,
+  source = 'callable',
+  requestData,
+  staticExportReadBytes = 0,
+}, operation) {
   const telemetry = {
     uidKey,
-    action: ['search', 'vods', 'stats', 'periodPeaks', 'statsResult', 'cancelStatsJob', 'worker'].includes(action)
+    action: ['search', 'vods', 'stats', 'periodPeaks', 'statsResult', 'cancelStatsJob', 'worker', 'staticExport'].includes(action)
       ? action
       : 'other',
     source,
     requestBytes: source === 'worker' ? 0 : viewerStatsJsonBytes(requestData),
     responseBytes: 0,
-    rtdbReadBytes: 0,
+    rtdbReadBytes: Math.max(0, Number(staticExportReadBytes) || 0),
     rtdbWriteBytes: 0,
     soopRequestBytes: 0,
     soopResponseBytes: 0,
+    staticExportReadBytes: Math.max(0, Number(staticExportReadBytes) || 0),
   };
   const startedAt = Date.now();
   return viewerStatsTelemetryStorage.run(telemetry, async () => {
@@ -4136,6 +4147,38 @@ exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => 
     return record ? { ...record.streamer, visitedAt: visit.visitedAt } : null;
   }));
   return { streamers: streamers.filter(Boolean) };
+});
+
+exports.streamerFanPageViewerStatsExportUsage = onRequest({
+  region: 'us-central1',
+  memory: '256MiB',
+  maxInstances: 1,
+  invoker: 'private',
+}, async (request, response) => {
+  if (request.method !== 'POST') {
+    return response.set('Allow', 'POST').status(405).json({ error: 'POST 요청만 허용합니다.' });
+  }
+  const report = request.body && typeof request.body === 'object' && !Array.isArray(request.body)
+    ? request.body
+    : {};
+  const rtdbReadBytes = Number(report.rtdbReadBytes);
+  if (!Number.isSafeInteger(rtdbReadBytes) || rtdbReadBytes < 0) {
+    return response.status(400).json({ error: 'RTDB 읽기 payload 크기를 확인해 주세요.' });
+  }
+
+  try {
+    const result = await runViewerStatsTelemetry({
+      uidKey: 'static-export',
+      action: 'staticExport',
+      source: 'export',
+      requestData: report,
+      staticExportReadBytes: rtdbReadBytes,
+    }, async () => ({ recorded: true }));
+    return response.status(200).json(result);
+  } catch (error) {
+    console.error('Could not record static VOD export usage:', error);
+    return response.status(500).json({ error: '정적 파일 생성 사용량을 기록하지 못했습니다.' });
+  }
 });
 
 exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request) => {

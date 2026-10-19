@@ -66,7 +66,7 @@ function buildPublicSnapshots(cache, generatedAt = new Date().toISOString()) {
 async function readPersistentCache() {
   if (process.env.VIEWER_STATS_EXPORT_INPUT) {
     const input = await fs.readFile(process.env.VIEWER_STATS_EXPORT_INPUT, 'utf8');
-    return JSON.parse(input);
+    return { cache: JSON.parse(input), rtdbReadBytes: 0 };
   }
 
   const { applicationDefault } = require('firebase-admin/app');
@@ -75,6 +75,7 @@ async function readPersistentCache() {
   const { access_token: accessToken } = await credential.getAccessToken();
   if (!accessToken) throw new Error('Google Cloud did not return an access token.');
 
+  let rtdbReadBytes = 0;
   async function readRtdbJson(pathname, query = {}) {
     const url = new URL(encodeURI(pathname + '.json'), DATABASE_URL + '/');
     Object.entries(query).forEach(([key, value]) => url.searchParams.set(key, value));
@@ -86,6 +87,7 @@ async function readPersistentCache() {
         signal: controller.signal,
       });
       const body = await response.text();
+      rtdbReadBytes += Buffer.byteLength(body, 'utf8');
       if (!response.ok) {
         throw new Error('RTDB request failed (' + response.status + '): ' + body.slice(0, 500));
       }
@@ -116,7 +118,7 @@ async function readPersistentCache() {
       }
     }
   }));
-  return cache;
+  return { cache, rtdbReadBytes };
 }
 
 async function writeSnapshots(outputDirectory, snapshots) {
@@ -152,13 +154,34 @@ async function writeSnapshots(outputDirectory, snapshots) {
 }
 
 async function main() {
-  const cache = await readPersistentCache();
+  const { cache, rtdbReadBytes } = await readPersistentCache();
   const snapshots = buildPublicSnapshots(cache);
   const outputDirectory = process.env.VIEWER_STATS_EXPORT_DIR
     || path.resolve(__dirname, '..', 'static-data', 'viewer-stats');
   await writeSnapshots(outputDirectory, snapshots);
+  const reportUrl = String(process.env.VIEWER_STATS_USAGE_REPORT_URL || '').trim();
+  const reportToken = String(process.env.VIEWER_STATS_USAGE_REPORT_TOKEN || '').trim();
+  if (reportUrl || reportToken) {
+    if (!reportUrl || !reportToken) {
+      throw new Error('Both VIEWER_STATS_USAGE_REPORT_URL and VIEWER_STATS_USAGE_REPORT_TOKEN are required.');
+    }
+    const response = await fetch(reportUrl, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + reportToken,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ rtdbReadBytes }),
+      signal: AbortSignal.timeout(RTDB_REQUEST_TIMEOUT_MS),
+    });
+    const body = await response.text();
+    if (!response.ok) {
+      throw new Error('Could not report static export usage (' + response.status + '): ' + body.slice(0, 500));
+    }
+  }
   console.log('Exported ' + snapshots.vodCount + ' public VOD summaries for '
-    + snapshots.streamerCount + ' streamers to ' + path.resolve(outputDirectory));
+    + snapshots.streamerCount + ' streamers to ' + path.resolve(outputDirectory)
+    + '; RTDB response payload ' + rtdbReadBytes + ' bytes.');
 }
 
 if (require.main === module) {
