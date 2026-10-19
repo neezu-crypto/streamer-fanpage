@@ -298,8 +298,8 @@
         <p class="viewer-subscription-dialog-intro">구독 권한은 현재 로그인한 개인 계정에 적용되며, 모든 스트리머에 사용할 수 있어요. 남은 기간이 있으면 이어서 연장됩니다.</p>
         <ol class="viewer-subscription-steps">
           <li><strong>1단계 · 후원자 정보</strong> 후원할 SOOP 계정의 닉네임과 방송국 아이디를 입력해 주세요.</li>
-          <li><strong>2단계 · 신청 등록</strong> 먼저 신청을 등록한 뒤 24시간 안에 운영자 방송국에 별풍선 33개를 후원해 주세요.</li>
-          <li><strong>3단계 · 자동 확인</strong> 신청 즉시 24시간 자동 감시가 시작돼요. 입력한 SOOP 아이디와 별풍선 수량이 유일하게 일치하면 완료 알리기 버튼을 누르지 않아도 자동 승인합니다. 여러 신청이 겹치면 관리자가 확인합니다.</li>
+          <li><strong>2단계 · 신청 등록</strong> 자동 확인을 원하면 신청 등록 후 1시간 안에 운영자 방송국에 별풍선 33개를 후원해 주세요.</li>
+          <li><strong>3단계 · 자동 확인</strong> 신청 즉시 1시간 자동 감시가 시작돼요. 입력한 SOOP 아이디와 별풍선 수량이 유일하게 일치하면 완료 알리기 버튼을 누르지 않아도 자동 승인합니다. 확인되지 않은 신청은 자동 취소되지 않고 관리자 확인 대기 상태로 남아요.</li>
         </ol>
         <label for="viewerSubscriptionNickname">후원자 SOOP 닉네임</label>
         <input id="viewerSubscriptionNickname" name="nickname" maxlength="20" autocomplete="off" placeholder="별풍선을 보낸 닉네임" required>
@@ -307,7 +307,7 @@
         <input id="viewerSubscriptionSoopId" name="donorSoopId" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" pattern="[A-Za-z0-9]{2,20}" title="SOOP 방송국 주소의 아이디를 입력해 주세요." placeholder="SOOP 방송국 주소의 아이디" required>
       </div>
       <div class="viewer-subscription-donation-step hidden" id="viewerSubscriptionDonationStep">
-        <p id="viewerSubscriptionDonationHelp">신청 후 24시간 동안 자동 감시해요. 신청에 입력한 SOOP 계정으로 별풍선 33개를 후원해 주세요. 후원 완료 알리기는 선택입니다.</p>
+        <p id="viewerSubscriptionDonationHelp">신청 후 1시간 동안 자동 감시해요. 신청에 입력한 SOOP 계정으로 별풍선 33개를 후원해 주세요. 후원 완료 알리기는 선택입니다.</p>
         <a class="button button-primary" id="viewerSubscriptionDonationLink" href="https://st.sooplive.com/app/gift_starballoon.php?szBjId=skftodwocks2&amp;szWork=BJ_STATION&amp;sys_type=web&amp;location=station" target="_blank" rel="noopener noreferrer">운영자 방송국에 33개 후원 ↗</a>
         <button class="button" id="viewerSubscriptionDonationComplete" type="button">후원 완료 알리기 (선택)</button>
       </div>
