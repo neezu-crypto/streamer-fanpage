@@ -1062,7 +1062,7 @@ body.fanpage-bottom-banner-active{min-height:0}
 .competition-history-form-footer{align-items:center;margin-top:0}
 .competition-history-form-footer small{color:#928a9a;font-size:10px}
 @media(min-width:561px){
-  .competition-history-dialog{position:fixed;inset:50% auto auto 50%;width:min(620px,calc(100vw - 40px));height:fit-content;max-height:calc(100vh - 40px);max-height:min(760px,calc(100dvh - 40px));margin:0;transform:translate(-50%,-50%)}
+  .competition-history-dialog{width:min(620px,calc(100vw - 40px));max-height:calc(100vh - 40px);max-height:min(760px,calc(100dvh - 40px))}
 }
 @media(max-width:560px){
   .competition-history-heading{align-items:flex-start;flex-direction:column;gap:11px}
