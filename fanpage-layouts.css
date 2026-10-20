@@ -370,6 +370,18 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 .competition-history-description { color: #6f6479; }
 #fanPageView.fanpage-layout-1 .competition-history-link { color: var(--kawaii-accent-deep); }
 #fanPageView.fanpage-layout-1 .competition-history-empty { border-color: #e8deea; background: #fff9fc; color: #81758b; }
+#fanPageView.fanpage-layout-1 .rolling-paper-subtitle,
+#fanPageView.fanpage-layout-1 .rolling-paper-count,
+#fanPageView.fanpage-layout-1 .rolling-paper-note,
+#fanPageView.fanpage-layout-1 .rolling-paper-status { color: #81758b; }
+#fanPageView.fanpage-layout-1 .rolling-paper-entry { border-color: #eadfeb; border-radius: 16px; background: linear-gradient(130deg, #fffafd, #fff 75%); box-shadow: 0 3px 0 #eee2ee; }
+#fanPageView.fanpage-layout-1 .rolling-paper-entry-author { color: #c26083; }
+#fanPageView.fanpage-layout-1 .rolling-paper-entry-date { color: #92869a; }
+#fanPageView.fanpage-layout-1 .rolling-paper-entry-content { color: #6f6479; }
+#fanPageView.fanpage-layout-1 .rolling-paper-empty { border-color: #e8deea; background: #fff9fc; color: #81758b; }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .rolling-paper-entry { border-color: #dbe4f8; background: linear-gradient(130deg, #f8faff, #fff 75%); box-shadow: 0 3px 0 #dce5f4; }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .rolling-paper-entry-author { color: #5376be; }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .rolling-paper-empty { border-color: #dbe4f8; background: #f8faff; color: #536f9a; }
 #fanPageView.fanpage-layout-1 .competition-history-form-grid .profile-editor-field input[type="month"] { color-scheme: light; }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-history-dialog .competition-history-form-grid input[type="month"] { color-scheme: light; }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-history-dialog .competition-history-form-status.is-error { color: #a74d6b !important; }
@@ -1334,7 +1346,7 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-heading>p:last-child{color:#81758b}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);gap:20px}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.content-card,.live-section,.messenger-link-section,.fan-character-ogq-pair){min-width:0;margin:0}
-#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section){grid-column:1/-1}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section,.rolling-paper-section){grid-column:1/-1}
 #fanPageView.fanpage-layout-1 .fanpage-tab-columns{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);align-items:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column{display:grid;align-content:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column>*{min-width:0;margin:0}
@@ -1356,8 +1368,9 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
   #fanPageView.fanpage-layout-1 .fanpage-activity-columns .roulette-section{order:3}
   #fanPageView.fanpage-layout-1 .fanpage-activity-columns .messenger-link-section{order:4}
   #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=activity] .fan-character-ogq-pair{order:1}
-  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=activity] .ogq-section{order:6}
   #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=activity] .fan-gallery-section{order:5}
+  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=activity] .rolling-paper-section{order:6}
+  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=activity] .ogq-section{order:7}
   #fanPageView.fanpage-layout-1 .fanpage-content-columns .youtube-section{order:1}
   #fanPageView.fanpage-layout-1 .fanpage-content-columns .songbook-section{order:2}
   #fanPageView.fanpage-layout-1 .fanpage-content-columns .played-games-section{order:3}
