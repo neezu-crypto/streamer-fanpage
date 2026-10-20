@@ -2493,13 +2493,27 @@ function formatCompetitionHistoryDate(value) {
   return match ? `${Number(match[1])}년 ${Number(match[2])}월` : '';
 }
 
-function renderRollingPaperSection(page) {
-  const streamerId = page.streamer.id;
+function rollingPaperStateFor(streamerId) {
   let state = rollingPaperStates.get(streamerId);
   if (!state) {
-    state = { items: [], count: 0, canDelete: false, loading: false, loaded: false, submitting: false, error: '' };
+    state = {
+      topics: [], topicsLoaded: false, topicsLoading: false, topicError: '', showTopicForm: false, creatingTopic: false,
+      activeTopicId: '', entriesByTopic: new Map(), loadedTopicIds: new Set(), loadingTopicId: '',
+      entryError: '', canDelete: false, canManageTopics: false, submitting: false,
+      galleryItems: null, galleryLoading: false, galleryError: '', galleryOpen: false, galleryHasMore: false,
+      galleryNextOffset: 0, galleryTotalCount: 0, selectedGalleryImage: null,
+    };
     rollingPaperStates.set(streamerId, state);
   }
+  return state;
+}
+
+function renderRollingPaperSection(page) {
+  const streamerId = page.streamer.id;
+  const state = rollingPaperStateFor(streamerId);
+  const activeTopic = state.topics.find((topic) => topic.id === state.activeTopicId);
+  const entries = state.entriesByTopic.get(state.activeTopicId) || [];
+  const totalCount = state.topics.reduce((sum, topic) => sum + (Number(topic.count) || 0), 0);
 
   const section = document.createElement('section');
   section.className = 'rolling-paper-section content-card';
@@ -2508,146 +2522,342 @@ function renderRollingPaperSection(page) {
   const heading = document.createElement('div'); heading.className = 'rolling-paper-heading';
   const headingCopy = document.createElement('div');
   const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'ROLLING PAPER';
-  const title = document.createElement('h2'); title.textContent = '롤링페이퍼';
+  const title = document.createElement('h2'); title.textContent = activeTopic?.title || '롤링페이퍼';
   const subtitle = document.createElement('p'); subtitle.className = 'rolling-paper-subtitle';
-  subtitle.textContent = '익명으로 마음을 전해 보세요.';
+  subtitle.textContent = activeTopic ? '익명으로 마음을 전해 보세요.' : '주제를 골라 익명으로 마음을 전해 보세요.';
   headingCopy.append(eyebrow, title, subtitle);
   const actions = document.createElement('div'); actions.className = 'rolling-paper-heading-actions';
   const count = document.createElement('span'); count.className = 'rolling-paper-count';
-  count.textContent = `${Number(state.count || 0).toLocaleString('ko-KR')}개`;
+  count.textContent = `${(activeTopic ? Number(activeTopic.count) || 0 : totalCount).toLocaleString('ko-KR')}개`;
+  if (!activeTopic && page.isOwner) {
+    const addTopic = document.createElement('button'); addTopic.type = 'button';
+    addTopic.className = 'button button-primary rolling-paper-topic-add'; addTopic.textContent = '+ 주제 추가';
+    addTopic.addEventListener('click', () => {
+      state.showTopicForm = !state.showTopicForm;
+      refreshRollingPaperSection(streamerId);
+      if (state.showTopicForm) requestAnimationFrame(() => $('rollingPaperTopicTitle')?.focus());
+    });
+    actions.append(addTopic);
+  }
   const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'button rolling-paper-refresh';
-  refresh.textContent = state.loading ? '불러오는 중…' : '↻ 새로고침';
-  refresh.disabled = state.loading;
-  refresh.addEventListener('click', () => loadRollingPaper(streamerId, true));
+  const loading = activeTopic ? state.loadingTopicId === activeTopic.id : state.topicsLoading;
+  refresh.textContent = loading ? '불러오는 중…' : '↻ 새로고침';
+  refresh.disabled = loading;
+  refresh.addEventListener('click', () => activeTopic
+    ? loadRollingPaperEntries(page, activeTopic.id, true)
+    : loadRollingPaperTopics(page, true));
   actions.append(count, refresh);
   heading.append(headingCopy, actions);
   section.append(heading);
 
+  if (!activeTopic) {
+    if (state.showTopicForm && page.isOwner) {
+      const topicForm = document.createElement('form'); topicForm.className = 'rolling-paper-topic-form';
+      const topicTitle = document.createElement('input'); topicTitle.id = 'rollingPaperTopicTitle'; topicTitle.name = 'title';
+      topicTitle.type = 'text'; topicTitle.maxLength = 32; topicTitle.required = true;
+      topicTitle.placeholder = '예: 100일 롤링페이퍼, 생일 축하'; topicTitle.setAttribute('aria-label', '새 롤링페이퍼 주제');
+      topicTitle.disabled = state.creatingTopic;
+      const topicSubmit = document.createElement('button'); topicSubmit.type = 'submit';
+      topicSubmit.className = 'button button-primary'; topicSubmit.textContent = state.creatingTopic ? '만드는 중…' : '주제 페이지 만들기';
+      topicSubmit.disabled = state.creatingTopic;
+      topicForm.append(topicTitle, topicSubmit);
+      topicForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (topicForm.reportValidity() && !topicSubmit.disabled) createRollingPaperTopic(page, topicTitle, topicSubmit);
+      });
+      section.append(topicForm);
+    }
+    const status = document.createElement('p'); status.className = 'rolling-paper-status';
+    status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    if (state.topicsLoading) status.textContent = '롤링페이퍼 주제를 불러오고 있어요.';
+    else if (state.topicError) { status.textContent = state.topicError; status.classList.add('is-error'); }
+    if (state.topicsLoading || state.topicError) section.append(status);
+    const grid = document.createElement('div'); grid.className = 'rolling-paper-topic-grid';
+    if (!state.topicsLoading && !state.topicError && !state.topics.length) {
+      const empty = document.createElement('p'); empty.className = 'rolling-paper-empty';
+      empty.textContent = '아직 주제가 없어요.'; grid.append(empty);
+    }
+    state.topics.forEach((topic, index) => {
+      const card = document.createElement('button'); card.type = 'button'; card.className = 'rolling-paper-topic-card';
+      card.setAttribute('aria-label', `${topic.title}, 메시지 ${Number(topic.count || 0)}개`);
+      const decoration = document.createElement('span'); decoration.className = 'rolling-paper-topic-decoration';
+      decoration.setAttribute('aria-hidden', 'true'); decoration.textContent = ['✦', '♡', '✿'][index % 3];
+      const topicTitle = document.createElement('strong'); topicTitle.className = 'rolling-paper-topic-title'; topicTitle.textContent = topic.title;
+      const topicCount = document.createElement('span'); topicCount.className = 'rolling-paper-topic-count';
+      topicCount.textContent = `메시지 ${Number(topic.count || 0).toLocaleString('ko-KR')}개`;
+      card.append(decoration, topicTitle, topicCount);
+      card.addEventListener('click', () => {
+        state.activeTopicId = topic.id;
+        state.entryError = '';
+        state.selectedGalleryImage = null;
+        refreshRollingPaperSection(streamerId);
+        void loadRollingPaperEntries(page, topic.id);
+      });
+      grid.append(card);
+    });
+    section.append(grid);
+    if (!state.topicsLoaded && !state.topicsLoading) void loadRollingPaperTopics(page);
+    return section;
+  }
+
+  const back = document.createElement('button'); back.type = 'button'; back.className = 'button rolling-paper-back';
+  back.textContent = '← 주제 목록'; back.addEventListener('click', () => {
+    state.activeTopicId = '';
+    state.entryError = '';
+    refreshRollingPaperSection(streamerId);
+  });
+  section.insertBefore(back, heading);
+
   const form = document.createElement('form'); form.className = 'rolling-paper-form';
+  const galleryActions = document.createElement('div'); galleryActions.className = 'rolling-paper-image-actions';
+  const chooseImage = document.createElement('button'); chooseImage.type = 'button';
+  chooseImage.className = 'button rolling-paper-image-picker-toggle';
+  chooseImage.textContent = state.galleryOpen ? '갤러리 닫기' : '▧ 갤러리 이미지 넣기';
+  chooseImage.disabled = state.submitting;
+  chooseImage.addEventListener('click', () => {
+    state.galleryOpen = !state.galleryOpen;
+    refreshRollingPaperSection(streamerId);
+    if (state.galleryOpen && !state.galleryItems && !state.galleryLoading) void loadRollingPaperGallery(page);
+  });
+  galleryActions.append(chooseImage);
+  if (state.selectedGalleryImage) {
+    const selected = document.createElement('div'); selected.className = 'rolling-paper-selected-image';
+    const preview = document.createElement('img'); preview.src = state.selectedGalleryImage.thumbUrl; preview.alt = '선택한 갤러리 이미지';
+    const selectedLabel = document.createElement('span'); selectedLabel.textContent = '이미지를 메시지에 함께 올려요.';
+    const clear = document.createElement('button'); clear.type = 'button'; clear.className = 'button'; clear.textContent = '제거';
+    clear.addEventListener('click', () => { state.selectedGalleryImage = null; refreshRollingPaperSection(streamerId); });
+    selected.append(preview, selectedLabel, clear); galleryActions.append(selected);
+  }
+  form.append(galleryActions);
+
+  if (state.galleryOpen) {
+    const picker = document.createElement('div'); picker.className = 'rolling-paper-gallery-picker';
+    if (state.galleryLoading && !state.galleryItems?.length) {
+      const pickerStatus = document.createElement('p'); pickerStatus.className = 'rolling-paper-status';
+      pickerStatus.textContent = '갤러리 이미지를 불러오고 있어요.'; picker.append(pickerStatus);
+    }
+    if (state.galleryError) {
+      const pickerError = document.createElement('p'); pickerError.className = 'rolling-paper-status is-error'; pickerError.textContent = state.galleryError;
+      const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button'; retry.textContent = '다시 불러오기';
+      retry.addEventListener('click', () => loadRollingPaperGallery(page, !!state.galleryItems?.length)); picker.append(pickerError, retry);
+    } else if (!state.galleryItems?.length && !state.galleryLoading) {
+      const emptyGallery = document.createElement('p'); emptyGallery.className = 'rolling-paper-status';
+      emptyGallery.textContent = '선택할 수 있는 공개 갤러리 이미지가 없어요.'; picker.append(emptyGallery);
+    }
+    if (state.galleryItems?.length) {
+      const galleryGrid = document.createElement('div'); galleryGrid.className = 'rolling-paper-gallery-grid';
+      state.galleryItems.forEach((image) => {
+        const imageButton = document.createElement('button'); imageButton.type = 'button'; imageButton.className = 'rolling-paper-gallery-image';
+        const isSelected = state.selectedGalleryImage?.id === image.id;
+        imageButton.classList.toggle('is-selected', isSelected); imageButton.setAttribute('aria-pressed', String(isSelected));
+        imageButton.setAttribute('aria-label', `${image.categoryLabel || '갤러리'} 이미지 선택`);
+        const thumbnail = document.createElement('img'); thumbnail.src = image.thumbUrl; thumbnail.alt = ''; thumbnail.loading = 'lazy';
+        imageButton.append(thumbnail);
+        imageButton.addEventListener('click', () => {
+          state.selectedGalleryImage = { id: image.id, thumbUrl: image.thumbUrl };
+          refreshRollingPaperSection(streamerId);
+        });
+        galleryGrid.append(imageButton);
+      });
+      picker.append(galleryGrid);
+    }
+    if (state.galleryHasMore && !state.galleryError) {
+      const more = document.createElement('button'); more.type = 'button'; more.className = 'button rolling-paper-gallery-more';
+      const remaining = Math.max(0, state.galleryTotalCount - (state.galleryItems?.length || 0));
+      more.textContent = state.galleryLoading ? '불러오는 중…' : `갤러리 이미지 더 보기 (${remaining.toLocaleString('ko-KR')}개 남음)`;
+      more.disabled = state.galleryLoading;
+      more.addEventListener('click', () => loadRollingPaperGallery(page, true)); picker.append(more);
+    }
+    form.append(picker);
+  }
+
   const textarea = document.createElement('textarea'); textarea.name = 'message'; textarea.maxLength = 300;
-  textarea.required = true; textarea.rows = 3;
-  textarea.setAttribute('aria-label', '익명 롤링페이퍼 메시지');
-  textarea.placeholder = '응원이나 전하고 싶은 마음을 적어 주세요.';
+  textarea.rows = 3; textarea.setAttribute('aria-label', '익명 롤링페이퍼 메시지');
+  textarea.placeholder = state.selectedGalleryImage ? '이미지와 함께 전할 말을 적어 주세요. (선택)' : '응원이나 전하고 싶은 마음을 적어 주세요.';
   textarea.disabled = state.submitting;
   const formFooter = document.createElement('div'); formFooter.className = 'rolling-paper-form-footer';
   const note = document.createElement('small'); note.className = 'rolling-paper-note';
-  note.textContent = '이름과 프로필 없이 익명으로 공개돼요. 하루 최대 5개까지 남길 수 있어요.';
+  note.textContent = '이름과 프로필 없이 익명으로 공개돼요. 글은 최대 300자, 하루 최대 5개까지 남길 수 있어요.';
   const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
   submit.textContent = state.submitting ? '등록 중…' : '익명으로 남기기'; submit.disabled = state.submitting;
   formFooter.append(note, submit); form.append(textarea, formFooter);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (form.reportValidity() && !submit.disabled) addRollingPaperEntry(page, textarea, submit);
+    if (!textarea.value.trim() && !state.selectedGalleryImage) {
+      textarea.setCustomValidity('메시지를 적거나 갤러리 이미지를 선택해 주세요.');
+      textarea.reportValidity(); textarea.addEventListener('input', () => textarea.setCustomValidity(''), { once: true });
+      return;
+    }
+    if (!submit.disabled) addRollingPaperEntry(page, textarea, submit);
   });
   section.append(form);
 
   const status = document.createElement('p'); status.className = 'rolling-paper-status';
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-  if (state.loading) status.textContent = '롤링페이퍼를 불러오고 있어요.';
-  else if (state.error) status.textContent = state.error;
-  if (state.error) status.classList.add('is-error');
-  if (state.loading || state.error) section.append(status);
+  if (state.loadingTopicId === activeTopic.id) status.textContent = '롤링페이퍼를 불러오고 있어요.';
+  else if (state.entryError) { status.textContent = state.entryError; status.classList.add('is-error'); }
+  if (state.loadingTopicId === activeTopic.id || state.entryError) section.append(status);
 
   const list = document.createElement('div'); list.className = 'rolling-paper-list';
-  if (!state.loading && !state.error && !state.items.length) {
+  if (state.loadingTopicId !== activeTopic.id && !state.entryError && !entries.length) {
     const empty = document.createElement('p'); empty.className = 'rolling-paper-empty';
-    empty.textContent = '아직 메시지가 없어요. 첫 번째로 마음을 남겨 보세요.';
-    list.append(empty);
-  } else if (!state.loading && state.items.length) {
-    state.items.forEach((entry) => {
+    empty.textContent = '아직 메시지가 없어요. 첫 번째로 마음을 남겨 보세요.'; list.append(empty);
+  } else if (state.loadingTopicId !== activeTopic.id && entries.length) {
+    entries.forEach((entry) => {
       const item = document.createElement('article'); item.className = 'rolling-paper-entry';
       const itemHeading = document.createElement('div'); itemHeading.className = 'rolling-paper-entry-heading';
-      const author = document.createElement('strong'); author.className = 'rolling-paper-entry-author';
-      author.textContent = '✦ 익명';
+      const author = document.createElement('strong'); author.className = 'rolling-paper-entry-author'; author.textContent = '✦ 익명';
       const date = document.createElement('time'); date.className = 'rolling-paper-entry-date';
       date.dateTime = new Date(entry.createdAt).toISOString();
       date.textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }).format(entry.createdAt);
       itemHeading.append(author, date);
       if (state.canDelete) {
-        const remove = document.createElement('button'); remove.type = 'button';
-        remove.className = 'button rolling-paper-delete'; remove.textContent = '삭제';
-        remove.setAttribute('aria-label', '롤링페이퍼 메시지 삭제');
-        remove.addEventListener('click', () => deleteRollingPaperEntry(page, entry, remove));
-        itemHeading.append(remove);
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button rolling-paper-delete';
+        remove.textContent = '삭제'; remove.setAttribute('aria-label', '롤링페이퍼 메시지 삭제');
+        remove.addEventListener('click', () => deleteRollingPaperEntry(page, activeTopic.id, entry, remove)); itemHeading.append(remove);
       }
-      const content = document.createElement('p'); content.className = 'rolling-paper-entry-content';
-      content.textContent = entry.content;
-      item.append(itemHeading, content); list.append(item);
+      if (entry.galleryImage?.url) {
+        const galleryImage = document.createElement('img'); galleryImage.className = 'rolling-paper-entry-image';
+        galleryImage.src = entry.galleryImage.url; galleryImage.alt = '스트리머 갤러리에서 선택한 이미지';
+        galleryImage.loading = 'lazy'; item.append(galleryImage);
+      }
+      item.append(itemHeading);
+      if (entry.content) {
+        const content = document.createElement('p'); content.className = 'rolling-paper-entry-content'; content.textContent = entry.content; item.append(content);
+      }
+      list.append(item);
     });
   }
   section.append(list);
-  if (!state.loaded && !state.loading) void loadRollingPaper(streamerId);
+  if (!state.loadedTopicIds.has(activeTopic.id) && state.loadingTopicId !== activeTopic.id) void loadRollingPaperEntries(page, activeTopic.id);
   return section;
 }
 
-async function loadRollingPaper(streamerId, force = false) {
-  const state = rollingPaperStates.get(streamerId)
-    || { items: [], count: 0, canDelete: false, loading: false, loaded: false, submitting: false, error: '' };
-  if (state.loading || (state.loaded && !force)) return;
-  state.loading = true; state.error = '';
-  rollingPaperStates.set(streamerId, state);
-  refreshRollingPaperSection(streamerId);
-  try {
-    const result = (await callRollingPaper({ action: 'list', streamerId })).data;
-    rollingPaperStates.set(streamerId, {
-      items: Array.isArray(result.items) ? result.items : [],
-      count: Number(result.count) || 0,
-      canDelete: result.canDelete === true,
-      loading: false,
-      loaded: true,
-      submitting: false,
-      error: '',
-    });
-  } catch (error) {
-    rollingPaperStates.set(streamerId, { ...state, loading: false, loaded: true, error: error.message || '롤링페이퍼를 불러오지 못했어요.' });
-  }
-  refreshRollingPaperSection(streamerId);
-}
-
-async function addRollingPaperEntry(page, textarea, button) {
+async function loadRollingPaperTopics(page, force = false) {
   const streamerId = page.streamer.id;
-  const state = rollingPaperStates.get(streamerId);
-  const content = textarea.value.trim();
-  if (!content || !state || state.submitting) return;
-  state.submitting = true; state.error = '';
-  rollingPaperStates.set(streamerId, state);
-  button.disabled = true; button.textContent = '등록 중…'; textarea.disabled = true;
+  const state = rollingPaperStateFor(streamerId);
+  if (state.topicsLoading || (state.topicsLoaded && !force)) return;
+  state.topicsLoading = true; state.topicError = '';
+  refreshRollingPaperSection(streamerId);
   try {
-    const result = (await callRollingPaper({ action: 'add', streamerId, content })).data;
-    rollingPaperStates.set(streamerId, {
-      items: Array.isArray(result.items) ? result.items : [],
-      count: Number(result.count) || 0,
-      canDelete: result.canDelete === true,
-      loading: false,
-      loaded: true,
-      submitting: false,
-      error: '',
-    });
-    textarea.value = '';
-    refreshRollingPaperSection(streamerId);
-    showToast('익명 메시지를 롤링페이퍼에 남겼어요.');
+    const result = (await callRollingPaper({ action: 'list-topics', streamerId })).data;
+    state.topics = Array.isArray(result.topics) ? result.topics : [];
+    state.canDelete = result.canDelete === true;
+    state.canManageTopics = result.canManageTopics === true;
+    state.topicsLoaded = true;
   } catch (error) {
-    state.submitting = false; state.error = error.message || '메시지를 등록하지 못했어요.';
+    state.topicError = error.message || '롤링페이퍼 주제를 불러오지 못했어요.';
+  } finally {
+    state.topicsLoading = false;
     rollingPaperStates.set(streamerId, state);
     refreshRollingPaperSection(streamerId);
   }
 }
 
-async function deleteRollingPaperEntry(page, entry, button) {
-  const state = rollingPaperStates.get(page.streamer.id);
-  if (!state?.canDelete || button.disabled || !window.confirm('이 롤링페이퍼 메시지를 삭제할까요?')) return;
+async function loadRollingPaperEntries(page, topicId, force = false) {
+  const streamerId = page.streamer.id;
+  const state = rollingPaperStateFor(streamerId);
+  if (state.loadingTopicId || (state.loadedTopicIds.has(topicId) && !force)) return;
+  state.loadingTopicId = topicId; state.entryError = '';
+  refreshRollingPaperSection(streamerId);
+  try {
+    const result = (await callRollingPaper({ action: 'list', streamerId, topicId })).data;
+    state.entriesByTopic.set(topicId, Array.isArray(result.items) ? result.items : []);
+    state.loadedTopicIds.add(topicId);
+    state.topics = Array.isArray(result.topics) ? result.topics : state.topics;
+    state.canDelete = result.canDelete === true;
+  } catch (error) {
+    state.entryError = error.message || '롤링페이퍼를 불러오지 못했어요.';
+  } finally {
+    state.loadingTopicId = '';
+    rollingPaperStates.set(streamerId, state);
+    refreshRollingPaperSection(streamerId);
+  }
+}
+
+async function createRollingPaperTopic(page, input, button) {
+  const state = rollingPaperStateFor(page.streamer.id);
+  const title = input.value.replace(/\s+/g, ' ').trim();
+  if (!title || state.creatingTopic) return;
+  state.creatingTopic = true; state.topicError = '';
+  button.disabled = true; button.textContent = '만드는 중…'; input.disabled = true;
+  try {
+    const result = (await callRollingPaper({ action: 'create-topic', streamerId: page.streamer.id, title })).data;
+    state.topics = Array.isArray(result.topics) ? result.topics : state.topics;
+    state.canManageTopics = result.canManageTopics === true;
+    state.canDelete = result.canDelete === true;
+    state.topicsLoaded = true; state.showTopicForm = false; state.creatingTopic = false;
+    if (result.topic?.id) {
+      state.activeTopicId = result.topic.id;
+      state.loadedTopicIds.delete(result.topic.id);
+    }
+    refreshRollingPaperSection(page.streamer.id);
+    if (result.topic?.id) void loadRollingPaperEntries(page, result.topic.id);
+    showToast('새 롤링페이퍼 페이지를 만들었어요.');
+  } catch (error) {
+    state.creatingTopic = false; state.topicError = error.message || '주제를 만들지 못했어요.';
+    refreshRollingPaperSection(page.streamer.id);
+  }
+}
+
+async function loadRollingPaperGallery(page, append = false) {
+  const state = rollingPaperStateFor(page.streamer.id);
+  if (state.galleryLoading) return;
+  state.galleryLoading = true; state.galleryError = '';
+  refreshRollingPaperSection(page.streamer.id);
+  try {
+    const offset = append ? state.galleryNextOffset : 0;
+    const result = (await callGallery({ streamerId: page.streamer.id, view: 'rolling-paper-picker', offset })).data;
+    const nextItems = Array.isArray(result.items) ? result.items.filter((item) => item && item.id && item.thumbUrl) : [];
+    state.galleryItems = append ? [...(state.galleryItems || []), ...nextItems] : nextItems;
+    state.galleryNextOffset = Number(result.nextOffset) || state.galleryItems.length;
+    state.galleryTotalCount = Number(result.totalCount) || state.galleryItems.length;
+    state.galleryHasMore = result.hasMore === true;
+    if (!state.galleryItems.length) state.galleryError = result.linked === false ? '연결된 스트리머 갤러리를 찾지 못했어요.' : '';
+  } catch (error) {
+    state.galleryError = error.message || '갤러리 이미지를 불러오지 못했어요.';
+  } finally {
+    state.galleryLoading = false;
+    refreshRollingPaperSection(page.streamer.id);
+  }
+}
+
+async function addRollingPaperEntry(page, textarea, button) {
+  const streamerId = page.streamer.id;
+  const state = rollingPaperStateFor(streamerId);
+  const topicId = state.activeTopicId;
+  const content = textarea.value.trim();
+  if ((!content && !state.selectedGalleryImage) || state.submitting || !topicId) return;
+  state.submitting = true; state.entryError = '';
+  button.disabled = true; button.textContent = '등록 중…'; textarea.disabled = true;
+  try {
+    const galleryImage = state.selectedGalleryImage
+      ? { id: state.selectedGalleryImage.id, url: state.selectedGalleryImage.thumbUrl }
+      : null;
+    const result = (await callRollingPaper({ action: 'add', streamerId, topicId, content, galleryImage })).data;
+    state.entriesByTopic.set(topicId, Array.isArray(result.items) ? result.items : []);
+    state.loadedTopicIds.add(topicId);
+    state.topics = Array.isArray(result.topics) ? result.topics : state.topics;
+    state.canDelete = result.canDelete === true; state.submitting = false; state.selectedGalleryImage = null;
+    textarea.value = '';
+    refreshRollingPaperSection(streamerId);
+    showToast('익명 메시지를 롤링페이퍼에 남겼어요.');
+  } catch (error) {
+    state.submitting = false; state.entryError = error.message || '메시지를 등록하지 못했어요.';
+    refreshRollingPaperSection(streamerId);
+  }
+}
+
+async function deleteRollingPaperEntry(page, topicId, entry, button) {
+  const state = rollingPaperStateFor(page.streamer.id);
+  if (!state.canDelete || button.disabled || !window.confirm('이 롤링페이퍼 메시지를 삭제할까요?')) return;
   button.disabled = true; button.textContent = '삭제 중…';
   try {
-    const result = (await callRollingPaper({ action: 'delete', streamerId: page.streamer.id, entryId: entry.id })).data;
-    rollingPaperStates.set(page.streamer.id, {
-      items: Array.isArray(result.items) ? result.items : [],
-      count: Number(result.count) || 0,
-      canDelete: result.canDelete === true,
-      loading: false,
-      loaded: true,
-      submitting: false,
-      error: '',
-    });
+    const result = (await callRollingPaper({ action: 'delete', streamerId: page.streamer.id, topicId, entryId: entry.id })).data;
+    state.entriesByTopic.set(topicId, Array.isArray(result.items) ? result.items : []);
+    state.loadedTopicIds.add(topicId);
+    state.topics = Array.isArray(result.topics) ? result.topics : state.topics;
+    state.canDelete = result.canDelete === true;
     refreshRollingPaperSection(page.streamer.id);
     showToast('롤링페이퍼 메시지를 삭제했어요.');
   } catch (error) {
@@ -2660,13 +2870,20 @@ function refreshRollingPaperSection(streamerId) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const section = $('rollingPaperSection');
   if (!section) return;
-  const previousTextarea = section.querySelector('textarea');
-  const keepFocus = document.activeElement === previousTextarea;
+  const previousTextarea = section.querySelector('textarea[name="message"]');
+  const previousTopicInput = section.querySelector('input[name="title"]');
+  const keepTextareaFocus = document.activeElement === previousTextarea;
+  const keepTopicInputFocus = document.activeElement === previousTopicInput;
   const nextSection = renderRollingPaperSection(currentPage);
-  const nextTextarea = nextSection.querySelector('textarea');
+  const nextTextarea = nextSection.querySelector('textarea[name="message"]');
+  const nextTopicInput = nextSection.querySelector('input[name="title"]');
   if (previousTextarea && nextTextarea) {
     nextTextarea.value = previousTextarea.value;
-    if (keepFocus) nextTextarea.focus({ preventScroll: true });
+    if (keepTextareaFocus) nextTextarea.focus({ preventScroll: true });
+  }
+  if (previousTopicInput && nextTopicInput) {
+    nextTopicInput.value = previousTopicInput.value;
+    if (keepTopicInputFocus) nextTopicInput.focus({ preventScroll: true });
   }
   section.replaceWith(nextSection);
 }
@@ -3056,6 +3273,7 @@ function renderFanPage(page, options = {}) {
     { key: 'home', label: '홈', eyebrow: 'YOUR HOME', title: '방송과 최신 소식', description: '방송 상태와 일정, 최근 다시보기를 모아 보여드려요.' },
     { key: 'activity', label: '팬 활동', eyebrow: 'FAN ACTIVITY', title: '팬들과 함께하는 공간', description: '팬 참여와 소통, 함께 만든 추억을 둘러보세요.' },
     { key: 'content', label: '콘텐츠', eyebrow: 'STREAMER CONTENTS', title: '다시보기와 활동 기록', description: '영상, 대회 이력, 플레이한 게임을 모아봤어요.' },
+    { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 익명으로 마음을 남겨 보세요.' },
   ];
   const tabNav = document.createElement('div');
   tabNav.className = 'fanpage-tab-nav';
@@ -3139,14 +3357,15 @@ function renderFanPage(page, options = {}) {
   const tabPanels = new Map([
     ['home', homePanel],
     ['activity', createFanPageTabPanel(tabDefinitions[1], layoutDesign === 1
-      ? [featuredPair, createFanPageColumnStacks('fanpage-activity-columns', [upboSection, messengerSection], [rouletteSection]), gallerySection, rollingPaperSection, fanCharacterCard ? null : ogqSection]
-      : [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, rollingPaperSection, fanCharacterCard ? null : ogqSection])],
+      ? [featuredPair, createFanPageColumnStacks('fanpage-activity-columns', [upboSection, messengerSection], [rouletteSection]), gallerySection, fanCharacterCard ? null : ogqSection]
+      : [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, fanCharacterCard ? null : ogqSection])],
     ['content', createFanPageTabPanel(tabDefinitions[2], layoutDesign === 1
       ? [
         createFanPageColumnStacks('fanpage-content-columns fanpage-content-overview-columns', [youtubeSection], [songbookSection, cafeSection]),
         createFanPageColumnStacks('fanpage-content-columns fanpage-game-history-columns', [playedGamesSection], [competitionHistorySection]),
       ]
       : [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
+    ['rolling-paper', createFanPageTabPanel(tabDefinitions[3], [rollingPaperSection])],
   ]);
   function selectFanPageTab(tabKey, moveFocus = false) {
     if (!tabPanels.has(tabKey)) return;

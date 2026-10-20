@@ -1134,7 +1134,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .competition-history-form-status.is-error{display:block}
 .competition-history-form-footer{align-items:center;margin-top:0}
 .competition-history-form-footer small{color:#928a9a;font-size:10px}
-.rolling-paper-section{margin-top:18px}
+.rolling-paper-section{margin-top:0}
 .rolling-paper-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
 .rolling-paper-heading .eyebrow{margin:0 0 5px;font-size:9px}
 .rolling-paper-heading h2{display:inline-block;margin:0;font:23px var(--display)}
@@ -1142,7 +1142,32 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .rolling-paper-heading-actions{display:flex;align-items:center;gap:10px}
 .rolling-paper-count{color:var(--muted);font-size:11px;white-space:nowrap}
 .rolling-paper-refresh{min-height:34px;padding:0 11px;font-size:10px;white-space:nowrap}
+.rolling-paper-topic-add{min-height:34px;padding:0 11px;font-size:10px;white-space:nowrap}
+.rolling-paper-back{min-height:32px;margin:0 0 12px;padding:0 11px;font-size:10px}
+.rolling-paper-topic-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;margin:0 0 16px}
+.rolling-paper-topic-form input{box-sizing:border-box;width:100%;min-width:0;min-height:42px;padding:10px 12px;border:1px solid #ffffff20;border-radius:12px;background:#111018;color:var(--text);font:12px var(--font);outline:0}
+.rolling-paper-topic-form input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.rolling-paper-topic-form .button{min-height:42px;padding:0 14px;font-size:11px}
+.rolling-paper-topic-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(8px,1.5vw,16px);max-width:980px}
+.rolling-paper-topic-card{position:relative;display:flex;min-width:0;aspect-ratio:1;flex-direction:column;align-items:center;justify-content:center;gap:10px;overflow:hidden;padding:clamp(10px,2vw,22px);border:1px solid #ffffff24;border-radius:clamp(18px,3vw,30px);background:radial-gradient(circle at 80% 15%,#f58cac16,transparent 36%),linear-gradient(145deg,#fff9fc0d,#ffffff04);color:var(--text);text-align:center;cursor:pointer;transition:transform .18s,border-color .18s,box-shadow .18s}
+.rolling-paper-topic-card:hover{transform:translateY(-3px);border-color:#f58cac66;box-shadow:0 9px 24px #0002}
+.rolling-paper-topic-card:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
+.rolling-paper-topic-decoration{display:grid;width:clamp(30px,5vw,48px);aspect-ratio:1;place-items:center;border:1px solid #ffffff20;border-radius:50%;background:#f58cac18;color:#f3a6c0;font-size:clamp(17px,2.5vw,25px)}
+.rolling-paper-topic-title{max-width:100%;font:700 clamp(11px,1.5vw,16px)/1.4 var(--display);overflow-wrap:anywhere}
+.rolling-paper-topic-count{color:#a59aaa;font-size:clamp(9px,1vw,11px)}
 .rolling-paper-form{display:grid;gap:9px;margin-bottom:14px}
+.rolling-paper-image-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.rolling-paper-image-picker-toggle{min-height:34px;padding:0 11px;font-size:10px}
+.rolling-paper-selected-image{display:flex;align-items:center;gap:8px;min-width:0;padding:5px 8px;border:1px solid #ffffff20;border-radius:12px;color:#aaa3b1;font-size:10px}
+.rolling-paper-selected-image img{width:42px;height:42px;border:1px solid #ffffff24;border-radius:9px;object-fit:cover}
+.rolling-paper-selected-image .button{min-height:28px;padding:0 8px;font-size:10px}
+.rolling-paper-gallery-picker{padding:10px;border:1px solid #ffffff18;border-radius:13px;background:#ffffff05}
+.rolling-paper-gallery-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;max-height:320px;overflow:auto}
+.rolling-paper-gallery-image{display:block;min-width:0;aspect-ratio:1;overflow:hidden;padding:0;border:2px solid transparent;border-radius:11px;background:#ffffff0a;cursor:pointer}
+.rolling-paper-gallery-image img{display:block;width:100%;height:100%;object-fit:cover}
+.rolling-paper-gallery-image.is-selected{border-color:#f58cac;box-shadow:0 0 0 2px #f58cac35}
+.rolling-paper-gallery-image:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.rolling-paper-gallery-more{display:block;min-height:34px;margin:10px auto 0;padding:0 13px;font-size:10px}
 .rolling-paper-form textarea{box-sizing:border-box;width:100%;min-width:0;min-height:88px;padding:11px 13px;border:1px solid #ffffff20;border-radius:12px;background:#111018;color:var(--text);outline:0;font:12px/1.65 var(--font);resize:vertical}
 .rolling-paper-form textarea:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
 .rolling-paper-form textarea::placeholder{color:#928a9a}
@@ -1153,13 +1178,14 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .rolling-paper-status.is-error{color:#ef9eae}
 .rolling-paper-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;max-height:min(55vh,480px);overflow:auto;padding:1px 4px 4px 1px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
 .rolling-paper-entry{position:relative;min-width:0;min-height:94px;padding:13px 14px;border:1px solid #ffffff16;border-radius:14px;background:linear-gradient(135deg,#ffffff08,#ffffff03)}
+.rolling-paper-entry-image{display:block;width:min(100%,360px);max-height:300px;margin:0 0 11px;border-radius:11px;object-fit:cover}
 .rolling-paper-entry-heading{display:flex;align-items:center;gap:8px;min-width:0}
 .rolling-paper-entry-author{color:#f3bfd0;font-size:11px}
 .rolling-paper-entry-date{color:#928a9a;font-size:10px;white-space:nowrap}
 .rolling-paper-delete{margin-left:auto;min-height:27px;padding:0 8px;color:#efb0bd;font-size:10px}
 .rolling-paper-entry-content{margin:10px 0 0;color:#d7cfda;font-size:12px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
 .rolling-paper-empty{grid-column:1/-1;display:grid;min-height:82px;place-items:center;margin:0;padding:14px;border:1px dashed #ffffff24;border-radius:13px;background:#ffffff04;color:#aaa1b2;font-size:12px;text-align:center;line-height:1.6}
-@media(max-width:560px){.rolling-paper-heading{align-items:flex-start;gap:10px}.rolling-paper-heading h2{font-size:21px}.rolling-paper-heading-actions{gap:7px}.rolling-paper-refresh{padding-inline:9px}.rolling-paper-form-footer{align-items:flex-start;flex-direction:column}.rolling-paper-form-footer .button{width:100%}.rolling-paper-list{grid-template-columns:1fr;max-height:min(62vh,560px)}.rolling-paper-entry{padding:12px}}
+@media(max-width:560px){.rolling-paper-heading{align-items:flex-start;gap:10px}.rolling-paper-heading h2{font-size:21px}.rolling-paper-heading-actions{gap:7px;flex-wrap:wrap;justify-content:flex-end}.rolling-paper-refresh,.rolling-paper-topic-add{padding-inline:9px}.rolling-paper-topic-form{grid-template-columns:1fr}.rolling-paper-topic-form .button{width:100%}.rolling-paper-topic-grid{gap:7px}.rolling-paper-topic-card{gap:7px;padding:8px;border-radius:17px}.rolling-paper-topic-title{font-size:11px}.rolling-paper-topic-count{font-size:9px}.rolling-paper-gallery-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.rolling-paper-form-footer{align-items:flex-start;flex-direction:column}.rolling-paper-form-footer .button{width:100%}.rolling-paper-list{grid-template-columns:1fr;max-height:min(62vh,560px)}.rolling-paper-entry{padding:12px}}
 @media(min-width:561px){
   .competition-history-dialog{width:min(620px,calc(100vw - 40px));max-height:calc(100vh - 40px);max-height:min(760px,calc(100dvh - 40px))}
 }
@@ -1194,8 +1220,8 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .registered-streamers-grid{margin-top:0}
 @media(max-width:720px){.registered-section{margin-top:28px}.registered-section-actions{gap:7px}.registered-streamers-toggle{min-height:31px;padding:5px 9px;font-size:9px}}
 
-/* Fanpage content is grouped into three focused views. */
-#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+/* Fanpage content is grouped into four focused views. */
+#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 #fanPageView .fanpage-tab-button{min-width:0;min-height:44px;padding:8px 12px;border:1px solid transparent;border-radius:13px;background:transparent;color:#c7c0cf;font:700 13px var(--font);cursor:pointer;transition:background .16s,border-color .16s,color .16s,box-shadow .16s}
 #fanPageView .fanpage-tab-button:hover{border-color:#ffffff24;background:#ffffff0b;color:var(--text)}
 #fanPageView .fanpage-tab-button[aria-selected=true]{border-color:#ffffff26;background:linear-gradient(180deg,#ffffff18,#ffffff0b);color:var(--text);box-shadow:inset 0 1px 0 #ffffff22}
@@ -1211,7 +1237,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 #fanPageView.fanpage-layout-2 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section){grid-column:1/-1}
 @media(max-width:560px){
   #fanPageView .fanpage-tab-nav{gap:4px;margin:14px 0 18px;padding:4px;border-radius:15px}
-  #fanPageView .fanpage-tab-button{min-height:42px;padding:7px 5px;border-radius:11px;font-size:12px}
+  #fanPageView .fanpage-tab-button{min-height:42px;padding:7px 3px;border-radius:11px;font-size:11px}
   #fanPageView .fanpage-tab-panel-heading{margin-bottom:12px}
   #fanPageView .fanpage-tab-panel-heading>p:last-child{font-size:11px}
 }
