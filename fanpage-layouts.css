@@ -533,6 +533,31 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
 #fanPageView.fanpage-layout-1 .fan-character-ogq-pair + .fanpage-design-one-grid { margin-top: 22px; }
 #fanPageView.fanpage-layout-1 .fan-character-ogq-pair > .fan-character-card { border: 0; border-radius: 0; box-shadow: none; }
 #fanPageView.fanpage-layout-1 .fan-character-ogq-pair > .fan-feature-ogq-panel { border: 0; border-radius: 0; background: #fffefd; box-shadow: none; }
+/* In the bright blue layout, keep the mascot surface as light as the nearby cards. */
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .fan-character-card {
+  border-color: color-mix(in srgb, var(--kawaii-accent) 38%, white);
+  background:
+    radial-gradient(ellipse at 82% 45%, color-mix(in srgb, var(--kawaii-accent) 14%, transparent), transparent 40%),
+    linear-gradient(115deg, #f8faff, #edf3ff 64%, #f4f1ff);
+  box-shadow: 0 6px 0 #d9e3f688, 0 16px 34px #536f9a12;
+  color: var(--text);
+}
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .fan-character-card::before {
+  border-color: color-mix(in srgb, var(--kawaii-accent) 20%, transparent);
+  box-shadow: 0 0 0 24px color-mix(in srgb, var(--kawaii-accent) 6%, transparent),
+    0 0 0 48px color-mix(in srgb, var(--kawaii-accent) 4%, transparent);
+}
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .fan-character-copy .eyebrow { color: var(--kawaii-accent-deep); }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .fan-character-copy h2 { color: var(--text); }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .fan-character-ogq-pair {
+  border-color: color-mix(in srgb, var(--kawaii-accent) 35%, white);
+  background: linear-gradient(125deg, #f8faff, #eef3ff 62%, #f7f4ff);
+  box-shadow: 0 8px 0 #d9e3f688, 0 18px 40px #536f9a14;
+}
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .fan-character-ogq-pair > .fan-character-card { border-right-color: color-mix(in srgb, var(--kawaii-accent) 28%, white); }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .fan-character-ogq-pair > .fan-feature-ogq-panel {
+  background: radial-gradient(ellipse at 100% 0, color-mix(in srgb, var(--kawaii-accent) 8%, transparent), transparent 58%), #fffefd;
+}
 
 #fanPageView.fanpage-layout-1 .fan-quick-panel { border-color: #eadfeb; background: #fffefdF5; color: #51465d; box-shadow: 0 16px 44px #58446122; }
 #fanPageView.fanpage-layout-1 .fan-quick-toggle,
