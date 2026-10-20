@@ -1335,7 +1335,17 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);gap:20px}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.content-card,.live-section,.messenger-link-section,.fan-character-ogq-pair){min-width:0;margin:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section){grid-column:1/-1}
-@media(max-width:900px){#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1fr);gap:16px}}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab=home] .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1fr)}
+#fanPageView.fanpage-layout-1 .fanpage-home-columns{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);align-items:start;gap:20px}
+#fanPageView.fanpage-layout-1 :is(.fanpage-home-main-column,.fanpage-home-side-column){display:grid;align-content:start;gap:20px;min-width:0}
+#fanPageView.fanpage-layout-1 .fanpage-home-columns :is(.live-section,.calendar-section,.vod-section){min-width:0;margin:0;scroll-margin-top:82px}
+@media(max-width:900px){
+  #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1fr);gap:16px}
+  #fanPageView.fanpage-layout-1 .fanpage-home-columns,#fanPageView.fanpage-layout-1 :is(.fanpage-home-main-column,.fanpage-home-side-column){display:contents}
+  #fanPageView.fanpage-layout-1 .fanpage-home-columns .live-section{order:1}
+  #fanPageView.fanpage-layout-1 .fanpage-home-columns .calendar-section{order:2}
+  #fanPageView.fanpage-layout-1 .fanpage-home-columns .vod-section{order:3}
+}
 @media(max-width:720px){
   #fanPageView.fanpage-layout-1 .fanpage-tab-nav{margin:14px 0 18px}
   #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{gap:14px}
