@@ -1324,7 +1324,24 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog { border-radius: 20px; }
 }
 
-@media(min-width:1280px){
+/* Keep the three fanpage tabs in the pastel jelly language. */
+#fanPageView.fanpage-layout-1 .fanpage-tab-nav{border-color:#eadfeb;background:#fffefd;box-shadow:0 5px 0 #e7dce8,0 10px 24px #7560800d}
+#fanPageView.fanpage-layout-1 .fanpage-tab-button{color:#71647b}
+#fanPageView.fanpage-layout-1 .fanpage-tab-button:hover{border-color:color-mix(in srgb,var(--kawaii-accent),white 68%);background:#fff5f9;color:#51465d}
+#fanPageView.fanpage-layout-1 .fanpage-tab-button[aria-selected=true]{border-color:color-mix(in srgb,var(--kawaii-accent-deep),white 36%);background:linear-gradient(180deg,color-mix(in srgb,var(--kawaii-accent),white 48%),color-mix(in srgb,var(--kawaii-accent),white 72%));color:var(--jelly-accent-ink);box-shadow:0 3px 0 color-mix(in srgb,var(--kawaii-accent-deep),white 68%),inset 0 1px 0 #fff}
+#fanPageView.fanpage-layout-1 .fanpage-tab-button:focus-visible{outline-color:var(--kawaii-accent-deep)}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel-heading .eyebrow{color:var(--kawaii-accent-deep)}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel-heading>p:last-child{color:#81758b}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);gap:20px}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.content-card,.live-section,.messenger-link-section,.fan-character-ogq-pair){min-width:0;margin:0}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section){grid-column:1/-1}
+@media(max-width:900px){#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1fr);gap:16px}}
+@media(max-width:720px){
+  #fanPageView.fanpage-layout-1 .fanpage-tab-nav{margin:14px 0 18px}
+  #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{gap:14px}
+}
+
+@media(min-width:1500px){
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button{border-color:#ded6ea;background:linear-gradient(180deg,#fff 0%,#fffafd 58%,#f5f1fa 100%);color:#5b5067;box-shadow:0 4px 0 #dfd8e8,0 7px 12px #75608014,inset 0 2px 0 #fff}
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button::before{color:var(--jelly-accent-deep)}
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button:hover{border-color:color-mix(in srgb,var(--jelly-accent),white 38%);box-shadow:0 6px 0 #dfd8e8,0 9px 14px #75608018,inset 0 2px 0 #fff}
