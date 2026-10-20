@@ -5515,8 +5515,14 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
     if (!/^[0-9]{13}_[0-9a-f-]{36}$/i.test(entryId)) {
       throw new HttpsError('invalid-argument', '삭제할 롤링페이퍼 메시지를 확인해 주세요.');
     }
-    const entryRef = rootRef.child('entries').child(entryId);
-    const deletion = await entryRef.transaction((current) => current ? null : undefined);
+    const entriesRef = rootRef.child('entries');
+    const deletion = await entriesRef.transaction((current) => {
+      if (!current || typeof current !== 'object' || Array.isArray(current)
+        || !Object.prototype.hasOwnProperty.call(current, entryId)) return undefined;
+      const next = { ...current };
+      delete next[entryId];
+      return Object.keys(next).length ? next : null;
+    });
     if (!deletion.committed) throw new HttpsError('not-found', '삭제할 롤링페이퍼 메시지를 찾을 수 없습니다.');
     await rootRef.child('count').transaction((current) => Math.max(0, Math.floor(Number(current) || 0) - 1));
     return readRollingPaper(target.streamer.id, canDelete);
