@@ -2889,6 +2889,17 @@ function renderFanPage(page, options = {}) {
     tabButtons.set(tab.key, button);
     tabNav.append(button);
   });
+  function createFanPageColumnStacks(className, leftSections, rightSections) {
+    const columns = document.createElement('div');
+    columns.className = `fanpage-tab-columns ${className}`;
+    [leftSections, rightSections].forEach((sections, index) => {
+      const column = document.createElement('div');
+      column.className = `fanpage-tab-column fanpage-tab-column-${index + 1}`;
+      sections.filter(Boolean).forEach((sectionElement) => column.append(sectionElement));
+      columns.append(column);
+    });
+    return columns;
+  }
   function createFanPageTabPanel(tab, sections) {
     const panel = document.createElement('section');
     panel.className = 'fanpage-tab-panel';
@@ -2928,8 +2939,12 @@ function renderFanPage(page, options = {}) {
   }
   const tabPanels = new Map([
     ['home', homePanel],
-    ['activity', createFanPageTabPanel(tabDefinitions[1], [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, fanCharacterCard ? null : ogqSection])],
-    ['content', createFanPageTabPanel(tabDefinitions[2], [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
+    ['activity', createFanPageTabPanel(tabDefinitions[1], layoutDesign === 1
+      ? [featuredPair, createFanPageColumnStacks('fanpage-activity-columns', [upboSection, messengerSection], [rouletteSection]), gallerySection, fanCharacterCard ? null : ogqSection]
+      : [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, fanCharacterCard ? null : ogqSection])],
+    ['content', createFanPageTabPanel(tabDefinitions[2], layoutDesign === 1
+      ? [createFanPageColumnStacks('fanpage-content-columns', [youtubeSection, playedGamesSection], [songbookSection, cafeSection]), competitionHistorySection]
+      : [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
   ]);
   function selectFanPageTab(tabKey, moveFocus = false) {
     if (!tabPanels.has(tabKey)) return;
@@ -3164,7 +3179,13 @@ function createFanPageQuickRemote(view) {
   const candidates = [...view.children].flatMap((element) => {
     if (element.classList.contains('fanpage-tab-nav')) return [];
     if (element.classList.contains('fanpage-tab-panel')) {
-      return [...element.querySelectorAll(':scope > .fanpage-tab-panel-grid > *')];
+      const flattenSectionGroups = (section) => {
+        if (section.matches('.fanpage-home-columns, .fanpage-home-main-column, .fanpage-home-side-column, .fanpage-tab-columns, .fanpage-tab-column')) {
+          return [...section.children].flatMap(flattenSectionGroups);
+        }
+        return [section];
+      };
+      return [...element.querySelectorAll(':scope > .fanpage-tab-panel-grid > *')].flatMap(flattenSectionGroups);
     }
     return [element];
   });
