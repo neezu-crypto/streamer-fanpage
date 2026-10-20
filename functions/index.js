@@ -5524,12 +5524,19 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
       exactMatch: storedEntryIds.includes(entryId),
     }));
     const deletion = await entriesRef.transaction((current) => {
+      const currentEntryIds = current && typeof current === 'object' && !Array.isArray(current) ? Object.keys(current) : [];
+      console.info('Rolling paper delete transaction input', JSON.stringify({
+        currentType: current === null ? 'null' : typeof current,
+        currentEntryIds,
+        exactMatch: currentEntryIds.includes(entryId),
+      }));
       if (!current || typeof current !== 'object' || Array.isArray(current)
         || !Object.prototype.hasOwnProperty.call(current, entryId)) return undefined;
       const next = { ...current };
       delete next[entryId];
       return Object.keys(next).length ? next : null;
     });
+    console.info('Rolling paper delete transaction result', JSON.stringify({ committed: deletion.committed }));
     if (!deletion.committed) throw new HttpsError('not-found', '삭제할 롤링페이퍼 메시지를 찾을 수 없습니다.');
     await rootRef.child('count').transaction((current) => Math.max(0, Math.floor(Number(current) || 0) - 1));
     return readRollingPaper(target.streamer.id, canDelete);
