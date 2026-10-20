@@ -964,7 +964,8 @@
 .site-shell.has-bottom-banner{min-height:0}
 .site-shell.has-bottom-banner>.main-content{flex:0 0 auto}
 .site-shell.has-bottom-banner>.footer{display:none}
-body.fanpage-bottom-banner-active{min-height:0}
+body.fanpage-bottom-banner-active{height:auto;min-height:0}
+body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0 auto}
 #fanPageView.has-bottom-banner{padding-bottom:0}
 #fanPageView.fanpage-layout-1.has-bottom-banner{padding-bottom:0}
 .topbar.topbar-with-banner{height:42px;min-height:42px;padding:0 clamp(14px,4vw,54px)}
