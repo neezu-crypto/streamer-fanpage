@@ -921,16 +921,7 @@ function renderViewerStatsUsage(usage) {
 
   const streamerList = $('viewerStatsAdminStreamerList');
   streamerList.replaceChildren();
-  const topStreamers = (Array.isArray(safeUsage.topSearchedStreamers) ? safeUsage.topSearchedStreamers : [])
-    .slice()
-    .sort((a, b) => {
-      const countDifference = (Number(b && b.count) || 0) - (Number(a && a.count) || 0);
-      if (countDifference) return countDifference;
-      const aName = String(a && (a.nickname || a.soopId || a.id) || '');
-      const bName = String(b && (b.nickname || b.soopId || b.id) || '');
-      return aName.localeCompare(bName, 'ko')
-        || String(a && (a.soopId || a.id) || '').localeCompare(String(b && (b.soopId || b.id) || ''));
-    });
+  const topStreamers = Array.isArray(safeUsage.topSearchedStreamers) ? safeUsage.topSearchedStreamers : [];
   if (!topStreamers.length) {
     const empty = document.createElement('p');
     empty.className = 'admin-viewer-usage-streamers-empty';
