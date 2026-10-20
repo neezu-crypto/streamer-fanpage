@@ -1338,7 +1338,7 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .fanpage-tab-columns{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);align-items:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column{display:grid;align-content:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column>*{min-width:0;margin:0}
-#fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab=home] .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1fr)}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=home] .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1fr)}
 #fanPageView.fanpage-layout-1 .fanpage-home-columns{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);align-items:start;gap:20px}
 #fanPageView.fanpage-layout-1 :is(.fanpage-home-main-column,.fanpage-home-side-column){display:grid;align-content:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-home-columns :is(.live-section,.calendar-section,.vod-section){min-width:0;margin:0;scroll-margin-top:82px}
@@ -1352,14 +1352,14 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
   #fanPageView.fanpage-layout-1 .fanpage-activity-columns .upbo-section{order:2}
   #fanPageView.fanpage-layout-1 .fanpage-activity-columns .roulette-section{order:3}
   #fanPageView.fanpage-layout-1 .fanpage-activity-columns .messenger-link-section{order:4}
-  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab=activity] .fan-character-ogq-pair{order:1}
-  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab=activity] .ogq-section{order:6}
-  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab=activity] .fan-gallery-section{order:5}
+  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=activity] .fan-character-ogq-pair{order:1}
+  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=activity] .ogq-section{order:6}
+  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=activity] .fan-gallery-section{order:5}
   #fanPageView.fanpage-layout-1 .fanpage-content-columns .youtube-section{order:1}
   #fanPageView.fanpage-layout-1 .fanpage-content-columns .songbook-section{order:2}
   #fanPageView.fanpage-layout-1 .fanpage-content-columns .played-games-section{order:3}
   #fanPageView.fanpage-layout-1 .fanpage-content-columns .cafe-section{order:4}
-  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab=content] .competition-history-section{order:5}
+  #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=content] .competition-history-section{order:5}
 }
 @media(max-width:720px){
   #fanPageView.fanpage-layout-1 .fanpage-tab-nav{margin:14px 0 18px}
