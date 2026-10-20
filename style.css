@@ -1162,7 +1162,7 @@ body.fanpage-bottom-banner-active{min-height:0}
 @media(max-width:720px){.registered-section{margin-top:28px}.registered-section-actions{gap:7px}.registered-streamers-toggle{min-height:31px;padding:5px 9px;font-size:9px}}
 
 /* Fanpage content is grouped into three focused views. */
-#fanPageView .fanpage-tab-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924c9;box-shadow:0 8px 24px #0002}
+#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 #fanPageView .fanpage-tab-button{min-width:0;min-height:44px;padding:8px 12px;border:1px solid transparent;border-radius:13px;background:transparent;color:#c7c0cf;font:700 13px var(--font);cursor:pointer;transition:background .16s,border-color .16s,color .16s,box-shadow .16s}
 #fanPageView .fanpage-tab-button:hover{border-color:#ffffff24;background:#ffffff0b;color:var(--text)}
 #fanPageView .fanpage-tab-button[aria-selected=true]{border-color:#ffffff26;background:linear-gradient(180deg,#ffffff18,#ffffff0b);color:var(--text);box-shadow:inset 0 1px 0 #ffffff22}
@@ -1174,7 +1174,7 @@ body.fanpage-bottom-banner-active{min-height:0}
 #fanPageView .fanpage-tab-panel-heading h2{margin:0;font:clamp(20px,2.6vw,26px)/1.25 var(--display)}
 #fanPageView .fanpage-tab-panel-heading>p:last-child{margin:6px 0 0;color:#aaa2b1;font-size:12px;line-height:1.65}
 #fanPageView .fanpage-tab-panel-grid{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:18px}
-#fanPageView .fanpage-tab-panel-grid>*{min-width:0;margin-top:0}
+#fanPageView .fanpage-tab-panel-grid>*{min-width:0;margin-top:0;scroll-margin-top:82px}
 #fanPageView.fanpage-layout-2 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section){grid-column:1/-1}
 @media(max-width:560px){
   #fanPageView .fanpage-tab-nav{gap:4px;margin:14px 0 18px;padding:4px;border-radius:15px}
