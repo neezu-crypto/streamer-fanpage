@@ -60,6 +60,11 @@ const saveButtonAudio = new Audio(new URL('./assets/sounds/save-button.mp3', imp
 const catPawCloseAudio = new Audio(new URL('./assets/sounds/cat-paw-close.mp3', import.meta.url).href);
 const catPawCloseArtwork = new Image();
 catPawCloseArtwork.src = new URL('./assets/fanpage-kawaii/cat-paw-close.svg', import.meta.url).href;
+let youtubeIframeApiPromise = null;
+let youtubePlayer = null;
+let youtubePlayerGeneration = 0;
+let youtubeVolumeLevel = 100;
+let youtubeLastAudibleVolume = 100;
 buttonClickAudio.preload = 'auto';
 modalOpenAudio.preload = 'auto';
 saveButtonAudio.preload = 'auto';
@@ -5431,7 +5436,7 @@ function renderVodPlayerDialog() {
   iframe.src = 'about:blank'; iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
   frame.append(iframe);
   const footer = document.createElement('div'); footer.className = 'vod-player-footer';
-  const note = document.createElement('p'); note.textContent = '플레이어가 표시되지 않거나 재생되지 않으면 SOOP에서 열어 주세요.';
+  const note = document.createElement('p'); note.textContent = 'SOOP 플레이어 안의 스피커 버튼이나 ↑/↓ 키로 볼륨을 조절할 수 있어요. 재생되지 않으면 SOOP에서 열어 주세요.';
   const link = document.createElement('a'); link.id = 'vodPlayerExternalLink'; link.className = 'button button-primary';
   link.href = 'https://vod.sooplive.com/'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'SOOP에서 열기 ↗';
   footer.append(note, link);
@@ -5452,7 +5457,7 @@ function openVodPlayer(vod) {
   const id = encodeURIComponent(vod.id);
   $('vodPlayerTitle').textContent = vod.title || '방송 다시보기';
   $('vodPlayerExternalLink').href = `https://vod.sooplive.com/player/${id}`;
-  $('vodPlayerFrame').src = `https://vod.sooplive.com/player/${id}/embed?autoPlay=false&mutePlay=true&showChat=true`;
+  $('vodPlayerFrame').src = `https://vod.sooplive.com/player/${id}/embed?autoPlay=false&mutePlay=false&showChat=true`;
   showFanPageModal($('vodPlayerDialog'));
   vodCommentState = {
     streamerId: currentPage.streamer.id,
@@ -5782,18 +5787,125 @@ function renderYouTubePlayerDialog() {
   close.addEventListener('click', () => dialog.close());
   heading.append(title, close);
   const frame = document.createElement('div'); frame.className = 'vod-player-frame';
-  const iframe = document.createElement('iframe'); iframe.id = 'youtubePlayerFrame'; iframe.title = 'YouTube 영상 플레이어';
-  iframe.src = 'about:blank';
-  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
-  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
-  frame.append(iframe);
+  frame.id = 'youtubePlayerFrame';
+  const volumeControls = document.createElement('div'); volumeControls.className = 'youtube-player-volume';
+  const volumeLabel = document.createElement('label'); volumeLabel.htmlFor = 'youtubePlayerVolume'; volumeLabel.textContent = '볼륨';
+  const volumeSlider = document.createElement('input'); volumeSlider.id = 'youtubePlayerVolume';
+  volumeSlider.type = 'range'; volumeSlider.min = '0'; volumeSlider.max = '100'; volumeSlider.step = '1';
+  volumeSlider.value = String(youtubeVolumeLevel); volumeSlider.disabled = true;
+  volumeSlider.setAttribute('aria-label', 'YouTube 영상 볼륨');
+  const volumeOutput = document.createElement('output'); volumeOutput.id = 'youtubePlayerVolumeOutput';
+  volumeOutput.htmlFor = volumeSlider.id; volumeOutput.textContent = `${youtubeVolumeLevel}%`;
+  const muteButton = document.createElement('button'); muteButton.id = 'youtubePlayerMuteButton';
+  muteButton.type = 'button'; muteButton.className = 'button'; muteButton.textContent = '음소거'; muteButton.disabled = true;
+  volumeControls.append(volumeLabel, volumeSlider, volumeOutput, muteButton);
   const footer = document.createElement('div'); footer.className = 'vod-player-footer';
-  const note = document.createElement('p'); note.textContent = '영상은 YouTube 공식 플레이어로 재생돼요. 외부 재생이 제한된 영상은 YouTube에서 열어 주세요.';
+  const note = document.createElement('p'); note.id = 'youtubePlayerNote';
+  note.textContent = '영상은 YouTube 공식 플레이어로 재생돼요. 외부 재생이 제한된 영상은 YouTube에서 열어 주세요.';
   const link = document.createElement('a'); link.id = 'youtubePlayerExternalLink'; link.className = 'button button-primary';
   link.href = 'https://www.youtube.com/'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'YouTube에서 열기 ↗';
-  footer.append(note, link); card.append(heading, frame, footer); dialog.append(card);
-  dialog.addEventListener('close', () => { iframe.src = 'about:blank'; });
+  footer.append(note, link); card.append(heading, frame, volumeControls, footer); dialog.append(card);
+  volumeSlider.addEventListener('input', () => {
+    const volume = Math.max(0, Math.min(100, Number(volumeSlider.value) || 0));
+    youtubeVolumeLevel = volume;
+    if (volume > 0) youtubeLastAudibleVolume = volume;
+    if (youtubePlayer) {
+      youtubePlayer.setVolume(volume);
+      if (volume === 0) youtubePlayer.mute();
+      else youtubePlayer.unMute();
+    }
+    updateYouTubeVolumeControls();
+  });
+  muteButton.addEventListener('click', () => {
+    if (!youtubePlayer) return;
+    if (youtubePlayer.isMuted()) {
+      const volume = youtubeVolumeLevel > 0 ? youtubeVolumeLevel : youtubeLastAudibleVolume;
+      youtubeVolumeLevel = volume;
+      volumeSlider.value = String(volume);
+      youtubePlayer.setVolume(volume);
+      youtubePlayer.unMute();
+    } else {
+      const volume = Number(youtubePlayer.getVolume());
+      if (volume > 0) {
+        youtubeLastAudibleVolume = volume;
+        youtubeVolumeLevel = volume;
+      }
+      youtubePlayer.mute();
+    }
+    updateYouTubeVolumeControls();
+  });
+  dialog.addEventListener('close', () => {
+    youtubePlayerGeneration += 1;
+    if (youtubePlayer) {
+      try { youtubePlayer.destroy(); } catch (_) { /* the iframe may already have been removed */ }
+      youtubePlayer = null;
+    }
+    frame.replaceChildren();
+    volumeSlider.disabled = true;
+    muteButton.disabled = true;
+    $('youtubePlayerNote').textContent = '영상은 YouTube 공식 플레이어로 재생돼요. 외부 재생이 제한된 영상은 YouTube에서 열어 주세요.';
+  });
   return dialog;
+}
+
+function loadYouTubeIframeApi() {
+  if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+  if (youtubeIframeApiPromise) return youtubeIframeApiPromise;
+  youtubeIframeApiPromise = new Promise((resolve, reject) => {
+    let timeoutId = 0;
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      if (error) reject(error);
+      else if (window.YT && window.YT.Player) resolve(window.YT);
+      else reject(new Error('YouTube 플레이어 API를 불러오지 못했어요.'));
+    };
+    const previousCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      try {
+        if (typeof previousCallback === 'function') previousCallback();
+      } finally {
+        finish();
+      }
+    };
+    let script = [...document.scripts].find((candidate) => {
+      try {
+        const url = new URL(candidate.src, location.href);
+        return url.hostname === 'www.youtube.com' && url.pathname === '/iframe_api';
+      } catch (_) {
+        return false;
+      }
+    });
+    if (!script) {
+      script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      script.addEventListener('error', () => finish(new Error('YouTube 플레이어 API를 불러오지 못했어요.')), { once: true });
+      document.head.append(script);
+    } else {
+      script.addEventListener('error', () => finish(new Error('YouTube 플레이어 API를 불러오지 못했어요.')), { once: true });
+    }
+    timeoutId = window.setTimeout(() => finish(new Error('YouTube 플레이어 API 연결 시간이 초과됐어요.')), 20000);
+  }).catch((error) => {
+    youtubeIframeApiPromise = null;
+    throw error;
+  });
+  return youtubeIframeApiPromise;
+}
+
+function updateYouTubeVolumeControls() {
+  const slider = $('youtubePlayerVolume');
+  const output = $('youtubePlayerVolumeOutput');
+  const muteButton = $('youtubePlayerMuteButton');
+  if (!slider || !output || !muteButton || !youtubePlayer) return;
+  const muted = youtubePlayer.isMuted();
+  const volume = Math.round(Number(youtubePlayer.getVolume()) || youtubeVolumeLevel);
+  if (volume > 0) youtubeLastAudibleVolume = volume;
+  slider.value = String(youtubeVolumeLevel);
+  output.textContent = `${youtubeVolumeLevel}%${muted ? ' · 음소거' : ''}`;
+  muteButton.textContent = muted ? '소리 켜기' : '음소거';
 }
 
 function openYouTubePlayer(video) {
@@ -5801,8 +5913,53 @@ function openYouTubePlayer(video) {
   const id = encodeURIComponent(video.id);
   $('youtubePlayerTitle').textContent = video.title || 'YouTube 영상';
   $('youtubePlayerExternalLink').href = `https://www.youtube.com/watch?v=${id}`;
-  $('youtubePlayerFrame').src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
-  showFanPageModal($('youtubePlayerDialog'));
+  const dialog = $('youtubePlayerDialog');
+  const frame = $('youtubePlayerFrame');
+  const iframe = document.createElement('iframe');
+  iframe.id = 'youtubePlayerFrameElement'; iframe.title = 'YouTube 영상 플레이어';
+  const playerUrl = new URL(`https://www.youtube-nocookie.com/embed/${id}`);
+  playerUrl.searchParams.set('autoplay', '1');
+  playerUrl.searchParams.set('rel', '0');
+  playerUrl.searchParams.set('playsinline', '1');
+  playerUrl.searchParams.set('enablejsapi', '1');
+  playerUrl.searchParams.set('origin', location.origin);
+  iframe.src = playerUrl.toString();
+  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+  frame.replaceChildren(iframe);
+  const generation = ++youtubePlayerGeneration;
+  $('youtubePlayerVolume').value = String(youtubeVolumeLevel);
+  $('youtubePlayerVolumeOutput').textContent = `${youtubeVolumeLevel}%`;
+  $('youtubePlayerVolume').disabled = true;
+  $('youtubePlayerMuteButton').disabled = true;
+  $('youtubePlayerNote').textContent = '볼륨 조절을 연결하고 있어요.';
+  showFanPageModal(dialog);
+  loadYouTubeIframeApi().then((YT) => {
+    if (generation !== youtubePlayerGeneration || !dialog.open || !iframe.isConnected) return;
+    youtubePlayer = new YT.Player(iframe, {
+      events: {
+        onReady: (event) => {
+          if (generation !== youtubePlayerGeneration || !dialog.open) {
+            try { event.target.destroy(); } catch (_) { /* stale player */ }
+            return;
+          }
+          youtubePlayer = event.target;
+          const currentVolume = Number(youtubePlayer.getVolume());
+          if (currentVolume > 0) {
+            youtubeVolumeLevel = Math.min(100, Math.max(0, Math.round(currentVolume)));
+            youtubeLastAudibleVolume = youtubeVolumeLevel;
+          }
+          $('youtubePlayerVolume').disabled = false;
+          $('youtubePlayerMuteButton').disabled = false;
+          $('youtubePlayerNote').textContent = '영상은 YouTube 공식 플레이어로 재생돼요. 아래 볼륨 조절은 쇼츠 화면에서도 사용할 수 있어요.';
+          updateYouTubeVolumeControls();
+        },
+      },
+    });
+  }).catch(() => {
+    if (generation !== youtubePlayerGeneration || !dialog.open) return;
+    $('youtubePlayerNote').textContent = '볼륨 조절 연결이 안 되면 영상 안의 스피커 버튼이나 YouTube에서 열기로 조절해 주세요.';
+  });
 }
 
 function replaceVodSectionIfCurrent(streamerId) {
