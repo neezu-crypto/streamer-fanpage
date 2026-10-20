@@ -2406,7 +2406,9 @@ function openProfileQuickEdit(page, field, target) {
   if (editor instanceof HTMLInputElement) editor.select();
 }
 
-function renderKawaiiWelcome(page) {
+function renderKawaiiWelcome(page, onSectionNavigate = (sectionId) => {
+  document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}) {
   const hero = document.createElement('section');
   hero.className = 'fanpage-kawaii-hero';
   hero.setAttribute('aria-labelledby', 'kawaiiWelcomeTitle');
@@ -2422,12 +2424,12 @@ function renderKawaiiWelcome(page) {
   const galleryButton = document.createElement('button'); galleryButton.type = 'button';
   galleryButton.className = 'button button-primary'; galleryButton.textContent = '팬 갤러리 둘러보기 ↓';
   galleryButton.addEventListener('click', () => {
-    document.getElementById('fanGallerySection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    onSectionNavigate('fanGallerySection');
   });
   const scheduleButton = document.createElement('button'); scheduleButton.type = 'button';
   scheduleButton.className = 'button'; scheduleButton.textContent = '방송 일정 보기';
   scheduleButton.addEventListener('click', () => {
-    document.getElementById('calendarSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    onSectionNavigate('calendarSection');
   });
   actions.append(galleryButton, scheduleButton); copy.append(eyebrow, title, description, actions);
 
@@ -2684,6 +2686,10 @@ function renderFanPage(page, options = {}) {
   currentPage = page;
   publishFanpageEmoteContext(page);
   const view = $('fanPageView');
+  const streamerIdForTabs = String(page.streamer.id || '').trim().toLowerCase();
+  const previousTabStreamerId = view.dataset.fanpageTabStreamerId || '';
+  const preferredTab = previousTabStreamerId === streamerIdForTabs ? view.dataset.fanpageActiveTab : 'home';
+  view.dataset.fanpageTabStreamerId = streamerIdForTabs;
   view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2');
   view.classList.remove('has-account-top-banner');
   document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-account-banner-hidden');
@@ -2796,7 +2802,15 @@ function renderFanPage(page, options = {}) {
     view.append(topBanner);
   }
   if (!page.isOwner) view.append(back);
-  if (layoutDesign === 1) view.append(renderKawaiiWelcome(page));
+  function navigateToFanPageSection(sectionId) {
+    const target = document.getElementById(sectionId);
+    const tabPanel = target?.closest('.fanpage-tab-panel');
+    if (tabPanel && tabPanel.hidden) view._selectFanPageTab?.(tabPanel.dataset.fanpageTabPanel);
+    window.requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+  if (layoutDesign === 1) view.append(renderKawaiiWelcome(page, navigateToFanPageSection));
   view.append(section);
   let fanCharacterCard = null;
   if (String(page.streamer.id || '').toLowerCase() === 'yuhatty') {
@@ -2839,22 +2853,86 @@ function renderFanPage(page, options = {}) {
   const calendarSection = renderCalendarSection(page);
   const gallerySection = renderGallerySection(page);
   const competitionHistorySection = renderCompetitionHistorySection(page);
-  const contentSections = [upboSection, rouletteSection, messengerSection, liveSection, vodSection,
-    youtubeSection, songbookSection, playedGamesSection, ogqSection, cafeSection, calendarSection, gallerySection, competitionHistorySection].filter(Boolean);
-  if (featuredPair) view.append(featuredPair);
-  if (layoutDesign === 1) {
-    const grid = document.createElement('div'); grid.className = 'fanpage-design-one-grid';
-    const mainColumn = document.createElement('div'); mainColumn.className = 'fanpage-design-one-column fanpage-design-one-main-column';
-    const sideColumn = document.createElement('aside'); sideColumn.className = 'fanpage-design-one-column fanpage-design-one-side-column';
-    [gallerySection, competitionHistorySection, liveSection, vodSection, cafeSection, calendarSection]
-      .filter(Boolean).forEach((contentSection) => mainColumn.append(contentSection));
-    [upboSection, rouletteSection, messengerSection, youtubeSection, songbookSection, playedGamesSection, ogqSection]
-      .filter(Boolean).forEach((contentSection) => sideColumn.append(contentSection));
-    grid.append(mainColumn, sideColumn);
-    view.append(grid);
-  } else {
-    contentSections.forEach((contentSection) => view.append(contentSection));
+  const tabDefinitions = [
+    { key: 'home', label: '홈', eyebrow: 'YOUR HOME', title: '방송과 최신 소식', description: '방송 상태와 일정, 최근 다시보기를 모아 보여드려요.' },
+    { key: 'activity', label: '팬 활동', eyebrow: 'FAN ACTIVITY', title: '팬들과 함께하는 공간', description: '팬 참여와 소통, 함께 만든 추억을 둘러보세요.' },
+    { key: 'content', label: '콘텐츠', eyebrow: 'STREAMER CONTENTS', title: '다시보기와 활동 기록', description: '영상, 대회 이력, 플레이한 게임을 모아봤어요.' },
+  ];
+  const tabNav = document.createElement('div');
+  tabNav.className = 'fanpage-tab-nav';
+  tabNav.id = 'fanpageTabNav';
+  tabNav.setAttribute('role', 'tablist');
+  tabNav.setAttribute('aria-label', `${page.streamer.nickname} 팬페이지 메뉴`);
+  const tabButtons = new Map();
+  tabDefinitions.forEach((tab) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'fanpage-tab-button';
+    button.id = `fanpageTab-${tab.key}`;
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-controls', `fanpagePanel-${tab.key}`);
+    button.setAttribute('aria-selected', 'false');
+    button.tabIndex = -1;
+    button.textContent = tab.label;
+    button.addEventListener('click', () => selectFanPageTab(tab.key));
+    button.addEventListener('keydown', (event) => {
+      const currentIndex = tabDefinitions.findIndex((item) => item.key === tab.key);
+      let nextIndex = currentIndex;
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % tabDefinitions.length;
+      else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (currentIndex + tabDefinitions.length - 1) % tabDefinitions.length;
+      else if (event.key === 'Home') nextIndex = 0;
+      else if (event.key === 'End') nextIndex = tabDefinitions.length - 1;
+      else return;
+      event.preventDefault();
+      selectFanPageTab(tabDefinitions[nextIndex].key, true);
+    });
+    tabButtons.set(tab.key, button);
+    tabNav.append(button);
+  });
+  function createFanPageTabPanel(tab, sections) {
+    const panel = document.createElement('section');
+    panel.className = 'fanpage-tab-panel';
+    panel.id = `fanpagePanel-${tab.key}`;
+    panel.dataset.fanpageTabPanel = tab.key;
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('aria-labelledby', `fanpageTab-${tab.key}`);
+    panel.tabIndex = 0;
+    const heading = document.createElement('header');
+    heading.className = 'fanpage-tab-panel-heading';
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = tab.eyebrow;
+    const title = document.createElement('h2');
+    title.textContent = tab.title;
+    const description = document.createElement('p');
+    description.textContent = tab.description;
+    heading.append(eyebrow, title, description);
+    const grid = document.createElement('div');
+    grid.className = 'fanpage-tab-panel-grid';
+    sections.filter(Boolean).forEach((sectionElement) => grid.append(sectionElement));
+    panel.append(heading, grid);
+    return panel;
   }
+  const tabPanels = new Map([
+    ['home', createFanPageTabPanel(tabDefinitions[0], [liveSection, calendarSection, vodSection])],
+    ['activity', createFanPageTabPanel(tabDefinitions[1], [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, fanCharacterCard ? null : ogqSection])],
+    ['content', createFanPageTabPanel(tabDefinitions[2], [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
+  ]);
+  function selectFanPageTab(tabKey, moveFocus = false) {
+    if (!tabPanels.has(tabKey)) return;
+    view.dataset.fanpageActiveTab = tabKey;
+    tabDefinitions.forEach((tab) => {
+      const selected = tab.key === tabKey;
+      const button = tabButtons.get(tab.key);
+      button.setAttribute('aria-selected', String(selected));
+      button.tabIndex = selected ? 0 : -1;
+      tabPanels.get(tab.key).hidden = !selected;
+    });
+    if (moveFocus) tabButtons.get(tabKey)?.focus();
+  }
+  view._selectFanPageTab = selectFanPageTab;
+  view.append(tabNav, ...tabPanels.values());
+  selectFanPageTab(tabPanels.has(preferredTab) ? preferredTab : 'home');
   const bottomBanner = renderBannerSection(page, 'bottom');
   if (bottomBanner) {
     view.classList.add('has-bottom-banner');
@@ -3070,7 +3148,14 @@ function createFanPageQuickRemote(view) {
     ['calendar-section', '방송 일정'], ['fan-gallery-section', '팬 갤러리'],
     ['fan-banner-bottom', '하단 배너'],
   ];
-  const sections = [...view.children]
+  const candidates = [...view.children].flatMap((element) => {
+    if (element.classList.contains('fanpage-tab-nav')) return [];
+    if (element.classList.contains('fanpage-tab-panel')) {
+      return [...element.querySelectorAll(':scope > .fanpage-tab-panel-grid > *')];
+    }
+    return [element];
+  });
+  const sections = candidates
     .filter((element) => element.tagName !== 'DIALOG' && !element.classList.contains('back-link'))
     .map((element, index) => {
       const label = sectionLabels.find(([className]) => element.classList.contains(className))?.[1]
@@ -3147,8 +3232,13 @@ function createFanPageQuickRemote(view) {
     const label = document.createElement('span'); label.className = 'fan-quick-label'; label.textContent = section.label;
     button.append(number, label);
     button.addEventListener('click', () => {
-      document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      if (!window.matchMedia('(min-width: 1280px)').matches) setExpanded(false);
+      const target = document.getElementById(section.id);
+      const tabPanel = target?.closest('.fanpage-tab-panel');
+      if (tabPanel && tabPanel.hidden) view._selectFanPageTab?.(tabPanel.dataset.fanpageTabPanel);
+      window.requestAnimationFrame(() => {
+        document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      if (!window.matchMedia('(min-width: 1500px)').matches) setExpanded(false);
     });
     nav.append(button);
     return button;
@@ -3172,7 +3262,7 @@ function createFanPageQuickRemote(view) {
   let resizeObserver = null;
   let emoteLauncherObserver = null;
   const positionStorageKey = 'streamerFanPage.quickRemotePosition';
-  const isDesktop = () => window.matchMedia('(min-width: 1280px)').matches;
+  const isDesktop = () => window.matchMedia('(min-width: 1500px)').matches;
   function syncEmoteLauncherPosition() {
     const launcher = document.getElementById('game-series-emote-launcher');
     if (!launcher) return;
@@ -3292,6 +3382,7 @@ function createFanPageQuickRemote(view) {
     let activeIndex = 0;
     sections.forEach((section, index) => {
       const target = document.getElementById(section.id);
+      if (target?.closest('.fanpage-tab-panel')?.hidden) return;
       if (target && target.getBoundingClientRect().top + window.scrollY <= marker) activeIndex = index;
     });
     navButtons.forEach((button, index) => {
@@ -3370,6 +3461,7 @@ function createFanPageQuickRemote(view) {
       document.body.append(emoteLauncher);
       emoteLauncher.classList.remove('fanpage-emote-remote-attached');
     }
+    if (view._selectFanPageTab) delete view._selectFanPageTab;
     if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
     if (resizeObserver) resizeObserver.disconnect();
   };
