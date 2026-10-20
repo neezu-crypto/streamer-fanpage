@@ -5947,12 +5947,11 @@ function renderYouTubePlayerDialog() {
   const dialog = document.createElement('dialog');
   dialog.id = 'youtubePlayerDialog'; dialog.className = 'account-dialog vod-player-dialog';
   const card = document.createElement('div'); card.className = 'account-dialog-card vod-player-card';
-  const heading = document.createElement('div'); heading.className = 'vod-player-heading';
+  const heading = document.createElement('div'); heading.className = 'vod-player-heading youtube-player-heading';
   const title = document.createElement('h2'); title.id = 'youtubePlayerTitle'; title.textContent = 'YouTube 영상';
   const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
   close.setAttribute('aria-label', 'YouTube 플레이어 닫기'); close.textContent = '×';
   close.addEventListener('click', () => dialog.close());
-  heading.append(title, close);
   const frame = document.createElement('div'); frame.className = 'vod-player-frame';
   frame.id = 'youtubePlayerFrame';
   const volumeControls = document.createElement('div'); volumeControls.className = 'youtube-player-volume';
@@ -5966,12 +5965,13 @@ function renderYouTubePlayerDialog() {
   const muteButton = document.createElement('button'); muteButton.id = 'youtubePlayerMuteButton';
   muteButton.type = 'button'; muteButton.className = 'button'; muteButton.textContent = '음소거'; muteButton.disabled = true;
   volumeControls.append(volumeLabel, volumeSlider, volumeOutput, muteButton);
+  heading.append(title, volumeControls, close);
   const footer = document.createElement('div'); footer.className = 'vod-player-footer';
   const note = document.createElement('p'); note.id = 'youtubePlayerNote';
   note.textContent = '영상은 YouTube 공식 플레이어로 재생돼요. 외부 재생이 제한된 영상은 YouTube에서 열어 주세요.';
   const link = document.createElement('a'); link.id = 'youtubePlayerExternalLink'; link.className = 'button button-primary';
   link.href = 'https://www.youtube.com/'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'YouTube에서 열기 ↗';
-  footer.append(note, link); card.append(heading, frame, volumeControls, footer); dialog.append(card);
+  footer.append(note, link); card.append(heading, frame, footer); dialog.append(card);
   volumeSlider.addEventListener('input', () => {
     const volume = setYouTubePlayerVolume(volumeSlider.value);
     if (volume > 0) youtubeLastAudibleVolume = volume;
