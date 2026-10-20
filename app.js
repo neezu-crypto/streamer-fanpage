@@ -3170,8 +3170,20 @@ function createFanPageQuickRemote(view) {
   let dragging = false;
   let remoteDrag = null;
   let resizeObserver = null;
+  let emoteLauncherObserver = null;
   const positionStorageKey = 'streamerFanPage.quickRemotePosition';
   const isDesktop = () => window.matchMedia('(min-width: 1280px)').matches;
+  function syncEmoteLauncherPosition() {
+    const launcher = document.getElementById('game-series-emote-launcher');
+    if (!launcher) return;
+    if (isDesktop()) {
+      if (launcher.parentElement !== remote) remote.insertBefore(launcher, panel);
+      launcher.classList.add('fanpage-emote-remote-attached');
+    } else {
+      if (launcher.parentElement !== document.body) document.body.append(launcher);
+      launcher.classList.remove('fanpage-emote-remote-attached');
+    }
+  }
   function positionRemote(left, top) {
     const bounds = remote.getBoundingClientRect();
     const maxLeft = Math.max(8, window.innerWidth - bounds.width - 8);
@@ -3256,6 +3268,7 @@ function createFanPageQuickRemote(view) {
     toggle.hidden = desktop;
     if (desktop) panel.hidden = false;
     else panel.hidden = !expanded;
+    syncEmoteLauncherPosition();
     if (!remoteDrag) restoreDesktopPosition();
     scheduleUpdate();
   }
@@ -3338,6 +3351,10 @@ function createFanPageQuickRemote(view) {
     resizeObserver = new ResizeObserver(scheduleUpdate);
     resizeObserver.observe(view);
   }
+  if (typeof MutationObserver === 'function') {
+    emoteLauncherObserver = new MutationObserver(syncEmoteLauncherPosition);
+    emoteLauncherObserver.observe(document.body, { childList: true });
+  }
   syncDeviceMode();
   return () => {
     window.removeEventListener('scroll', onScroll);
@@ -3347,6 +3364,12 @@ function createFanPageQuickRemote(view) {
     header.removeEventListener('pointerup', finishRemoteDrag);
     header.removeEventListener('pointercancel', finishRemoteDrag);
     header.removeEventListener('lostpointercapture', finishRemoteDrag);
+    if (emoteLauncherObserver) emoteLauncherObserver.disconnect();
+    const emoteLauncher = document.getElementById('game-series-emote-launcher');
+    if (emoteLauncher && emoteLauncher.parentElement === remote) {
+      document.body.append(emoteLauncher);
+      emoteLauncher.classList.remove('fanpage-emote-remote-attached');
+    }
     if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
     if (resizeObserver) resizeObserver.disconnect();
   };

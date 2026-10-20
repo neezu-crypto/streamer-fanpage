@@ -1083,6 +1083,13 @@ body.fanpage-bottom-banner-active{min-height:0}
   .fan-quick-panel{width:min(210px,calc(100vw - 54px));max-height:62dvh}
 }
 
+@media(min-width:1280px){
+  #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached{position:relative;right:auto;bottom:auto;z-index:auto;align-self:stretch;width:100%;margin:0}
+  #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button{width:100%;min-height:38px;padding:0 6px;border:1px solid #ffffff24;border-radius:12px;background:#1b1924f5;color:var(--text);box-shadow:0 5px 0 #0d0c12,0 8px 16px #0004,inset 0 1px 0 #ffffff1c;font-size:11px;white-space:nowrap}
+  #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button::before{margin-right:4px;color:var(--pink)}
+  #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button:hover{transform:translateY(-1px);box-shadow:0 6px 0 #0d0c12,0 10px 18px #0005,inset 0 1px 0 #ffffff24}
+}
+
 /* Competition history card */
 .competition-history-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px}
 .competition-history-heading .eyebrow{margin:0 0 5px;font-size:9px}
