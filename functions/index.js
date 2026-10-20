@@ -68,6 +68,7 @@ const FANPAGE_SCHEDULE_TYPES = new Set(['방송', '방송예정', '합방', '휴
 const FANPAGE_GALLERY_PREVIEW_SIZE = 8;
 const FANPAGE_GALLERY_CACHE_TTL_MS = 3 * 60 * 1000;
 const FANPAGE_GALLERY_CACHE_MAX_ITEMS = 100;
+const FANPAGE_GALLERY_PICKER_PAGE_SIZE = 60;
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const YOUTUBE_VIDEO_PAGE_SIZE = 24;
 const YOUTUBE_CACHE_TTL_MS = 30 * 60 * 1000;
@@ -78,6 +79,9 @@ const FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS = 20;
 const FANPAGE_ROLLING_PAPER_MAX_ITEMS = 300;
 const FANPAGE_ROLLING_PAPER_MAX_LENGTH = 300;
 const FANPAGE_ROLLING_PAPER_DAILY_POST_LIMIT = 5;
+const FANPAGE_ROLLING_PAPER_MAX_TOPICS = 30;
+const FANPAGE_ROLLING_PAPER_MAX_TOPIC_TITLE_LENGTH = 32;
+const FANPAGE_ROLLING_PAPER_TOPIC_ID_PATTERN = /^[0-9a-f-]{36}$/i;
 const CAFE_POST_PREVIEW_SIZE = 6;
 const CAFE_POST_CACHE_TTL_MS = 5 * 60 * 1000;
 const NAVER_CAFE_API_BASE = 'https://apis.naver.com/cafe-web/cafe-boardlist-api/v1';
@@ -101,6 +105,7 @@ const GALLERY_CATEGORY_LABELS = Object.freeze({
   etc: '기타',
 });
 const fanpageGalleryMemoryCache = new Map();
+const fanpageGalleryPickerMemoryCache = new Map();
 const youtubeFetchInProgress = new Map();
 const cafeFetchInProgress = new Map();
 const weflabRouletteFetchInProgress = new Map();
@@ -1190,6 +1195,49 @@ async function readStreamerGallery(target) {
     fanpageGalleryMemoryCache.delete(fanpageGalleryMemoryCache.keys().next().value);
   }
   return result;
+}
+
+async function readStreamerGalleryPicker(target, requestedOffset = 0) {
+  const cacheKey = target.streamer.id;
+  let cached = fanpageGalleryPickerMemoryCache.get(cacheKey);
+  if (!cached || Date.now() - cached.fetchedAt >= FANPAGE_GALLERY_CACHE_TTL_MS) {
+    const galleryStreamerIds = await findGalleryStreamerIds(target);
+    if (!galleryStreamerIds.length) return { linked: false, totalCount: 0, items: [], offset: 0, hasMore: false };
+    const snapshots = await Promise.all(galleryStreamerIds.map((galleryStreamerId) => db.ref('gallery/imagesPublic')
+      .orderByChild('streamerId').equalTo(galleryStreamerId).get()));
+    const uniqueImages = new Map();
+    snapshots.forEach((snapshot) => {
+      Object.entries(snapshot.val() || {}).forEach(([id, value]) => {
+        if (!value || !isGalleryPublicUrl(value.thumbUrl)) return;
+        uniqueImages.set(id, {
+          id,
+          category: Object.hasOwn(GALLERY_CATEGORY_LABELS, value.category) ? value.category : 'etc',
+          createdAt: Number(value.createdAt) || 0,
+          thumbUrl: value.thumbUrl,
+        });
+      });
+    });
+    const items = [...uniqueImages.values()].sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+      .map((item) => ({ ...item, categoryLabel: GALLERY_CATEGORY_LABELS[item.category] }));
+    cached = { fetchedAt: Date.now(), items };
+    fanpageGalleryPickerMemoryCache.set(cacheKey, cached);
+    while (fanpageGalleryPickerMemoryCache.size > FANPAGE_GALLERY_CACHE_MAX_ITEMS) {
+      fanpageGalleryPickerMemoryCache.delete(fanpageGalleryPickerMemoryCache.keys().next().value);
+    }
+  }
+
+  const offset = Math.max(0, Math.min(cached.items.length, Math.floor(Number(requestedOffset) || 0)));
+  const items = cached.items.slice(offset, offset + FANPAGE_GALLERY_PICKER_PAGE_SIZE);
+  const nextOffset = offset + items.length;
+  return {
+    linked: true,
+    totalCount: cached.items.length,
+    items,
+    offset,
+    nextOffset,
+    hasMore: nextOffset < cached.items.length,
+    fetchedAt: cached.fetchedAt,
+  };
 }
 
 function vodListRef(streamerId) {
@@ -2791,21 +2839,71 @@ function normalizeRollingPaperEntry(value, id) {
     || !/^[0-9]{13}_[0-9a-f-]{36}$/i.test(id)) return null;
   const content = typeof value.content === 'string' ? value.content.trim().slice(0, FANPAGE_ROLLING_PAPER_MAX_LENGTH) : '';
   const createdAt = Number(value.createdAt);
-  if (!content || !Number.isFinite(createdAt) || createdAt < 1) return null;
-  return { id, content, createdAt };
+  const rawImage = value.galleryImage && typeof value.galleryImage === 'object' && !Array.isArray(value.galleryImage)
+    ? value.galleryImage
+    : null;
+  const imageId = rawImage && typeof rawImage.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(rawImage.id) ? rawImage.id : '';
+  const imageUrl = rawImage && isGalleryPublicUrl(rawImage.url) ? rawImage.url : '';
+  const galleryImage = imageId && imageUrl ? { id: imageId, url: imageUrl } : null;
+  if ((!content && !galleryImage) || !Number.isFinite(createdAt) || createdAt < 1) return null;
+  return { id, content, createdAt, ...(galleryImage ? { galleryImage } : {}) };
 }
 
-async function readRollingPaper(streamerId, canDelete) {
-  const rootRef = rollingPaperRef(streamerId);
-  const entriesSnapshot = await rootRef.child('entries').orderByKey().limitToLast(FANPAGE_ROLLING_PAPER_MAX_ITEMS).get();
-  const entries = Object.entries(entriesSnapshot.val() || {})
+function rollingPaperObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function rollingPaperTopicEntries(value) {
+  return Object.entries(rollingPaperObject(value))
     .map(([id, entry]) => normalizeRollingPaperEntry(entry, id))
-    .filter(Boolean)
-    .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id));
+    .filter(Boolean);
+}
+
+function normalizeRollingPaperTopics(value) {
+  const root = rollingPaperObject(value);
+  const topicNodes = rollingPaperObject(root.topics);
+  const legacyEntries = rollingPaperTopicEntries(root.entries);
+  const topics = [{
+    id: 'general',
+    title: '응원 메시지',
+    createdAt: 0,
+    count: legacyEntries.length + rollingPaperTopicEntries(topicNodes.general && topicNodes.general.entries).length,
+  }];
+  Object.entries(topicNodes).forEach(([id, topic]) => {
+    if (id === 'general' || !FANPAGE_ROLLING_PAPER_TOPIC_ID_PATTERN.test(id)
+      || !topic || typeof topic !== 'object' || Array.isArray(topic)) return;
+    const title = typeof topic.title === 'string' ? topic.title.trim().slice(0, FANPAGE_ROLLING_PAPER_MAX_TOPIC_TITLE_LENGTH) : '';
+    const createdAt = Number(topic.createdAt) || 0;
+    if (!title) return;
+    topics.push({ id, title, createdAt, count: rollingPaperTopicEntries(topic.entries).length });
+  });
+  return topics.sort((a, b) => a.createdAt - b.createdAt || a.title.localeCompare(b.title, 'ko'));
+}
+
+function rollingPaperTotalCount(value) {
+  const root = rollingPaperObject(value);
+  const topics = rollingPaperObject(root.topics);
+  return rollingPaperTopicEntries(root.entries).length
+    + Object.values(topics).reduce((sum, topic) => sum + rollingPaperTopicEntries(topic && topic.entries).length, 0);
+}
+
+async function readRollingPaper(streamerId, canDelete, topicId = 'general') {
+  const rootSnapshot = await rollingPaperRef(streamerId).get();
+  const root = rollingPaperObject(rootSnapshot.val());
+  const topics = rollingPaperObject(root.topics);
+  const selectedTopic = topics[topicId];
+  const rawEntries = topicId === 'general'
+    ? { ...rollingPaperObject(root.entries), ...rollingPaperObject(selectedTopic && selectedTopic.entries) }
+    : rollingPaperObject(selectedTopic && selectedTopic.entries);
+  const entries = rollingPaperTopicEntries(rawEntries)
+    .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+    .slice(0, FANPAGE_ROLLING_PAPER_MAX_ITEMS);
   return {
     items: entries,
     count: entries.length,
     canDelete,
+    topicId,
+    topics: normalizeRollingPaperTopics(root),
   };
 }
 
@@ -3949,9 +4047,13 @@ exports.streamerFanPageLiveStatus = onCall({ maxInstances: 20 }, async (request)
 
 exports.streamerFanPageGallery = onCall({ maxInstances: 20 }, async (request) => {
   requireAuth(request);
-  const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
   const target = await findVerifiedBySoopId(streamerId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  if (data.view === 'rolling-paper-picker') {
+    return readStreamerGalleryPicker(target, data.offset);
+  }
   return await readStreamerGallery(target);
 });
 
@@ -5470,30 +5572,142 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
   const canDelete = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
   const rootRef = rollingPaperRef(target.streamer.id);
+  const canManageTopics = canDelete;
 
-  if (action === 'list') return readRollingPaper(target.streamer.id, canDelete);
+  if (action === 'list-topics') {
+    const snapshot = await rootRef.get();
+    return {
+      topics: normalizeRollingPaperTopics(snapshot.val()),
+      canDelete,
+      canManageTopics,
+    };
+  }
+
+  if (action === 'create-topic') {
+    if (!canManageTopics) {
+      throw new HttpsError('permission-denied', '해당 스트리머와 관리자만 롤링페이퍼 주제를 추가할 수 있습니다.');
+    }
+    const title = typeof data.title === 'string' ? data.title.replace(/\s+/g, ' ').trim() : '';
+    if (title.length < 2 || title.length > FANPAGE_ROLLING_PAPER_MAX_TOPIC_TITLE_LENGTH
+      || /[\x00-\x1F\x7F]/.test(title)) {
+      throw new HttpsError('invalid-argument', `주제는 2자 이상 ${FANPAGE_ROLLING_PAPER_MAX_TOPIC_TITLE_LENGTH}자 이하로 입력해 주세요.`);
+    }
+    const topicsRef = rootRef.child('topics');
+    const topicsBeforeCreate = rollingPaperObject((await topicsRef.get()).val());
+    const topicId = randomUUID();
+    const createdAt = Date.now();
+    const normalizedTitle = title.normalize('NFKC').toLocaleLowerCase('ko-KR');
+    const reservation = await topicsRef.transaction((current) => {
+      const topics = rollingPaperObject(current === null ? topicsBeforeCreate : current);
+      const existingTopics = normalizeRollingPaperTopics({ topics }).filter((topic) => topic.id !== 'general');
+      if (existingTopics.length >= FANPAGE_ROLLING_PAPER_MAX_TOPICS - 1
+        || existingTopics.some((topic) => topic.title.normalize('NFKC').toLocaleLowerCase('ko-KR') === normalizedTitle)) return undefined;
+      return { ...topics, [topicId]: { title, createdAt } };
+    });
+    if (!reservation.committed) {
+      const latestTopics = rollingPaperObject((await topicsRef.get()).val());
+      const existingTopics = normalizeRollingPaperTopics({ topics: latestTopics }).filter((topic) => topic.id !== 'general');
+      if (existingTopics.some((topic) => topic.title.normalize('NFKC').toLocaleLowerCase('ko-KR') === normalizedTitle)) {
+        throw new HttpsError('already-exists', '이미 같은 이름의 주제가 있어요.');
+      }
+      throw new HttpsError('resource-exhausted', `주제는 최대 ${FANPAGE_ROLLING_PAPER_MAX_TOPICS}개까지 만들 수 있어요.`);
+    }
+    const snapshot = await rootRef.get();
+    return {
+      topic: { id: topicId, title, createdAt, count: 0 },
+      topics: normalizeRollingPaperTopics(snapshot.val()),
+      canDelete,
+      canManageTopics,
+    };
+  }
+
+  const topicId = typeof data.topicId === 'string' && data.topicId.trim() ? data.topicId.trim() : 'general';
+  if (topicId !== 'general' && !FANPAGE_ROLLING_PAPER_TOPIC_ID_PATTERN.test(topicId)) {
+    throw new HttpsError('invalid-argument', '롤링페이퍼 주제를 확인해 주세요.');
+  }
+
+  if (action === 'list') {
+    const result = await readRollingPaper(target.streamer.id, canDelete, topicId);
+    if (topicId !== 'general' && !result.topics.some((topic) => topic.id === topicId)) {
+      throw new HttpsError('not-found', '롤링페이퍼 주제를 찾을 수 없습니다.');
+    }
+    return result;
+  }
 
   if (action === 'add') {
     const content = typeof data.content === 'string' ? data.content.replace(/\r\n?/g, '\n').trim() : '';
-    if (!content || content.length > FANPAGE_ROLLING_PAPER_MAX_LENGTH
+    const hasGalleryImage = Object.hasOwn(data, 'galleryImage') && data.galleryImage !== null;
+    const rawImage = data.galleryImage && typeof data.galleryImage === 'object' && !Array.isArray(data.galleryImage)
+      ? data.galleryImage
+      : null;
+    const imageId = rawImage && typeof rawImage.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(rawImage.id) ? rawImage.id : '';
+    const imageUrl = rawImage && isGalleryPublicUrl(rawImage.url) ? rawImage.url : '';
+    if (hasGalleryImage && (!imageId || !imageUrl)) {
+      throw new HttpsError('invalid-argument', '스트리머 갤러리에서 이미지를 다시 선택해 주세요.');
+    }
+    let galleryImage = null;
+    if (hasGalleryImage) {
+      const [imageSnapshot, galleryStreamerIds] = await Promise.all([
+        db.ref('gallery/imagesPublic').child(imageId).get(),
+        findGalleryStreamerIds(target),
+      ]);
+      const publicImage = imageSnapshot.val();
+      if (!publicImage || !galleryStreamerIds.includes(String(publicImage.streamerId || ''))
+        || !isGalleryPublicUrl(publicImage.thumbUrl) || publicImage.thumbUrl !== imageUrl) {
+        throw new HttpsError('invalid-argument', '현재 스트리머 갤러리에 공개된 이미지만 사용할 수 있어요.');
+      }
+      galleryImage = { id: imageId, url: publicImage.thumbUrl };
+    }
+    if ((!content && !galleryImage) || content.length > FANPAGE_ROLLING_PAPER_MAX_LENGTH
       || /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(content)) {
-      throw new HttpsError('invalid-argument', `메시지는 비어 있지 않게 ${FANPAGE_ROLLING_PAPER_MAX_LENGTH}자 이하로 적어 주세요.`);
+      throw new HttpsError('invalid-argument', `메시지나 갤러리 이미지를 선택하고, 글은 ${FANPAGE_ROLLING_PAPER_MAX_LENGTH}자 이하로 적어 주세요.`);
+    }
+    const initialRoot = rollingPaperObject((await rootRef.get()).val());
+    const initialTopics = rollingPaperObject(initialRoot.topics);
+    if (topicId !== 'general' && !initialTopics[topicId]) {
+      throw new HttpsError('not-found', '롤링페이퍼 주제를 찾을 수 없습니다.');
+    }
+    if (rollingPaperTotalCount(initialRoot) >= FANPAGE_ROLLING_PAPER_MAX_ITEMS) {
+      throw new HttpsError('resource-exhausted', `롤링페이퍼는 최대 ${FANPAGE_ROLLING_PAPER_MAX_ITEMS}개까지 등록할 수 있어요.`);
     }
     const createdAt = Date.now();
     await enforceRollingPaperDailyLimit(uid, target.streamer.id, createdAt);
     const entryId = `${String(createdAt).padStart(13, '0')}_${randomUUID()}`;
-    const entriesRef = rootRef.child('entries');
-    const entriesBeforeAdd = (await entriesRef.get()).val() || {};
-    const reservation = await entriesRef.transaction((current) => {
-      const entries = current === null ? entriesBeforeAdd : current;
-      if (!entries || typeof entries !== 'object' || Array.isArray(entries)) return undefined;
-      if (Object.keys(entries).length >= FANPAGE_ROLLING_PAPER_MAX_ITEMS) return undefined;
-      return { ...entries, [entryId]: { content, createdAt } };
+    const reservation = await rootRef.transaction((current) => {
+      const root = rollingPaperObject(current === null ? initialRoot : current);
+      const topics = rollingPaperObject(root.topics);
+      if (topicId !== 'general' && !topics[topicId]) return undefined;
+      if (rollingPaperTotalCount(root) >= FANPAGE_ROLLING_PAPER_MAX_ITEMS) return undefined;
+      const selectedTopic = rollingPaperObject(topics[topicId]);
+      const entries = rollingPaperObject(selectedTopic.entries);
+      const topic = topicId === 'general'
+        ? { title: '응원 메시지', createdAt: 0, ...selectedTopic }
+        : selectedTopic;
+      return {
+        ...root,
+        topics: {
+          ...topics,
+          [topicId]: {
+            ...topic,
+            entries: {
+              ...entries,
+              [entryId]: { content, ...(galleryImage ? { galleryImage } : {}), createdAt },
+            },
+          },
+        },
+      };
     });
     if (!reservation.committed) {
-      throw new HttpsError('resource-exhausted', `롤링페이퍼는 최대 ${FANPAGE_ROLLING_PAPER_MAX_ITEMS}개까지 등록할 수 있어요.`);
+      const latest = rollingPaperObject((await rootRef.get()).val());
+      if (topicId !== 'general' && !rollingPaperObject(latest.topics)[topicId]) {
+        throw new HttpsError('not-found', '롤링페이퍼 주제를 찾을 수 없습니다.');
+      }
+      if (rollingPaperTotalCount(latest) >= FANPAGE_ROLLING_PAPER_MAX_ITEMS) {
+        throw new HttpsError('resource-exhausted', `롤링페이퍼는 최대 ${FANPAGE_ROLLING_PAPER_MAX_ITEMS}개까지 등록할 수 있어요.`);
+      }
+      throw new HttpsError('aborted', '메시지를 저장하지 못했어요. 다시 시도해 주세요.');
     }
-    return readRollingPaper(target.streamer.id, canDelete);
+    return readRollingPaper(target.streamer.id, canDelete, topicId);
   }
 
   if (action === 'delete') {
@@ -5504,22 +5718,41 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
     if (!/^[0-9]{13}_[0-9a-f-]{36}$/i.test(entryId)) {
       throw new HttpsError('invalid-argument', '삭제할 롤링페이퍼 메시지를 확인해 주세요.');
     }
-    const entriesRef = rootRef.child('entries');
-    const entriesBeforeDelete = await entriesRef.get();
-    const initialEntries = entriesBeforeDelete.val() || {};
-    if (!Object.prototype.hasOwnProperty.call(initialEntries, entryId)) {
+    const initialRoot = rollingPaperObject((await rootRef.get()).val());
+    const initialTopics = rollingPaperObject(initialRoot.topics);
+    const initialTopicEntries = rollingPaperObject(initialTopics[topicId] && initialTopics[topicId].entries);
+    const initialLegacyEntries = topicId === 'general' ? rollingPaperObject(initialRoot.entries) : {};
+    if (!Object.prototype.hasOwnProperty.call(initialTopicEntries, entryId)
+      && !Object.prototype.hasOwnProperty.call(initialLegacyEntries, entryId)) {
       throw new HttpsError('not-found', '삭제할 롤링페이퍼 메시지를 찾을 수 없습니다.');
     }
-    const deletion = await entriesRef.transaction((current) => {
-      const entries = current === null ? initialEntries : current;
-      if (!entries || typeof entries !== 'object' || Array.isArray(entries)
-        || !Object.prototype.hasOwnProperty.call(entries, entryId)) return undefined;
-      const next = { ...entries };
-      delete next[entryId];
+    const deletion = await rootRef.transaction((current) => {
+      const root = rollingPaperObject(current === null ? initialRoot : current);
+      const topics = rollingPaperObject(root.topics);
+      const topic = rollingPaperObject(topics[topicId]);
+      const topicEntries = rollingPaperObject(topic.entries);
+      const legacyEntries = rollingPaperObject(root.entries);
+      const isTopicEntry = Object.prototype.hasOwnProperty.call(topicEntries, entryId);
+      const isLegacyEntry = topicId === 'general' && Object.prototype.hasOwnProperty.call(legacyEntries, entryId);
+      if (!isTopicEntry && !isLegacyEntry) return undefined;
+      const next = { ...root };
+      if (isTopicEntry) {
+        const remaining = { ...topicEntries };
+        delete remaining[entryId];
+        const nextTopic = { ...topic };
+        if (Object.keys(remaining).length) nextTopic.entries = remaining;
+        else delete nextTopic.entries;
+        next.topics = { ...topics, [topicId]: nextTopic };
+      } else {
+        const remaining = { ...legacyEntries };
+        delete remaining[entryId];
+        if (Object.keys(remaining).length) next.entries = remaining;
+        else delete next.entries;
+      }
       return Object.keys(next).length ? next : null;
     });
     if (!deletion.committed) throw new HttpsError('not-found', '삭제할 롤링페이퍼 메시지를 찾을 수 없습니다.');
-    return readRollingPaper(target.streamer.id, canDelete);
+    return readRollingPaper(target.streamer.id, canDelete, topicId);
   }
 
   throw new HttpsError('invalid-argument', '롤링페이퍼 요청을 확인해 주세요.');
