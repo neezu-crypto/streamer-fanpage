@@ -2961,7 +2961,10 @@ function renderFanPage(page, options = {}) {
       ? [featuredPair, createFanPageColumnStacks('fanpage-activity-columns', [upboSection, messengerSection], [rouletteSection]), gallerySection, fanCharacterCard ? null : ogqSection]
       : [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, fanCharacterCard ? null : ogqSection])],
     ['content', createFanPageTabPanel(tabDefinitions[2], layoutDesign === 1
-      ? [createFanPageColumnStacks('fanpage-content-columns', [youtubeSection, playedGamesSection], [songbookSection, cafeSection]), competitionHistorySection]
+      ? [
+        createFanPageColumnStacks('fanpage-content-columns', [youtubeSection], [songbookSection, cafeSection]),
+        createFanPageColumnStacks('fanpage-content-columns fanpage-game-history-columns', [playedGamesSection], [competitionHistorySection]),
+      ]
       : [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
   ]);
   function selectFanPageTab(tabKey, moveFocus = false) {
