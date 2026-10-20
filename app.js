@@ -54,6 +54,8 @@ const MAX_UPBO_ITEMS = 100;
 const DEFAULT_FANPAGE_LAYOUT = 1;
 const BUTTON_CLICK_SOUND_STORAGE_KEY = 'streamerFanPage.buttonClickVolume';
 const DEFAULT_BUTTON_CLICK_VOLUME = 20;
+const YOUTUBE_PLAYER_VOLUME_STORAGE_KEY = 'streamerFanPage.youtubePlayerVolume';
+const DEFAULT_YOUTUBE_PLAYER_VOLUME = 50;
 const buttonClickAudio = new Audio(new URL('./assets/sounds/button-click.mp3', import.meta.url).href);
 const modalOpenAudio = new Audio(new URL('./assets/sounds/modal-open.mp3', import.meta.url).href);
 const saveButtonAudio = new Audio(new URL('./assets/sounds/save-button.mp3', import.meta.url).href);
@@ -63,8 +65,24 @@ catPawCloseArtwork.src = new URL('./assets/fanpage-kawaii/cat-paw-close.svg', im
 let youtubeIframeApiPromise = null;
 let youtubePlayer = null;
 let youtubePlayerGeneration = 0;
-let youtubeVolumeLevel = 100;
-let youtubeLastAudibleVolume = 100;
+function readYouTubePlayerVolume() {
+  try {
+    const stored = localStorage.getItem(YOUTUBE_PLAYER_VOLUME_STORAGE_KEY);
+    if (stored === null) return DEFAULT_YOUTUBE_PLAYER_VOLUME;
+    const volume = Number(stored);
+    return Number.isFinite(volume) ? Math.max(0, Math.min(100, volume)) : DEFAULT_YOUTUBE_PLAYER_VOLUME;
+  } catch (_) {
+    return DEFAULT_YOUTUBE_PLAYER_VOLUME;
+  }
+}
+function setYouTubePlayerVolume(value) {
+  const volume = Number(value);
+  youtubeVolumeLevel = Number.isFinite(volume) ? Math.max(0, Math.min(100, volume)) : DEFAULT_YOUTUBE_PLAYER_VOLUME;
+  try { localStorage.setItem(YOUTUBE_PLAYER_VOLUME_STORAGE_KEY, String(youtubeVolumeLevel)); } catch (_) { /* volume still applies for this visit */ }
+  return youtubeVolumeLevel;
+}
+let youtubeVolumeLevel = readYouTubePlayerVolume();
+let youtubeLastAudibleVolume = youtubeVolumeLevel > 0 ? youtubeVolumeLevel : DEFAULT_YOUTUBE_PLAYER_VOLUME;
 buttonClickAudio.preload = 'auto';
 modalOpenAudio.preload = 'auto';
 saveButtonAudio.preload = 'auto';
@@ -5955,8 +5973,7 @@ function renderYouTubePlayerDialog() {
   link.href = 'https://www.youtube.com/'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'YouTube에서 열기 ↗';
   footer.append(note, link); card.append(heading, frame, volumeControls, footer); dialog.append(card);
   volumeSlider.addEventListener('input', () => {
-    const volume = Math.max(0, Math.min(100, Number(volumeSlider.value) || 0));
-    youtubeVolumeLevel = volume;
+    const volume = setYouTubePlayerVolume(volumeSlider.value);
     if (volume > 0) youtubeLastAudibleVolume = volume;
     if (youtubePlayer) {
       youtubePlayer.setVolume(volume);
@@ -5969,7 +5986,7 @@ function renderYouTubePlayerDialog() {
     if (!youtubePlayer) return;
     if (youtubePlayer.isMuted()) {
       const volume = youtubeVolumeLevel > 0 ? youtubeVolumeLevel : youtubeLastAudibleVolume;
-      youtubeVolumeLevel = volume;
+      youtubeVolumeLevel = setYouTubePlayerVolume(volume);
       volumeSlider.value = String(volume);
       youtubePlayer.setVolume(volume);
       youtubePlayer.unMute();
@@ -6093,11 +6110,8 @@ function openYouTubePlayer(video) {
             return;
           }
           youtubePlayer = event.target;
-          const currentVolume = Number(youtubePlayer.getVolume());
-          if (currentVolume > 0) {
-            youtubeVolumeLevel = Math.min(100, Math.max(0, Math.round(currentVolume)));
-            youtubeLastAudibleVolume = youtubeVolumeLevel;
-          }
+          youtubePlayer.setVolume(youtubeVolumeLevel);
+          if (youtubeVolumeLevel === 0) youtubePlayer.mute();
           $('youtubePlayerVolume').disabled = false;
           $('youtubePlayerMuteButton').disabled = false;
           $('youtubePlayerNote').textContent = '영상은 YouTube 공식 플레이어로 재생돼요. 아래 볼륨 조절은 쇼츠 화면에서도 사용할 수 있어요.';
