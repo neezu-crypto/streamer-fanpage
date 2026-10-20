@@ -73,6 +73,8 @@ const YOUTUBE_VIDEO_PAGE_SIZE = 24;
 const YOUTUBE_CACHE_TTL_MS = 30 * 60 * 1000;
 const YOUTUBE_REFRESH_COOLDOWN_MS = 60 * 1000;
 const FANPAGE_SONGBOOK_MAX_ITEMS = 500;
+const FANPAGE_PLAYED_GAMES_MAX_ITEMS = 100;
+const FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS = 20;
 const CAFE_POST_PREVIEW_SIZE = 6;
 const CAFE_POST_CACHE_TTL_MS = 5 * 60 * 1000;
 const NAVER_CAFE_API_BASE = 'https://apis.naver.com/cafe-web/cafe-boardlist-api/v1';
@@ -2743,6 +2745,110 @@ function normalizeSongbookEntries(value) {
     .slice(-FANPAGE_SONGBOOK_MAX_ITEMS);
 }
 
+function parseSteamGameUrl(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 500) return null;
+  try {
+    const parsed = new URL(value.trim());
+    if (parsed.protocol !== 'https:' || !['store.steampowered.com', 'www.store.steampowered.com'].includes(parsed.hostname)
+      || parsed.username || parsed.password || parsed.port) return null;
+    const match = /^\/app\/(\d+)(?:\/|$)/i.exec(parsed.pathname);
+    if (!match || !/^[1-9]\d{0,9}$/.test(match[1])) return null;
+    const appId = match[1];
+    return { appId, url: `https://store.steampowered.com/app/${appId}/` };
+  } catch (_) {
+    return null;
+  }
+}
+
+function parseSoopVodUrl(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 500) return null;
+  try {
+    const parsed = new URL(value.trim());
+    if (parsed.protocol !== 'https:' || !['vod.sooplive.com', 'vod.afreecatv.com'].includes(parsed.hostname)
+      || parsed.username || parsed.password || parsed.port) return null;
+    const match = /^\/player\/(\d+)(?:\/|$)/i.exec(parsed.pathname);
+    if (!match || !/^\d{1,20}$/.test(match[1])) return null;
+    const id = match[1];
+    return { id, url: `https://vod.sooplive.com/player/${id}` };
+  } catch (_) {
+    return null;
+  }
+}
+
+function playedGamesRef(streamerId) {
+  return db.ref(`streamerFanPagePlayedGames/${streamerId}`);
+}
+
+function normalizePlayedGames(value) {
+  const entries = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return Object.entries(entries)
+    .map(([key, raw]) => {
+      if (!/^[1-9]\d{0,9}$/.test(key) || !raw || typeof raw !== 'object') return null;
+      const rawThumbnail = typeof raw.thumbnailUrl === 'string' ? raw.thumbnailUrl : '';
+      let thumbnailUrl = '';
+      try {
+        const parsed = new URL(rawThumbnail);
+        if (parsed.protocol === 'https:' && (parsed.hostname === 'steamstatic.com' || parsed.hostname.endsWith('.steamstatic.com'))) {
+          thumbnailUrl = parsed.href;
+        }
+      } catch (_) { /* Missing or unexpected Steam artwork is omitted. */ }
+      const rawVods = raw.vods && typeof raw.vods === 'object' && !Array.isArray(raw.vods) ? raw.vods : {};
+      const vods = Object.entries(rawVods)
+        .filter(([id, vod]) => /^\d{1,20}$/.test(id) && vod && typeof vod === 'object')
+        .map(([id, vod]) => ({
+          id,
+          url: `https://vod.sooplive.com/player/${id}`,
+          createdAt: Number.isFinite(Number(vod.createdAt)) ? Number(vod.createdAt) : 0,
+        }))
+        .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+        .slice(-FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS);
+      return {
+        appId: key,
+        name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 200) : `Steam 게임 ${key}`,
+        steamUrl: `https://store.steampowered.com/app/${key}/`,
+        thumbnailUrl,
+        createdAt: Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : 0,
+        vods,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.createdAt - a.createdAt || a.appId.localeCompare(b.appId))
+    .slice(0, FANPAGE_PLAYED_GAMES_MAX_ITEMS);
+}
+
+async function fetchSteamGameMetadata(appId) {
+  let response;
+  try {
+    const params = new URLSearchParams({ appids: appId, cc: 'kr', l: 'koreana' });
+    response = await fetch(`https://store.steampowered.com/api/appdetails?${params}`, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (_) {
+    throw new HttpsError('unavailable', 'Steam 게임 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!response.ok) throw new HttpsError('unavailable', 'Steam 게임 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (_) {
+    throw new HttpsError('unavailable', 'Steam 게임 정보를 읽지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  const result = payload && payload[appId];
+  const game = result && result.success && result.data && result.data.type === 'game' ? result.data : null;
+  if (!game) throw new HttpsError('failed-precondition', 'Steam에 등록된 게임 링크인지 확인해 주세요.');
+  const name = typeof game.name === 'string' ? game.name.trim().slice(0, 200) : '';
+  if (!name) throw new HttpsError('failed-precondition', '게임 이름을 확인할 수 없어요. Steam 링크를 확인해 주세요.');
+  let thumbnailUrl = '';
+  try {
+    const parsed = new URL(typeof game.header_image === 'string' ? game.header_image : '');
+    if (parsed.protocol === 'https:' && (parsed.hostname === 'steamstatic.com' || parsed.hostname.endsWith('.steamstatic.com'))) {
+      thumbnailUrl = parsed.href;
+    }
+  } catch (_) { /* Steam artwork can be absent for some products. */ }
+  return { name, thumbnailUrl };
+}
+
 function parseNaverCafeUrl(value) {
   if (typeof value !== 'string' || !value.trim() || value.length > 300) return null;
   try {
@@ -3417,11 +3523,12 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
 
   const target = await findVerifiedBySoopId(requestedId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
-  const [pageSnap, vods, stockNamesSnap, songbookSnap, fanpageEmotesSnap] = await Promise.all([
+  const [pageSnap, vods, stockNamesSnap, songbookSnap, playedGamesSnap, fanpageEmotesSnap] = await Promise.all([
     pageRef(target.streamer.id).get(),
     readVodPage(target.streamer.id),
     db.ref('streamerNames').get(),
     songbookRef(target.streamer.id).get(),
+    playedGamesRef(target.streamer.id).get(),
     db.ref(`streamerFanPageEmotes/${target.streamer.id}`).get(),
     recordRecentVisit(uid, target.streamer.id),
     ...(!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)
@@ -3439,6 +3546,7 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
       vods,
       stock,
       songbook: normalizeSongbookEntries(songbookSnap.val()),
+      playedGames: normalizePlayedGames(playedGamesSnap.val()),
       decorations: normalizeFanpageEmotes(fanpageEmotesSnap.val()),
     },
   };
@@ -5197,6 +5305,106 @@ exports.streamerFanPageSongbook = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxI
   }
 
   throw new HttpsError('invalid-argument', '노래책 요청을 확인해 주세요.');
+});
+
+exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+  let targetStreamer;
+  if (isAdmin) {
+    const targetId = String(data.streamerId || '').trim().toLowerCase();
+    if (!targetId) throw new HttpsError('invalid-argument', '수정할 팬페이지를 지정해 주세요.');
+    targetStreamer = await findVerifiedBySoopId(targetId);
+    if (!targetStreamer) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  } else {
+    if (!verified) throw new HttpsError('permission-denied', '인증 스트리머 또는 관리자만 플레이한 게임을 수정할 수 있습니다.');
+    targetStreamer = verified;
+  }
+
+  const action = String(data.action || '');
+  const rootRef = playedGamesRef(targetStreamer.streamer.id);
+  if (action === 'add-game') {
+    const parsed = parseSteamGameUrl(data.steamUrl);
+    if (!parsed) throw new HttpsError('invalid-argument', 'Steam 게임 링크를 확인해 주세요.');
+    const existing = (await rootRef.get()).val();
+    const entries = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
+    if (Object.prototype.hasOwnProperty.call(entries, parsed.appId)) {
+      throw new HttpsError('already-exists', '이미 추가한 게임이에요.');
+    }
+    if (Object.keys(entries).length >= FANPAGE_PLAYED_GAMES_MAX_ITEMS) {
+      throw new HttpsError('resource-exhausted', `게임은 최대 ${FANPAGE_PLAYED_GAMES_MAX_ITEMS}개까지 등록할 수 있어요.`);
+    }
+
+    const metadata = await fetchSteamGameMetadata(parsed.appId);
+    const entry = { ...metadata, createdAt: Date.now(), vods: {} };
+    const transaction = await rootRef.transaction((current) => {
+      const games = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
+      if (Object.prototype.hasOwnProperty.call(games, parsed.appId) || Object.keys(games).length >= FANPAGE_PLAYED_GAMES_MAX_ITEMS) return undefined;
+      return { ...games, [parsed.appId]: entry };
+    });
+    if (!transaction.committed) {
+      const latest = (await rootRef.get()).val() || {};
+      if (Object.prototype.hasOwnProperty.call(latest, parsed.appId)) throw new HttpsError('already-exists', '이미 추가한 게임이에요.');
+      throw new HttpsError('resource-exhausted', `게임은 최대 ${FANPAGE_PLAYED_GAMES_MAX_ITEMS}개까지 등록할 수 있어요.`);
+    }
+    return { playedGames: normalizePlayedGames(transaction.snapshot.val()) };
+  }
+
+  if (action === 'delete-game') {
+    const appId = String(data.appId || '').trim();
+    if (!/^[1-9]\d{0,9}$/.test(appId)) throw new HttpsError('invalid-argument', '삭제할 게임을 확인해 주세요.');
+    const current = (await rootRef.child(appId).get()).val();
+    if (!current) throw new HttpsError('not-found', '삭제할 게임을 찾을 수 없습니다.');
+    await rootRef.child(appId).remove();
+    return { playedGames: normalizePlayedGames((await rootRef.get()).val()) };
+  }
+
+  if (action === 'add-vod') {
+    const appId = String(data.appId || '').trim();
+    const parsed = parseSoopVodUrl(data.vodUrl);
+    if (!/^[1-9]\d{0,9}$/.test(appId) || !parsed) {
+      throw new HttpsError('invalid-argument', 'Steam 게임과 SOOP 다시보기 링크를 확인해 주세요.');
+    }
+    const gameSnapshot = await rootRef.child(appId).get();
+    const game = gameSnapshot.val();
+    if (!game || typeof game !== 'object') throw new HttpsError('not-found', '다시보기를 연결할 게임을 찾을 수 없습니다.');
+    const existingVods = game.vods && typeof game.vods === 'object' && !Array.isArray(game.vods) ? game.vods : {};
+    if (Object.prototype.hasOwnProperty.call(existingVods, parsed.id)) {
+      throw new HttpsError('already-exists', '이미 이 게임에 연결한 다시보기예요.');
+    }
+    if (Object.keys(existingVods).length >= FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS) {
+      throw new HttpsError('resource-exhausted', `게임 하나에 다시보기 링크를 최대 ${FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS}개까지 연결할 수 있어요.`);
+    }
+    const transaction = await rootRef.child(appId).transaction((current) => {
+      if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
+      const vods = current.vods && typeof current.vods === 'object' && !Array.isArray(current.vods) ? current.vods : {};
+      if (Object.prototype.hasOwnProperty.call(vods, parsed.id) || Object.keys(vods).length >= FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS) return undefined;
+      return { ...current, vods: { ...vods, [parsed.id]: { createdAt: Date.now() } } };
+    });
+    if (!transaction.committed) {
+      const latest = (await rootRef.child(appId).get()).val();
+      const vods = latest && latest.vods && typeof latest.vods === 'object' ? latest.vods : {};
+      if (!latest) throw new HttpsError('not-found', '다시보기를 연결할 게임을 찾을 수 없습니다.');
+      if (Object.prototype.hasOwnProperty.call(vods, parsed.id)) throw new HttpsError('already-exists', '이미 이 게임에 연결한 다시보기예요.');
+      throw new HttpsError('resource-exhausted', `게임 하나에 다시보기 링크를 최대 ${FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS}개까지 연결할 수 있어요.`);
+    }
+    return { playedGames: normalizePlayedGames((await rootRef.get()).val()) };
+  }
+
+  if (action === 'delete-vod') {
+    const appId = String(data.appId || '').trim();
+    const vodId = String(data.vodId || '').trim();
+    if (!/^[1-9]\d{0,9}$/.test(appId) || !/^\d{1,20}$/.test(vodId)) {
+      throw new HttpsError('invalid-argument', '삭제할 게임이나 다시보기를 확인해 주세요.');
+    }
+    const vodRef = rootRef.child(appId).child('vods').child(vodId);
+    if (!(await vodRef.get()).exists()) throw new HttpsError('not-found', '삭제할 다시보기 링크를 찾을 수 없습니다.');
+    await vodRef.remove();
+    return { playedGames: normalizePlayedGames((await rootRef.get()).val()) };
+  }
+
+  throw new HttpsError('invalid-argument', '플레이한 게임 요청을 확인해 주세요.');
 });
 
 exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3600, memory: '1GiB' }, async (request) => {

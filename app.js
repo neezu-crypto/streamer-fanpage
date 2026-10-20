@@ -25,6 +25,7 @@ const callDesignFeedback = httpsCallable(functions, 'streamerFanPageDesignFeedba
 const callAdminViewerSubscriptionRequests = httpsCallable(functions, 'streamerFanPageAdminViewerSubscriptionRequests');
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
 const callSongbook = httpsCallable(functions, 'streamerFanPageSongbook');
+const callPlayedGames = httpsCallable(functions, 'streamerFanPagePlayedGames');
 const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
 const callVodComments = httpsCallable(functions, 'streamerFanPageVodComments');
 const callVodCommentAdd = httpsCallable(functions, 'streamerFanPageVodCommentAdd');
@@ -2827,13 +2828,14 @@ function renderFanPage(page, options = {}) {
   const vodSection = renderVodSection(page);
   const youtubeSection = renderYouTubeSection(page);
   const songbookSection = renderSongbookSection(page);
+  const playedGamesSection = renderPlayedGamesSection(page);
   const ogqSection = fanCharacterCard ? null : renderOgqSection(page);
   const cafeSection = renderCafeSection(page);
   const calendarSection = renderCalendarSection(page);
   const gallerySection = renderGallerySection(page);
   const competitionHistorySection = renderCompetitionHistorySection(page);
   const contentSections = [upboSection, rouletteSection, messengerSection, liveSection, vodSection,
-    youtubeSection, songbookSection, ogqSection, cafeSection, calendarSection, gallerySection, competitionHistorySection].filter(Boolean);
+    youtubeSection, songbookSection, playedGamesSection, ogqSection, cafeSection, calendarSection, gallerySection, competitionHistorySection].filter(Boolean);
   if (featuredPair) view.append(featuredPair);
   if (layoutDesign === 1) {
     const grid = document.createElement('div'); grid.className = 'fanpage-design-one-grid';
@@ -2841,7 +2843,7 @@ function renderFanPage(page, options = {}) {
     const sideColumn = document.createElement('aside'); sideColumn.className = 'fanpage-design-one-column fanpage-design-one-side-column';
     [gallerySection, competitionHistorySection, liveSection, vodSection, cafeSection, calendarSection]
       .filter(Boolean).forEach((contentSection) => mainColumn.append(contentSection));
-    [upboSection, rouletteSection, messengerSection, youtubeSection, songbookSection, ogqSection]
+    [upboSection, rouletteSection, messengerSection, youtubeSection, songbookSection, playedGamesSection, ogqSection]
       .filter(Boolean).forEach((contentSection) => sideColumn.append(contentSection));
     grid.append(mainColumn, sideColumn);
     view.append(grid);
@@ -3058,7 +3060,7 @@ function createFanPageQuickRemote(view) {
     ['fan-character-ogq-pair', '팬 캐릭터·OGQ'], ['upbo-section', '업보 정리'],
     ['roulette-section', '룰렛 확률'], ['messenger-link-section', '메신저'],
     ['live-section', '방송 상태'], ['vod-section', '다시보기'],
-    ['youtube-section', 'YouTube'], ['songbook-section', '노래책'],
+    ['youtube-section', 'YouTube'], ['songbook-section', '노래책'], ['played-games-section', '플레이한 게임'],
     ['ogq-section', 'OGQ 이모티콘'], ['cafe-section', '네이버 카페'],
     ['calendar-section', '방송 일정'], ['fan-gallery-section', '팬 갤러리'],
     ['fan-banner-bottom', '하단 배너'],
@@ -4469,6 +4471,201 @@ function refreshSongbookSection(streamerId) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const section = $('songbookSection');
   if (section) section.replaceWith(renderSongbookSection(currentPage));
+}
+
+function renderPlayedGamesSection(page) {
+  const games = Array.isArray(page.playedGames) ? page.playedGames : [];
+  const section = document.createElement('section');
+  section.className = 'played-games-section content-card';
+  section.id = 'playedGamesSection';
+
+  const heading = document.createElement('div'); heading.className = 'played-games-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'PLAYED GAMES';
+  const title = document.createElement('h2'); title.textContent = '플레이한 게임';
+  const count = document.createElement('span'); count.className = 'played-games-count';
+  count.textContent = `${games.length.toLocaleString('ko-KR')}개`;
+  copy.append(eyebrow, title, count); heading.append(copy); section.append(heading);
+
+  const description = document.createElement('p'); description.className = 'played-games-description';
+  description.textContent = '함께 플레이한 게임과 다시보기를 모아뒀어요.';
+  section.append(description);
+
+  if (page.isOwner) {
+    const form = document.createElement('form'); form.className = 'played-games-add-form';
+    const input = document.createElement('input'); input.type = 'url'; input.name = 'steamUrl';
+    input.required = true; input.maxLength = 500; input.placeholder = 'Steam 게임 링크를 붙여 넣어 주세요';
+    input.setAttribute('aria-label', '추가할 Steam 게임 링크');
+    const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary';
+    add.textContent = '＋ 게임 추가';
+    form.append(input, add);
+    const hint = document.createElement('small'); hint.className = 'played-games-owner-hint';
+    hint.textContent = 'Steam 게임 링크를 확인해 이름과 썸네일을 가져옵니다. 게임마다 SOOP 다시보기를 연결할 수 있어요.';
+    form.append(hint);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (form.reportValidity()) addPlayedGame(page, input, add);
+    });
+    section.append(form);
+  }
+
+  if (!games.length) {
+    const empty = document.createElement('p'); empty.className = 'played-games-empty-state';
+    empty.textContent = page.isOwner ? '아직 추가한 게임이 없어요. Steam 링크로 첫 게임을 등록해 보세요.' : '아직 등록된 게임이 없어요.';
+    section.append(empty);
+    return section;
+  }
+
+  const grid = document.createElement('div'); grid.className = 'played-games-grid';
+  const cachedVods = page.vods && Array.isArray(page.vods.items) ? page.vods.items : [];
+  games.forEach((game) => {
+    const appId = String(game && game.appId || '');
+    if (!/^[1-9]\d{0,9}$/.test(appId)) return;
+    const card = document.createElement('article'); card.className = 'played-game-card';
+    const top = document.createElement('div'); top.className = 'played-game-main';
+    const link = document.createElement('a'); link.className = 'played-game-steam-link';
+    link.href = `https://store.steampowered.com/app/${encodeURIComponent(appId)}/`;
+    link.target = '_blank'; link.rel = 'noopener noreferrer';
+    link.setAttribute('aria-label', `${game.name || 'Steam 게임'} Steam 페이지 열기`);
+    const frame = document.createElement('span'); frame.className = 'played-game-thumbnail-frame';
+    if (typeof game.thumbnailUrl === 'string' && /^https:\/\/(?:[^/]+\.)?steamstatic\.com\//i.test(game.thumbnailUrl)) {
+      const image = document.createElement('img'); image.className = 'played-game-thumbnail';
+      image.src = game.thumbnailUrl; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
+      image.addEventListener('error', () => { image.remove(); frame.classList.add('is-missing'); }, { once: true });
+      frame.append(image);
+    } else {
+      frame.classList.add('is-missing');
+    }
+    const details = document.createElement('span'); details.className = 'played-game-details';
+    const name = document.createElement('strong'); name.textContent = game.name || 'Steam 게임';
+    const shortcut = document.createElement('span'); shortcut.textContent = 'Steam에서 게임 보기 ↗';
+    details.append(name, shortcut); link.append(frame, details); top.append(link);
+    if (page.isOwner) {
+      const removeGame = document.createElement('button'); removeGame.type = 'button';
+      removeGame.className = 'button played-game-delete-button'; removeGame.textContent = '삭제';
+      removeGame.setAttribute('aria-label', `${game.name || '게임'} 삭제`);
+      removeGame.addEventListener('click', () => deletePlayedGame(page, appId, removeGame));
+      top.append(removeGame);
+    }
+    card.append(top);
+
+    const vods = Array.isArray(game.vods) ? game.vods : [];
+    const vodHeading = document.createElement('div'); vodHeading.className = 'played-game-vods-heading';
+    const vodLabel = document.createElement('strong'); vodLabel.textContent = '다시보기';
+    const vodCount = document.createElement('span'); vodCount.textContent = `${vods.length}개`;
+    vodHeading.append(vodLabel, vodCount); card.append(vodHeading);
+    if (vods.length) {
+      const vodList = document.createElement('ul'); vodList.className = 'played-game-vod-list';
+      vods.forEach((vodEntry) => {
+        const vodId = String(vodEntry && vodEntry.id || '');
+        if (!/^\d{1,20}$/.test(vodId)) return;
+        const vodData = cachedVods.find((item) => String(item && item.id) === vodId);
+        const item = document.createElement('li'); item.className = 'played-game-vod-item';
+        const vodLink = document.createElement('a'); vodLink.href = `https://vod.sooplive.com/player/${encodeURIComponent(vodId)}`;
+        vodLink.target = '_blank'; vodLink.rel = 'noopener noreferrer';
+        vodLink.textContent = vodData && vodData.title && vodData.title !== '제목 없음' ? vodData.title : `다시보기 #${vodId}`;
+        vodLink.setAttribute('aria-label', `${vodLink.textContent} 열기`);
+        item.append(vodLink);
+        if (page.isOwner) {
+          const removeVod = document.createElement('button'); removeVod.type = 'button';
+          removeVod.className = 'played-game-vod-delete'; removeVod.textContent = '×';
+          removeVod.setAttribute('aria-label', `다시보기 #${vodId} 삭제`);
+          removeVod.addEventListener('click', () => deletePlayedGameVod(page, appId, vodId, removeVod));
+          item.append(removeVod);
+        }
+        vodList.append(item);
+      });
+      card.append(vodList);
+    } else {
+      const noVods = document.createElement('p'); noVods.className = 'played-game-no-vods';
+      noVods.textContent = '연결된 다시보기가 없어요.';
+      card.append(noVods);
+    }
+    if (page.isOwner) {
+      const vodForm = document.createElement('form'); vodForm.className = 'played-game-vod-form';
+      const vodInput = document.createElement('input'); vodInput.type = 'url'; vodInput.name = 'vodUrl';
+      vodInput.required = true; vodInput.maxLength = 500; vodInput.placeholder = 'SOOP 다시보기 링크';
+      vodInput.setAttribute('aria-label', `${game.name || '게임'}에 연결할 SOOP 다시보기 링크`);
+      const addVod = document.createElement('button'); addVod.type = 'submit'; addVod.className = 'button'; addVod.textContent = '링크 연결';
+      vodForm.append(vodInput, addVod);
+      vodForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (vodForm.reportValidity()) addPlayedGameVod(page, appId, vodInput, addVod);
+      });
+      card.append(vodForm);
+    }
+    grid.append(card);
+  });
+  section.append(grid);
+  return section;
+}
+
+async function addPlayedGame(page, input, button) {
+  if (!page.isOwner || button.disabled) return;
+  button.disabled = true; button.textContent = '게임 확인 중…';
+  try {
+    const result = (await callPlayedGames({ action: 'add-game', streamerId: page.streamer.id, steamUrl: input.value.trim() })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    currentPage.playedGames = Array.isArray(result.playedGames) ? result.playedGames : [];
+    refreshPlayedGamesSection(page.streamer.id);
+    showToast('플레이한 게임을 추가했어요.');
+  } catch (error) {
+    showToast(error.message || '게임을 추가하지 못했어요.');
+  } finally {
+    button.disabled = false; button.textContent = '＋ 게임 추가';
+  }
+}
+
+async function addPlayedGameVod(page, appId, input, button) {
+  if (!page.isOwner || button.disabled) return;
+  button.disabled = true; button.textContent = '연결 중…';
+  try {
+    const result = (await callPlayedGames({ action: 'add-vod', streamerId: page.streamer.id, appId, vodUrl: input.value.trim() })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    currentPage.playedGames = Array.isArray(result.playedGames) ? result.playedGames : [];
+    refreshPlayedGamesSection(page.streamer.id);
+    showToast('다시보기를 게임에 연결했어요.');
+  } catch (error) {
+    showToast(error.message || '다시보기를 연결하지 못했어요.');
+  } finally {
+    button.disabled = false; button.textContent = '링크 연결';
+  }
+}
+
+async function deletePlayedGame(page, appId, button) {
+  if (!page.isOwner || button.disabled || !confirm('이 게임과 연결된 다시보기를 모두 삭제할까요?')) return;
+  button.disabled = true;
+  try {
+    const result = (await callPlayedGames({ action: 'delete-game', streamerId: page.streamer.id, appId })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    currentPage.playedGames = Array.isArray(result.playedGames) ? result.playedGames : [];
+    refreshPlayedGamesSection(page.streamer.id);
+    showToast('게임을 삭제했어요.');
+  } catch (error) {
+    showToast(error.message || '게임을 삭제하지 못했어요.');
+    button.disabled = false;
+  }
+}
+
+async function deletePlayedGameVod(page, appId, vodId, button) {
+  if (!page.isOwner || button.disabled || !confirm('이 다시보기 링크를 삭제할까요?')) return;
+  button.disabled = true;
+  try {
+    const result = (await callPlayedGames({ action: 'delete-vod', streamerId: page.streamer.id, appId, vodId })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    currentPage.playedGames = Array.isArray(result.playedGames) ? result.playedGames : [];
+    refreshPlayedGamesSection(page.streamer.id);
+    showToast('다시보기 링크를 삭제했어요.');
+  } catch (error) {
+    showToast(error.message || '다시보기를 삭제하지 못했어요.');
+    button.disabled = false;
+  }
+}
+
+function refreshPlayedGamesSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('playedGamesSection');
+  if (section) section.replaceWith(renderPlayedGamesSection(currentPage));
 }
 
 function renderOgqSection(page, paired = false) {

@@ -341,6 +341,43 @@
 .songbook-delete-button{flex:none;padding:8px 11px;color:#efb0bd;font-size:11px}
 @media(max-width:720px){.songbook-heading h2{font-size:21px}.songbook-add-form{grid-template-columns:1fr}.songbook-add-form .button{width:100%}.songbook-entry{gap:10px}.songbook-thumbnail-frame{flex-basis:104px;width:104px;height:59px}.songbook-entry-details strong{font-size:13px}.songbook-delete-button{padding:7px 9px}}
 @media(max-width:380px){.songbook-row{gap:6px;padding:6px}.songbook-thumbnail-frame{flex-basis:88px;width:88px;height:50px}.songbook-entry-details strong{font-size:12px}.songbook-entry-details>span{font-size:10px}}
+.played-games-section{margin-top:18px}
+.played-games-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.played-games-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.played-games-heading h2{display:inline-block;margin:0;font:23px var(--display)}
+.played-games-count{margin-left:9px;color:var(--muted);font-size:12px}
+.played-games-description{margin:8px 0 14px;color:#aaa3b1;font-size:12px;line-height:1.6}
+.played-games-add-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:14px}
+.played-games-add-form input,.played-game-vod-form input{width:100%;min-width:0;min-height:40px;padding:9px 11px;border:1px solid #ffffff20;border-radius:10px;background:#111018;color:var(--text);outline:0;font:12px var(--font)}
+.played-games-add-form input:focus,.played-game-vod-form input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.played-games-add-form .button{white-space:nowrap}
+.played-games-owner-hint{grid-column:1/-1;color:#8f8997;font-size:11px;line-height:1.5}
+.played-games-empty-state{margin:0;padding:15px;border-radius:10px;background:#ffffff04;color:#96909d;text-align:center;font-size:12px}
+.played-games-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px}
+.played-game-card{min-width:0;padding:10px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff04}
+.played-game-main{display:flex;align-items:flex-start;gap:7px;min-width:0}
+.played-game-steam-link{display:grid;flex:1;min-width:0;color:var(--text);text-decoration:none}
+.played-game-thumbnail-frame{position:relative;display:grid;place-items:center;aspect-ratio:460/215;overflow:hidden;border:1px solid #ffffff12;border-radius:9px;background:linear-gradient(135deg,#302631,#17151e)}
+.played-game-thumbnail-frame.is-missing::after{content:'STEAM GAME';color:#ffffff55;font-size:10px;font-weight:800;letter-spacing:.14em}
+.played-game-thumbnail{width:100%;height:100%;object-fit:cover}
+.played-game-details{display:grid;gap:5px;min-width:0;padding:9px 2px 0}
+.played-game-details strong{overflow:hidden;font-size:14px;text-overflow:ellipsis;white-space:nowrap;transition:color .18s}
+.played-game-steam-link:hover .played-game-details strong{color:var(--pink)}
+.played-game-details>span{color:#928a9a;font-size:11px}
+.played-game-delete-button{flex:none;padding:6px 8px;color:#efb0bd;font-size:10px}
+.played-game-vods-heading{display:flex;align-items:center;gap:7px;margin-top:11px;padding-top:9px;border-top:1px solid #ffffff10;font-size:11px}
+.played-game-vods-heading span{color:#928a9a}
+.played-game-vod-list{display:grid;gap:5px;max-height:125px;overflow:auto;margin:7px 0 0;padding:0;list-style:none}
+.played-game-vod-item{display:flex;align-items:center;gap:7px;min-width:0;padding:6px 8px;border-radius:8px;background:#ffffff05}
+.played-game-vod-item a{overflow:hidden;flex:1;min-width:0;color:#cfc5d4;font-size:11px;text-decoration:none;text-overflow:ellipsis;white-space:nowrap}
+.played-game-vod-item a:hover{color:var(--pink)}
+.played-game-vod-delete{flex:none;width:24px;height:24px;border:0;border-radius:50%;background:#ffffff08;color:#efb0bd;font-size:17px;line-height:1}
+.played-game-no-vods{margin:7px 0 0;color:#928a9a;font-size:11px}
+.played-game-vod-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin-top:8px}
+.played-game-vod-form input{min-height:34px;padding:7px 9px;font-size:11px}
+.played-game-vod-form .button{padding:6px 9px;font-size:10px;white-space:nowrap}
+@media(max-width:720px){.played-games-heading h2{font-size:21px}.played-games-add-form{grid-template-columns:1fr}.played-games-add-form .button{width:100%}.played-games-grid{grid-template-columns:1fr 1fr;gap:8px}.played-game-card{padding:8px}.played-game-details strong{font-size:13px}.played-game-vod-form{grid-template-columns:1fr}.played-game-vod-form .button{width:100%}}
+@media(max-width:420px){.played-games-grid{grid-template-columns:1fr}.played-game-vod-form{grid-template-columns:minmax(0,1fr) auto}.played-game-vod-form .button{width:auto}}
 .calendar-section{margin-top:18px}
 .calendar-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
 .calendar-heading .eyebrow{margin:0 0 5px;font-size:9px}
