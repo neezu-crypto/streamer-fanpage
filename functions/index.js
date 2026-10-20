@@ -3172,6 +3172,25 @@ function normalizePage(streamer, value) {
   };
 }
 
+function normalizeFanpageEmotes(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  return Object.entries(value).slice(0, 100).flatMap(([id, item]) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)
+      || !/^[A-Za-z0-9_-]{1,128}$/.test(id)
+      || typeof item.stickerId !== 'string' || !/^[a-z0-9_-]{1,64}$/i.test(item.stickerId)) return [];
+    const x = Number(item.x);
+    const y = Number(item.y);
+    if (!Number.isFinite(x) || x < 0 || x > 1 || !Number.isFinite(y) || y < 0 || y > 1) return [];
+    return [{
+      id,
+      stickerId: item.stickerId,
+      x,
+      y,
+      updatedAt: Number.isFinite(Number(item.updatedAt)) ? Number(item.updatedAt) : 0,
+    }];
+  });
+}
+
 function normalizeFanPageCompetitionHistory(value, options = {}) {
   const strict = options.strict === true;
   const invalid = () => {
@@ -3398,11 +3417,12 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
 
   const target = await findVerifiedBySoopId(requestedId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
-  const [pageSnap, vods, stockNamesSnap, songbookSnap] = await Promise.all([
+  const [pageSnap, vods, stockNamesSnap, songbookSnap, fanpageEmotesSnap] = await Promise.all([
     pageRef(target.streamer.id).get(),
     readVodPage(target.streamer.id),
     db.ref('streamerNames').get(),
     songbookRef(target.streamer.id).get(),
+    db.ref(`streamerFanPageEmotes/${target.streamer.id}`).get(),
     recordRecentVisit(uid, target.streamer.id),
     ...(!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)
       ? [recordFanPageView(uid, target.streamer.id).catch((error) => {
@@ -3414,7 +3434,13 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
   return {
     verifiedStreamer: verified ? verified.streamer : null,
     isAdmin,
-    page: { ...normalizePage(target.streamer, pageSnap.val()), vods, stock, songbook: normalizeSongbookEntries(songbookSnap.val()) },
+    page: {
+      ...normalizePage(target.streamer, pageSnap.val()),
+      vods,
+      stock,
+      songbook: normalizeSongbookEntries(songbookSnap.val()),
+      decorations: normalizeFanpageEmotes(fanpageEmotesSnap.val()),
+    },
   };
 });
 

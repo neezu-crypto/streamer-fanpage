@@ -138,6 +138,31 @@ function showFanPageModal(dialog) {
   modalOpenGeneration += 1;
   if (activePointerSoundActivation?.soundType !== 'modal') playUiSound(modalOpenAudio);
 }
+window.streamerFanPageOpenLoginModal = () => showFanPageModal($('loginChoiceDialog'));
+
+function publishFanpageEmoteContext(page) {
+  const context = {
+    streamerId: page && page.streamer ? String(page.streamer.id || '').trim().toLowerCase() : '',
+    isStreamerOwner: !!(page && page.isStreamerOwner),
+    decorations: page && Array.isArray(page.decorations) ? page.decorations : [],
+  };
+  window.__streamerFanPageEmotes = context;
+  window.__gameSeriesEmoteRoomId = context.streamerId || 'public';
+  window.dispatchEvent(new CustomEvent('game-series-emote-room-change', {
+    detail: { roomId: context.streamerId || 'public' },
+  }));
+  window.dispatchEvent(new CustomEvent('streamer-fanpage-emotes-context-change', { detail: context }));
+}
+
+window.addEventListener('streamer-fanpage-emotes-updated', (event) => {
+  if (currentPage?.streamer.id === event.detail?.streamerId) {
+    currentPage.decorations = Array.isArray(event.detail.decorations) ? event.detail.decorations : [];
+  }
+});
+window.addEventListener('streamer-fanpage-emotes-error', (event) => {
+  showToast(event.detail?.message || '스티커를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+});
+
 function isSaveOrCompleteButton(button) {
   return /저장|완료|save|done|complete/i.test([
     button.textContent || '', button.getAttribute('aria-label') || '', button.title || '',
@@ -1122,6 +1147,7 @@ function setVisibleView(page) {
     stockPriceUnsubscribe = null;
   }
   if (!page) stockPriceSparklineRequest += 1;
+  if (!page) publishFanpageEmoteContext(null);
   document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-account-banner-hidden');
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active');
@@ -2650,6 +2676,7 @@ function renderFanPage(page, options = {}) {
   }
   stockPriceSparklineRequest += 1;
   currentPage = page;
+  publishFanpageEmoteContext(page);
   const view = $('fanPageView');
   view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2');
   view.classList.remove('has-account-top-banner');
