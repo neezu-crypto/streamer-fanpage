@@ -1323,3 +1323,9 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 @media (max-width: 560px) {
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog { border-radius: 20px; }
 }
+
+@media(min-width:1280px){
+  body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button{border-color:#ded6ea;background:linear-gradient(180deg,#fff 0%,#fffafd 58%,#f5f1fa 100%);color:#5b5067;box-shadow:0 4px 0 #dfd8e8,0 7px 12px #75608014,inset 0 2px 0 #fff}
+  body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button::before{color:var(--jelly-accent-deep)}
+  body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button:hover{border-color:color-mix(in srgb,var(--jelly-accent),white 38%);box-shadow:0 6px 0 #dfd8e8,0 9px 14px #75608018,inset 0 2px 0 #fff}
+}
