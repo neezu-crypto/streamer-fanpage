@@ -5516,6 +5516,13 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
       throw new HttpsError('invalid-argument', '삭제할 롤링페이퍼 메시지를 확인해 주세요.');
     }
     const entriesRef = rootRef.child('entries');
+    const entriesBeforeDelete = await entriesRef.get();
+    const storedEntryIds = Object.keys(entriesBeforeDelete.val() || {});
+    console.info('Rolling paper delete lookup', JSON.stringify({
+      requestedEntryId: entryId,
+      storedEntryIds,
+      exactMatch: storedEntryIds.includes(entryId),
+    }));
     const deletion = await entriesRef.transaction((current) => {
       if (!current || typeof current !== 'object' || Array.isArray(current)
         || !Object.prototype.hasOwnProperty.call(current, entryId)) return undefined;
