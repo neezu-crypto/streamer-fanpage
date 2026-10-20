@@ -685,6 +685,9 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
 }
 #fanPageView.fanpage-layout-1 .vod-player-heading .button:not(.profile-settings-close):hover { border-color: var(--kawaii-accent); background: #fff3f8; }
 #fanPageView.fanpage-layout-1 .vod-player-frame { box-shadow: 0 4px 14px #44344e18; }
+#fanPageView.fanpage-layout-1 .youtube-player-volume { border-color: #eadfeb; background: #fff8fc; }
+#fanPageView.fanpage-layout-1 .youtube-player-volume input[type=range] { accent-color: var(--kawaii-accent); }
+#fanPageView.fanpage-layout-1 .youtube-player-volume output { color: #81758b; }
 #fanPageView.fanpage-layout-1 .vod-player-footer p { color: #81758b; }
 #fanPageView.fanpage-layout-1 .vod-player-footer .button-primary {
   border-color: var(--kawaii-accent);
@@ -777,6 +780,11 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog
   background: linear-gradient(145deg, #fffefd, #fff8fc);
   box-shadow: 0 9px 0 #dcc9df88, 0 26px 72px #44344e30;
 }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .youtube-player-volume {
+  border-color: #eadfeb;
+  background: #fff8fc;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .youtube-player-volume output { color: #81758b; }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog::backdrop {
   background: #51465d55;
   backdrop-filter: blur(6px);
