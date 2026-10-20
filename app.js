@@ -2913,8 +2913,21 @@ function renderFanPage(page, options = {}) {
     panel.append(heading, grid);
     return panel;
   }
+  const homePanel = createFanPageTabPanel(tabDefinitions[0], layoutDesign === 1 ? [] : [liveSection, calendarSection, vodSection]);
+  if (layoutDesign === 1) {
+    const homeColumns = document.createElement('div');
+    homeColumns.className = 'fanpage-home-columns';
+    const mainColumn = document.createElement('div');
+    mainColumn.className = 'fanpage-home-main-column';
+    const sideColumn = document.createElement('div');
+    sideColumn.className = 'fanpage-home-side-column';
+    mainColumn.append(liveSection, vodSection);
+    sideColumn.append(calendarSection);
+    homeColumns.append(mainColumn, sideColumn);
+    homePanel.querySelector('.fanpage-tab-panel-grid').append(homeColumns);
+  }
   const tabPanels = new Map([
-    ['home', createFanPageTabPanel(tabDefinitions[0], [liveSection, calendarSection, vodSection])],
+    ['home', homePanel],
     ['activity', createFanPageTabPanel(tabDefinitions[1], [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, fanCharacterCard ? null : ogqSection])],
     ['content', createFanPageTabPanel(tabDefinitions[2], [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
   ]);
