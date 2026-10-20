@@ -345,7 +345,7 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1.fanpage-theme-sora :is(.content-card, .live-section, .messenger-link-section, .fan-character-ogq-pair) { border-color: #dbe4f8; box-shadow: 0 6px 0 #cdd8ed88, 0 15px 35px #536f9a12; }
 #fanPageView.fanpage-layout-1 .content-card { padding: 22px; }
 #fanPageView.fanpage-layout-1 :is(.content-card, .live-section, .messenger-link-section) :is(h2, h3, h4, h5, strong) { color: var(--text); }
-#fanPageView.fanpage-layout-1 .content-card :is(.upbo-subtitle, .roulette-description, .songbook-description, .youtube-status, .youtube-empty-state, .calendar-owner-hint, .fan-gallery-subtitle, .fan-gallery-count, .vod-count, .vod-refresh-status, .upbo-topic-copy p, .upbo-viewer-total, .upbo-request-note, .upbo-item-batch-status, .upbo-empty-copy p, .upbo-empty-copy strong, .profile-link-empty-state, .cafe-more-link) { color: #81758b; }
+#fanPageView.fanpage-layout-1 .content-card :is(.upbo-subtitle, .roulette-description, .songbook-description, .played-games-description, .youtube-status, .youtube-empty-state, .calendar-owner-hint, .fan-gallery-subtitle, .fan-gallery-count, .vod-count, .vod-refresh-status, .upbo-topic-copy p, .upbo-viewer-total, .upbo-request-note, .upbo-item-batch-status, .upbo-empty-copy p, .upbo-empty-copy strong, .profile-link-empty-state, .cafe-more-link) { color: #81758b; }
 #fanPageView.fanpage-layout-1 .eyebrow { color: var(--kawaii-accent-deep); }
 #fanPageView.fanpage-layout-1 .content-card .button,
 #fanPageView.fanpage-layout-1 .live-section .button,
@@ -445,7 +445,19 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
 #fanPageView.fanpage-layout-1 .songbook-entry-details strong { color: #51465d; }
 #fanPageView.fanpage-layout-1 .songbook-entry-details > span,
 #fanPageView.fanpage-layout-1 .songbook-owner-hint { color: #81758b; }
+#fanPageView.fanpage-layout-1 .played-game-card { border-color: #e8deea; background: #fffafd; }
+#fanPageView.fanpage-layout-1 .played-game-steam-link,
+#fanPageView.fanpage-layout-1 .played-game-vods-heading strong { color: #51465d; }
+#fanPageView.fanpage-layout-1 .played-game-details > span,
+#fanPageView.fanpage-layout-1 .played-game-vods-heading > span,
+#fanPageView.fanpage-layout-1 .played-game-vod-item a,
+#fanPageView.fanpage-layout-1 .played-game-no-vods,
+#fanPageView.fanpage-layout-1 .played-games-owner-hint { color: #81758b; }
+#fanPageView.fanpage-layout-1 .played-game-vods-heading { border-color: #e8deea; }
+#fanPageView.fanpage-layout-1 .played-game-vod-item { background: #fff; }
+#fanPageView.fanpage-layout-1 .played-game-vod-delete { background: #fff0f6; }
 #fanPageView.fanpage-layout-1 .songbook-empty-state,
+#fanPageView.fanpage-layout-1 .played-games-empty-state,
 #fanPageView.fanpage-layout-1 .youtube-status,
 #fanPageView.fanpage-layout-1 .upbo-status,
 #fanPageView.fanpage-layout-1 .upbo-inline-empty,
