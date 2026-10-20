@@ -1134,6 +1134,32 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .competition-history-form-status.is-error{display:block}
 .competition-history-form-footer{align-items:center;margin-top:0}
 .competition-history-form-footer small{color:#928a9a;font-size:10px}
+.rolling-paper-section{margin-top:18px}
+.rolling-paper-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
+.rolling-paper-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.rolling-paper-heading h2{display:inline-block;margin:0;font:23px var(--display)}
+.rolling-paper-subtitle{margin:5px 0 0;color:#aaa3b1;font-size:12px;line-height:1.55}
+.rolling-paper-heading-actions{display:flex;align-items:center;gap:10px}
+.rolling-paper-count{color:var(--muted);font-size:11px;white-space:nowrap}
+.rolling-paper-refresh{min-height:34px;padding:0 11px;font-size:10px;white-space:nowrap}
+.rolling-paper-form{display:grid;gap:9px;margin-bottom:14px}
+.rolling-paper-form textarea{box-sizing:border-box;width:100%;min-width:0;min-height:88px;padding:11px 13px;border:1px solid #ffffff20;border-radius:12px;background:#111018;color:var(--text);outline:0;font:12px/1.65 var(--font);resize:vertical}
+.rolling-paper-form textarea:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.rolling-paper-form textarea::placeholder{color:#928a9a}
+.rolling-paper-form-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.rolling-paper-note{color:#8f8997;font-size:10px;line-height:1.55}
+.rolling-paper-form-footer .button{flex:none;min-height:36px;padding:0 13px;font-size:10px}
+.rolling-paper-status{margin:0 0 12px;color:#aaa3b1;font-size:11px;line-height:1.55}
+.rolling-paper-status.is-error{color:#ef9eae}
+.rolling-paper-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;max-height:min(55vh,480px);overflow:auto;padding:1px 4px 4px 1px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
+.rolling-paper-entry{position:relative;min-width:0;min-height:94px;padding:13px 14px;border:1px solid #ffffff16;border-radius:14px;background:linear-gradient(135deg,#ffffff08,#ffffff03)}
+.rolling-paper-entry-heading{display:flex;align-items:center;gap:8px;min-width:0}
+.rolling-paper-entry-author{color:#f3bfd0;font-size:11px}
+.rolling-paper-entry-date{color:#928a9a;font-size:10px;white-space:nowrap}
+.rolling-paper-delete{margin-left:auto;min-height:27px;padding:0 8px;color:#efb0bd;font-size:10px}
+.rolling-paper-entry-content{margin:10px 0 0;color:#d7cfda;font-size:12px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.rolling-paper-empty{grid-column:1/-1;display:grid;min-height:82px;place-items:center;margin:0;padding:14px;border:1px dashed #ffffff24;border-radius:13px;background:#ffffff04;color:#aaa1b2;font-size:12px;text-align:center;line-height:1.6}
+@media(max-width:560px){.rolling-paper-heading{align-items:flex-start;gap:10px}.rolling-paper-heading h2{font-size:21px}.rolling-paper-heading-actions{gap:7px}.rolling-paper-refresh{padding-inline:9px}.rolling-paper-form-footer{align-items:flex-start;flex-direction:column}.rolling-paper-form-footer .button{width:100%}.rolling-paper-list{grid-template-columns:1fr;max-height:min(62vh,560px)}.rolling-paper-entry{padding:12px}}
 @media(min-width:561px){
   .competition-history-dialog{width:min(620px,calc(100vw - 40px));max-height:calc(100vh - 40px);max-height:min(760px,calc(100dvh - 40px))}
 }

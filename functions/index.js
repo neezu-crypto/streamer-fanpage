@@ -75,6 +75,9 @@ const YOUTUBE_REFRESH_COOLDOWN_MS = 60 * 1000;
 const FANPAGE_SONGBOOK_MAX_ITEMS = 500;
 const FANPAGE_PLAYED_GAMES_MAX_ITEMS = 100;
 const FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS = 20;
+const FANPAGE_ROLLING_PAPER_MAX_ITEMS = 300;
+const FANPAGE_ROLLING_PAPER_MAX_LENGTH = 300;
+const FANPAGE_ROLLING_PAPER_DAILY_POST_LIMIT = 5;
 const CAFE_POST_PREVIEW_SIZE = 6;
 const CAFE_POST_CACHE_TTL_MS = 5 * 60 * 1000;
 const NAVER_CAFE_API_BASE = 'https://apis.naver.com/cafe-web/cafe-boardlist-api/v1';
@@ -2779,6 +2782,54 @@ function playedGamesRef(streamerId) {
   return db.ref(`streamerFanPagePlayedGames/${streamerId}`);
 }
 
+function rollingPaperRef(streamerId) {
+  return db.ref(`streamerFanPageRollingPapers/${streamerId}`);
+}
+
+function normalizeRollingPaperEntry(value, id) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || !/^[0-9]{13}_[0-9a-f-]{36}$/i.test(id)) return null;
+  const content = typeof value.content === 'string' ? value.content.trim().slice(0, FANPAGE_ROLLING_PAPER_MAX_LENGTH) : '';
+  const createdAt = Number(value.createdAt);
+  if (!content || !Number.isFinite(createdAt) || createdAt < 1) return null;
+  return { id, content, createdAt };
+}
+
+async function readRollingPaper(streamerId, canDelete) {
+  const rootRef = rollingPaperRef(streamerId);
+  const [entriesSnapshot, countSnapshot] = await Promise.all([
+    rootRef.child('entries').orderByKey().limitToLast(FANPAGE_ROLLING_PAPER_MAX_ITEMS).get(),
+    rootRef.child('count').get(),
+  ]);
+  const entries = Object.entries(entriesSnapshot.val() || {})
+    .map(([id, entry]) => normalizeRollingPaperEntry(entry, id))
+    .filter(Boolean)
+    .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id));
+  return {
+    items: entries,
+    count: Math.max(entries.length, Math.max(0, Math.floor(Number(countSnapshot.val()) || 0))),
+    canDelete,
+  };
+}
+
+function rollingPaperKoreaDayKey(timestamp) {
+  return new Date(timestamp + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+async function enforceRollingPaperDailyLimit(uid, streamerId, now) {
+  const uidHash = createHash('sha256').update(`streamerFanPageRollingPaper:${uid}`).digest('hex');
+  const limitRef = db.ref(`streamerFanPageRollingPaperLimits/${streamerId}/${uidHash}`);
+  const dayKey = rollingPaperKoreaDayKey(now);
+  const transaction = await limitRef.transaction((current) => {
+    const sameDayCount = current && current.dayKey === dayKey ? Math.max(0, Math.floor(Number(current.count) || 0)) : 0;
+    if (sameDayCount >= FANPAGE_ROLLING_PAPER_DAILY_POST_LIMIT) return undefined;
+    return { dayKey, count: sameDayCount + 1, updatedAt: now };
+  });
+  if (!transaction.committed) {
+    throw new HttpsError('resource-exhausted', `하루에 익명 메시지를 ${FANPAGE_ROLLING_PAPER_DAILY_POST_LIMIT}개까지 남길 수 있어요.`);
+  }
+}
+
 function normalizePlayedGames(value) {
   const entries = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return Object.entries(entries)
@@ -5405,6 +5456,73 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
   }
 
   throw new HttpsError('invalid-argument', '플레이한 게임 요청을 확인해 주세요.');
+});
+
+exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const action = String(data.action || '');
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  if (!streamerId) throw new HttpsError('invalid-argument', '롤링페이퍼를 확인할 팬페이지를 지정해 주세요.');
+
+  const [target, verified, isAdmin] = await Promise.all([
+    findVerifiedBySoopId(streamerId),
+    findVerifiedByUid(uid),
+    isAdminUid(uid),
+  ]);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  const canDelete = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
+  const rootRef = rollingPaperRef(target.streamer.id);
+
+  if (action === 'list') return readRollingPaper(target.streamer.id, canDelete);
+
+  if (action === 'add') {
+    const content = typeof data.content === 'string' ? data.content.replace(/\r\n?/g, '\n').trim() : '';
+    if (!content || content.length > FANPAGE_ROLLING_PAPER_MAX_LENGTH
+      || /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(content)) {
+      throw new HttpsError('invalid-argument', `메시지는 비어 있지 않게 ${FANPAGE_ROLLING_PAPER_MAX_LENGTH}자 이하로 적어 주세요.`);
+    }
+    const countRef = rootRef.child('count');
+    const currentCount = Math.max(0, Math.floor(Number((await countRef.get()).val()) || 0));
+    if (currentCount >= FANPAGE_ROLLING_PAPER_MAX_ITEMS) {
+      throw new HttpsError('resource-exhausted', `롤링페이퍼는 최대 ${FANPAGE_ROLLING_PAPER_MAX_ITEMS}개까지 등록할 수 있어요.`);
+    }
+    const createdAt = Date.now();
+    await enforceRollingPaperDailyLimit(uid, target.streamer.id, createdAt);
+    const reservation = await countRef.transaction((current) => {
+      const count = Math.max(0, Math.floor(Number(current) || 0));
+      if (count >= FANPAGE_ROLLING_PAPER_MAX_ITEMS) return undefined;
+      return count + 1;
+    });
+    if (!reservation.committed) {
+      throw new HttpsError('resource-exhausted', `롤링페이퍼는 최대 ${FANPAGE_ROLLING_PAPER_MAX_ITEMS}개까지 등록할 수 있어요.`);
+    }
+    const entryId = `${String(createdAt).padStart(13, '0')}_${randomUUID()}`;
+    try {
+      await rootRef.child('entries').child(entryId).set({ content, createdAt });
+    } catch (error) {
+      await countRef.transaction((current) => Math.max(0, Math.floor(Number(current) || 0) - 1)).catch(() => {});
+      throw error;
+    }
+    return readRollingPaper(target.streamer.id, canDelete);
+  }
+
+  if (action === 'delete') {
+    if (!canDelete) {
+      throw new HttpsError('permission-denied', '해당 스트리머와 관리자만 롤링페이퍼 메시지를 삭제할 수 있습니다.');
+    }
+    const entryId = typeof data.entryId === 'string' ? data.entryId.trim() : '';
+    if (!/^[0-9]{13}_[0-9a-f-]{36}$/i.test(entryId)) {
+      throw new HttpsError('invalid-argument', '삭제할 롤링페이퍼 메시지를 확인해 주세요.');
+    }
+    const entryRef = rootRef.child('entries').child(entryId);
+    const deletion = await entryRef.transaction((current) => current ? null : undefined);
+    if (!deletion.committed) throw new HttpsError('not-found', '삭제할 롤링페이퍼 메시지를 찾을 수 없습니다.');
+    await rootRef.child('count').transaction((current) => Math.max(0, Math.floor(Number(current) || 0) - 1));
+    return readRollingPaper(target.streamer.id, canDelete);
+  }
+
+  throw new HttpsError('invalid-argument', '롤링페이퍼 요청을 확인해 주세요.');
 });
 
 exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3600, memory: '1GiB' }, async (request) => {
