@@ -1339,7 +1339,8 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .fanpage-tab-column{display:grid;align-content:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column>*{min-width:0;margin:0}
 #fanPageView.fanpage-layout-1 .fanpage-content-overview-columns{align-items:stretch}
-#fanPageView.fanpage-layout-1 .fanpage-content-overview-columns .fanpage-tab-column:last-child{grid-template-rows:repeat(2,minmax(0,1fr))}
+#fanPageView.fanpage-layout-1 .fanpage-content-overview-columns .fanpage-tab-column{align-content:stretch}
+#fanPageView.fanpage-layout-1 .fanpage-content-overview-columns .fanpage-tab-column:last-child{grid-template-rows:repeat(2,minmax(min-content,auto))}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=home] .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1fr)}
 #fanPageView.fanpage-layout-1 .fanpage-home-columns{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);align-items:start;gap:20px}
 #fanPageView.fanpage-layout-1 :is(.fanpage-home-main-column,.fanpage-home-side-column){display:grid;align-content:start;gap:20px;min-width:0}
