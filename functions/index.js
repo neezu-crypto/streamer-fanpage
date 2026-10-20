@@ -2797,17 +2797,14 @@ function normalizeRollingPaperEntry(value, id) {
 
 async function readRollingPaper(streamerId, canDelete) {
   const rootRef = rollingPaperRef(streamerId);
-  const [entriesSnapshot, countSnapshot] = await Promise.all([
-    rootRef.child('entries').orderByKey().limitToLast(FANPAGE_ROLLING_PAPER_MAX_ITEMS).get(),
-    rootRef.child('count').get(),
-  ]);
+  const entriesSnapshot = await rootRef.child('entries').orderByKey().limitToLast(FANPAGE_ROLLING_PAPER_MAX_ITEMS).get();
   const entries = Object.entries(entriesSnapshot.val() || {})
     .map(([id, entry]) => normalizeRollingPaperEntry(entry, id))
     .filter(Boolean)
     .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id));
   return {
     items: entries,
-    count: Math.max(entries.length, Math.max(0, Math.floor(Number(countSnapshot.val()) || 0))),
+    count: entries.length,
     canDelete,
   };
 }
@@ -5482,27 +5479,19 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
       || /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(content)) {
       throw new HttpsError('invalid-argument', `메시지는 비어 있지 않게 ${FANPAGE_ROLLING_PAPER_MAX_LENGTH}자 이하로 적어 주세요.`);
     }
-    const countRef = rootRef.child('count');
-    const currentCount = Math.max(0, Math.floor(Number((await countRef.get()).val()) || 0));
-    if (currentCount >= FANPAGE_ROLLING_PAPER_MAX_ITEMS) {
-      throw new HttpsError('resource-exhausted', `롤링페이퍼는 최대 ${FANPAGE_ROLLING_PAPER_MAX_ITEMS}개까지 등록할 수 있어요.`);
-    }
     const createdAt = Date.now();
     await enforceRollingPaperDailyLimit(uid, target.streamer.id, createdAt);
-    const reservation = await countRef.transaction((current) => {
-      const count = Math.max(0, Math.floor(Number(current) || 0));
-      if (count >= FANPAGE_ROLLING_PAPER_MAX_ITEMS) return undefined;
-      return count + 1;
+    const entryId = `${String(createdAt).padStart(13, '0')}_${randomUUID()}`;
+    const entriesRef = rootRef.child('entries');
+    const entriesBeforeAdd = (await entriesRef.get()).val() || {};
+    const reservation = await entriesRef.transaction((current) => {
+      const entries = current === null ? entriesBeforeAdd : current;
+      if (!entries || typeof entries !== 'object' || Array.isArray(entries)) return undefined;
+      if (Object.keys(entries).length >= FANPAGE_ROLLING_PAPER_MAX_ITEMS) return undefined;
+      return { ...entries, [entryId]: { content, createdAt } };
     });
     if (!reservation.committed) {
       throw new HttpsError('resource-exhausted', `롤링페이퍼는 최대 ${FANPAGE_ROLLING_PAPER_MAX_ITEMS}개까지 등록할 수 있어요.`);
-    }
-    const entryId = `${String(createdAt).padStart(13, '0')}_${randomUUID()}`;
-    try {
-      await rootRef.child('entries').child(entryId).set({ content, createdAt });
-    } catch (error) {
-      await countRef.transaction((current) => Math.max(0, Math.floor(Number(current) || 0) - 1)).catch(() => {});
-      throw error;
     }
     return readRollingPaper(target.streamer.id, canDelete);
   }
@@ -5517,28 +5506,19 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
     }
     const entriesRef = rootRef.child('entries');
     const entriesBeforeDelete = await entriesRef.get();
-    const storedEntryIds = Object.keys(entriesBeforeDelete.val() || {});
-    console.info('Rolling paper delete lookup', JSON.stringify({
-      requestedEntryId: entryId,
-      storedEntryIds,
-      exactMatch: storedEntryIds.includes(entryId),
-    }));
+    const initialEntries = entriesBeforeDelete.val() || {};
+    if (!Object.prototype.hasOwnProperty.call(initialEntries, entryId)) {
+      throw new HttpsError('not-found', '삭제할 롤링페이퍼 메시지를 찾을 수 없습니다.');
+    }
     const deletion = await entriesRef.transaction((current) => {
-      const currentEntryIds = current && typeof current === 'object' && !Array.isArray(current) ? Object.keys(current) : [];
-      console.info('Rolling paper delete transaction input', JSON.stringify({
-        currentType: current === null ? 'null' : typeof current,
-        currentEntryIds,
-        exactMatch: currentEntryIds.includes(entryId),
-      }));
-      if (!current || typeof current !== 'object' || Array.isArray(current)
-        || !Object.prototype.hasOwnProperty.call(current, entryId)) return undefined;
-      const next = { ...current };
+      const entries = current === null ? initialEntries : current;
+      if (!entries || typeof entries !== 'object' || Array.isArray(entries)
+        || !Object.prototype.hasOwnProperty.call(entries, entryId)) return undefined;
+      const next = { ...entries };
       delete next[entryId];
       return Object.keys(next).length ? next : null;
     });
-    console.info('Rolling paper delete transaction result', JSON.stringify({ committed: deletion.committed }));
     if (!deletion.committed) throw new HttpsError('not-found', '삭제할 롤링페이퍼 메시지를 찾을 수 없습니다.');
-    await rootRef.child('count').transaction((current) => Math.max(0, Math.floor(Number(current) || 0) - 1));
     return readRollingPaper(target.streamer.id, canDelete);
   }
 
