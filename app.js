@@ -2554,7 +2554,23 @@ function renderRollingPaperSection(page) {
   refresh.addEventListener('click', () => activeTopic
     ? loadRollingPaperEntries(page, activeTopic.id, true)
     : loadRollingPaperTopics(page, true));
-  actions.append(count, refresh);
+  actions.append(count);
+  if (activeTopic && !page.isStreamerOwner) {
+    const composerOpen = state.composeTopicId === activeTopic.id;
+    const composeToggle = document.createElement('button'); composeToggle.type = 'button';
+    composeToggle.className = 'button button-primary rolling-paper-topic-compose';
+    composeToggle.textContent = composerOpen ? '작성 닫기' : '메시지 남기기';
+    composeToggle.setAttribute('aria-expanded', String(composerOpen));
+    composeToggle.addEventListener('click', () => {
+      state.composeTopicId = composerOpen ? '' : activeTopic.id;
+      state.entryError = '';
+      state.selectedGalleryImage = null;
+      refreshRollingPaperSection(streamerId);
+      if (!composerOpen) requestAnimationFrame(() => $('rollingPaperSection')?.querySelector('textarea[name="message"]')?.focus({ preventScroll: true }));
+    });
+    actions.append(composeToggle);
+  }
+  actions.append(refresh);
   heading.append(headingCopy, actions);
   section.append(heading);
 
@@ -2616,6 +2632,7 @@ function renderRollingPaperSection(page) {
       viewEntries.setAttribute('aria-label', '받은 메시지 보기');
       viewEntries.addEventListener('click', () => {
         state.activeTopicId = topic.id;
+        state.composeTopicId = topic.id;
         state.entryError = '';
         state.selectedGalleryImage = null;
         refreshRollingPaperSection(streamerId);
@@ -2640,13 +2657,14 @@ function renderRollingPaperSection(page) {
   const back = document.createElement('button'); back.type = 'button'; back.className = 'button rolling-paper-back';
   back.textContent = '← 주제 목록'; back.addEventListener('click', () => {
     state.activeTopicId = '';
-    state.composeTopicId = activeTopic.id;
     state.entryError = '';
     refreshRollingPaperSection(streamerId);
   });
   section.insertBefore(back, heading);
 
-  if (!page.isStreamerOwner) section.append(createRollingPaperComposer(page, activeTopic.id));
+  if (!page.isStreamerOwner && state.composeTopicId === activeTopic.id) {
+    section.append(createRollingPaperComposer(page, activeTopic.id));
+  }
 
   const status = document.createElement('p'); status.className = 'rolling-paper-status';
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
@@ -2900,6 +2918,7 @@ async function addRollingPaperEntry(page, nicknameInput, textarea, button, topic
     state.loadedTopicIds.add(topicId);
     state.topics = Array.isArray(result.topics) ? result.topics : state.topics;
     state.canDelete = result.canDelete === true; state.submitting = false; state.selectedGalleryImage = null; state.entryError = '';
+    state.activeTopicId = topicId; state.composeTopicId = ''; state.galleryOpen = false;
     nicknameInput.value = ''; textarea.value = '';
     refreshRollingPaperSection(streamerId);
     showToast('메시지를 롤링페이퍼에 남겼어요.');
