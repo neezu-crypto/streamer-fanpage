@@ -998,10 +998,10 @@ function renderAdminViewerSubscriptionRequests(requests, truncated = false) {
     account.textContent = '계정 UID · ' + (uid.length > 8 ? '…' + uid.slice(-8) : uid);
     const donationStatus = document.createElement('small');
     donationStatus.textContent = request.verificationSource === 'soop-donation-notification'
-      ? 'SOOP 후원 알림 자동 확인 완료'
+      ? '과거 SOOP 후원 알림 자동 확인 기록'
       : request.donationCompletedAt
         ? '후원 완료 신호 · ' + new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(request.donationCompletedAt))
-        : request.donorSoopId ? '신청 후 자동 감시 중 · 완료 알림 없음' : '자동 확인 정보 없음';
+        : request.donorSoopId ? '후원 완료 표시 전 · 관리자 수동 확인 대기' : '후원 정보 없음 · 관리자 수동 확인';
     const requestedAt = document.createElement('small');
     requestedAt.textContent = request.requestedAt
       ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(request.requestedAt))
@@ -1018,7 +1018,7 @@ function renderAdminViewerSubscriptionRequests(requests, truncated = false) {
     const processingAge = Date.now() - (Number(request.processingAt) || 0);
     const processingActive = request.status === 'processing' && processingAge < 2 * 60 * 1000;
     approve.disabled = processingActive;
-    approve.textContent = processingActive ? '자동 승인 처리 중…' : request.status === 'processing' ? '승인 재개' : '후원 확인 · 30일 승인';
+    approve.textContent = processingActive ? '수동 승인 처리 중…' : request.status === 'processing' ? '승인 재개' : '후원 확인 · 30일 승인';
     actions.append(approve);
     if (request.status === 'pending') {
       const reject = document.createElement('button');
@@ -1033,7 +1033,7 @@ function renderAdminViewerSubscriptionRequests(requests, truncated = false) {
     container.append(row);
   });
   $('viewerSubscriptionAdminStatus').textContent = rows.length
-    ? `${formatStatCount(rows.length)}건 대기 중${truncated ? ' · 200건까지만 표시' : ''}. 자동 확인이 일치하지 않거나 오래 멈춘 신청은 후원자 SOOP 아이디와 후원 내역을 확인해 처리해 주세요.`
+    ? `${formatStatCount(rows.length)}건 대기 중${truncated ? ' · 200건까지만 표시' : ''}. 후원 완료 신호와 후원자 SOOP 아이디를 참고해 내역을 확인한 뒤 수동 승인 또는 반려해 주세요.`
     : '현재 확인 대기 중인 신청이 없습니다.';
 }
 async function loadAdminViewerSubscriptionRequests() {

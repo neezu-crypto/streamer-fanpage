@@ -246,7 +246,7 @@ exports.streamerFanPageSponsorAds = onCall({ maxInstances: 20, enforceAppCheck: 
 
     if (action === 'donationComplete') {
       const now = Date.now();
-      // 자동 대조가 먼저 승인한 뒤 브라우저의 상태 폴링이 갱신되기 전에
+      // 관리자가 수동 승인을 처리하는 동안 브라우저 상태 폴링이 갱신되기 전에
       // 사용자가 완료 버튼을 누를 수 있다. 승인/처리 중 상태는 오류로 돌리지 않는다.
       if (existing.status === 'approved') {
         const ad = existing.campaignId
@@ -285,7 +285,7 @@ exports.streamerFanPageSponsorAds = onCall({ maxInstances: 20, enforceAppCheck: 
       }
       if (!claim.committed && !(claimValue && claimValue.status === 'pending' &&
           claimValue.soopId === requestSoopId && Number(claimValue.donationCompletedAt) > 0)) {
-        // 자동 검증이 같은 순간에 승인을 시작했을 수 있으니 최신 상태를 확인하고,
+        // 관리자가 같은 순간에 승인을 시작했을 수 있으니 최신 상태를 확인하고,
         // 대기열에 남은 정상 신청에는 기존의 잘못된 '자리 없음' 안내를 하지 않는다.
         const [latestRequestSnapshot, latestClaimSnapshot] = await Promise.all([
           requestRef.get(),

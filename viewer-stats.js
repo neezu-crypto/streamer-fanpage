@@ -26,7 +26,6 @@ const callViewerSubscription = httpsCallable(functions, 'streamerFanPageViewerSu
 const callSponsorAds = httpsCallable(functions, 'streamerFanPageSponsorAds');
 const callAdminSponsorAds = httpsCallable(functions, 'streamerFanPageAdminSponsorAds');
 const callSponsorLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
-const VIEWER_SUBSCRIPTION_MONITOR_MS = 60 * 60 * 1000;
 const $ = (id) => document.getElementById(id);
 
 function setupDevbarMarquee() {
@@ -153,7 +152,6 @@ let subscriptionState = {
   expiresAt: 0,
   pending: false,
   pendingRequestId: '',
-  pendingRequestedAt: 0,
   pendingDonorSoopId: '',
   pendingBalloonCost: 33,
   pendingDonationCompletedAt: 0,
@@ -310,7 +308,6 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
       expiresAt: Number(data.expiresAt) || 0,
       pending: data.pending === true,
       pendingRequestId: typeof data.pendingRequestId === 'string' ? data.pendingRequestId : '',
-      pendingRequestedAt: Number(data.pendingRequestedAt) || 0,
       pendingDonorSoopId: typeof data.pendingDonorSoopId === 'string' ? data.pendingDonorSoopId : '',
       pendingBalloonCost: Number(data.pendingBalloonCost) || 33,
       pendingDonationCompletedAt: Number(data.pendingDonationCompletedAt) || 0,
@@ -332,7 +329,7 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
       comparisonGateWaiting = true;
       setComparisonStatus(subscriptionState.accountProtected
         ? subscriptionState.pending
-          ? `구독 신청 승인 대기 중이에요. ${subscriptionState.pendingBalloonCost}개 후원을 확인하면 선택한 스트리머와 날짜의 비교 결과가 자동으로 열립니다.`
+          ? `구독 신청 승인 대기 중이에요. 관리자가 ${subscriptionState.pendingBalloonCost}개 후원을 확인해 승인하면 선택한 스트리머와 날짜의 비교 결과가 열립니다.`
           : '로그인이 확인됐어요. 별풍선 33개 구독을 신청하면 승인 후 비교 결과가 자동으로 열립니다.'
         : '선택한 스트리머와 날짜는 유지돼요. 새 탭에서 로그인한 뒤 이 화면으로 돌아와 주세요.');
       renderComparisonSelection();
@@ -341,7 +338,7 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
       keywordComparisonGateWaiting = true;
       setKeywordComparisonStatus(subscriptionState.accountProtected
         ? subscriptionState.pending
-          ? `구독 신청 승인 대기 중이에요. ${subscriptionState.pendingBalloonCost}개 후원을 확인하면 선택한 스트리머의 키워드 고점 비교 결과가 자동으로 열립니다.`
+          ? `구독 신청 승인 대기 중이에요. 관리자가 ${subscriptionState.pendingBalloonCost}개 후원을 확인해 승인하면 키워드 고점 비교 결과가 열립니다.`
           : '로그인이 확인됐어요. 별풍선 33개 구독을 신청하면 승인 후 키워드 고점 비교 결과가 자동으로 열립니다.'
         : '선택한 키워드와 스트리머는 유지돼요. 로그인한 뒤 이 화면으로 돌아와 주세요.');
       renderKeywordComparisonSelection();
@@ -371,11 +368,8 @@ function renderSubscriptionDialogStatus(message = '') {
   const donationLink = $('viewerSubscriptionDonationLink');
   const donationComplete = $('viewerSubscriptionDonationComplete');
   const hasPending = subscriptionState.pending && subscriptionState.pendingRequestId;
-  const autoVerificationReady = !!subscriptionState.pendingDonorSoopId;
+  const donorDetailsAvailable = !!subscriptionState.pendingDonorSoopId;
   const donationCompleted = subscriptionState.pendingDonationCompletedAt > 0;
-  const pendingRequestedAt = Number(subscriptionState.pendingRequestedAt) || 0;
-  const automaticMonitoringActive = pendingRequestedAt > Date.now() - VIEWER_SUBSCRIPTION_MONITOR_MS &&
-    pendingRequestedAt <= Date.now();
   const pendingBalloonCost = Number(subscriptionState.pendingBalloonCost) || 33;
   const keywordComparisonContext = !!pendingKeywordComparisonRequest;
   const comparisonContext = !!pendingComparisonRequest || keywordComparisonContext;
@@ -389,18 +383,16 @@ function renderSubscriptionDialogStatus(message = '') {
   loginNote.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.accountProtected);
   submit.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
   cancel.classList.toggle('hidden', subscriptionState.isAdmin || !hasPending);
-  donationLink.classList.toggle('hidden', !autoVerificationReady);
-  donationComplete.classList.toggle('hidden', !autoVerificationReady || donationCompleted);
+  donationLink.classList.toggle('hidden', !donorDetailsAvailable);
+  donationComplete.classList.toggle('hidden', !donorDetailsAvailable || donationCompleted);
   donationComplete.disabled = false;
-  donationComplete.textContent = '후원 완료 알리기 (선택)';
-  if (!autoVerificationReady) {
-    donationHelp.textContent = '이 신청은 자동 확인에 필요한 SOOP 아이디 정보가 없어요. 후원 내역은 관리자가 수동 확인합니다.';
-  } else if (!automaticMonitoringActive) {
-    donationHelp.textContent = '신청 후 1시간 자동 감시가 종료됐어요. 신청은 자동 취소되지 않고 관리자 확인 대기 상태로 남습니다. 후원 완료 알리기는 관리자 확인에 참고하도록 선택적으로 전달할 수 있어요.';
+  donationComplete.textContent = '후원 완료 알리기';
+  if (!donorDetailsAvailable) {
+    donationHelp.textContent = '이 신청에는 후원자 SOOP 아이디가 없습니다. 후원 내역은 관리자가 수동으로 확인합니다.';
   } else if (donationCompleted) {
-    donationHelp.textContent = '후원 완료 알림을 전달했어요. 신청 등록 후 1시간 동안 자동 감시하며, 입력한 SOOP 아이디와 별풍선 수량이 유일하게 일치하면 30일 이용권이 자동 적용됩니다.';
+    donationHelp.textContent = '후원 완료 알림을 전달했어요. 관리자가 후원 내역을 확인한 뒤 30일 이용권을 수동 승인합니다.';
   } else {
-    donationHelp.textContent = `신청 후 1시간 동안 자동 감시해요. 신청에 입력한 SOOP 계정으로 별풍선 ${pendingBalloonCost}개를 후원해 주세요. 후원 완료 알리기는 선택이며, 누르지 않아도 SOOP 아이디와 수량이 유일하게 일치하면 자동 승인됩니다. 1시간이 지나면 신청은 취소되지 않고 관리자 확인 대기 상태로 남아요.`;
+    donationHelp.textContent = `신청한 SOOP 계정으로 별풍선 ${pendingBalloonCost}개를 후원한 뒤 완료 알리기를 눌러 주세요. 후원 알림은 자동 감시·자동 승인하지 않으며, 관리자가 내역을 확인해 수동 승인합니다.`;
   }
   submit.textContent = subscriptionState.subscribed ? '신청 등록 · 30일 연장' : '구독 신청 등록';
   if (subscriptionState.isAdmin) {
@@ -412,27 +404,19 @@ function renderSubscriptionDialogStatus(message = '') {
       ? '선택한 비교 조건은 유지됩니다. Google·Kakao 로그인 또는 스트리머 인증 후 구독을 신청할 수 있어요.'
       : '익명 계정은 구독 권한을 구매할 수 없어요. Google·Kakao 로그인 또는 스트리머 인증 후 이용해 주세요.';
   } else if (hasPending) {
-    if (!autoVerificationReady) {
-      status.textContent = '이전 방식으로 접수된 신청입니다. 관리자가 후원 내역을 수동 확인하며, 자동 확인을 원하면 신청을 취소하고 다시 등록해 주세요.';
-    } else if (!automaticMonitoringActive) {
-      status.textContent = '신청 후 1시간 자동 감시가 종료됐어요. 신청은 취소되지 않았고 관리자 확인 대기 상태로 남아 있습니다.';
-    } else if (donationCompleted) {
-      status.textContent = comparisonContext
-        ? keywordComparisonContext
-          ? '후원 알림 자동 확인 중이에요. 신청한 SOOP 아이디와 수량이 유일하게 일치하면 키워드 고점 비교 결과가 자동으로 열립니다.'
-          : '후원 알림 자동 확인 중이에요. 신청한 SOOP 아이디와 수량이 유일하게 일치하면 선택한 날짜의 비교 결과가 자동으로 열립니다.'
-        : '후원 알림을 자동 대조하고 있어요. 신청한 SOOP 아이디와 수량이 유일하게 일치하면 이 계정에 30일 이용권이 적용됩니다.';
-    } else {
-      status.textContent = `신청 등록 후 1시간 동안 자동 감시합니다. 운영자 방송국에 ${pendingBalloonCost}개 후원해 주세요. 완료 알리기는 선택이며, SOOP 아이디와 수량이 유일하게 일치하면 자동 승인됩니다. 1시간이 지나도 신청은 취소되지 않아요.`;
-    }
+    status.textContent = donationCompleted
+      ? '후원 완료 알림을 접수했습니다. 관리자가 후원 내역을 확인한 뒤 수동 승인하면 신청한 분석 결과가 열립니다.'
+      : donorDetailsAvailable
+        ? `구독 신청 승인 대기 중이에요. 운영자 방송국에 별풍선 ${pendingBalloonCost}개를 후원한 뒤 완료 알리기를 눌러 주세요. 관리자가 후원 내역을 확인해 수동 승인합니다.`
+        : '이전 신청이 관리자 확인 대기 중입니다. 후원 내역을 수동 확인한 뒤 승인합니다.';
   } else if (subscriptionState.subscribed) {
     status.textContent = formatSubscriptionDate(subscriptionState.expiresAt) + '까지 구독 중이에요. 미리 갱신해도 남은 기간에 30일이 더해집니다.';
   } else {
     status.textContent = comparisonContext
       ? keywordComparisonContext
-        ? '후원자 SOOP 정보를 입력해 신청을 등록하면 1시간 자동 감시가 시작돼요. 완료 알리기는 선택이며, 아이디와 수량이 일치하면 키워드 고점 비교 결과가 자동으로 열립니다.'
-        : '후원자 SOOP 정보를 입력해 신청을 등록하면 1시간 자동 감시가 시작돼요. 완료 알리기는 선택이며, 아이디와 수량이 일치하면 비교 결과가 자동으로 열립니다.'
-      : '신청하면 1시간 자동 감시가 시작됩니다. 입력한 SOOP 아이디와 별풍선 수량이 유일하게 일치하면 30일 이용권이 자동 승인됩니다. 1시간 안에 확인되지 않은 신청은 취소되지 않고 관리자 확인 대기 상태로 남습니다.';
+        ? '후원자 SOOP 정보를 입력해 신청한 뒤 관리자가 후원 내역을 확인해 승인하면 키워드 고점 비교 결과가 열립니다.'
+        : '후원자 SOOP 정보를 입력해 신청한 뒤 관리자가 후원 내역을 확인해 승인하면 비교 결과가 열립니다.'
+      : '신청한 SOOP 계정으로 별풍선 33개를 후원해 주세요. 후원 알림은 자동 감시·자동 승인하지 않으며, 완료 알리기를 전달하면 관리자가 후원 내역을 확인해 30일 이용권을 수동 승인합니다.';
   }
 }
 
@@ -2873,7 +2857,7 @@ $('viewerSubscriptionForm').addEventListener('submit', async (event) => {
     await refreshSubscriptionStatus();
     renderSubscriptionDialogStatus(result.action === 'already-pending'
       ? '이미 대기 중인 신청이 있어요. 현재 신청 정보를 확인해 주세요.'
-      : '신청을 등록했어요. 1시간 자동 감시가 시작됐습니다. 운영자 방송국에 33개를 후원해 주세요.');
+      : '신청을 등록했어요. 운영자 방송국에 33개를 후원한 뒤 완료 알리기를 눌러 주세요. 관리자가 후원 내역을 확인해 수동 승인합니다.');
     if (result.action === 'pending' || result.action === 'already-pending') {
       $('viewerSubscriptionNickname').value = '';
       $('viewerSubscriptionSoopId').value = '';
@@ -2894,9 +2878,9 @@ $('viewerSubscriptionDonationComplete').addEventListener('click', async (event) 
   try {
     await callViewerSubscription({ action: 'donationComplete', requestId: subscriptionState.pendingRequestId });
     await refreshSubscriptionStatus();
-    renderSubscriptionDialogStatus('후원 완료 알림을 전달했어요. 자동 감시는 신청 후 1시간까지이며, 이후 미확인 신청은 관리자 확인 대기 상태로 남습니다.');
+    renderSubscriptionDialogStatus('후원 완료 알림을 전달했어요. 관리자가 후원 내역을 확인해 수동 승인합니다.');
   } catch (error) {
-    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '후원 완료 알림을 전달하지 못했어요. 자동 감시는 신청 후 1시간 동안 진행됩니다.'));
+    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '후원 완료 알림을 전달하지 못했어요.'));
   } finally {
     button.disabled = false;
     renderSubscriptionDialogStatus();
@@ -2905,8 +2889,8 @@ $('viewerSubscriptionDonationComplete').addEventListener('click', async (event) 
 
 $('viewerSubscriptionCancel').addEventListener('click', async () => {
   const cancelMessage = subscriptionState.pendingDonationCompletedAt
-    ? '이미 후원 완료를 알린 신청입니다. 취소하면 후원 감시와 자동 승인이 중단됩니다. 취소할까요?'
-    : '구독 신청을 취소하면 후원 감시와 자동 승인이 중단됩니다. 이미 후원했다면 취소하지 말고 신청 상태를 확인해 주세요. 취소할까요?';
+    ? '이미 후원 완료를 알린 신청입니다. 취소하면 대기 신청이 철회됩니다. 취소할까요?'
+    : '구독 신청을 취소할까요? 이미 후원했다면 취소하지 말고 관리자에게 문의해 주세요.';
   if (!subscriptionState.pendingRequestId || !confirm(cancelMessage)) return;
   const cancel = $('viewerSubscriptionCancel');
   cancel.disabled = true;
@@ -3195,7 +3179,7 @@ function showSponsorDonationStep(record) {
   $('sponsorRequestFields').classList.add('hidden');
   $('sponsorDonationStep').classList.remove('hidden');
   $('sponsorRequestTitle').textContent = '후원 신청 확인';
-  $('sponsorRequestIntro').textContent = '신청 후 1시간 동안 후원자 SOOP 아이디와 별풍선 수량을 자동 대조합니다. 두 정보가 유일하게 일치하면 후원 완료 알리기 버튼 없이도 홍보 신청이 자동 승인됩니다.';
+  $('sponsorRequestIntro').textContent = '후원 알림은 자동 감시·자동 승인하지 않습니다. 후원 완료 알리기를 전달하면 관리자가 후원 내역을 확인한 뒤 홍보 신청을 수동 승인합니다.';
   const summary = $('sponsorDonationSummary');
   summary.replaceChildren();
   const rows = [
@@ -3214,15 +3198,13 @@ function showSponsorDonationStep(record) {
     summary.append(cell);
   });
   const completed = Number(record.donationCompletedAt) > 0;
-  const requestedAt = Number(record.requestedAt) || 0;
-  const watchActive = requestedAt > 0 && requestedAt <= Date.now() && Date.now() - requestedAt < 60 * 60 * 1000;
   $('sponsorDonationComplete').classList.toggle('hidden', completed);
   $('sponsorRequestWithdraw').classList.toggle('hidden', completed);
   $('sponsorDonationLink').classList.toggle('hidden', completed);
   $('sponsorRequestDone').classList.toggle('hidden', false);
-  $('sponsorDonationStatus').textContent = watchActive
-    ? `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원해 주세요. 신청 후 1시간 동안 후원자 아이디와 수량이 유일하게 일치하면 ${completed ? '자동 승인됩니다. 완료 알림 시각은 자동 대조 조건이 아닙니다.' : '완료 알리기 버튼 없이 자동 승인됩니다.'} 일치가 모호하면 운영자가 확인하며, 완료 알리기는 선택입니다.`
-    : `신청 후 1시간 자동 감시가 종료됐습니다. 신청은 취소되지 않았으며 자동 승인은 더 이상 진행되지 않습니다. ${completed ? '후원 완료 알림이 접수되어 운영자 수동 확인 대기 상태입니다.' : '후원 완료 알리기를 선택적으로 눌러 운영자 수동 확인을 요청할 수 있습니다. 알리지 않은 신청은 7일 후 만료됩니다.'}`;
+  $('sponsorDonationStatus').textContent = completed
+    ? '후원 완료 알림을 전달했어요. 관리자가 후원 내역을 확인한 뒤 수동 승인합니다.'
+    : `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원한 뒤 완료 알리기를 눌러 주세요. 후원 알림은 자동 감시·자동 승인하지 않으며, 관리자가 내역을 확인해 수동 승인합니다. 알림이 없는 신청은 7일 후 만료됩니다.`;
   $('sponsorRequestStatus').textContent = '';
   startSponsorStatusPolling();
 }
@@ -3426,7 +3408,7 @@ $('sponsorDonationComplete').addEventListener('click', async () => {
       return;
     }
     if (sponsorRequestRecord) sponsorRequestRecord.donationCompletedAt = Date.now();
-    $('sponsorDonationStatus').textContent = '후원 완료 알림을 전달했어요. 자동 감시는 신청 후 1시간까지이며, 자동 확인되지 않으면 운영자가 수동으로 확인합니다.';
+    $('sponsorDonationStatus').textContent = '후원 완료 알림을 전달했어요. 관리자가 후원 내역을 확인한 뒤 수동 승인합니다.';
     showSponsorDonationStep(sponsorRequestRecord);
   } catch (error) {
     $('sponsorDonationStatus').textContent = viewerStatsErrorMessage(error, '후원 완료를 접수하지 못했습니다.');
