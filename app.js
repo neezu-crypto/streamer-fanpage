@@ -2677,7 +2677,7 @@ function renderRollingPaperSection(page) {
   section.insertBefore(back, heading);
 
   if (!page.isStreamerOwner && state.composeTopicId === activeTopic.id) {
-    section.append(createRollingPaperComposer(page, activeTopic.id));
+    section.append(createRollingPaperComposer(page, activeTopic.id, null, true));
   }
 
   const status = document.createElement('p'); status.className = 'rolling-paper-status';
@@ -2722,10 +2722,11 @@ function renderRollingPaperSection(page) {
   return section;
 }
 
-function createRollingPaperComposer(page, topicId, imageActionSlot = null) {
+function createRollingPaperComposer(page, topicId, imageActionSlot = null, isDetail = false) {
   const streamerId = page.streamer.id;
   const state = rollingPaperStateFor(streamerId);
-  const form = document.createElement('form'); form.className = 'rolling-paper-form';
+  const form = document.createElement('form'); form.className = `rolling-paper-form${isDetail ? ' rolling-paper-form-detail' : ''}`;
+  form.classList.toggle('has-gallery-picker', isDetail && state.galleryOpen);
   const galleryActions = document.createElement('div'); galleryActions.className = 'rolling-paper-image-actions';
   const chooseImage = document.createElement('button'); chooseImage.type = 'button';
   chooseImage.className = 'button rolling-paper-image-picker-toggle';
