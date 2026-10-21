@@ -5634,6 +5634,35 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
     throw new HttpsError('invalid-argument', '롤링페이퍼 주제를 확인해 주세요.');
   }
 
+  if (action === 'delete-topic') {
+    if (!canManageTopics) {
+      throw new HttpsError('permission-denied', '해당 스트리머와 관리자만 롤링페이퍼 주제를 삭제할 수 있습니다.');
+    }
+    if (topicId === 'general') {
+      throw new HttpsError('invalid-argument', '기본 응원 메시지 주제는 삭제할 수 없습니다.');
+    }
+    const deletion = await rootRef.transaction((current) => {
+      const root = rollingPaperObject(current);
+      const topics = rollingPaperObject(root.topics);
+      if (!Object.hasOwn(topics, topicId)) return undefined;
+      const remainingTopics = { ...topics };
+      delete remainingTopics[topicId];
+      const next = { ...root };
+      if (Object.keys(remainingTopics).length) next.topics = remainingTopics;
+      else delete next.topics;
+      return Object.keys(next).length ? next : null;
+    });
+    if (!deletion.committed) {
+      throw new HttpsError('not-found', '삭제할 롤링페이퍼 주제를 찾을 수 없습니다.');
+    }
+    const snapshot = await rootRef.get();
+    return {
+      topics: normalizeRollingPaperTopics(snapshot.val()),
+      canDelete,
+      canManageTopics,
+    };
+  }
+
   if (action === 'list') {
     const result = await readRollingPaper(target.streamer.id, canDelete, topicId);
     if (topicId !== 'general' && !result.topics.some((topic) => topic.id === topicId)) {
