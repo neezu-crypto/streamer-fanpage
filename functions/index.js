@@ -5641,20 +5641,11 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
     if (topicId === 'general') {
       throw new HttpsError('invalid-argument', '기본 응원 메시지 주제는 삭제할 수 없습니다.');
     }
-    const deletion = await rootRef.transaction((current) => {
-      const root = rollingPaperObject(current);
-      const topics = rollingPaperObject(root.topics);
-      if (!Object.hasOwn(topics, topicId)) return undefined;
-      const remainingTopics = { ...topics };
-      delete remainingTopics[topicId];
-      const next = { ...root };
-      if (Object.keys(remainingTopics).length) next.topics = remainingTopics;
-      else delete next.topics;
-      return Object.keys(next).length ? next : null;
-    });
-    if (!deletion.committed) {
+    const topicRef = rootRef.child('topics').child(topicId);
+    if (!(await topicRef.get()).exists()) {
       throw new HttpsError('not-found', '삭제할 롤링페이퍼 주제를 찾을 수 없습니다.');
     }
+    await topicRef.remove();
     const snapshot = await rootRef.get();
     return {
       topics: normalizeRollingPaperTopics(snapshot.val()),
