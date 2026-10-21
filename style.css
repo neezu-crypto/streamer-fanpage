@@ -1153,7 +1153,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .rolling-paper-topic-grid{display:grid;width:100%;grid-template-columns:minmax(0,1fr);justify-items:center;gap:clamp(8px,1.5vw,16px)}
 .rolling-paper-topic-card{position:relative;display:flex;box-sizing:border-box;width:50%;max-width:480px;min-width:0;aspect-ratio:1;flex-direction:column;align-items:center;justify-content:center;gap:10px;overflow:hidden;padding:clamp(10px,2vw,22px);border:1px solid #ffffff24;border-radius:clamp(18px,3vw,30px);background:radial-gradient(circle at 80% 15%,#f58cac16,transparent 36%),linear-gradient(145deg,#fff9fc0d,#ffffff04);color:var(--text);text-align:center;transition:transform .18s,border-color .18s,box-shadow .18s}
 .rolling-paper-topic-card:hover{transform:translateY(-3px);border-color:#f58cac66;box-shadow:0 9px 24px #0002}
-.rolling-paper-topic-card.is-composing{width:100%;max-width:720px;aspect-ratio:auto;align-items:stretch;justify-content:flex-start;gap:14px;overflow:visible;padding:clamp(14px,2.5vw,24px);text-align:left}
+.rolling-paper-topic-card.is-composing{width:50%;max-width:480px;aspect-ratio:1;align-items:stretch;justify-content:flex-start;gap:14px;overflow:visible;padding:clamp(14px,2.5vw,24px);text-align:left}
 .rolling-paper-topic-card-heading{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:9px 12px;min-width:0}
 .rolling-paper-topic-card.is-composing .rolling-paper-topic-card-heading{justify-content:flex-start}
 .rolling-paper-topic-card-actions{display:flex;align-items:center;justify-content:center;flex-wrap:nowrap;gap:6px}
