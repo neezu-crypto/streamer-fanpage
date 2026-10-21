@@ -2645,9 +2645,10 @@ function renderRollingPaperSection(page) {
       viewEntries.setAttribute('aria-label', '받은 메시지 보기');
       viewEntries.addEventListener('click', () => {
         state.activeTopicId = topic.id;
-        state.composeTopicId = topic.id;
+        state.composeTopicId = '';
         state.entryError = '';
         state.selectedGalleryImage = null;
+        state.galleryOpen = false;
         refreshRollingPaperSection(streamerId);
         void loadRollingPaperEntries(page, topic.id);
       });
