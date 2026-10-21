@@ -1391,10 +1391,13 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .rolling-paper-image-picker-toggle,
 #fanPageView.fanpage-layout-1 .rolling-paper-selected-image .button{border-color:#d9e2f7;background:#fff;color:#52668f}
 #fanPageView.fanpage-layout-1 .rolling-paper-topic-form input,
+#fanPageView.fanpage-layout-1 .rolling-paper-nickname,
 #fanPageView.fanpage-layout-1 .rolling-paper-form textarea{border-color:#d9e2f7;background:#fff;color:#51465d}
 #fanPageView.fanpage-layout-1 .rolling-paper-topic-form input:focus,
+#fanPageView.fanpage-layout-1 .rolling-paper-nickname:focus,
 #fanPageView.fanpage-layout-1 .rolling-paper-form textarea:focus{border-color:#7696df;box-shadow:0 0 0 3px #7696df20}
 #fanPageView.fanpage-layout-1 .rolling-paper-topic-form input::placeholder,
+#fanPageView.fanpage-layout-1 .rolling-paper-nickname::placeholder,
 #fanPageView.fanpage-layout-1 .rolling-paper-form textarea::placeholder{color:#a29aae}
 #fanPageView.fanpage-layout-1 .rolling-paper-topic-card{border-color:#dbe4f8;background:radial-gradient(circle at 82% 16%,#b9cafa55,transparent 37%),linear-gradient(145deg,#fff,#f5f8ff);color:#51465d;box-shadow:0 4px 0 #dfe6f4}
 #fanPageView.fanpage-layout-1 .rolling-paper-topic-card:hover{border-color:#99b2ec;box-shadow:0 7px 0 #dfe6f4,0 12px 24px #6e7e9c14}
