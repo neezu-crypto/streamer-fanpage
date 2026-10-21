@@ -1181,7 +1181,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .rolling-paper-gallery-image.is-selected{border-color:#f58cac;box-shadow:0 0 0 2px #f58cac35}
 .rolling-paper-gallery-image:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 .rolling-paper-gallery-more{display:block;min-height:34px;margin:10px auto 0;padding:0 13px;font-size:10px}
-.rolling-paper-form textarea{box-sizing:border-box;width:100%;min-width:0;min-height:88px;padding:11px 13px;border:1px solid #ffffff20;border-radius:12px;background:#111018;color:var(--text);outline:0;font:12px/1.65 var(--font);resize:vertical}
+.rolling-paper-form textarea{box-sizing:border-box;width:100%;min-width:0;min-height:88px;padding:11px 13px;border:1px solid #ffffff20;border-radius:12px;background:#111018;color:var(--text);outline:0;font:12px/1.65 var(--font);resize:none;overflow-y:hidden}
 .rolling-paper-form textarea:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
 .rolling-paper-form textarea::placeholder{color:#928a9a}
 .rolling-paper-form-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
