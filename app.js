@@ -2599,11 +2599,12 @@ function renderRollingPaperSection(page) {
     }
     const status = document.createElement('p'); status.className = 'rolling-paper-status';
     status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-    if (state.topicsLoading) status.textContent = '롤링페이퍼 주제를 불러오고 있어요.';
+    const loadingTopics = state.topicsLoading || (!state.topicsLoaded && !state.topicError);
+    if (loadingTopics) status.textContent = '롤링페이퍼 주제를 불러오고 있어요.';
     else if (state.topicError) { status.textContent = state.topicError; status.classList.add('is-error'); }
-    if (state.topicsLoading || state.topicError) section.append(status);
+    if (loadingTopics || state.topicError) section.append(status);
     const grid = document.createElement('div'); grid.className = 'rolling-paper-topic-grid';
-    if (!state.topicsLoading && !state.topicError && !state.topics.length) {
+    if (state.topicsLoaded && !state.topicsLoading && !state.topicError && !state.topics.length) {
       const empty = document.createElement('p'); empty.className = 'rolling-paper-empty';
       empty.textContent = '아직 주제가 없어요.'; grid.append(empty);
     }
