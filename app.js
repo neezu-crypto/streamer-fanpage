@@ -2605,7 +2605,8 @@ function renderRollingPaperSection(page) {
         if (!isComposing) requestAnimationFrame(() => $('rollingPaperSection')?.querySelector('textarea[name="message"]')?.focus({ preventScroll: true }));
       });
       const viewEntries = document.createElement('button'); viewEntries.type = 'button';
-      viewEntries.className = 'button rolling-paper-topic-view'; viewEntries.textContent = '받은 메시지 보기';
+      viewEntries.className = 'button rolling-paper-topic-view'; viewEntries.textContent = '메시지 보기';
+      viewEntries.setAttribute('aria-label', '받은 메시지 보기');
       viewEntries.addEventListener('click', () => {
         state.activeTopicId = topic.id;
         state.entryError = '';
@@ -2616,7 +2617,7 @@ function renderRollingPaperSection(page) {
       cardActions.append(composeToggle, viewEntries);
       card.append(cardHeading, cardActions);
       if (isComposing) {
-        card.append(createRollingPaperComposer(page, topic.id));
+        card.append(createRollingPaperComposer(page, topic.id, cardActions));
         if (state.entryError) {
           const composerError = document.createElement('p'); composerError.className = 'rolling-paper-status is-error';
           composerError.setAttribute('role', 'status'); composerError.textContent = state.entryError; card.append(composerError);
@@ -2682,30 +2683,32 @@ function renderRollingPaperSection(page) {
   return section;
 }
 
-function createRollingPaperComposer(page, topicId) {
+function createRollingPaperComposer(page, topicId, imageActionSlot = null) {
   const streamerId = page.streamer.id;
   const state = rollingPaperStateFor(streamerId);
   const form = document.createElement('form'); form.className = 'rolling-paper-form';
   const galleryActions = document.createElement('div'); galleryActions.className = 'rolling-paper-image-actions';
   const chooseImage = document.createElement('button'); chooseImage.type = 'button';
   chooseImage.className = 'button rolling-paper-image-picker-toggle';
-  chooseImage.textContent = state.galleryOpen ? '갤러리 닫기' : '▧ 갤러리 이미지 넣기';
+  chooseImage.textContent = state.galleryOpen ? '갤러리 닫기' : '▧ 갤러리 첨부';
+  chooseImage.setAttribute('aria-label', state.galleryOpen ? '갤러리 닫기' : '갤러리 이미지 넣기');
   chooseImage.disabled = state.submitting;
   chooseImage.addEventListener('click', () => {
     state.galleryOpen = !state.galleryOpen;
     refreshRollingPaperSection(streamerId);
     if (state.galleryOpen && !state.galleryItems && !state.galleryLoading) void loadRollingPaperGallery(page);
   });
-  galleryActions.append(chooseImage);
+  if (imageActionSlot) imageActionSlot.append(chooseImage);
+  else galleryActions.append(chooseImage);
   if (state.selectedGalleryImage) {
     const selected = document.createElement('div'); selected.className = 'rolling-paper-selected-image';
     const preview = document.createElement('img'); preview.src = state.selectedGalleryImage.thumbUrl; preview.alt = '선택한 갤러리 이미지';
     const selectedLabel = document.createElement('span'); selectedLabel.textContent = '이미지를 메시지에 함께 올려요.';
     const clear = document.createElement('button'); clear.type = 'button'; clear.className = 'button'; clear.textContent = '제거';
     clear.addEventListener('click', () => { state.selectedGalleryImage = null; refreshRollingPaperSection(streamerId); });
-    selected.append(preview, selectedLabel, clear); galleryActions.append(selected);
+    selected.append(preview, selectedLabel, clear); form.append(selected);
   }
-  form.append(galleryActions);
+  if (!imageActionSlot) form.append(galleryActions);
 
   if (state.galleryOpen) {
     const picker = document.createElement('div'); picker.className = 'rolling-paper-gallery-picker';
