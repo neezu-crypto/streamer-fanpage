@@ -2570,6 +2570,12 @@ function renderRollingPaperSection(page) {
     });
     actions.append(composeToggle);
   }
+  if (activeTopic && activeTopic.id !== 'general' && page.isOwner && state.canManageTopics) {
+    const deleteTopic = document.createElement('button'); deleteTopic.type = 'button';
+    deleteTopic.className = 'button rolling-paper-topic-delete'; deleteTopic.textContent = '주제 삭제';
+    deleteTopic.addEventListener('click', () => deleteRollingPaperTopic(page, activeTopic, deleteTopic));
+    actions.append(deleteTopic);
+  }
   actions.append(refresh);
   heading.append(headingCopy, actions);
   section.append(heading);
@@ -2626,6 +2632,12 @@ function renderRollingPaperSection(page) {
           if (!isComposing) requestAnimationFrame(() => $('rollingPaperSection')?.querySelector('textarea[name="message"]')?.focus({ preventScroll: true }));
         });
         cardActions.append(composeToggle);
+      }
+      if (topic.id !== 'general' && page.isOwner && state.canManageTopics) {
+        const deleteTopic = document.createElement('button'); deleteTopic.type = 'button';
+        deleteTopic.className = 'button rolling-paper-topic-delete'; deleteTopic.textContent = '주제 삭제';
+        deleteTopic.addEventListener('click', () => deleteRollingPaperTopic(page, topic, deleteTopic));
+        cardActions.append(deleteTopic);
       }
       const viewEntries = document.createElement('button'); viewEntries.type = 'button';
       viewEntries.className = 'button rolling-paper-topic-view'; viewEntries.textContent = '메시지 보기';
@@ -2760,6 +2772,7 @@ function createRollingPaperComposer(page, topicId, imageActionSlot = null) {
         imageButton.append(thumbnail);
         imageButton.addEventListener('click', () => {
           state.selectedGalleryImage = { id: image.id, thumbUrl: image.thumbUrl };
+          state.galleryOpen = false;
           refreshRollingPaperSection(streamerId);
         });
         galleryGrid.append(imageButton);
@@ -2943,6 +2956,30 @@ async function deleteRollingPaperEntry(page, topicId, entry, button) {
   } catch (error) {
     showToast(error.message || '메시지를 삭제하지 못했어요.');
     button.disabled = false; button.textContent = '삭제';
+  }
+}
+
+async function deleteRollingPaperTopic(page, topic, button) {
+  const state = rollingPaperStateFor(page.streamer.id);
+  if (!page.isOwner || !state.canManageTopics || button.disabled
+    || !window.confirm(`“${topic.title}” 주제와 그 안의 메시지를 모두 삭제할까요? 삭제 후에는 복구할 수 없어요.`)) return;
+  button.disabled = true; button.textContent = '삭제 중…';
+  try {
+    const result = (await callRollingPaper({ action: 'delete-topic', streamerId: page.streamer.id, topicId: topic.id })).data;
+    state.topics = Array.isArray(result.topics) ? result.topics : state.topics.filter((item) => item.id !== topic.id);
+    state.topicsLoaded = true;
+    state.entriesByTopic.delete(topic.id);
+    state.loadedTopicIds.delete(topic.id);
+    if (state.activeTopicId === topic.id) state.activeTopicId = '';
+    if (state.composeTopicId === topic.id) state.composeTopicId = '';
+    state.selectedGalleryImage = null; state.galleryOpen = false; state.entryError = '';
+    state.canDelete = result.canDelete === true;
+    state.canManageTopics = result.canManageTopics === true;
+    refreshRollingPaperSection(page.streamer.id);
+    showToast('롤링페이퍼 주제와 메시지를 삭제했어요.');
+  } catch (error) {
+    showToast(error.message || '주제를 삭제하지 못했어요.');
+    button.disabled = false; button.textContent = '주제 삭제';
   }
 }
 
