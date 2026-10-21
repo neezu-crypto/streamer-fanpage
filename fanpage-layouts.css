@@ -374,12 +374,12 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 .rolling-paper-count,
 #fanPageView.fanpage-layout-1 .rolling-paper-note,
 #fanPageView.fanpage-layout-1 .rolling-paper-status { color: #81758b; }
-#fanPageView.fanpage-layout-1 .rolling-paper-entry { border-color: #eadfeb; border-radius: 16px; background: linear-gradient(130deg, #fffafd, #fff 75%); box-shadow: 0 3px 0 #eee2ee; }
+#fanPageView.fanpage-layout-1 .rolling-paper-entry { border-color: #eadfeb; background: radial-gradient(circle at 82% 16%, #f7c6d855, transparent 37%), linear-gradient(145deg, #fff, #fff7fb); box-shadow: 0 4px 0 #f1e2ed; }
 #fanPageView.fanpage-layout-1 .rolling-paper-entry-author { color: #c26083; }
 #fanPageView.fanpage-layout-1 .rolling-paper-entry-date { color: #92869a; }
 #fanPageView.fanpage-layout-1 .rolling-paper-entry-content { color: #6f6479; }
 #fanPageView.fanpage-layout-1 .rolling-paper-empty { border-color: #e8deea; background: #fff9fc; color: #81758b; }
-#fanPageView.fanpage-layout-1.fanpage-theme-sora .rolling-paper-entry { border-color: #dbe4f8; background: linear-gradient(130deg, #f8faff, #fff 75%); box-shadow: 0 3px 0 #dce5f4; }
+#fanPageView.fanpage-layout-1.fanpage-theme-sora .rolling-paper-entry { border-color: #dbe4f8; background: radial-gradient(circle at 82% 16%, #b9cafa55, transparent 37%), linear-gradient(145deg, #fff, #f5f8ff); box-shadow: 0 4px 0 #dfe6f4; }
 #fanPageView.fanpage-layout-1.fanpage-theme-sora .rolling-paper-entry-author { color: #5376be; }
 #fanPageView.fanpage-layout-1.fanpage-theme-sora .rolling-paper-empty { border-color: #dbe4f8; background: #f8faff; color: #536f9a; }
 #fanPageView.fanpage-layout-1 .competition-history-form-grid .profile-editor-field input[type="month"] { color-scheme: light; }
@@ -1410,7 +1410,7 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .rolling-paper-selected-image img{border-color:#dbe4f8}
 #fanPageView.fanpage-layout-1 .rolling-paper-gallery-image{background:#eaf0fd}
 #fanPageView.fanpage-layout-1 .rolling-paper-gallery-image.is-selected{border-color:#6686cf;box-shadow:0 0 0 2px #6686cf25}
-#fanPageView.fanpage-layout-1 .rolling-paper-entry{border-color:#dbe4f8;border-radius:16px;background:linear-gradient(130deg,#f8faff,#fff 75%);box-shadow:0 3px 0 #dce5f4}
+#fanPageView.fanpage-layout-1 .rolling-paper-entry{border-color:#dbe4f8;background:radial-gradient(circle at 82% 16%,#b9cafa55,transparent 37%),linear-gradient(145deg,#fff,#f5f8ff);box-shadow:0 4px 0 #dfe6f4}
 #fanPageView.fanpage-layout-1 .rolling-paper-entry-author{color:#5376be}
 #fanPageView.fanpage-layout-1 .rolling-paper-entry-date{color:#92869a}
 #fanPageView.fanpage-layout-1 .rolling-paper-entry-content{color:#5f5870}
