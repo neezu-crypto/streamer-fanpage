@@ -1148,10 +1148,11 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .rolling-paper-topic-form input{box-sizing:border-box;width:100%;min-width:0;min-height:42px;padding:10px 12px;border:1px solid #ffffff20;border-radius:12px;background:#111018;color:var(--text);font:12px var(--font);outline:0}
 .rolling-paper-topic-form input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
 .rolling-paper-topic-form .button{min-height:42px;padding:0 14px;font-size:11px}
-.rolling-paper-topic-grid{display:grid;width:50%;max-width:480px;margin-inline:auto;grid-template-columns:minmax(0,1fr);gap:clamp(8px,1.5vw,16px)}
-.rolling-paper-topic-card{position:relative;display:flex;min-width:0;aspect-ratio:1;flex-direction:column;align-items:center;justify-content:center;gap:10px;overflow:hidden;padding:clamp(10px,2vw,22px);border:1px solid #ffffff24;border-radius:clamp(18px,3vw,30px);background:radial-gradient(circle at 80% 15%,#f58cac16,transparent 36%),linear-gradient(145deg,#fff9fc0d,#ffffff04);color:var(--text);text-align:center;cursor:pointer;transition:transform .18s,border-color .18s,box-shadow .18s}
+.rolling-paper-topic-grid{display:grid;width:100%;grid-template-columns:minmax(0,1fr);justify-items:center;gap:clamp(8px,1.5vw,16px)}
+.rolling-paper-topic-card{position:relative;display:flex;box-sizing:border-box;width:50%;max-width:480px;min-width:0;aspect-ratio:1;flex-direction:column;align-items:center;justify-content:center;gap:10px;overflow:hidden;padding:clamp(10px,2vw,22px);border:1px solid #ffffff24;border-radius:clamp(18px,3vw,30px);background:radial-gradient(circle at 80% 15%,#f58cac16,transparent 36%),linear-gradient(145deg,#fff9fc0d,#ffffff04);color:var(--text);text-align:center;cursor:pointer;transition:transform .18s,border-color .18s,box-shadow .18s}
 .rolling-paper-topic-card:hover{transform:translateY(-3px);border-color:#f58cac66;box-shadow:0 9px 24px #0002}
 .rolling-paper-topic-card:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
+.rolling-paper-topic-grid>.rolling-paper-empty{width:100%;justify-self:stretch}
 .rolling-paper-topic-decoration{display:grid;width:clamp(30px,5vw,48px);aspect-ratio:1;place-items:center;border:1px solid #ffffff20;border-radius:50%;background:#f58cac18;color:#f3a6c0;font-size:clamp(17px,2.5vw,25px)}
 .rolling-paper-topic-title{max-width:100%;font:700 clamp(11px,1.5vw,16px)/1.4 var(--display);overflow-wrap:anywhere}
 .rolling-paper-topic-count{color:#a59aaa;font-size:clamp(9px,1vw,11px)}
