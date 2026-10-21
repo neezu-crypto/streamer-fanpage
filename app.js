@@ -2759,12 +2759,14 @@ function createRollingPaperComposer(page, topicId, imageActionSlot = null) {
   textarea.rows = 3; textarea.setAttribute('aria-label', '롤링페이퍼 메시지');
   textarea.placeholder = state.selectedGalleryImage ? '이미지와 함께 전할 말을 적어 주세요. (선택)' : '응원이나 전하고 싶은 마음을 적어 주세요.';
   textarea.disabled = state.submitting;
+  textarea.addEventListener('input', () => resizeRollingPaperTextarea(textarea));
   const formFooter = document.createElement('div'); formFooter.className = 'rolling-paper-form-footer';
   const note = document.createElement('small'); note.className = 'rolling-paper-note';
   note.textContent = '닉네임은 입력하면 공개되고, 비워 두면 익명으로 표시돼요. 글은 최대 300자, 하루 최대 5개까지 남길 수 있어요.';
   const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
   submit.textContent = state.submitting ? '등록 중…' : '메시지 남기기'; submit.disabled = state.submitting;
   formFooter.append(note, submit); form.append(nicknameInput, textarea, formFooter);
+  resizeRollingPaperTextarea(textarea);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!textarea.value.trim() && !state.selectedGalleryImage) {
@@ -2775,6 +2777,11 @@ function createRollingPaperComposer(page, topicId, imageActionSlot = null) {
     if (!submit.disabled) addRollingPaperEntry(page, nicknameInput, textarea, submit, topicId);
   });
   return form;
+}
+
+function resizeRollingPaperTextarea(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = `${Math.max(textarea.scrollHeight, 88)}px`;
 }
 
 async function loadRollingPaperTopics(page, force = false) {
@@ -2929,6 +2936,7 @@ function refreshRollingPaperSection(streamerId) {
   const nextTopicInput = nextSection.querySelector('input[name="title"]');
   if (previousTextarea && nextTextarea) {
     nextTextarea.value = previousTextarea.value;
+    resizeRollingPaperTextarea(nextTextarea);
     if (keepTextareaFocus) nextTextarea.focus({ preventScroll: true });
   }
   if (previousNickname && nextNickname) {
