@@ -78,6 +78,7 @@ const FANPAGE_PLAYED_GAMES_MAX_ITEMS = 100;
 const FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS = 20;
 const FANPAGE_ROLLING_PAPER_MAX_ITEMS = 300;
 const FANPAGE_ROLLING_PAPER_MAX_LENGTH = 300;
+const FANPAGE_ROLLING_PAPER_MAX_NICKNAME_LENGTH = 20;
 const FANPAGE_ROLLING_PAPER_DAILY_POST_LIMIT = 5;
 const FANPAGE_ROLLING_PAPER_MAX_TOPICS = 30;
 const FANPAGE_ROLLING_PAPER_MAX_TOPIC_TITLE_LENGTH = 32;
@@ -2838,6 +2839,7 @@ function normalizeRollingPaperEntry(value, id) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || !/^[0-9]{13}_[0-9a-f-]{36}$/i.test(id)) return null;
   const content = typeof value.content === 'string' ? value.content.trim().slice(0, FANPAGE_ROLLING_PAPER_MAX_LENGTH) : '';
+  const nickname = normalizeRollingPaperNickname(value.nickname);
   const createdAt = Number(value.createdAt);
   const rawImage = value.galleryImage && typeof value.galleryImage === 'object' && !Array.isArray(value.galleryImage)
     ? value.galleryImage
@@ -2846,7 +2848,13 @@ function normalizeRollingPaperEntry(value, id) {
   const imageUrl = rawImage && isGalleryPublicUrl(rawImage.url) ? rawImage.url : '';
   const galleryImage = imageId && imageUrl ? { id: imageId, url: imageUrl } : null;
   if ((!content && !galleryImage) || !Number.isFinite(createdAt) || createdAt < 1) return null;
-  return { id, content, createdAt, ...(galleryImage ? { galleryImage } : {}) };
+  return { id, nickname, content, createdAt, ...(galleryImage ? { galleryImage } : {}) };
+}
+
+function normalizeRollingPaperNickname(value) {
+  if (typeof value !== 'string' || /[\x00-\x1F\x7F]/.test(value)) return '';
+  return Array.from(value.normalize('NFC').replace(/\s+/g, ' ').trim())
+    .slice(0, FANPAGE_ROLLING_PAPER_MAX_NICKNAME_LENGTH).join('');
 }
 
 function rollingPaperObject(value) {
@@ -2921,7 +2929,7 @@ async function enforceRollingPaperDailyLimit(uid, streamerId, now) {
     return { dayKey, count: sameDayCount + 1, updatedAt: now };
   });
   if (!transaction.committed) {
-    throw new HttpsError('resource-exhausted', `하루에 익명 메시지를 ${FANPAGE_ROLLING_PAPER_DAILY_POST_LIMIT}개까지 남길 수 있어요.`);
+    throw new HttpsError('resource-exhausted', `하루에 롤링페이퍼 메시지를 ${FANPAGE_ROLLING_PAPER_DAILY_POST_LIMIT}개까지 남길 수 있어요.`);
   }
 }
 
@@ -5636,6 +5644,13 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
 
   if (action === 'add') {
     const content = typeof data.content === 'string' ? data.content.replace(/\r\n?/g, '\n').trim() : '';
+    const rawNickname = data.nickname === undefined ? '' : data.nickname;
+    const nickname = normalizeRollingPaperNickname(rawNickname);
+    if (typeof rawNickname !== 'string'
+      || /[\x00-\x1F\x7F]/.test(rawNickname)
+      || Array.from(rawNickname.normalize('NFC').replace(/\s+/g, ' ').trim()).length > FANPAGE_ROLLING_PAPER_MAX_NICKNAME_LENGTH) {
+      throw new HttpsError('invalid-argument', `닉네임은 ${FANPAGE_ROLLING_PAPER_MAX_NICKNAME_LENGTH}자 이하로 입력해 주세요.`);
+    }
     const hasGalleryImage = Object.hasOwn(data, 'galleryImage') && data.galleryImage !== null;
     const rawImage = data.galleryImage && typeof data.galleryImage === 'object' && !Array.isArray(data.galleryImage)
       ? data.galleryImage
@@ -5691,7 +5706,7 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
             ...topic,
             entries: {
               ...entries,
-              [entryId]: { content, ...(galleryImage ? { galleryImage } : {}), createdAt },
+              [entryId]: { ...(nickname ? { nickname } : {}), content, ...(galleryImage ? { galleryImage } : {}), createdAt },
             },
           },
         },

@@ -1157,6 +1157,9 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .rolling-paper-topic-title{max-width:100%;font:700 clamp(11px,1.5vw,16px)/1.4 var(--display);overflow-wrap:anywhere}
 .rolling-paper-topic-count{color:#a59aaa;font-size:clamp(9px,1vw,11px)}
 .rolling-paper-form{display:grid;gap:9px;margin-bottom:14px}
+.rolling-paper-nickname{box-sizing:border-box;width:100%;min-width:0;min-height:42px;padding:10px 13px;border:1px solid #ffffff20;border-radius:12px;background:#111018;color:var(--text);outline:0;font:12px var(--font)}
+.rolling-paper-nickname:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.rolling-paper-nickname::placeholder{color:#928a9a}
 .rolling-paper-image-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .rolling-paper-image-picker-toggle{min-height:34px;padding:0 11px;font-size:10px}
 .rolling-paper-selected-image{display:flex;align-items:center;gap:8px;min-width:0;padding:5px 8px;border:1px solid #ffffff20;border-radius:12px;color:#aaa3b1;font-size:10px}

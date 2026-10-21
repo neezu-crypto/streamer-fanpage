@@ -2524,7 +2524,7 @@ function renderRollingPaperSection(page) {
   const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'ROLLING PAPER';
   const title = document.createElement('h2'); title.textContent = activeTopic?.title || '롤링페이퍼';
   const subtitle = document.createElement('p'); subtitle.className = 'rolling-paper-subtitle';
-  subtitle.textContent = activeTopic ? '익명으로 마음을 전해 보세요.' : '주제를 골라 익명으로 마음을 전해 보세요.';
+  subtitle.textContent = activeTopic ? '닉네임은 선택 사항이에요. 비워 두면 익명으로 표시돼요.' : '주제를 골라 마음을 전해 보세요.';
   headingCopy.append(eyebrow, title, subtitle);
   const actions = document.createElement('div'); actions.className = 'rolling-paper-heading-actions';
   const count = document.createElement('span'); count.className = 'rolling-paper-count';
@@ -2671,16 +2671,20 @@ function renderRollingPaperSection(page) {
     form.append(picker);
   }
 
+  const nicknameInput = document.createElement('input'); nicknameInput.type = 'text'; nicknameInput.name = 'nickname';
+  nicknameInput.className = 'rolling-paper-nickname'; nicknameInput.maxLength = 20;
+  nicknameInput.placeholder = '닉네임 (선택 · 비워 두면 익명)'; nicknameInput.setAttribute('aria-label', '닉네임 (선택)');
+  nicknameInput.autocomplete = 'off'; nicknameInput.disabled = state.submitting;
   const textarea = document.createElement('textarea'); textarea.name = 'message'; textarea.maxLength = 300;
-  textarea.rows = 3; textarea.setAttribute('aria-label', '익명 롤링페이퍼 메시지');
+  textarea.rows = 3; textarea.setAttribute('aria-label', '롤링페이퍼 메시지');
   textarea.placeholder = state.selectedGalleryImage ? '이미지와 함께 전할 말을 적어 주세요. (선택)' : '응원이나 전하고 싶은 마음을 적어 주세요.';
   textarea.disabled = state.submitting;
   const formFooter = document.createElement('div'); formFooter.className = 'rolling-paper-form-footer';
   const note = document.createElement('small'); note.className = 'rolling-paper-note';
-  note.textContent = '이름과 프로필 없이 익명으로 공개돼요. 글은 최대 300자, 하루 최대 5개까지 남길 수 있어요.';
+  note.textContent = '닉네임은 입력하면 공개되고, 비워 두면 익명으로 표시돼요. 글은 최대 300자, 하루 최대 5개까지 남길 수 있어요.';
   const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
-  submit.textContent = state.submitting ? '등록 중…' : '익명으로 남기기'; submit.disabled = state.submitting;
-  formFooter.append(note, submit); form.append(textarea, formFooter);
+  submit.textContent = state.submitting ? '등록 중…' : '메시지 남기기'; submit.disabled = state.submitting;
+  formFooter.append(note, submit); form.append(nicknameInput, textarea, formFooter);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!textarea.value.trim() && !state.selectedGalleryImage) {
@@ -2688,7 +2692,7 @@ function renderRollingPaperSection(page) {
       textarea.reportValidity(); textarea.addEventListener('input', () => textarea.setCustomValidity(''), { once: true });
       return;
     }
-    if (!submit.disabled) addRollingPaperEntry(page, textarea, submit);
+    if (!submit.disabled) addRollingPaperEntry(page, nicknameInput, textarea, submit);
   });
   section.append(form);
 
@@ -2706,7 +2710,8 @@ function renderRollingPaperSection(page) {
     entries.forEach((entry) => {
       const item = document.createElement('article'); item.className = 'rolling-paper-entry';
       const itemHeading = document.createElement('div'); itemHeading.className = 'rolling-paper-entry-heading';
-      const author = document.createElement('strong'); author.className = 'rolling-paper-entry-author'; author.textContent = '✦ 익명';
+      const author = document.createElement('strong'); author.className = 'rolling-paper-entry-author';
+      author.textContent = `✦ ${entry.nickname || '익명'}`;
       const date = document.createElement('time'); date.className = 'rolling-paper-entry-date';
       date.dateTime = new Date(entry.createdAt).toISOString();
       date.textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }).format(entry.createdAt);
@@ -2822,26 +2827,27 @@ async function loadRollingPaperGallery(page, append = false) {
   }
 }
 
-async function addRollingPaperEntry(page, textarea, button) {
+async function addRollingPaperEntry(page, nicknameInput, textarea, button) {
   const streamerId = page.streamer.id;
   const state = rollingPaperStateFor(streamerId);
   const topicId = state.activeTopicId;
   const content = textarea.value.trim();
   if ((!content && !state.selectedGalleryImage) || state.submitting || !topicId) return;
+  const nickname = nicknameInput.value.trim();
   state.submitting = true; state.entryError = '';
-  button.disabled = true; button.textContent = '등록 중…'; textarea.disabled = true;
+  button.disabled = true; button.textContent = '등록 중…'; nicknameInput.disabled = true; textarea.disabled = true;
   try {
     const galleryImage = state.selectedGalleryImage
       ? { id: state.selectedGalleryImage.id, url: state.selectedGalleryImage.thumbUrl }
       : null;
-    const result = (await callRollingPaper({ action: 'add', streamerId, topicId, content, galleryImage })).data;
+    const result = (await callRollingPaper({ action: 'add', streamerId, topicId, nickname, content, galleryImage })).data;
     state.entriesByTopic.set(topicId, Array.isArray(result.items) ? result.items : []);
     state.loadedTopicIds.add(topicId);
     state.topics = Array.isArray(result.topics) ? result.topics : state.topics;
     state.canDelete = result.canDelete === true; state.submitting = false; state.selectedGalleryImage = null;
-    textarea.value = '';
+    nicknameInput.value = ''; textarea.value = '';
     refreshRollingPaperSection(streamerId);
-    showToast('익명 메시지를 롤링페이퍼에 남겼어요.');
+    showToast('메시지를 롤링페이퍼에 남겼어요.');
   } catch (error) {
     state.submitting = false; state.entryError = error.message || '메시지를 등록하지 못했어요.';
     refreshRollingPaperSection(streamerId);
@@ -3273,7 +3279,7 @@ function renderFanPage(page, options = {}) {
     { key: 'home', label: '홈', eyebrow: 'YOUR HOME', title: '방송과 최신 소식', description: '방송 상태와 일정, 최근 다시보기를 모아 보여드려요.' },
     { key: 'activity', label: '팬 활동', eyebrow: 'FAN ACTIVITY', title: '팬들과 함께하는 공간', description: '팬 참여와 소통, 함께 만든 추억을 둘러보세요.' },
     { key: 'content', label: '콘텐츠', eyebrow: 'STREAMER CONTENTS', title: '다시보기와 활동 기록', description: '영상, 대회 이력, 플레이한 게임을 모아봤어요.' },
-    { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 익명으로 마음을 남겨 보세요.' },
+    { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 응원 메시지를 남겨 보세요.' },
   ];
   const tabNav = document.createElement('div');
   tabNav.className = 'fanpage-tab-nav';
