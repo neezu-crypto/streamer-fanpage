@@ -1191,8 +1191,8 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .rolling-paper-status{margin:0 0 12px;color:#aaa3b1;font-size:11px;line-height:1.55}
 .rolling-paper-status.is-error{color:#ef9eae}
 .rolling-paper-list{display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;gap:clamp(8px,1.5vw,16px);padding:1px 4px 4px 1px}
-.rolling-paper-entry{box-sizing:border-box;position:relative;display:flex;width:50%;max-width:480px;min-width:0;aspect-ratio:1;flex-direction:column;align-items:stretch;justify-content:center;gap:10px;padding:clamp(18px,3vw,28px);border:1px solid #ffffff16;border-radius:clamp(18px,3vw,30px);background:linear-gradient(135deg,#ffffff08,#ffffff03)}
-.rolling-paper-entry-image{display:block;width:min(100%,320px);max-height:270px;flex:0 0 auto;margin:0 auto;border-radius:11px;object-fit:cover}
+.rolling-paper-entry{box-sizing:border-box;position:relative;display:flex;width:50%;max-width:480px;min-width:0;aspect-ratio:1;flex-direction:column;align-items:stretch;justify-content:center;gap:8px;padding:clamp(14px,2vw,24px);border:1px solid #ffffff16;border-radius:clamp(18px,3vw,30px);background:linear-gradient(135deg,#ffffff08,#ffffff03)}
+.rolling-paper-entry-image{display:block;width:min(100%,320px);max-height:260px;flex:0 0 auto;margin:0 auto;border-radius:11px;object-fit:cover}
 .rolling-paper-entry-heading{position:static;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;padding-inline:40px}
 .rolling-paper-entry-author{color:#f3bfd0;font-size:11px}
 .rolling-paper-entry-date{color:#928a9a;font-size:10px;white-space:nowrap}
