@@ -1059,7 +1059,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .fan-sound-settings-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
 .fan-sound-settings-actions .button{min-width:96px}
 @media(max-width:520px){.fan-sound-settings-card{padding:20px}.fan-sound-settings-actions .button{min-width:0;flex:1}}
-@media(max-width:720px){.fan-quick-header{gap:7px;padding:9px 8px}.fan-quick-fullscreen{display:grid}}
+@media(max-width:720px){.fan-quick-header{gap:7px;padding:9px 8px}.fan-quick-mobile-actions{flex-direction:column;gap:9px}.fan-quick-fullscreen{display:grid}}
 @media(min-width:1500px){
   .fan-quick-header{gap:6px;padding:9px 6px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
   .fan-quick-remote.is-dragging .fan-quick-header{cursor:grabbing}
