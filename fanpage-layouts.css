@@ -1097,7 +1097,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :i
 }
 
 /* Cream jelly keeps small utility controls distinct from large call-to-action buttons. */
-body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close) {
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-fullscreen, .fan-quick-close) {
   border-color: color-mix(in srgb, var(--jelly-cream-deep), white 42%);
   border-radius: 999px;
   background: linear-gradient(180deg, #fffdf6, var(--jelly-cream));
@@ -1105,7 +1105,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :i
   box-shadow: 0 3px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), 0 5px 9px #75608012, inset 0 2px 0 #fff;
   transition: transform .2s cubic-bezier(.2, 1.7, .45, 1), box-shadow .2s ease, background .2s ease;
 }
-body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close):hover:not(:disabled) {
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-fullscreen, .fan-quick-close):hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 5px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), 0 8px 12px #75608018, inset 0 2px 0 #fff;
 }
@@ -1135,19 +1135,19 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-
   color: var(--jelly-accent-ink);
   box-shadow: 0 4px 0 color-mix(in srgb, var(--jelly-accent-deep), white 22%), inset 0 2px 0 #ffffffdc;
 }
-body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-sound-settings, .fan-quick-close) {
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-fullscreen, .fan-quick-sound-settings, .fan-quick-close) {
   border-color: color-mix(in srgb, var(--jelly-cream-deep), white 42%);
   background: linear-gradient(180deg, #fffdf6, var(--jelly-cream));
   color: var(--jelly-cream-ink);
   box-shadow: 0 3px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), 0 5px 9px #75608012, inset 0 2px 0 #fff;
 }
-body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-sound-settings, .fan-quick-close):hover:not(:disabled) {
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-fullscreen, .fan-quick-sound-settings, .fan-quick-close):hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--jelly-cream-deep), white 30%);
   background: linear-gradient(180deg, #fffefa, color-mix(in srgb, var(--jelly-cream), white 12%));
   color: var(--jelly-cream-ink);
   box-shadow: 0 5px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), 0 8px 12px #75608018, inset 0 2px 0 #fff;
 }
-body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-sound-settings, .fan-quick-close):active:not(:disabled) {
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-fullscreen, .fan-quick-sound-settings, .fan-quick-close):active:not(:disabled) {
   transform: translateY(2px) scale(.96);
   box-shadow: 0 1px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), inset 0 2px 4px #77628512;
 }
