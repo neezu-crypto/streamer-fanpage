@@ -2834,7 +2834,6 @@ async function loadRollingPaperTopics(page, force = false) {
   try {
     const result = (await callRollingPaper({ action: 'list-topics', streamerId })).data;
     state.topics = Array.isArray(result.topics) ? result.topics : [];
-    if (state.topics.length === 1 && !state.activeTopicId && !state.composeTopicId) state.composeTopicId = state.topics[0].id;
     state.canDelete = result.canDelete === true;
     state.canManageTopics = result.canManageTopics === true;
     state.topicsLoaded = true;
@@ -3497,6 +3496,12 @@ function renderFanPage(page, options = {}) {
   ]);
   function selectFanPageTab(tabKey, moveFocus = false) {
     if (!tabPanels.has(tabKey)) return;
+    const previousTabKey = view.dataset.fanpageActiveTab;
+    if (tabKey === 'rolling-paper' && previousTabKey !== 'rolling-paper') {
+      const rollingPaperState = rollingPaperStateFor(page.streamer.id);
+      rollingPaperState.activeTopicId = '';
+      refreshRollingPaperSection(page.streamer.id);
+    }
     view.dataset.fanpageActiveTab = tabKey;
     tabDefinitions.forEach((tab) => {
       const selected = tab.key === tabKey;
