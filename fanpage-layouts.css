@@ -1348,7 +1348,7 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-heading>p:last-child{color:#81758b}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);gap:20px}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.content-card,.live-section,.messenger-link-section,.fan-character-ogq-pair){min-width:0;margin:0}
-#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section,.rolling-paper-section){grid-column:1/-1}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section,.rolling-paper-section,.memory-moments-section){grid-column:1/-1}
 #fanPageView.fanpage-layout-1 .fanpage-tab-columns{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);align-items:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column{display:grid;align-content:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column>*{min-width:0;margin:0}
@@ -1419,6 +1419,20 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .rolling-paper-entry-content{color:#5f5870}
 #fanPageView.fanpage-layout-1 .rolling-paper-entry-image{border:1px solid #dbe4f8}
 #fanPageView.fanpage-layout-1 .rolling-paper-empty{border-color:#dbe4f8;background:#f8faff;color:#536f9a}
+#fanPageView.fanpage-layout-1 .memory-moments-heading .eyebrow{color:#6686cf}
+#fanPageView.fanpage-layout-1 .memory-moments-count,
+#fanPageView.fanpage-layout-1 .memory-moments-description,
+#fanPageView.fanpage-layout-1 .memory-moments-owner-hint{color:#81758b}
+#fanPageView.fanpage-layout-1 .memory-moments-form input{border-color:#d9e2f7;background:#fff;color:#51465d}
+#fanPageView.fanpage-layout-1 .memory-moments-form input:focus{border-color:#7696df;box-shadow:0 0 0 3px #7696df20}
+#fanPageView.fanpage-layout-1 .memory-moments-form input::placeholder{color:#a29aae}
+#fanPageView.fanpage-layout-1 .memory-moment-card{border-color:#dbe4f8;background:radial-gradient(circle at 82% 16%,#b9cafa55,transparent 37%),linear-gradient(145deg,#fff,#f5f8ff);color:#51465d;box-shadow:0 4px 0 #dfe6f4}
+#fanPageView.fanpage-layout-1 .memory-moment-symbol{border-color:#dbe4f8;background:#edf2ff;color:#6686cf}
+#fanPageView.fanpage-layout-1 .memory-moment-platform{border-color:#d9e2f7;background:#fff;color:#52668f}
+#fanPageView.fanpage-layout-1 .memory-moment-date{color:#92869a}
+#fanPageView.fanpage-layout-1 .memory-moment-external{border-color:#d9e2f7;background:#fff;color:#52668f}
+#fanPageView.fanpage-layout-1 .memory-moment-delete{border-color:#f1d3dc;background:#fff7fa;color:#bb6e85}
+#fanPageView.fanpage-layout-1 .memory-moments-empty{border-color:#dbe4f8;background:#f8faff;color:#536f9a}
 
 @media(min-width:1500px){
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button{border-color:#ded6ea;background:linear-gradient(180deg,#fff 0%,#fffafd 58%,#f5f1fa 100%);color:#5b5067;box-shadow:0 4px 0 #dfd8e8,0 7px 12px #75608014,inset 0 2px 0 #fff}

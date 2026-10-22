@@ -76,6 +76,8 @@ const YOUTUBE_REFRESH_COOLDOWN_MS = 60 * 1000;
 const FANPAGE_SONGBOOK_MAX_ITEMS = 500;
 const FANPAGE_PLAYED_GAMES_MAX_ITEMS = 100;
 const FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS = 20;
+const FANPAGE_MEMORY_MOMENTS_MAX_ITEMS = 50;
+const FANPAGE_MEMORY_MOMENT_TITLE_MAX_LENGTH = 80;
 const FANPAGE_ROLLING_PAPER_MAX_ITEMS = 300;
 const FANPAGE_ROLLING_PAPER_MAX_LENGTH = 300;
 const FANPAGE_ROLLING_PAPER_MAX_NICKNAME_LENGTH = 20;
@@ -2831,6 +2833,35 @@ function playedGamesRef(streamerId) {
   return db.ref(`streamerFanPagePlayedGames/${streamerId}`);
 }
 
+function fanPageMemoriesRef(streamerId) {
+  return db.ref(`streamerFanPageMemories/${streamerId}`);
+}
+
+function parseFanPageMemoryVideoUrl(value) {
+  const soopVod = parseSoopVodUrl(value);
+  if (soopVod) return { platform: 'soop', videoId: soopVod.id, url: soopVod.url };
+  const youtubeVideo = parseYouTubeVideoUrl(value);
+  if (youtubeVideo) return { platform: 'youtube', videoId: youtubeVideo.id, url: youtubeVideo.url };
+  return null;
+}
+
+function normalizeFanPageMemories(value) {
+  const entries = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return Object.entries(entries)
+    .map(([id, entry]) => {
+      if (!/^[0-9a-f-]{36}$/i.test(id) || !entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+      const title = typeof entry.title === 'string' ? entry.title.normalize('NFC').trim().replace(/\s+/g, ' ') : '';
+      const video = parseFanPageMemoryVideoUrl(entry.url);
+      const createdAt = Number(entry.createdAt);
+      if (!title || Array.from(title).length > FANPAGE_MEMORY_MOMENT_TITLE_MAX_LENGTH || /[\x00-\x1F\x7F]/.test(title)
+        || !video || !Number.isFinite(createdAt) || createdAt < 1) return null;
+      return { id, title, ...video, createdAt };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+    .slice(-FANPAGE_MEMORY_MOMENTS_MAX_ITEMS);
+}
+
 function rollingPaperRef(streamerId) {
   return db.ref(`streamerFanPageRollingPapers/${streamerId}`);
 }
@@ -3677,12 +3708,13 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
 
   const target = await findVerifiedBySoopId(requestedId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
-  const [pageSnap, vods, stockNamesSnap, songbookSnap, playedGamesSnap, fanpageEmotesSnap] = await Promise.all([
+  const [pageSnap, vods, stockNamesSnap, songbookSnap, playedGamesSnap, memoriesSnap, fanpageEmotesSnap] = await Promise.all([
     pageRef(target.streamer.id).get(),
     readVodPage(target.streamer.id),
     db.ref('streamerNames').get(),
     songbookRef(target.streamer.id).get(),
     playedGamesRef(target.streamer.id).get(),
+    fanPageMemoriesRef(target.streamer.id).get(),
     db.ref(`streamerFanPageEmotes/${target.streamer.id}`).get(),
     recordRecentVisit(uid, target.streamer.id),
     ...(!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)
@@ -3701,6 +3733,7 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
       stock,
       songbook: normalizeSongbookEntries(songbookSnap.val()),
       playedGames: normalizePlayedGames(playedGamesSnap.val()),
+      memories: normalizeFanPageMemories(memoriesSnap.val()),
       decorations: normalizeFanpageEmotes(fanpageEmotesSnap.val()),
     },
   };
@@ -5563,6 +5596,65 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
   }
 
   throw new HttpsError('invalid-argument', '플레이한 게임 요청을 확인해 주세요.');
+});
+
+exports.streamerFanPageMemories = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  if (!streamerId) throw new HttpsError('invalid-argument', '팬페이지를 지정해 주세요.');
+  const [target, verified, isAdmin] = await Promise.all([
+    findVerifiedBySoopId(streamerId),
+    findVerifiedByUid(uid),
+    isAdminUid(uid),
+  ]);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  const canManage = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
+  const rootRef = fanPageMemoriesRef(target.streamer.id);
+  const action = String(data.action || 'list');
+
+  if (action === 'list') {
+    return { memories: normalizeFanPageMemories((await rootRef.get()).val()), canManage };
+  }
+  if (!canManage) {
+    throw new HttpsError('permission-denied', '인증 스트리머 또는 관리자만 기억의 순간을 수정할 수 있습니다.');
+  }
+
+  if (action === 'add') {
+    if (typeof data.title !== 'string' || /[\x00-\x1F\x7F]/.test(data.title)) {
+      throw new HttpsError('invalid-argument', '기억의 순간 제목을 확인해 주세요.');
+    }
+    const title = data.title.normalize('NFC').trim().replace(/\s+/g, ' ');
+    if (!title || Array.from(title).length > FANPAGE_MEMORY_MOMENT_TITLE_MAX_LENGTH) {
+      throw new HttpsError('invalid-argument', `제목은 1자 이상 ${FANPAGE_MEMORY_MOMENT_TITLE_MAX_LENGTH}자 이하로 입력해 주세요.`);
+    }
+    const video = parseFanPageMemoryVideoUrl(data.url);
+    if (!video) {
+      throw new HttpsError('invalid-argument', 'SOOP 다시보기 또는 YouTube 영상 링크를 입력해 주세요.');
+    }
+    const id = randomUUID();
+    const entry = { title, ...video, createdAt: Date.now() };
+    const transaction = await rootRef.transaction((current) => {
+      const entries = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
+      if (Object.keys(entries).length >= FANPAGE_MEMORY_MOMENTS_MAX_ITEMS) return undefined;
+      return { ...entries, [id]: entry };
+    });
+    if (!transaction.committed) {
+      throw new HttpsError('resource-exhausted', `기억의 순간은 최대 ${FANPAGE_MEMORY_MOMENTS_MAX_ITEMS}개까지 등록할 수 있어요.`);
+    }
+    return { memories: normalizeFanPageMemories(transaction.snapshot.val()), canManage };
+  }
+
+  if (action === 'delete') {
+    const id = String(data.id || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpsError('invalid-argument', '삭제할 기억의 순간을 확인해 주세요.');
+    const entryRef = rootRef.child(id);
+    if (!(await entryRef.get()).exists()) throw new HttpsError('not-found', '삭제할 기억의 순간을 찾을 수 없습니다.');
+    await entryRef.remove();
+    return { memories: normalizeFanPageMemories((await rootRef.get()).val()), canManage };
+  }
+
+  throw new HttpsError('invalid-argument', '기억의 순간 요청을 확인해 주세요.');
 });
 
 exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (request) => {

@@ -26,6 +26,7 @@ const callAdminViewerSubscriptionRequests = httpsCallable(functions, 'streamerFa
 const callSave = httpsCallable(functions, 'streamerFanPageSave');
 const callSongbook = httpsCallable(functions, 'streamerFanPageSongbook');
 const callPlayedGames = httpsCallable(functions, 'streamerFanPagePlayedGames');
+const callMemories = httpsCallable(functions, 'streamerFanPageMemories');
 const callRollingPaper = httpsCallable(functions, 'streamerFanPageRollingPaper');
 const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
 const callVodComments = httpsCallable(functions, 'streamerFanPageVodComments');
@@ -336,6 +337,7 @@ const cafeStates = new Map();
 const rouletteStates = new Map();
 const upboStates = new Map();
 const rollingPaperStates = new Map();
+const fanPageMemoryStates = new Map();
 let galleryLoadPromise = Promise.resolve();
 
 if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
@@ -3395,12 +3397,14 @@ function renderFanPage(page, options = {}) {
   const calendarSection = renderCalendarSection(page);
   const gallerySection = renderGallerySection(page);
   const rollingPaperSection = renderRollingPaperSection(page);
+  const memoriesSection = renderMemoriesSection(page);
   const competitionHistorySection = renderCompetitionHistorySection(page);
   const tabDefinitions = [
     { key: 'home', label: '홈', eyebrow: 'YOUR HOME', title: '방송과 최신 소식', description: '방송 상태와 일정, 최근 다시보기를 모아 보여드려요.' },
     { key: 'activity', label: '팬 활동', eyebrow: 'FAN ACTIVITY', title: '팬들과 함께하는 공간', description: '팬 참여와 소통, 함께 만든 추억을 둘러보세요.' },
     { key: 'content', label: '콘텐츠', eyebrow: 'STREAMER CONTENTS', title: '다시보기와 활동 기록', description: '영상, 대회 이력, 플레이한 게임을 모아봤어요.' },
     { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 응원 메시지를 남겨 보세요.' },
+    { key: 'memories', label: '기억의 순간', eyebrow: 'MEMORY MOMENTS', title: '기억의 순간', description: '100일·200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아봤어요.' },
   ];
   const tabNav = document.createElement('div');
   tabNav.className = 'fanpage-tab-nav';
@@ -3493,6 +3497,7 @@ function renderFanPage(page, options = {}) {
       ]
       : [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
     ['rolling-paper', createFanPageTabPanel(tabDefinitions[3], [rollingPaperSection])],
+    ['memories', createFanPageTabPanel(tabDefinitions[4], [memoriesSection])],
   ]);
   function selectFanPageTab(tabKey, moveFocus = false) {
     if (!tabPanels.has(tabKey)) return;
@@ -5419,6 +5424,158 @@ function refreshPlayedGamesSection(streamerId) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const section = $('playedGamesSection');
   if (section) section.replaceWith(renderPlayedGamesSection(currentPage));
+}
+
+function fanPageMemoryStateFor(streamerId) {
+  let state = fanPageMemoryStates.get(streamerId);
+  if (!state) {
+    state = { saving: false, deletingId: '' };
+    fanPageMemoryStates.set(streamerId, state);
+  }
+  return state;
+}
+
+function renderMemoriesSection(page) {
+  const memories = Array.isArray(page.memories) ? page.memories : [];
+  const state = fanPageMemoryStateFor(page.streamer.id);
+  const section = document.createElement('section');
+  section.className = 'memory-moments-section content-card';
+  section.id = 'memoryMomentsSection';
+
+  const heading = document.createElement('div'); heading.className = 'memory-moments-heading';
+  const copy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'MEMORY MOMENTS';
+  const title = document.createElement('h2'); title.textContent = '기억의 순간';
+  const count = document.createElement('span'); count.className = 'memory-moments-count';
+  count.textContent = `${memories.length.toLocaleString('ko-KR')}개`;
+  copy.append(eyebrow, title, count); heading.append(copy); section.append(heading);
+
+  const description = document.createElement('p'); description.className = 'memory-moments-description';
+  description.textContent = '100일, 200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아뒀어요.';
+  section.append(description);
+
+  if (page.isOwner) {
+    const form = document.createElement('form'); form.className = 'memory-moments-form';
+    const momentTitle = document.createElement('input'); momentTitle.type = 'text'; momentTitle.name = 'title';
+    momentTitle.required = true; momentTitle.maxLength = 80; momentTitle.placeholder = '예: 100일 방송 다시보기';
+    momentTitle.setAttribute('aria-label', '기억의 순간 제목');
+    const videoUrl = document.createElement('input'); videoUrl.type = 'url'; videoUrl.name = 'url';
+    videoUrl.required = true; videoUrl.maxLength = 500; videoUrl.placeholder = 'SOOP 다시보기 또는 YouTube 영상 링크';
+    videoUrl.setAttribute('aria-label', '기억의 순간 다시보기 링크');
+    const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary';
+    add.disabled = state.saving; add.textContent = state.saving ? '저장 중…' : '＋ 순간 추가';
+    form.append(momentTitle, videoUrl, add);
+    const hint = document.createElement('small'); hint.className = 'memory-moments-owner-hint';
+    hint.textContent = '인증 스트리머와 관리자만 추가·삭제할 수 있어요. SOOP 다시보기와 YouTube 영상 링크를 지원합니다.';
+    form.append(hint);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (form.reportValidity()) addMemoryMoment(page, momentTitle, videoUrl, add);
+    });
+    section.append(form);
+  }
+
+  if (!memories.length) {
+    const empty = document.createElement('p'); empty.className = 'memory-moments-empty';
+    empty.textContent = page.isOwner
+      ? '아직 등록된 기억의 순간이 없어요. 첫 기념 다시보기를 추가해 보세요.'
+      : '아직 등록된 기념 다시보기가 없어요.';
+    section.append(empty);
+    return section;
+  }
+
+  const list = document.createElement('div'); list.className = 'memory-moments-list';
+  memories.forEach((memory) => {
+    if (!memory || !/^[0-9a-f-]{36}$/i.test(String(memory.id || ''))) return;
+    const card = document.createElement('article'); card.className = 'memory-moment-card';
+    const symbol = document.createElement('span'); symbol.className = 'memory-moment-symbol';
+    symbol.textContent = '✦'; symbol.setAttribute('aria-hidden', 'true');
+    const detail = document.createElement('div'); detail.className = 'memory-moment-detail';
+    const meta = document.createElement('div'); meta.className = 'memory-moment-meta';
+    const platform = document.createElement('span'); platform.className = 'memory-moment-platform';
+    platform.textContent = memory.platform === 'youtube' ? 'YouTube' : 'SOOP';
+    const createdAt = Number(memory.createdAt);
+    if (Number.isFinite(createdAt) && createdAt > 0) {
+      const date = document.createElement('time'); date.className = 'memory-moment-date';
+      date.dateTime = new Date(createdAt).toISOString();
+      date.textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }).format(createdAt);
+      meta.append(platform, date);
+    } else {
+      meta.append(platform);
+    }
+    const name = document.createElement('h3'); name.className = 'memory-moment-title';
+    name.textContent = String(memory.title || '기억의 순간');
+    detail.append(meta, name);
+    const actions = document.createElement('div'); actions.className = 'memory-moment-actions';
+    const play = document.createElement('button'); play.type = 'button'; play.className = 'button button-primary memory-moment-play';
+    play.textContent = '▶ 팬페이지에서 재생';
+    play.addEventListener('click', () => {
+      if (memory.platform === 'youtube') openYouTubePlayer({ id: memory.videoId, title: memory.title });
+      else openVodPlayer({ id: memory.videoId, title: memory.title });
+    });
+    const external = document.createElement('a'); external.className = 'button memory-moment-external';
+    external.href = memory.url; external.target = '_blank'; external.rel = 'noopener noreferrer';
+    external.textContent = '원본 링크 ↗';
+    actions.append(play, external);
+    if (page.isOwner) {
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button memory-moment-delete';
+      remove.disabled = state.saving || state.deletingId === memory.id;
+      remove.textContent = state.deletingId === memory.id ? '삭제 중…' : '삭제';
+      remove.setAttribute('aria-label', `${memory.title || '기억의 순간'} 삭제`);
+      remove.addEventListener('click', () => deleteMemoryMoment(page, memory, remove));
+      actions.append(remove);
+    }
+    card.append(symbol, detail, actions); list.append(card);
+  });
+  section.append(list);
+  return section;
+}
+
+async function addMemoryMoment(page, titleInput, urlInput, button) {
+  const state = fanPageMemoryStateFor(page.streamer.id);
+  if (!page.isOwner || state.saving || button.disabled) return;
+  state.saving = true; button.disabled = true; button.textContent = '저장 중…';
+  try {
+    const result = (await callMemories({
+      action: 'add', streamerId: page.streamer.id, title: titleInput.value.trim(), url: urlInput.value.trim(),
+    })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    page.memories = Array.isArray(result.memories) ? result.memories : [];
+    currentPage.memories = page.memories;
+    state.saving = false;
+    refreshMemoriesSection(page.streamer.id);
+    showToast('기억의 순간을 추가했어요.');
+  } catch (error) {
+    showToast(error.message || '기억의 순간을 추가하지 못했어요.');
+  } finally {
+    state.saving = false;
+    if (button.isConnected) { button.disabled = false; button.textContent = '＋ 순간 추가'; }
+  }
+}
+
+async function deleteMemoryMoment(page, memory, button) {
+  const state = fanPageMemoryStateFor(page.streamer.id);
+  if (!page.isOwner || state.saving || button.disabled
+    || !confirm(`“${memory.title}” 기억의 순간을 삭제할까요?`)) return;
+  state.saving = true; state.deletingId = memory.id; button.disabled = true; button.textContent = '삭제 중…';
+  try {
+    const result = (await callMemories({ action: 'delete', streamerId: page.streamer.id, id: memory.id })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    page.memories = Array.isArray(result.memories) ? result.memories : [];
+    currentPage.memories = page.memories;
+    showToast('기억의 순간을 삭제했어요.');
+  } catch (error) {
+    showToast(error.message || '기억의 순간을 삭제하지 못했어요.');
+  } finally {
+    state.saving = false; state.deletingId = '';
+    refreshMemoriesSection(page.streamer.id);
+  }
+}
+
+function refreshMemoriesSection(streamerId) {
+  if (!currentPage || currentPage.streamer.id !== streamerId) return;
+  const section = $('memoryMomentsSection');
+  if (section) section.replaceWith(renderMemoriesSection(currentPage));
 }
 
 function renderOgqSection(page, paired = false) {
