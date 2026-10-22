@@ -1031,6 +1031,10 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .fan-quick-sound-settings svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.7}
 .fan-quick-sound-settings:hover{border-color:#f58cac70;background:#f58cac12}
 .fan-quick-sound-settings:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
+.fan-quick-fullscreen{display:none;width:30px;height:30px;flex:0 0 30px;place-items:center;padding:0;border:1px solid #ffffff20;border-radius:9px;background:#ffffff08;color:var(--text)}
+.fan-quick-fullscreen svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.7}
+.fan-quick-fullscreen:hover{border-color:#f58cac70;background:#f58cac12}
+.fan-quick-fullscreen:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
 .fan-quick-close{display:grid;width:30px;height:30px;place-items:center;border:1px solid #ffffff20;border-radius:9px;background:#ffffff08;color:var(--text);font-size:19px;line-height:1}
 .fan-quick-body{display:grid;min-height:0;grid-template-columns:minmax(0,1fr) 20px;gap:9px;padding:8px 9px 10px}
 .fan-quick-links{display:grid;align-content:start;gap:3px;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:2px;scrollbar-width:thin;scrollbar-color:#ffffff35 transparent}
@@ -1054,6 +1058,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .fan-sound-settings-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
 .fan-sound-settings-actions .button{min-width:96px}
 @media(max-width:520px){.fan-sound-settings-card{padding:20px}.fan-sound-settings-actions .button{min-width:0;flex:1}}
+@media(max-width:720px){.fan-quick-header{gap:7px;padding:9px 8px}.fan-quick-fullscreen{display:grid}}
 @media(min-width:1500px){
   .fan-quick-header{gap:6px;padding:9px 6px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
   .fan-quick-remote.is-dragging .fan-quick-header{cursor:grabbing}
