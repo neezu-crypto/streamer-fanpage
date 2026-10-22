@@ -3215,6 +3215,60 @@ async function saveCompetitionHistory(page, entries, successMessage = '대회 �
   showToast(successMessage);
 }
 
+function renderAffiliatePromoCard() {
+  const productUrl = 'https://bitl.bz/4aO8WU';
+  const imageUrl = 'https://sitem.ssgcdn.com/49/33/50/item/1000815503349_i1_1200.jpg';
+  const card = document.createElement('article');
+  card.className = 'affiliate-promo-card';
+  card.setAttribute('aria-label', '먼작귀 목쿠션 제휴 상품');
+
+  const adLabel = document.createElement('p');
+  adLabel.className = 'affiliate-promo-ad-label';
+  adLabel.textContent = '광고 · 제휴';
+
+  const layout = document.createElement('div');
+  layout.className = 'affiliate-promo-layout';
+
+  const imageLink = document.createElement('a');
+  imageLink.className = 'affiliate-promo-image-link';
+  imageLink.href = productUrl;
+  imageLink.target = '_blank';
+  imageLink.rel = 'noopener noreferrer';
+  imageLink.setAttribute('aria-label', '먼작귀 목쿠션 상품 페이지를 새 탭에서 열기');
+  const image = document.createElement('img');
+  image.src = imageUrl;
+  image.alt = '먼작귀 목쿠션 상품';
+  image.loading = 'lazy';
+  image.decoding = 'async';
+  imageLink.append(image);
+
+  const details = document.createElement('div');
+  details.className = 'affiliate-promo-details';
+  const brand = document.createElement('p');
+  brand.className = 'affiliate-promo-brand';
+  brand.textContent = 'CHIikAWA PICK';
+  const title = document.createElement('h3');
+  title.className = 'affiliate-promo-title';
+  title.textContent = '먼작귀 목쿠션';
+  const description = document.createElement('p');
+  description.className = 'affiliate-promo-description';
+  description.textContent = '상품 상세 정보와 판매 옵션은 상품 페이지에서 확인해 보세요.';
+  const button = document.createElement('a');
+  button.className = 'affiliate-promo-button';
+  button.href = productUrl;
+  button.target = '_blank';
+  button.rel = 'noopener noreferrer';
+  button.textContent = '상품 보러가기 ↗';
+  details.append(brand, title, description, button);
+  layout.append(imageLink, details);
+
+  const disclosure = document.createElement('p');
+  disclosure.className = 'affiliate-promo-disclosure';
+  disclosure.textContent = '이 링크를 통해 구매하면 팬페이지 운영자가 수수료를 받을 수 있습니다.';
+  card.append(adLabel, layout, disclosure);
+  return card;
+}
+
 function renderFanPage(page, options = {}) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
@@ -3481,7 +3535,7 @@ function renderFanPage(page, options = {}) {
     const sideColumn = document.createElement('div');
     sideColumn.className = 'fanpage-home-side-column';
     mainColumn.append(liveSection, vodSection);
-    sideColumn.append(calendarSection);
+    sideColumn.append(calendarSection, renderAffiliatePromoCard());
     homeColumns.append(mainColumn, sideColumn);
     homePanel.querySelector('.fanpage-tab-panel-grid').append(homeColumns);
   }
