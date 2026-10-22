@@ -2904,8 +2904,8 @@ async function readRollingPaper(streamerId, canDelete, topicId = 'general') {
     ? { ...rollingPaperObject(root.entries), ...rollingPaperObject(selectedTopic && selectedTopic.entries) }
     : rollingPaperObject(selectedTopic && selectedTopic.entries);
   const entries = rollingPaperTopicEntries(rawEntries)
-    .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-    .slice(0, FANPAGE_ROLLING_PAPER_MAX_ITEMS);
+    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+    .slice(-FANPAGE_ROLLING_PAPER_MAX_ITEMS);
   return {
     items: entries,
     count: entries.length,
