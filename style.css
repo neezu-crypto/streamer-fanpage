@@ -1142,6 +1142,29 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .competition-history-form-status.is-error{display:block}
 .competition-history-form-footer{align-items:center;margin-top:0}
 .competition-history-form-footer small{color:#928a9a;font-size:10px}
+.memory-moments-section{margin-top:0}
+.memory-moments-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.memory-moments-heading .eyebrow{margin:0 0 5px;font-size:9px}
+.memory-moments-heading h2{display:inline-block;margin:0;font:23px var(--display)}
+.memory-moments-count{margin-left:9px;color:var(--muted);font-size:12px}
+.memory-moments-description{margin:8px 0 14px;color:#aaa3b1;font-size:12px;line-height:1.6}
+.memory-moments-form{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.5fr) auto;gap:8px;margin-bottom:14px}
+.memory-moments-form input{box-sizing:border-box;width:100%;min-width:0;min-height:40px;padding:9px 11px;border:1px solid #ffffff20;border-radius:10px;background:#111018;color:var(--text);outline:0;font:12px var(--font)}
+.memory-moments-form input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.memory-moments-form .button{white-space:nowrap}
+.memory-moments-owner-hint{grid-column:1/-1;color:#8f8997;font-size:11px;line-height:1.5}
+.memory-moments-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px}
+.memory-moment-card{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;padding:14px;border:1px solid #ffffff16;border-radius:15px;background:linear-gradient(135deg,#ffffff08,#ffffff03)}
+.memory-moment-symbol{display:grid;width:42px;aspect-ratio:1;place-items:center;border:1px solid #f58cac35;border-radius:50%;background:#f58cac12;color:#f3a6c0;font-size:20px}
+.memory-moment-detail{min-width:0}
+.memory-moment-meta{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-bottom:5px}
+.memory-moment-platform{padding:3px 7px;border:1px solid #ffffff1b;border-radius:99px;background:#ffffff08;color:#c4bacb;font-size:9px;font-weight:700}
+.memory-moment-date{color:#928a9a;font-size:10px}
+.memory-moment-title{margin:0;font:16px/1.4 var(--display);overflow-wrap:anywhere}
+.memory-moment-actions{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.memory-moment-actions .button{min-height:33px;padding:0 10px;font-size:10px;white-space:nowrap}
+.memory-moment-delete{margin-left:auto;color:#ef9eae}
+.memory-moments-empty{display:grid;min-height:82px;place-items:center;margin:0;padding:14px;border:1px dashed #ffffff24;border-radius:13px;background:#ffffff04;color:#aaa1b2;font-size:12px;text-align:center;line-height:1.6}
 .rolling-paper-section{margin-top:0}
 .rolling-paper-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
 .rolling-paper-heading .eyebrow{margin:0 0 5px;font-size:9px}
@@ -1208,6 +1231,8 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .rolling-paper-entry-content{flex:0 0 auto;margin:0;color:#d7cfda;font-size:24px;line-height:1.65;text-align:center;white-space:pre-wrap;overflow-wrap:anywhere}
 .rolling-paper-empty{grid-column:1/-1;display:grid;min-height:82px;place-items:center;margin:0;padding:14px;border:1px dashed #ffffff24;border-radius:13px;background:#ffffff04;color:#aaa1b2;font-size:12px;text-align:center;line-height:1.6}
 @media(max-width:560px){.rolling-paper-heading{align-items:flex-start;gap:10px}.rolling-paper-heading h2{font-size:21px}.rolling-paper-heading-actions{gap:7px;flex-wrap:wrap;justify-content:flex-end}.rolling-paper-refresh,.rolling-paper-topic-add,.rolling-paper-topic-delete{padding-inline:9px}.rolling-paper-topic-form{grid-template-columns:1fr}.rolling-paper-topic-form .button{width:100%}.rolling-paper-topic-grid{gap:7px}.rolling-paper-topic-card{gap:10px;padding:12px;border-radius:25px}.rolling-paper-topic-card.is-composing{width:100%;padding:15px;border-radius:20px}.rolling-paper-topic-card-actions{width:100%;justify-content:flex-start;gap:5px}.rolling-paper-topic-card-actions .button{min-height:32px;padding-inline:6px;font-size:9px}.rolling-paper-topic-decoration{width:42px;font-size:22px}.rolling-paper-topic-title{font-size:15px}.rolling-paper-gallery-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.rolling-paper-form-footer{align-items:flex-start;flex-direction:column}.rolling-paper-form-footer .button{width:100%}.rolling-paper-form-detail{width:100%;padding:20px;border-radius:25px}.rolling-paper-list{grid-template-columns:1fr}.rolling-paper-entry{width:100%;padding:20px}}
+@media(max-width:720px){.memory-moments-form{grid-template-columns:1fr}.memory-moments-form .button{width:100%}.memory-moment-actions{gap:6px}.memory-moment-actions .button{flex:1 1 auto}.memory-moment-delete{margin-left:0}}
+@media(max-width:560px){.memory-moments-heading{align-items:flex-start}.memory-moments-heading h2{font-size:21px}.memory-moments-list{grid-template-columns:1fr}.memory-moment-card{padding:12px}.memory-moment-actions .button{flex:1 1 42%}}
 @media(max-width:720px){
   .rolling-paper-heading{align-items:stretch;flex-direction:column;gap:10px}
   .rolling-paper-heading-actions{width:100%;justify-content:flex-start}
@@ -1251,7 +1276,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 @media(max-width:720px){.registered-section{margin-top:28px}.registered-section-actions{gap:7px}.registered-streamers-toggle{min-height:31px;padding:5px 9px;font-size:9px}}
 
 /* Fanpage content is grouped into four focused views. */
-#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 #fanPageView .fanpage-tab-button{min-width:0;min-height:44px;padding:8px 12px;border:1px solid transparent;border-radius:13px;background:transparent;color:#c7c0cf;font:700 13px var(--font);cursor:pointer;transition:background .16s,border-color .16s,color .16s,box-shadow .16s}
 #fanPageView .fanpage-tab-button:hover{border-color:#ffffff24;background:#ffffff0b;color:var(--text)}
 #fanPageView .fanpage-tab-button[aria-selected=true]{border-color:#ffffff26;background:linear-gradient(180deg,#ffffff18,#ffffff0b);color:var(--text);box-shadow:inset 0 1px 0 #ffffff22}
@@ -1267,7 +1292,8 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 #fanPageView.fanpage-layout-2 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section){grid-column:1/-1}
 @media(max-width:560px){
   #fanPageView .fanpage-tab-nav{gap:4px;margin:14px 0 18px;padding:4px;border-radius:15px}
-  #fanPageView .fanpage-tab-button{min-height:42px;padding:7px 3px;border-radius:11px;font-size:11px}
+  #fanPageView .fanpage-tab-button{min-height:42px;padding:7px 0;border-radius:11px;font-size:clamp(8px,2.4vw,10px)}
   #fanPageView .fanpage-tab-panel-heading{margin-bottom:12px}
   #fanPageView .fanpage-tab-panel-heading>p:last-child{font-size:11px}
 }
+@media(max-width:900px){#fanPageView .fanpage-tab-nav{padding-right:56px}}
