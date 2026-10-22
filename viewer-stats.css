@@ -403,6 +403,25 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
   outline: 3px solid #486bd64d;
   outline-offset: 2px;
 }
+@media(min-width:1121px) {
+  .viewer-workspace {
+    align-items: stretch;
+    column-gap: 0;
+  }
+  .viewer-hero-group {
+    align-items: stretch;
+  }
+  .viewer-hero-group .viewer-stats-hero {
+    align-self: center;
+  }
+  .viewer-affiliate-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-self: stretch;
+    box-sizing: border-box;
+  }
+}
 @media(max-width:1120px) {
   .viewer-workspace {
     grid-template-columns: minmax(0, 1fr);
