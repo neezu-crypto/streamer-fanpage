@@ -3763,9 +3763,14 @@ function createFanPageQuickRemote(view) {
   soundSettingsButton.setAttribute('aria-label', '효과음 볼륨 설정');
   soundSettingsButton.title = '효과음 볼륨 설정';
   soundSettingsButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4Z"/><path d="M16 9a5 5 0 0 1 0 6M18.5 6.5a9 9 0 0 1 0 11"/></svg>';
+  const fullscreenButton = document.createElement('button'); fullscreenButton.type = 'button';
+  fullscreenButton.className = 'fan-quick-fullscreen';
+  fullscreenButton.setAttribute('aria-label', '전체 화면 보기');
+  fullscreenButton.title = '전체 화면 보기';
+  fullscreenButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4"/></svg>';
   const close = document.createElement('button'); close.type = 'button'; close.className = 'fan-quick-close';
   close.setAttribute('aria-label', '빠른 이동 리모콘 닫기'); close.textContent = '×';
-  header.append(title, soundSettingsButton, close);
+  header.append(title, soundSettingsButton, fullscreenButton, close);
   const soundDialog = document.createElement('dialog');
   soundDialog.className = 'account-dialog fan-sound-settings-dialog';
   soundDialog.setAttribute('aria-labelledby', 'fanSoundSettingsTitle');
@@ -3846,6 +3851,37 @@ function createFanPageQuickRemote(view) {
   let emoteLauncherObserver = null;
   const positionStorageKey = 'streamerFanPage.quickRemotePosition';
   const isDesktop = () => window.matchMedia('(min-width: 1500px)').matches;
+  function currentFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || document.webkitCurrentFullScreenElement || null;
+  }
+  function syncFullscreenButton() {
+    const isFullscreen = !!currentFullscreenElement();
+    const label = isFullscreen ? '전체 화면 종료' : '전체 화면 보기';
+    fullscreenButton.setAttribute('aria-label', label);
+    fullscreenButton.setAttribute('aria-pressed', String(isFullscreen));
+    fullscreenButton.title = label;
+  }
+  async function toggleFullscreen() {
+    const fullscreenElement = currentFullscreenElement();
+    const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen;
+    if (fullscreenElement) {
+      if (typeof exitFullscreen !== 'function') {
+        showToast('이 브라우저에서는 전체 화면을 종료할 수 없어요.');
+        return;
+      }
+      try { await exitFullscreen.call(document); }
+      catch (_) { showToast('전체 화면을 종료하지 못했어요.'); }
+      return;
+    }
+    const root = document.documentElement;
+    const requestFullscreen = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (typeof requestFullscreen !== 'function') {
+      showToast('현재 브라우저는 페이지 전체 화면을 지원하지 않아요.');
+      return;
+    }
+    try { await requestFullscreen.call(root); }
+    catch (_) { showToast('전체 화면을 시작하지 못했어요. 브라우저의 화면 전환 기능을 확인해 주세요.'); }
+  }
   function syncEmoteLauncherPosition() {
     const launcher = document.getElementById('game-series-emote-launcher');
     if (!launcher) return;
@@ -4007,6 +4043,10 @@ function createFanPageQuickRemote(view) {
     syncDeviceMode();
   };
   toggle.addEventListener('click', () => setExpanded(!expanded));
+  fullscreenButton.addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', syncFullscreenButton);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
+  syncFullscreenButton();
   close.addEventListener('click', () => setExpanded(false));
   header.addEventListener('pointerdown', startRemoteDrag);
   header.addEventListener('pointermove', moveRemoteDrag);
@@ -4033,6 +4073,9 @@ function createFanPageQuickRemote(view) {
   return () => {
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', onResize);
+    document.removeEventListener('fullscreenchange', syncFullscreenButton);
+    document.removeEventListener('webkitfullscreenchange', syncFullscreenButton);
+    fullscreenButton.removeEventListener('click', toggleFullscreen);
     header.removeEventListener('pointerdown', startRemoteDrag);
     header.removeEventListener('pointermove', moveRemoteDrag);
     header.removeEventListener('pointerup', finishRemoteDrag);
