@@ -3755,6 +3755,7 @@ function createFanPageQuickRemote(view) {
   toggle.className = 'fan-quick-toggle'; toggle.setAttribute('aria-label', '빠른 이동 리모콘 열기');
   toggle.setAttribute('aria-expanded', 'false');
   toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h9M5 17h14"/><circle cx="17" cy="12" r="2"/></svg>';
+  const mobileActions = document.createElement('div'); mobileActions.className = 'fan-quick-mobile-actions';
   const panel = document.createElement('div'); panel.className = 'fan-quick-panel'; panel.id = 'fanQuickPanel'; panel.hidden = true;
   const header = document.createElement('div'); header.className = 'fan-quick-header';
   const title = document.createElement('strong'); title.textContent = '빠른 이동';
@@ -3770,7 +3771,7 @@ function createFanPageQuickRemote(view) {
   fullscreenButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4"/></svg>';
   const close = document.createElement('button'); close.type = 'button'; close.className = 'fan-quick-close';
   close.setAttribute('aria-label', '빠른 이동 리모콘 닫기'); close.textContent = '×';
-  header.append(title, soundSettingsButton, fullscreenButton, close);
+  header.append(title, soundSettingsButton, close);
   const soundDialog = document.createElement('dialog');
   soundDialog.className = 'account-dialog fan-sound-settings-dialog';
   soundDialog.setAttribute('aria-labelledby', 'fanSoundSettingsTitle');
@@ -3841,7 +3842,8 @@ function createFanPageQuickRemote(view) {
   scrubber.append(rail, thumb); body.append(nav, scrubber); panel.append(header, body);
   soundDialog.id = 'fanSoundSettingsDialog';
   toggle.setAttribute('aria-controls', panel.id);
-  remote.append(toggle, panel); view.append(remote, soundDialog);
+  mobileActions.append(toggle, fullscreenButton);
+  remote.append(mobileActions, panel); view.append(remote, soundDialog);
 
   let expanded = false;
   let scrollFrame = 0;
