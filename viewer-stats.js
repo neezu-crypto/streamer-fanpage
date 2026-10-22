@@ -3462,6 +3462,11 @@ document.addEventListener('visibilitychange', () => {
 });
 
 setupDevbarMarquee();
+document.querySelectorAll('.viewer-affiliate-image img').forEach((image) => {
+  const showFallback = () => image.closest('.viewer-affiliate-image')?.classList.add('is-unavailable');
+  image.addEventListener('error', showFallback, { once: true });
+  if (image.complete && image.naturalWidth === 0) showFallback();
+});
 renderComparisonSelection();
 loadDevbarLinks();
 getAuthReady().then(() => {

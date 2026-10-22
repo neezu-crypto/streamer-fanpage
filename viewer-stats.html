@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20261019-all-modals-mobile">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261019-on-demand-stats">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261023-affiliate-card">
   <link rel="stylesheet" href="viewer-sponsors.css?v=20261019-mobile-left-rail">
 </head>
 <body class="viewer-stats-page">
@@ -74,11 +74,28 @@
 
     <main class="main-content viewer-stats-main">
       <section class="viewer-workspace" aria-label="스트리머 통계 검색">
-      <section class="viewer-stats-hero">
-        <p class="eyebrow">SOOP VIEWER ANALYTICS</p>
-        <h1>방송의 흐름을<br><span>숫자로 확인하세요</span></h1>
-        <p>다시보기별 최고·최저 시청 순간과 기간별 기록을 확인하고, 같은 날 또는 키워드별로 스트리머 고점을 비교할 수 있습니다.</p>
-      </section>
+      <div class="viewer-hero-group">
+        <section class="viewer-stats-hero">
+          <p class="eyebrow">SOOP VIEWER ANALYTICS</p>
+          <h1>방송의 흐름을<br><span>숫자로 확인하세요</span></h1>
+          <p>다시보기별 최고·최저 시청 순간과 기간별 기록을 확인하고, 같은 날 또는 키워드별로 스트리머 고점을 비교할 수 있습니다.</p>
+        </section>
+
+        <article class="viewer-affiliate-card" aria-labelledby="viewerAffiliateTitle">
+          <p class="viewer-affiliate-label">광고 · 제휴</p>
+          <p class="viewer-affiliate-disclosure">구매가 발생하면 고점체크 운영자가 수수료를 받을 수 있습니다.</p>
+          <div class="viewer-affiliate-product">
+            <a class="viewer-affiliate-image" href="https://bitl.bz/4aO8WU" target="_blank" rel="sponsored nofollow noopener noreferrer" aria-label="먼작귀 목쿠션 상품 페이지 열기">
+              <img src="https://sitem.ssgcdn.com/49/33/50/item/1000815503349_i1_1200.jpg" alt="먼작귀 목쿠션 상품 이미지" loading="lazy" decoding="async">
+              <span class="viewer-affiliate-image-fallback" aria-hidden="true">먼작귀<br>목쿠션</span>
+            </a>
+            <div class="viewer-affiliate-copy">
+              <h2 id="viewerAffiliateTitle">먼작귀 목쿠션</h2>
+              <a class="viewer-affiliate-cta" href="https://bitl.bz/4aO8WU" target="_blank" rel="sponsored nofollow noopener noreferrer">상품 보러가기 <span aria-hidden="true">↗</span></a>
+            </div>
+          </div>
+        </article>
+      </div>
 
       <section class="viewer-search-panel" aria-labelledby="viewerSearchTitle">
         <form id="viewerSearchForm" class="viewer-search-form" autocomplete="off">
@@ -376,6 +393,6 @@
       <p class="viewer-sponsor-dialog-status" id="sponsorRequestStatus" role="status" aria-live="polite"></p>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261019-on-demand-stats"></script>
+  <script type="module" src="viewer-stats.js?v=20261023-affiliate-card"></script>
 </body>
 </html>
