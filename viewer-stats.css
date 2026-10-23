@@ -324,7 +324,7 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 }
 .viewer-affiliate-product {
   display: grid;
-  grid-template-columns: minmax(76px, 38%) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 11px;
   margin-top: 11px;
@@ -452,7 +452,7 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
     padding: 12px;
   }
   .viewer-affiliate-product {
-    grid-template-columns: 82px minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     margin-top: 9px;
   }
@@ -469,9 +469,6 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
   }
 }
 @media(max-width:360px) {
-  .viewer-affiliate-product {
-    grid-template-columns: 72px minmax(0, 1fr);
-  }
   .viewer-affiliate-disclosure {
     font-size: 9px;
   }
