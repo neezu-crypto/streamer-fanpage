@@ -17,36 +17,40 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 const functions = getFunctions(app, 'us-central1');
+function authenticatedCallable(name, options) {
+  const callable = httpsCallable(functions, name, options);
+  return (data, callOptions) => ensureAuthReady().then(() => callable(data, callOptions));
+}
 const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
-const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
-const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
-const callAdminStats = httpsCallable(functions, 'streamerFanPageAdminStats');
-const callDesignFeedback = httpsCallable(functions, 'streamerFanPageDesignFeedback');
-const callAdminViewerSubscriptionRequests = httpsCallable(functions, 'streamerFanPageAdminViewerSubscriptionRequests');
-const callSave = httpsCallable(functions, 'streamerFanPageSave');
-const callSongbook = httpsCallable(functions, 'streamerFanPageSongbook');
-const callPlayedGames = httpsCallable(functions, 'streamerFanPagePlayedGames');
-const callMemories = httpsCallable(functions, 'streamerFanPageMemories');
-const callRollingPaper = httpsCallable(functions, 'streamerFanPageRollingPaper');
-const callVodPage = httpsCallable(functions, 'streamerFanPageVodPage');
-const callVodComments = httpsCallable(functions, 'streamerFanPageVodComments');
-const callVodCommentAdd = httpsCallable(functions, 'streamerFanPageVodCommentAdd');
-const callVodCommentDelete = httpsCallable(functions, 'streamerFanPageVodCommentDelete');
-const callCommentProfileSave = httpsCallable(functions, 'streamerFanPageCommentProfileSave');
-const callVodRefresh = httpsCallable(functions, 'streamerFanPageVodRefresh', { timeout: 3600000 });
-const callCalendar = httpsCallable(functions, 'streamerFanPageCalendar');
-const callLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
-const callGallery = httpsCallable(functions, 'streamerFanPageGallery');
-const callScheduleAdd = httpsCallable(functions, 'streamerFanPageScheduleAdd');
-const callScheduleDelete = httpsCallable(functions, 'streamerFanPageScheduleDelete');
-const callYouTubeVideos = httpsCallable(functions, 'streamerFanPageYouTubeVideos');
-const callCafePosts = httpsCallable(functions, 'streamerFanPageCafePosts');
-const callRoulette = httpsCallable(functions, 'streamerFanPageRoulette');
-const callUpbo = httpsCallable(functions, 'streamerFanPageUpbo');
+const callSearch = authenticatedCallable('streamerFanPageSearch');
+const callRecent = authenticatedCallable('streamerFanPageRecent');
+const callAdminStats = authenticatedCallable('streamerFanPageAdminStats');
+const callDesignFeedback = authenticatedCallable('streamerFanPageDesignFeedback');
+const callAdminViewerSubscriptionRequests = authenticatedCallable('streamerFanPageAdminViewerSubscriptionRequests');
+const callSave = authenticatedCallable('streamerFanPageSave');
+const callSongbook = authenticatedCallable('streamerFanPageSongbook');
+const callPlayedGames = authenticatedCallable('streamerFanPagePlayedGames');
+const callMemories = authenticatedCallable('streamerFanPageMemories');
+const callRollingPaper = authenticatedCallable('streamerFanPageRollingPaper');
+const callVodPage = authenticatedCallable('streamerFanPageVodPage');
+const callVodComments = authenticatedCallable('streamerFanPageVodComments');
+const callVodCommentAdd = authenticatedCallable('streamerFanPageVodCommentAdd');
+const callVodCommentDelete = authenticatedCallable('streamerFanPageVodCommentDelete');
+const callCommentProfileSave = authenticatedCallable('streamerFanPageCommentProfileSave');
+const callVodRefresh = authenticatedCallable('streamerFanPageVodRefresh', { timeout: 3600000 });
+const callCalendar = authenticatedCallable('streamerFanPageCalendar');
+const callLiveStatus = authenticatedCallable('streamerFanPageLiveStatus');
+const callGallery = authenticatedCallable('streamerFanPageGallery');
+const callScheduleAdd = authenticatedCallable('streamerFanPageScheduleAdd');
+const callScheduleDelete = authenticatedCallable('streamerFanPageScheduleDelete');
+const callYouTubeVideos = authenticatedCallable('streamerFanPageYouTubeVideos');
+const callCafePosts = authenticatedCallable('streamerFanPageCafePosts');
+const callRoulette = authenticatedCallable('streamerFanPageRoulette');
+const callUpbo = authenticatedCallable('streamerFanPageUpbo');
 // 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
-const callLinkGoogle = httpsCallable(functions, 'linkGoogleAccount');
-const callLinkKakao = httpsCallable(functions, 'linkKakaoAccount');
-const callStreamerVerification = httpsCallable(functions, 'requestStreamerVerification');
+const callLinkGoogle = authenticatedCallable('linkGoogleAccount');
+const callLinkKakao = authenticatedCallable('linkKakaoAccount');
+const callStreamerVerification = authenticatedCallable('requestStreamerVerification');
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
@@ -56,6 +60,7 @@ const MAX_UPBO_ITEMS = 100;
 const DEFAULT_FANPAGE_LAYOUT = 1;
 const KAKAO_JAVASCRIPT_KEY = 'ed4f01d6903ca41d5dc0ab32b6ae143c';
 let kakaoSdkPromise = null;
+let authReadyPromise = null;
 const BUTTON_CLICK_SOUND_STORAGE_KEY = 'streamerFanPage.buttonClickVolume';
 const DEFAULT_BUTTON_CLICK_VOLUME = 20;
 const YOUTUBE_PLAYER_VOLUME_STORAGE_KEY = 'streamerFanPage.youtubePlayerVolume';
@@ -661,6 +666,18 @@ function waitForAuthRestore() {
       reject(error);
     });
   });
+}
+function ensureAuthReady() {
+  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+  if (!authReadyPromise) {
+    authReadyPromise = waitForAuthRestore()
+      .then((user) => user || signInAnonymously(auth).then((credential) => credential.user))
+      .catch((error) => {
+        authReadyPromise = null;
+        throw error;
+      });
+  }
+  return authReadyPromise;
 }
 function goHome() { location.hash = '#/'; }
 function goPage(id) { location.hash = `#/p/${encodeURIComponent(id)}`; }
@@ -3351,6 +3368,8 @@ function renderFanPage(page, options = {}) {
   const avatar = document.createElement('img');
   avatar.className = 'profile-avatar';
   setImage(avatar, page.streamer.avatarUrl, page.streamer.nickname);
+  avatar.loading = 'eager';
+  avatar.fetchPriority = 'high';
   const identityCopy = document.createElement('div');
   const name = document.createElement('h1');
   name.className = 'profile-name';
@@ -7234,9 +7253,16 @@ async function loadApp() {
   $('startupTitle').textContent = '페이지를 준비하고 있어요';
   $('startupMessage').textContent = '로그인 상태와 인증된 스트리머 정보를 확인하고 있습니다.';
   try {
-    if (!await waitForAuthRestore()) await signInAnonymously(auth);
     let requestedId = routeId();
-    let result = (await callBootstrap({ streamerId: requestedId })).data;
+    const hadAuthAtBootstrap = !!auth.currentUser;
+    const authReady = ensureAuthReady();
+    let result;
+    if (requestedId) {
+      result = (await callBootstrap({ streamerId: requestedId })).data;
+    } else {
+      await authReady;
+      result = (await callBootstrap({ streamerId: requestedId })).data;
+    }
     if (result.redirectTo && result.redirectTo !== requestedId) {
       history.replaceState(null, '', `#/p/${encodeURIComponent(result.redirectTo)}`);
       requestedId = result.redirectTo;
@@ -7285,6 +7311,31 @@ async function loadApp() {
           renderList($('recentPages'), recent, true, '최근 방문한 팬페이지가 여기에 표시돼요.');
         }
       });
+      if (!hadAuthAtBootstrap) {
+        void authReady.then(async (user) => {
+          if (!user || routeId() !== requestedId) return;
+          const authenticated = (await callBootstrap({ streamerId: requestedId })).data;
+          if (authenticated.redirectTo && authenticated.redirectTo !== requestedId) {
+            history.replaceState(null, '', `#/p/${encodeURIComponent(authenticated.redirectTo)}`);
+            void loadApp();
+            return;
+          }
+          isAdminUser = authenticated.isAdmin === true;
+          verifiedStreamerUid = authenticated.verifiedStreamer ? user.uid : '';
+          verifiedStreamerProfile = authenticated.verifiedStreamer || null;
+          verifiedStreamerProfileUid = authenticated.verifiedStreamer ? user.uid : '';
+          renderAuthControls();
+          if (!currentPage || currentPage.streamer.id !== requestedId) return;
+          const wasOwner = currentPage.isOwner;
+          const wasStreamerOwner = currentPage.isStreamerOwner;
+          currentPage.isStreamerOwner = !!(authenticated.verifiedStreamer
+            && authenticated.verifiedStreamer.id === currentPage.streamer.id);
+          currentPage.isOwner = currentPage.isStreamerOwner || authenticated.isAdmin === true;
+          if (wasOwner !== currentPage.isOwner || wasStreamerOwner !== currentPage.isStreamerOwner) {
+            renderFanPage(currentPage);
+          }
+        }).catch((error) => console.warn('로그인 상태에 따른 팬페이지 권한 확인 실패:', error.message || error));
+      }
     }
     void waitForPageAssets();
     $('startupCover').classList.add('hidden');

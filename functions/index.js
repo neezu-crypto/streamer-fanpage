@@ -3750,9 +3750,19 @@ function normalizeFanpageVodComment(value, id) {
 }
 
 exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) => {
-  const uid = requireAuth(request);
-  const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   const requestedId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
+  const uid = request.auth && typeof request.auth.uid === 'string' ? request.auth.uid : '';
+  // Public fanpages can render while the browser restores its anonymous Auth session.
+  if (!uid && !requestedId) throw new HttpsError('unauthenticated', '로그인이 필요합니다.');
+  const signInProvider = request.auth && request.auth.token && request.auth.token.firebase
+    ? String(request.auth.token.firebase.sign_in_provider || '')
+    : '';
+  const [verified, isAdmin] = uid
+    ? await Promise.all([
+      findVerifiedByUid(uid),
+      signInProvider === 'anonymous' ? Promise.resolve(false) : isAdminUid(uid),
+    ])
+    : [null, false];
   if (verified && !isAdmin && requestedId !== verified.streamer.id) {
     return { verifiedStreamer: verified.streamer, isAdmin, redirectTo: verified.streamer.id };
   }
