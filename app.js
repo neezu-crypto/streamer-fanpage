@@ -19,6 +19,7 @@ const db = getDatabase(app);
 const functions = getFunctions(app, 'us-central1');
 const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
 const callSearch = httpsCallable(functions, 'streamerFanPageSearch');
+const callRecent = httpsCallable(functions, 'streamerFanPageRecent');
 const callAdminStats = httpsCallable(functions, 'streamerFanPageAdminStats');
 const callDesignFeedback = httpsCallable(functions, 'streamerFanPageDesignFeedback');
 const callAdminViewerSubscriptionRequests = httpsCallable(functions, 'streamerFanPageAdminViewerSubscriptionRequests');
@@ -53,10 +54,6 @@ const MAX_LOADED_VIDEO_ITEMS = 500;
 const MAX_BANNER_IMAGE_ITEMS = 20;
 const MAX_UPBO_ITEMS = 100;
 const DEFAULT_FANPAGE_LAYOUT = 1;
-const RECENT_PAGES_STORAGE_KEY = 'streamerFanPage.recentPages.v2';
-const RECENT_PAGES_LIMIT = 8;
-const KAKAO_JAVASCRIPT_KEY = 'ed4f01d6903ca41d5dc0ab32b6ae143c';
-let kakaoSdkPromise = null;
 const BUTTON_CLICK_SOUND_STORAGE_KEY = 'streamerFanPage.buttonClickVolume';
 const DEFAULT_BUTTON_CLICK_VOLUME = 20;
 const YOUTUBE_PLAYER_VOLUME_STORAGE_KEY = 'streamerFanPage.youtubePlayerVolume';
@@ -343,31 +340,7 @@ const rollingPaperStates = new Map();
 const fanPageMemoryStates = new Map();
 let galleryLoadPromise = Promise.resolve();
 
-function ensureKakaoSdk() {
-  if (window.Kakao) {
-    if (!window.Kakao.isInitialized()) window.Kakao.init(KAKAO_JAVASCRIPT_KEY);
-    return Promise.resolve(window.Kakao);
-  }
-  if (!kakaoSdkPromise) {
-    kakaoSdkPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://developers.kakao.com/sdk/js/kakao.js';
-      script.async = true;
-      script.referrerPolicy = 'no-referrer';
-      script.onload = () => {
-        if (!window.Kakao) return reject(new Error('카카오 SDK를 초기화하지 못했어요.'));
-        if (!window.Kakao.isInitialized()) window.Kakao.init(KAKAO_JAVASCRIPT_KEY);
-        resolve(window.Kakao);
-      };
-      script.onerror = () => reject(new Error('카카오 로그인을 불러오지 못했어요.'));
-      document.head.append(script);
-    }).catch((error) => {
-      kakaoSdkPromise = null;
-      throw error;
-    });
-  }
-  return kakaoSdkPromise;
-}
+if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
 
 // admin-center가 관리하는 공개 devbarLinks를 표시한다. 읽기 실패나 빈 노드에는
 // HTML에 둔 기본 링크를 유지하고, 이 페이지 자신은 항상 제외한다.
@@ -594,18 +567,13 @@ async function loginWithGoogle() {
 }
 
 async function loginWithKakao() {
-  const button = $('choiceKakaoLogin');
-  button.disabled = true;
-  let kakao;
-  try {
-    kakao = await ensureKakaoSdk();
-    if (!kakao.isInitialized()) throw new Error('카카오 로그인을 초기화하지 못했어요.');
-  } catch (error) {
-    button.disabled = false;
-    showToast(error.message || '카카오 로그인을 불러오지 못했어요.');
+  if (!window.Kakao || !window.Kakao.isInitialized()) {
+    showToast('카카오 로그인을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return;
   }
-  kakao.Auth.login({
+  const button = $('choiceKakaoLogin');
+  button.disabled = true;
+  window.Kakao.Auth.login({
     success: async (authObj) => {
       try {
         const result = await callLinkKakao({ kakaoAccessToken: authObj.access_token });
@@ -673,8 +641,6 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
 }
 function setImage(img, url, nickname) {
-  img.loading = 'lazy';
-  img.referrerPolicy = 'no-referrer';
   img.src = url || '';
   img.alt = `${nickname} 프로필`;
   img.addEventListener('error', () => { img.src = ''; img.classList.add('avatar-fallback'); }, { once: true });
@@ -713,42 +679,6 @@ function renderList(container, items, recent = false, emptyText = '검색 결과
     return;
   }
   items.forEach((item) => container.append(streamerCard(item, recent)));
-}
-function readLocalRecentPages() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(RECENT_PAGES_STORAGE_KEY) || '[]');
-    if (!Array.isArray(stored)) return [];
-    return stored.filter((item) => item && /^[a-z0-9_]{2,20}$/i.test(String(item.id || ''))
-      && /^[a-z0-9]{2,20}$/i.test(String(item.soopId || ''))
-      && typeof item.nickname === 'string')
-      .slice(0, RECENT_PAGES_LIMIT)
-      .map((item) => {
-        const soopId = String(item.soopId).toLowerCase();
-        return {
-          id: String(item.id).toLowerCase(),
-          nickname: item.nickname.slice(0, 40),
-          soopId,
-          avatarUrl: `https://stimg.sooplive.com/LOGO/${soopId.slice(0, 2)}/${soopId}/${soopId}.jpg`,
-          visitedAt: Number(item.visitedAt) || 0,
-        };
-      });
-  } catch (_) {
-    return [];
-  }
-}
-function rememberLocalRecentPage(streamer) {
-  if (!streamer || !/^[a-z0-9_]{2,20}$/i.test(String(streamer.id || ''))
-      || !/^[a-z0-9]{2,20}$/i.test(String(streamer.soopId || ''))) return;
-  const soopId = String(streamer.soopId).toLowerCase();
-  const entry = {
-    id: String(streamer.id).toLowerCase(),
-    nickname: String(streamer.nickname || streamer.soopId || streamer.id).slice(0, 40),
-    soopId,
-    visitedAt: Date.now(),
-  };
-  const visits = readLocalRecentPages().filter((item) => item.id !== entry.id);
-  try { localStorage.setItem(RECENT_PAGES_STORAGE_KEY, JSON.stringify([entry, ...visits].slice(0, RECENT_PAGES_LIMIT))); }
-  catch (_) { /* Recent pages are optional and stay local to this browser. */ }
 }
 function renderRegisteredStreamers(streamers) {
   const section = $('registeredStreamersSection');
@@ -821,6 +751,7 @@ function renderAdminStatsList(streamers) {
       ['누적 조회', streamer.totalViews],
       ['최근 7일', streamer.last7Views],
       ['최근 30일', streamer.last30Views],
+      ['일별 순방문 합', streamer.last30DailyUniqueVisitors],
     ].forEach(([label, value]) => {
       const metric = document.createElement('span'); metric.className = 'admin-stat-metric';
       const metricLabel = document.createElement('small'); metricLabel.textContent = label;
@@ -837,7 +768,7 @@ function renderAdminStatsList(streamers) {
       const bar = document.createElement('span');
       const views = Math.max(0, Number(day.views) || 0);
       bar.style.height = `${maxViews ? Math.max(5, views / maxViews * 100) : 5}%`;
-      bar.title = `${day.date}: 조회 ${formatStatCount(views)}회`;
+      bar.title = `${day.date}: 조회 ${formatStatCount(views)}회 · 일별 순방문 ${formatStatCount(day.uniqueVisitors)}명`;
       chart.append(bar);
     });
     card.append(identity, metrics, chart);
@@ -6952,7 +6883,7 @@ function openYouTubePlayer(video) {
   playerUrl.searchParams.set('origin', location.origin);
   iframe.src = playerUrl.toString();
   iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
-  iframe.referrerPolicy = 'no-referrer';
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
   frame.replaceChildren(iframe);
   const generation = ++youtubePlayerGeneration;
   $('youtubePlayerVolume').value = String(youtubeVolumeLevel);
@@ -7110,8 +7041,7 @@ async function loadApp() {
     if (requestedId && !result.page) {
       throw Object.assign(new Error('팬페이지를 찾을 수 없습니다.'), { code: 'not-found' });
     }
-    if (requestedId && result.page && result.page.streamer) rememberLocalRecentPage(result.page.streamer);
-    const recentPromise = Promise.resolve(readLocalRecentPages());
+    const recentPromise = callRecent().then((value) => value.data.streamers);
     if (!requestedId) {
       const directoryPromise = callSearch({ query: '', includeAll: true })
         .then((value) => Array.isArray(value.data.streamers) ? value.data.streamers : [])
