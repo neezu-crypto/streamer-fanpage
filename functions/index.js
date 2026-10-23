@@ -761,10 +761,9 @@ async function findVerifiedBySoopId(soopId) {
 }
 
 async function recordRecentVisit(uid, streamerId) {
+  // Scope this server-only history to the authenticated caller; never accept a UID from request data.
   const ref = db.ref(`streamerFanPageRecentVisits/${uid}`);
   await ref.child(streamerId).set({ visitedAt: Date.now() });
-  // 방문 이력은 최대 8개만 유지하므로 규칙 변경이 필요한 RTDB 정렬 쿼리 대신
-  // Admin SDK로 작은 목록을 읽고 서버에서 정렬한다.
   const snap = await ref.get();
   const visits = Object.entries(snap.val() || {})
     .sort((a, b) => (Number(a[1] && a[1].visitedAt) || 0) - (Number(b[1] && b[1].visitedAt) || 0));
@@ -777,6 +776,16 @@ async function recordRecentVisit(uid, streamerId) {
 
 function fanPageStatsDateKey(timestamp = Date.now()) {
   return new Date(timestamp + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+async function cleanupVerifiedStreamerVisitDedup(todayKey) {
+  const ref = db.ref('verifiedStreamerVisitDedup/streamerFanPage');
+  const snapshot = await ref.get();
+  const updates = {};
+  Object.keys(snapshot.val() || {}).forEach((key) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || key < todayKey) updates[key] = null;
+  });
+  if (Object.keys(updates).length) await ref.update(updates);
 }
 
 function metricCount(value) {
@@ -827,9 +836,13 @@ async function recordFanPageView(uid, streamerId) {
   await pruneFanPageDailyStats(streamerId, date);
 }
 
-async function recordVerifiedStreamerFanPageVisit(uid, verified) {
+async function recordVerifiedStreamerFanPageVisit(verified) {
   const dateKey = fanPageStatsDateKey();
-  const dedupRef = db.ref(`verifiedStreamerVisitDedup/streamerFanPage/${uid}/${dateKey}`);
+  const soopId = String(verified && verified.streamer && verified.streamer.soopId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(soopId)) return false;
+
+  // 하루 단위로 공개 SOOP ID만 사용해 중복 알림을 막고, Firebase UID는 방문 기록에 넣지 않는다.
+  const dedupRef = db.ref(`verifiedStreamerVisitDedup/streamerFanPage/${dateKey}/${soopId}`);
   let alreadyLogged = false;
   const dedupResult = await dedupRef.transaction((current) => {
     if (current) {
@@ -840,13 +853,17 @@ async function recordVerifiedStreamerFanPageVisit(uid, verified) {
   });
   if (!dedupResult.committed || alreadyLogged) return false;
 
-  await db.ref('verifiedStreamerVisits').push({
-    uid,
-    nickname: verified.streamer.nickname || '',
-    soopId: verified.streamer.soopId || '',
-    market: 'streamerFanPage',
-    visitedAt: Date.now(),
-  });
+  try {
+    await db.ref('verifiedStreamerVisits').push({
+      nickname: String(verified.streamer.nickname || '').slice(0, 40),
+      soopId,
+      market: 'streamerFanPage',
+      visitedAt: Date.now(),
+    });
+  } catch (error) {
+    await dedupRef.remove().catch(() => {});
+    throw error;
+  }
   return true;
 }
 
@@ -3685,7 +3702,6 @@ function normalizeFanpageVodComment(value, id) {
   if (!profile || !content || !Number.isFinite(createdAt)) return null;
   return {
     id,
-    uid: typeof value.uid === 'string' ? value.uid : '',
     ...profile,
     content,
     createdAt,
@@ -3696,7 +3712,7 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
   const uid = requireAuth(request);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   if (verified) {
-    await recordVerifiedStreamerFanPageVisit(uid, verified).catch((error) => {
+    await recordVerifiedStreamerFanPageVisit(verified).catch((error) => {
       console.warn('Could not record the verified streamer fanpage visit:', error);
     });
   }
@@ -4042,7 +4058,15 @@ exports.streamerFanPageVodCommentAdd = onCall({ maxInstances: 20 }, async (reque
     createdAt,
   };
   await fanPageVodCommentsRef(target.streamer.id, vodId).child(id).set(comment);
-  return { comment: { id, ...comment } };
+  // The record keeps the author UID for server-side moderation, but never echo it to clients.
+  const publicComment = {
+    nickname: comment.nickname,
+    soopId: comment.soopId,
+    avatarUrl: comment.avatarUrl,
+    content: comment.content,
+    createdAt: comment.createdAt,
+  };
+  return { comment: { id, ...publicComment } };
 });
 
 exports.streamerFanPageVodCommentDelete = onCall({ maxInstances: 20 }, async (request) => {
@@ -4459,10 +4483,12 @@ exports.streamerFanPageViewerStatsJobCleanup = onSchedule({
 }, async () => {
   lastViewerStatsJobCleanupAt = 0;
   await cleanupOldViewerStatsJobs();
+  await cleanupVerifiedStreamerVisitDedup(fanPageStatsDateKey());
 });
 
 exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
+  // Read only the authenticated caller's own history.
   const snap = await db.ref(`streamerFanPageRecentVisits/${uid}`).get();
   const visits = Object.entries(snap.val() || {})
     .map(([streamerId, value]) => ({ streamerId, visitedAt: Number(value && value.visitedAt) || 0 }))

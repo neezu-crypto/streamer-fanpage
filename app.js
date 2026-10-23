@@ -54,6 +54,8 @@ const MAX_LOADED_VIDEO_ITEMS = 500;
 const MAX_BANNER_IMAGE_ITEMS = 20;
 const MAX_UPBO_ITEMS = 100;
 const DEFAULT_FANPAGE_LAYOUT = 1;
+const KAKAO_JAVASCRIPT_KEY = 'ed4f01d6903ca41d5dc0ab32b6ae143c';
+let kakaoSdkPromise = null;
 const BUTTON_CLICK_SOUND_STORAGE_KEY = 'streamerFanPage.buttonClickVolume';
 const DEFAULT_BUTTON_CLICK_VOLUME = 20;
 const YOUTUBE_PLAYER_VOLUME_STORAGE_KEY = 'streamerFanPage.youtubePlayerVolume';
@@ -340,7 +342,31 @@ const rollingPaperStates = new Map();
 const fanPageMemoryStates = new Map();
 let galleryLoadPromise = Promise.resolve();
 
-if (window.Kakao && !window.Kakao.isInitialized()) window.Kakao.init('ed4f01d6903ca41d5dc0ab32b6ae143c');
+function ensureKakaoSdk() {
+  if (window.Kakao) {
+    if (!window.Kakao.isInitialized()) window.Kakao.init(KAKAO_JAVASCRIPT_KEY);
+    return Promise.resolve(window.Kakao);
+  }
+  if (!kakaoSdkPromise) {
+    kakaoSdkPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://developers.kakao.com/sdk/js/kakao.js';
+      script.async = true;
+      script.referrerPolicy = 'no-referrer';
+      script.onload = () => {
+        if (!window.Kakao) return reject(new Error('카카오 SDK를 초기화하지 못했어요.'));
+        if (!window.Kakao.isInitialized()) window.Kakao.init(KAKAO_JAVASCRIPT_KEY);
+        resolve(window.Kakao);
+      };
+      script.onerror = () => reject(new Error('카카오 로그인을 불러오지 못했어요.'));
+      document.head.append(script);
+    }).catch((error) => {
+      kakaoSdkPromise = null;
+      throw error;
+    });
+  }
+  return kakaoSdkPromise;
+}
 
 // admin-center가 관리하는 공개 devbarLinks를 표시한다. 읽기 실패나 빈 노드에는
 // HTML에 둔 기본 링크를 유지하고, 이 페이지 자신은 항상 제외한다.
@@ -567,13 +593,18 @@ async function loginWithGoogle() {
 }
 
 async function loginWithKakao() {
-  if (!window.Kakao || !window.Kakao.isInitialized()) {
-    showToast('카카오 로그인을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
-    return;
-  }
   const button = $('choiceKakaoLogin');
   button.disabled = true;
-  window.Kakao.Auth.login({
+  let kakao;
+  try {
+    kakao = await ensureKakaoSdk();
+    if (!kakao.isInitialized()) throw new Error('카카오 로그인을 초기화하지 못했어요.');
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message || '카카오 로그인을 불러오지 못했어요.');
+    return;
+  }
+  kakao.Auth.login({
     success: async (authObj) => {
       try {
         const result = await callLinkKakao({ kakaoAccessToken: authObj.access_token });
@@ -641,6 +672,8 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
 }
 function setImage(img, url, nickname) {
+  img.loading = 'lazy';
+  img.referrerPolicy = 'no-referrer';
   img.src = url || '';
   img.alt = `${nickname} 프로필`;
   img.addEventListener('error', () => { img.src = ''; img.classList.add('avatar-fallback'); }, { once: true });
@@ -751,7 +784,7 @@ function renderAdminStatsList(streamers) {
       ['누적 조회', streamer.totalViews],
       ['최근 7일', streamer.last7Views],
       ['최근 30일', streamer.last30Views],
-      ['일별 순방문 합', streamer.last30DailyUniqueVisitors],
+      ['최근 30일 순방문', streamer.last30DailyUniqueVisitors],
     ].forEach(([label, value]) => {
       const metric = document.createElement('span'); metric.className = 'admin-stat-metric';
       const metricLabel = document.createElement('small'); metricLabel.textContent = label;
@@ -768,7 +801,7 @@ function renderAdminStatsList(streamers) {
       const bar = document.createElement('span');
       const views = Math.max(0, Number(day.views) || 0);
       bar.style.height = `${maxViews ? Math.max(5, views / maxViews * 100) : 5}%`;
-      bar.title = `${day.date}: 조회 ${formatStatCount(views)}회 · 일별 순방문 ${formatStatCount(day.uniqueVisitors)}명`;
+      bar.title = `${day.date}: 조회 ${formatStatCount(views)}회 · 순방문 ${formatStatCount(day.uniqueVisitors)}명`;
       chart.append(bar);
     });
     card.append(identity, metrics, chart);
@@ -6883,7 +6916,7 @@ function openYouTubePlayer(video) {
   playerUrl.searchParams.set('origin', location.origin);
   iframe.src = playerUrl.toString();
   iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
-  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+  iframe.referrerPolicy = 'no-referrer';
   frame.replaceChildren(iframe);
   const generation = ++youtubePlayerGeneration;
   $('youtubePlayerVolume').value = String(youtubeVolumeLevel);
