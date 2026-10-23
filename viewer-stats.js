@@ -102,7 +102,6 @@ const VIEWER_STATS_EXCLUDED_EDGE_SECONDS = 5 * 60;
 const VIEWER_STATS_INSUFFICIENT_WINDOW_CODE = 'insufficient-analysis-window';
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
 const VIEWER_STATS_STATIC_CACHE_SCHEMA_VERSION = 1;
-const SOOP_PUBLIC_VOD_API = 'https://chapi.sooplive.com/api';
 try { window.localStorage.removeItem('streamerFanPage.viewerStats.recentStreamers.v1'); } catch (_) {}
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const VIEWER_PEAK_PERIODS = [
@@ -1290,90 +1289,9 @@ function isCurrentComparisonRequest(request) {
     && request.selectionKey === comparisonSelectionKey();
 }
 
-function normalizePublicSoopVod(row) {
-  if (!row || typeof row !== 'object') return null;
-  const id = String(row.title_no || row.id || '').trim();
-  if (!/^\d{1,20}$/.test(id)) return null;
-  const title = typeof row.title_name === 'string' ? row.title_name.trim().slice(0, 300) : '';
-  const regDate = typeof row.reg_date === 'string' ? row.reg_date.trim().slice(0, 25) : '';
-  const count = row.count && typeof row.count === 'object' ? row.count : {};
-  const ucc = row.ucc && typeof row.ucc === 'object' ? row.ucc : {};
-  let thumbnailUrl = '';
-  if (typeof ucc.thumb === 'string' && ucc.thumb.trim()) {
-    try {
-      const source = ucc.thumb.trim();
-      const thumbnail = new URL(source.startsWith('//') ? 'https:' + source : source);
-      if (thumbnail.protocol === 'https:' && thumbnail.hostname === 'videoimg.sooplive.com') {
-        thumbnailUrl = thumbnail.href;
-      }
-    } catch (_) {
-      // 잘못된 썸네일 주소는 생략하고 나머지 다시보기 정보는 표시한다.
-    }
-  }
-  return {
-    id,
-    title: title || '제목 없음',
-    regDate,
-    readCount: Math.max(0, Math.floor(Number(count.read_cnt) || 0)),
-    durationMs: Math.max(0, Math.floor(Number(ucc.total_file_duration) || 0)),
-    thumbnailUrl,
-    url: 'https://vod.sooplive.com/player/' + encodeURIComponent(id),
-  };
-}
-
-async function fetchPublicVodPage(streamerId, page, keyword = '') {
-  const normalizedStreamerId = String(streamerId || '').trim().toLowerCase();
-  const normalizedPage = Number(page);
-  const normalizedKeyword = String(keyword || '').trim();
-  if (!SOOP_ID_PATTERN.test(normalizedStreamerId)
-      || !Number.isSafeInteger(normalizedPage) || normalizedPage < 1 || normalizedPage > 400
-      || normalizedKeyword.length > 80) {
-    throw new Error('다시보기 목록 요청을 확인해 주세요.');
-  }
-
-  const url = new URL(SOOP_PUBLIC_VOD_API + '/' + encodeURIComponent(normalizedStreamerId) + '/vods/review');
-  url.search = new URLSearchParams({
-    keyword: normalizedKeyword,
-    orderby: 'reg_date',
-    page: String(normalizedPage),
-    field: 'title,contents,user_nick,user_id',
-    per_page: String(VIEWER_VOD_PAGE_SIZE),
-    start_date: '',
-    end_date: '',
-  }).toString();
-  const response = await fetch(url, {
-    headers: { accept: 'application/json' },
-    mode: 'cors',
-    credentials: 'omit',
-    cache: 'no-store',
-  });
-  if (!response.ok) throw new Error('SOOP 다시보기 서버가 목록 요청을 처리하지 못했습니다.');
-
-  const payload = await response.json();
-  if (!payload || !Array.isArray(payload.data) || !payload.meta
-      || !Number.isFinite(Number(payload.meta.total))) {
-    throw new Error('SOOP 다시보기 응답 형식을 확인하지 못했습니다.');
-  }
-  const vods = payload.data.map(normalizePublicSoopVod);
-  if (vods.some((vod) => !vod)) throw new Error('SOOP 다시보기 목록 일부를 읽지 못했습니다.');
-  return {
-    streamerId: normalizedStreamerId,
-    nickname: typeof payload.data[0]?.user_nick === 'string' ? payload.data[0].user_nick.trim().slice(0, 40) : '',
-    vods,
-    total: Math.max(0, Math.floor(Number(payload.meta.total))),
-    page: normalizedPage,
-    hasMore: normalizedPage * VIEWER_VOD_PAGE_SIZE < Number(payload.meta.total),
-  };
-}
-
 async function getViewerVodPage(streamerId, page, keyword = '') {
-  try {
-    return await fetchPublicVodPage(streamerId, page, keyword);
-  } catch (error) {
-    console.warn('SOOP 공개 다시보기 목록의 브라우저 직접 조회에 실패했습니다. 서버 경로로 다시 시도합니다.', error);
-    const response = await callViewerStats({ action: 'vods', streamerId, page, keyword });
-    return response.data || {};
-  }
+  const response = await callViewerStats({ action: 'vods', streamerId, page, keyword });
+  return response.data || {};
 }
 
 function comparisonMetric(label, value, isPeak = false) {

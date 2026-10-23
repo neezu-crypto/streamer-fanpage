@@ -3,16 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#151320">
   <meta name="description" content="좋아하는 스트리머의 공식 팬페이지를 만나보세요.">
   <title>스트리머 팬페이지</title>
   <script src="input-privacy.js?v=20261016-input-privacy"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
-  <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
   <link rel="preload" as="image" href="assets/fanpage-kawaii/cat-paw-close.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=20261022-memory-moments">
+  <link rel="stylesheet" href="style.css?v=20261023-privacy-hardening">
   <link rel="stylesheet" href="fanpage-layouts.css?v=20261022-affiliate-home">
 </head>
 <body>
@@ -88,7 +85,7 @@
           <div class="recent-grid registered-streamers-grid" id="registeredStreamersGrid"></div>
         </section>
         <section class="recent-section" aria-labelledby="recentTitle">
-          <div class="section-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2 id="recentTitle">최근 방문한 팬페이지</h2></div><span class="section-note">최근 8개</span></div>
+          <div class="section-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2 id="recentTitle">최근 방문한 팬페이지</h2></div><span class="section-note">이 브라우저에만 저장</span></div>
           <div id="recentPages" class="recent-grid"><p class="empty-state">아직 방문한 팬페이지가 없어요.</p></div>
         </section>
       </section>
@@ -140,7 +137,7 @@
         <div><p class="eyebrow">WELCOME TO STREAMER SERIES</p><h2>로그인 방법을 선택해 주세요</h2></div>
         <button class="button profile-settings-close" id="closeLoginChoices" type="button" aria-label="로그인 선택 창 닫기">×</button>
       </div>
-      <p>로그인하면 최근 방문한 팬페이지가 계정에 저장됩니다. 다시보기 댓글을 쓰려면 로그인 후 댓글 프로필을 설정해 주세요. 인증 스트리머는 인증 후 본인 팬페이지로 연결돼요.</p>
+      <p>최근 방문 목록은 이 브라우저에만 저장됩니다. 로그인하면 다시보기 댓글을 쓸 수 있고, 인증 스트리머는 인증 후 본인 팬페이지로 연결돼요.</p>
       <div class="login-choice-actions">
         <button class="auth-button google-button" id="choiceGoogleLogin" type="button">Google로 로그인</button>
         <button class="auth-button kakao-button" id="choiceKakaoLogin" type="button">카카오로 로그인</button>
@@ -180,7 +177,7 @@
         <div><p class="eyebrow">ACCOUNT SWITCH</p><h2>이미 연결된 계정이 있어요</h2></div>
         <button class="button profile-settings-close" id="cancelAccountSwitch" type="button" aria-label="계정 전환 창 닫기">×</button>
       </div>
-      <p>기존 계정으로 전환하면 현재 세션에 저장된 최근 방문 기록은 기존 계정과 합쳐지지 않습니다.</p>
+      <p>최근 방문 목록은 계정과 동기화되지 않고 이 브라우저에만 남습니다.</p>
       <div class="account-dialog-actions">
         <button class="button button-primary" id="confirmAccountSwitch" type="button">기존 계정으로 전환</button>
       </div>
@@ -200,7 +197,7 @@
       <p class="admin-stats-status" id="adminStatsStatus" role="status" aria-live="polite">관리자 통계를 불러옵니다.</p>
       <div class="admin-stats-list-heading"><strong>스트리머별 집계</strong><span id="adminStatsStreamerCount"></span></div>
       <div class="admin-stats-list" id="adminStatsList"></div>
-      <p class="admin-stats-note">집계는 기능 적용 후부터 시작하며 관리자와 해당 스트리머 본인의 열람은 제외합니다. 일별 순방문은 한국 날짜별 계정 중복을 제외한 합계예요.</p>
+      <p class="admin-stats-note">관리자와 해당 스트리머 본인의 열람은 제외하고 조회 합계만 저장합니다. 방문자별 식별 정보와 순방문자 수는 수집하지 않습니다.</p>
       <div class="admin-stats-summary" id="adminStatsSummary"></div>
       <section class="admin-viewer-usage" aria-labelledby="viewerStatsAdminTitle">
         <div class="admin-viewer-usage-heading">
@@ -229,7 +226,7 @@
         <div class="admin-viewer-usage-queue-grid" id="viewerStatsAdminQueue"></div>
         <div class="admin-viewer-usage-streamers-heading"><strong>스트리머별 검색·선택 횟수</strong><span>최근 30일 · 상위 30명</span></div>
         <div class="admin-viewer-usage-streamers" id="viewerStatsAdminStreamerList"></div>
-        <p class="admin-viewer-usage-note">요청 수는 한도 검사를 통과한 횟수이며 사용자 UID는 해시 처리합니다. 스트리머별 집계는 검색 결과 선택 후 다시보기 첫 페이지를 요청한 횟수이고, 검색어는 저장하지 않습니다. 대기 시간은 작업이 큐에서 꺼내질 때까지의 평균이며 캐시 적중은 함수 인스턴스 메모리 캐시 기준입니다.</p>
+        <p class="admin-viewer-usage-note">요청 제한용 가명 키는 날짜마다 바뀌며 전날 카운터는 정리합니다. 사용량은 계정과 연결하지 않고 일별 합계로만 보관합니다. 검색어와 개인별 스트리머 선택 기록은 저장하지 않습니다.</p>
       </section>
       <section class="admin-viewer-subscriptions" aria-labelledby="viewerSubscriptionAdminTitle">
         <div class="admin-viewer-usage-heading">
@@ -250,7 +247,7 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261022-affiliate-home"></script>
+  <script type="module" src="app.js?v=20261023-privacy-hardening"></script>
   <script type="module" src="https://neezu-crypto.github.io/streamer-game-series-shop/game-series-emotes.js?game=streamerFanPage&amp;v=20261021-decoration-layer-height"></script>
 </body>
 </html>
