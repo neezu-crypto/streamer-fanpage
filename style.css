@@ -1155,8 +1155,10 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .memory-moments-form .button{white-space:nowrap}
 .memory-moments-owner-hint{grid-column:1/-1;color:#8f8997;font-size:11px;line-height:1.5}
 .memory-moments-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px}
-.memory-moment-card{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;padding:14px;border:1px solid #ffffff16;border-radius:15px;background:linear-gradient(135deg,#ffffff08,#ffffff03)}
-.memory-moment-symbol{display:grid;width:42px;aspect-ratio:1;place-items:center;border:1px solid #f58cac35;border-radius:50%;background:#f58cac12;color:#f3a6c0;font-size:20px}
+.memory-moment-card{display:grid;grid-template-columns:minmax(100px,34%) minmax(0,1fr);align-items:center;gap:10px;padding:14px;border:1px solid #ffffff16;border-radius:15px;background:linear-gradient(135deg,#ffffff08,#ffffff03)}
+.memory-moment-thumbnail-frame{position:relative;display:grid;width:100%;aspect-ratio:16/9;place-items:center;overflow:hidden;border:1px solid #ffffff1b;border-radius:11px;background:linear-gradient(145deg,#ffffff12,#ffffff04)}
+.memory-moment-thumbnail{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.memory-moment-thumbnail-fallback{display:grid;width:38px;aspect-ratio:1;place-items:center;border:1px solid #f58cac35;border-radius:50%;background:#f58cac12;color:#f3a6c0;font-size:20px}
 .memory-moment-detail{min-width:0}
 .memory-moment-meta{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-bottom:5px}
 .memory-moment-platform{padding:3px 7px;border:1px solid #ffffff1b;border-radius:99px;background:#ffffff08;color:#c4bacb;font-size:9px;font-weight:700}
@@ -1233,7 +1235,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .rolling-paper-empty{grid-column:1/-1;display:grid;min-height:82px;place-items:center;margin:0;padding:14px;border:1px dashed #ffffff24;border-radius:13px;background:#ffffff04;color:#aaa1b2;font-size:12px;text-align:center;line-height:1.6}
 @media(max-width:560px){.rolling-paper-heading{align-items:flex-start;gap:10px}.rolling-paper-heading h2{font-size:21px}.rolling-paper-heading-actions{gap:7px;flex-wrap:wrap;justify-content:flex-end}.rolling-paper-refresh,.rolling-paper-topic-add,.rolling-paper-topic-delete{padding-inline:9px}.rolling-paper-topic-form{grid-template-columns:1fr}.rolling-paper-topic-form .button{width:100%}.rolling-paper-topic-grid{gap:7px}.rolling-paper-topic-card{gap:10px;padding:12px;border-radius:25px}.rolling-paper-topic-card.is-composing{width:100%;padding:15px;border-radius:20px}.rolling-paper-topic-card-actions{width:100%;justify-content:flex-start;gap:5px}.rolling-paper-topic-card-actions .button{min-height:32px;padding-inline:6px;font-size:9px}.rolling-paper-topic-decoration{width:42px;font-size:22px}.rolling-paper-topic-title{font-size:15px}.rolling-paper-gallery-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.rolling-paper-form-footer{align-items:flex-start;flex-direction:column}.rolling-paper-form-footer .button{width:100%}.rolling-paper-form-detail{width:100%;padding:20px;border-radius:25px}.rolling-paper-list{grid-template-columns:1fr}.rolling-paper-entry{width:100%;padding:20px}}
 @media(max-width:720px){.memory-moments-form{grid-template-columns:1fr}.memory-moments-form .button{width:100%}.memory-moment-actions{gap:6px}.memory-moment-actions .button{flex:1 1 auto}.memory-moment-delete{margin-left:0}}
-@media(max-width:560px){.memory-moments-heading{align-items:flex-start}.memory-moments-heading h2{font-size:21px}.memory-moments-list{grid-template-columns:1fr}.memory-moment-card{padding:12px}.memory-moment-actions .button{flex:1 1 42%}}
+@media(max-width:560px){.memory-moments-heading{align-items:flex-start}.memory-moments-heading h2{font-size:21px}.memory-moments-list{grid-template-columns:1fr}.memory-moment-card{grid-template-columns:minmax(90px,34%) minmax(0,1fr);padding:12px}.memory-moment-actions .button{flex:1 1 42%}}
 @media(max-width:720px){
   .rolling-paper-heading{align-items:stretch;flex-direction:column;gap:10px}
   .rolling-paper-heading-actions{width:100%;justify-content:flex-start}

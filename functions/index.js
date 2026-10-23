@@ -2862,6 +2862,20 @@ function parseFanPageMemoryVideoUrl(value) {
   return null;
 }
 
+function normalizeFanPageMemoryThumbnailUrl(value, video) {
+  if (!video || !video.videoId) return '';
+  if (video.platform === 'youtube') return `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`;
+  if (video.platform !== 'soop' || typeof value !== 'string' || !value.trim()) return '';
+  try {
+    const thumbnail = new URL(value.trim().startsWith('//') ? `https:${value.trim()}` : value.trim());
+    if (!['http:', 'https:'].includes(thumbnail.protocol) || thumbnail.hostname !== 'videoimg.sooplive.com') return '';
+    thumbnail.protocol = 'https:';
+    return thumbnail.href;
+  } catch (_) {
+    return '';
+  }
+}
+
 function normalizeFanPageMemories(value) {
   const entries = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return Object.entries(entries)
@@ -2872,11 +2886,38 @@ function normalizeFanPageMemories(value) {
       const createdAt = Number(entry.createdAt);
       if (!title || Array.from(title).length > FANPAGE_MEMORY_MOMENT_TITLE_MAX_LENGTH || /[\x00-\x1F\x7F]/.test(title)
         || !video || !Number.isFinite(createdAt) || createdAt < 1) return null;
-      return { id, title, ...video, createdAt };
+      return {
+        id,
+        title,
+        ...video,
+        thumbnailUrl: normalizeFanPageMemoryThumbnailUrl(entry.thumbnailUrl, video),
+        createdAt,
+      };
     })
     .filter(Boolean)
     .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
     .slice(-FANPAGE_MEMORY_MOMENTS_MAX_ITEMS);
+}
+
+async function hydrateFanPageMemoryThumbnails(rootRef, memories) {
+  const pending = memories.filter((memory) => memory.platform === 'soop' && !memory.thumbnailUrl);
+  let nextIndex = 0;
+  const workerCount = Math.min(8, pending.length);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < pending.length) {
+      const memory = pending[nextIndex++];
+      const info = await fetchSoopVodInfoForComments(memory.videoId, 5000);
+      const thumbnailUrl = normalizeFanPageMemoryThumbnailUrl(info && info.thumb, memory);
+      if (!thumbnailUrl) continue;
+      memory.thumbnailUrl = thumbnailUrl;
+      try {
+        await rootRef.child(memory.id).update({ thumbnailUrl });
+      } catch (error) {
+        console.warn(`Could not save SOOP VOD thumbnail for memory ${memory.id}:`, error);
+      }
+    }
+  }));
+  return memories;
 }
 
 function rollingPaperRef(streamerId) {
@@ -3596,7 +3637,7 @@ async function resolveFanpageCommentProfile(uid) {
   return null;
 }
 
-async function fetchSoopVodInfoForComments(vodId) {
+async function fetchSoopVodInfoForComments(vodId, timeoutMs = 12000) {
   let response;
   try {
     response = await fetch('https://api.m.sooplive.com/station/video/a/view', {
@@ -3608,7 +3649,7 @@ async function fetchSoopVodInfoForComments(vodId) {
         'user-agent': 'Mozilla/5.0',
       },
       body: new URLSearchParams({ nTitleNo: vodId, nApiLevel: '11', nPlaylistIdx: '0' }).toString(),
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     console.warn(`SOOP VOD metadata request failed for ${vodId}:`, error);
@@ -5640,7 +5681,9 @@ exports.streamerFanPageMemories = onCall({ maxInstances: 20 }, async (request) =
   const action = String(data.action || 'list');
 
   if (action === 'list') {
-    return { memories: normalizeFanPageMemories((await rootRef.get()).val()), canManage };
+    const memories = normalizeFanPageMemories((await rootRef.get()).val());
+    await hydrateFanPageMemoryThumbnails(rootRef, memories);
+    return { memories, canManage };
   }
   if (!canManage) {
     throw new HttpsError('permission-denied', '인증 스트리머 또는 관리자만 기억의 순간을 수정할 수 있습니다.');
@@ -5658,8 +5701,12 @@ exports.streamerFanPageMemories = onCall({ maxInstances: 20 }, async (request) =
     if (!video) {
       throw new HttpsError('invalid-argument', 'SOOP 다시보기 또는 YouTube 영상 링크를 입력해 주세요.');
     }
+    const videoInfo = video.platform === 'soop'
+      ? await fetchSoopVodInfoForComments(video.videoId, 5000)
+      : null;
+    const thumbnailUrl = normalizeFanPageMemoryThumbnailUrl(videoInfo && videoInfo.thumb, video);
     const id = randomUUID();
-    const entry = { title, ...video, createdAt: Date.now() };
+    const entry = { title, ...video, thumbnailUrl, createdAt: Date.now() };
     const transaction = await rootRef.transaction((current) => {
       const entries = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
       if (Object.keys(entries).length >= FANPAGE_MEMORY_MOMENTS_MAX_ITEMS) return undefined;

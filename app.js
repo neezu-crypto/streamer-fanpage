@@ -3602,6 +3602,7 @@ function renderFanPage(page, options = {}) {
       button.tabIndex = selected ? 0 : -1;
       tabPanels.get(tab.key).hidden = !selected;
     });
+    if (tabKey === 'memories') loadMemoryMomentThumbnails(page);
     if (moveFocus) tabButtons.get(tabKey)?.focus();
   }
   view._selectFanPageTab = selectFanPageTab;
@@ -5516,7 +5517,7 @@ function refreshPlayedGamesSection(streamerId) {
 function fanPageMemoryStateFor(streamerId) {
   let state = fanPageMemoryStates.get(streamerId);
   if (!state) {
-    state = { saving: false, deletingId: '' };
+    state = { saving: false, deletingId: '', thumbnailsLoaded: false, thumbnailsLoading: false };
     fanPageMemoryStates.set(streamerId, state);
   }
   return state;
@@ -5575,8 +5576,21 @@ function renderMemoriesSection(page) {
   memories.forEach((memory) => {
     if (!memory || !/^[0-9a-f-]{36}$/i.test(String(memory.id || ''))) return;
     const card = document.createElement('article'); card.className = 'memory-moment-card';
-    const symbol = document.createElement('span'); symbol.className = 'memory-moment-symbol';
-    symbol.textContent = '✦'; symbol.setAttribute('aria-hidden', 'true');
+    const thumbnailFrame = document.createElement('div'); thumbnailFrame.className = 'memory-moment-thumbnail-frame';
+    const thumbnailFallback = document.createElement('span'); thumbnailFallback.className = 'memory-moment-thumbnail-fallback';
+    thumbnailFallback.textContent = '✦'; thumbnailFallback.setAttribute('aria-hidden', 'true');
+    thumbnailFrame.append(thumbnailFallback);
+    if (typeof memory.thumbnailUrl === 'string' && memory.thumbnailUrl) {
+      const thumbnail = document.createElement('img'); thumbnail.className = 'memory-moment-thumbnail';
+      thumbnail.src = memory.thumbnailUrl; thumbnail.alt = `${memory.title || '기억의 순간'} 썸네일`;
+      thumbnail.loading = 'lazy'; thumbnail.decoding = 'async'; thumbnail.referrerPolicy = 'no-referrer';
+      thumbnail.addEventListener('error', () => {
+        thumbnailFrame.classList.remove('has-thumbnail');
+        thumbnail.remove();
+      }, { once: true });
+      thumbnailFrame.classList.add('has-thumbnail');
+      thumbnailFrame.append(thumbnail);
+    }
     const detail = document.createElement('div'); detail.className = 'memory-moment-detail';
     const meta = document.createElement('div'); meta.className = 'memory-moment-meta';
     const platform = document.createElement('span'); platform.className = 'memory-moment-platform';
@@ -5612,7 +5626,7 @@ function renderMemoriesSection(page) {
       remove.addEventListener('click', () => deleteMemoryMoment(page, memory, remove));
       actions.append(remove);
     }
-    card.append(symbol, detail, actions); list.append(card);
+    card.append(thumbnailFrame, detail, actions); list.append(card);
   });
   section.append(list);
   return section;
@@ -5637,6 +5651,31 @@ async function addMemoryMoment(page, titleInput, urlInput, button) {
   } finally {
     state.saving = false;
     if (button.isConnected) { button.disabled = false; button.textContent = '＋ 순간 추가'; }
+  }
+}
+
+async function loadMemoryMomentThumbnails(page) {
+  const state = fanPageMemoryStateFor(page.streamer.id);
+  if (state.thumbnailsLoaded || state.thumbnailsLoading) return;
+  state.thumbnailsLoading = true;
+  try {
+    const result = (await callMemories({ action: 'list', streamerId: page.streamer.id })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    const resolved = new Map((Array.isArray(result.memories) ? result.memories : []).map((memory) => [memory.id, memory]));
+    const currentMemories = Array.isArray(currentPage.memories) ? currentPage.memories : [];
+    currentPage.memories = currentMemories.map((memory) => {
+      const resolvedMemory = resolved.get(memory.id);
+      return resolvedMemory && resolvedMemory.thumbnailUrl
+        ? { ...memory, thumbnailUrl: resolvedMemory.thumbnailUrl }
+        : memory;
+    });
+    page.memories = currentPage.memories;
+    state.thumbnailsLoaded = true;
+    refreshMemoriesSection(page.streamer.id);
+  } catch (error) {
+    console.warn('Could not load memory moment thumbnails:', error.message || error);
+  } finally {
+    state.thumbnailsLoading = false;
   }
 }
 
