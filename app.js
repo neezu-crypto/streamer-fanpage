@@ -340,7 +340,7 @@ const rouletteStates = new Map();
 const upboStates = new Map();
 const rollingPaperStates = new Map();
 const fanPageMemoryStates = new Map();
-let galleryLoadPromise = Promise.resolve();
+const fanPageContentStates = new Map();
 
 function ensureKakaoSdk() {
   if (window.Kakao) {
@@ -3602,7 +3602,13 @@ function renderFanPage(page, options = {}) {
       button.tabIndex = selected ? 0 : -1;
       tabPanels.get(tab.key).hidden = !selected;
     });
-    if (tabKey === 'memories') loadMemoryMomentThumbnails(page);
+    if (tabKey === 'activity') {
+      gallerySection.loadGallery?.();
+      const upboState = upboStateFor(page.streamer.id);
+      if (!upboState.boardLoaded || upboState.error) loadUpboBoard(page.streamer.id);
+    }
+    if (tabKey === 'content') loadFanPageContent(page);
+    if (tabKey === 'memories') loadFanPageMemories(page);
     if (moveFocus) tabButtons.get(tabKey)?.focus();
   }
   view._selectFanPageTab = selectFanPageTab;
@@ -3621,10 +3627,7 @@ function renderFanPage(page, options = {}) {
   fanPageQuickNavCleanup = createFanPageQuickRemote(view);
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
-  if (page.profile && page.profile.youtubeChannelUrl) loadYouTubeVideos(page.streamer.id);
-  if (page.profile && page.profile.cafeUrl) loadCafePosts(page.streamer.id);
   loadCalendar(page.streamer.id);
-  loadUpboBoard(page.streamer.id);
 
   if (page.isOwner && options.preservedSettingsDialog) {
     view.append(options.preservedSettingsDialog);
@@ -5211,7 +5214,8 @@ function renderYouTubeSection(page) {
 }
 
 function renderSongbookSection(page) {
-  const entries = Array.isArray(page.songbook) ? page.songbook : [];
+  const state = fanPageContentStateFor(page.streamer.id);
+  const entries = Array.isArray(page.songbook) ? page.songbook : state.songbook;
   const section = document.createElement('section');
   section.className = 'songbook-section content-card';
   section.id = 'songbookSection';
@@ -5248,7 +5252,18 @@ function renderSongbookSection(page) {
 
   if (!entries.length) {
     const empty = document.createElement('p'); empty.className = 'songbook-empty-state';
-    empty.textContent = page.isOwner ? '아직 등록한 노래가 없어요. YouTube 링크를 추가해 보세요.' : '아직 등록된 노래가 없어요.';
+    if (!state.songbookLoaded) {
+      if (state.songbookLoading) empty.textContent = '노래 목록을 불러오고 있어요.';
+      else if (state.songbookError) {
+        empty.textContent = state.songbookError;
+        const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button songbook-retry-button';
+        retry.textContent = '다시 불러오기'; retry.addEventListener('click', () => loadSongbookEntries(page));
+        section.append(empty, retry);
+        return section;
+      } else empty.textContent = '노래 목록을 불러옵니다.';
+    } else {
+      empty.textContent = page.isOwner ? '아직 등록한 노래가 없어요. YouTube 링크를 추가해 보세요.' : '아직 등록된 노래가 없어요.';
+    }
     section.append(empty);
     return section;
   }
@@ -5288,7 +5303,7 @@ async function addSongbookEntry(page, input, button) {
   try {
     const result = (await callSongbook({ action: 'add', streamerId: page.streamer.id, youtubeUrl: input.value.trim() })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    currentPage.songbook = Array.isArray(result.songbook) ? result.songbook : [];
+    currentPage.songbook = rememberFanPageContent(page.streamer.id, 'songbook', result.songbook, true);
     refreshSongbookSection(page.streamer.id);
     showToast('노래를 노래책에 추가했어요.');
   } catch (error) {
@@ -5304,7 +5319,7 @@ async function deleteSongbookEntry(page, videoId, button) {
   try {
     const result = (await callSongbook({ action: 'delete', streamerId: page.streamer.id, videoId })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    currentPage.songbook = Array.isArray(result.songbook) ? result.songbook : [];
+    currentPage.songbook = rememberFanPageContent(page.streamer.id, 'songbook', result.songbook, true);
     refreshSongbookSection(page.streamer.id);
     showToast('노래를 노래책에서 삭제했어요.');
   } catch (error) {
@@ -5319,8 +5334,62 @@ function refreshSongbookSection(streamerId) {
   if (section) section.replaceWith(renderSongbookSection(currentPage));
 }
 
+function fanPageContentStateFor(streamerId) {
+  let state = fanPageContentStates.get(streamerId);
+  if (!state) {
+    state = {
+      songbook: [], songbookLoaded: false, songbookLoading: false, songbookError: '', songbookRevision: 0,
+      playedGames: [], playedGamesLoaded: false, playedGamesLoading: false, playedGamesError: '', playedGamesRevision: 0,
+    };
+    fanPageContentStates.set(streamerId, state);
+  }
+  return state;
+}
+
+function rememberFanPageContent(streamerId, key, value, changed = false) {
+  const state = fanPageContentStateFor(streamerId);
+  state[key] = Array.isArray(value) ? value : [];
+  state[`${key}Loaded`] = true;
+  state[`${key}Error`] = '';
+  if (changed) state[`${key}Revision`] += 1;
+  return state[key];
+}
+
+function loadFanPageContent(page) {
+  const state = fanPageContentStateFor(page.streamer.id);
+  if (state.songbookLoaded) page.songbook = state.songbook;
+  else loadSongbookEntries(page);
+  if (state.playedGamesLoaded) page.playedGames = state.playedGames;
+  else loadPlayedGames(page);
+  if (page.profile && page.profile.youtubeChannelUrl) loadYouTubeVideos(page.streamer.id);
+  if (page.profile && page.profile.cafeUrl) loadCafePosts(page.streamer.id);
+}
+
+async function loadSongbookEntries(page) {
+  const streamerId = page.streamer.id;
+  const state = fanPageContentStateFor(streamerId);
+  if (state.songbookLoaded || state.songbookLoading) return;
+  const revision = state.songbookRevision;
+  state.songbookLoading = true; state.songbookError = '';
+  refreshSongbookSection(streamerId);
+  try {
+    const result = (await callSongbook({ action: 'list', streamerId })).data;
+    const entries = Array.isArray(result.songbook) ? result.songbook : [];
+    if (state.songbookRevision === revision) rememberFanPageContent(streamerId, 'songbook', entries);
+  } catch (error) {
+    state.songbookError = error.message || '노래 목록을 불러오지 못했어요.';
+  } finally {
+    state.songbookLoading = false;
+    if (currentPage && currentPage.streamer.id === streamerId) {
+      currentPage.songbook = state.songbook;
+      refreshSongbookSection(streamerId);
+    }
+  }
+}
+
 function renderPlayedGamesSection(page) {
-  const games = Array.isArray(page.playedGames) ? page.playedGames : [];
+  const state = fanPageContentStateFor(page.streamer.id);
+  const games = Array.isArray(page.playedGames) ? page.playedGames : state.playedGames;
   const section = document.createElement('section');
   section.className = 'played-games-section content-card';
   section.id = 'playedGamesSection';
@@ -5357,7 +5426,18 @@ function renderPlayedGamesSection(page) {
 
   if (!games.length) {
     const empty = document.createElement('p'); empty.className = 'played-games-empty-state';
-    empty.textContent = page.isOwner ? '아직 추가한 게임이 없어요. Steam 링크로 첫 게임을 등록해 보세요.' : '아직 등록된 게임이 없어요.';
+    if (!state.playedGamesLoaded) {
+      if (state.playedGamesLoading) empty.textContent = '플레이한 게임 목록을 불러오고 있어요.';
+      else if (state.playedGamesError) {
+        empty.textContent = state.playedGamesError;
+        const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button played-games-retry-button';
+        retry.textContent = '다시 불러오기'; retry.addEventListener('click', () => loadPlayedGames(page));
+        section.append(empty, retry);
+        return section;
+      } else empty.textContent = '플레이한 게임 목록을 불러옵니다.';
+    } else {
+      empty.textContent = page.isOwner ? '아직 추가한 게임이 없어요. Steam 링크로 첫 게임을 등록해 보세요.' : '아직 등록된 게임이 없어요.';
+    }
     section.append(empty);
     return section;
   }
@@ -5452,7 +5532,7 @@ async function addPlayedGame(page, input, button) {
   try {
     const result = (await callPlayedGames({ action: 'add-game', streamerId: page.streamer.id, steamUrl: input.value.trim() })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    currentPage.playedGames = Array.isArray(result.playedGames) ? result.playedGames : [];
+    currentPage.playedGames = rememberFanPageContent(page.streamer.id, 'playedGames', result.playedGames, true);
     refreshPlayedGamesSection(page.streamer.id);
     showToast('플레이한 게임을 추가했어요.');
   } catch (error) {
@@ -5468,7 +5548,7 @@ async function addPlayedGameVod(page, appId, input, button) {
   try {
     const result = (await callPlayedGames({ action: 'add-vod', streamerId: page.streamer.id, appId, vodUrl: input.value.trim() })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    currentPage.playedGames = Array.isArray(result.playedGames) ? result.playedGames : [];
+    currentPage.playedGames = rememberFanPageContent(page.streamer.id, 'playedGames', result.playedGames, true);
     refreshPlayedGamesSection(page.streamer.id);
     showToast('다시보기를 게임에 연결했어요.');
   } catch (error) {
@@ -5484,7 +5564,7 @@ async function deletePlayedGame(page, appId, button) {
   try {
     const result = (await callPlayedGames({ action: 'delete-game', streamerId: page.streamer.id, appId })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    currentPage.playedGames = Array.isArray(result.playedGames) ? result.playedGames : [];
+    currentPage.playedGames = rememberFanPageContent(page.streamer.id, 'playedGames', result.playedGames, true);
     refreshPlayedGamesSection(page.streamer.id);
     showToast('게임을 삭제했어요.');
   } catch (error) {
@@ -5499,7 +5579,7 @@ async function deletePlayedGameVod(page, appId, vodId, button) {
   try {
     const result = (await callPlayedGames({ action: 'delete-vod', streamerId: page.streamer.id, appId, vodId })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    currentPage.playedGames = Array.isArray(result.playedGames) ? result.playedGames : [];
+    currentPage.playedGames = rememberFanPageContent(page.streamer.id, 'playedGames', result.playedGames, true);
     refreshPlayedGamesSection(page.streamer.id);
     showToast('다시보기 링크를 삭제했어요.');
   } catch (error) {
@@ -5514,18 +5594,40 @@ function refreshPlayedGamesSection(streamerId) {
   if (section) section.replaceWith(renderPlayedGamesSection(currentPage));
 }
 
+async function loadPlayedGames(page) {
+  const streamerId = page.streamer.id;
+  const state = fanPageContentStateFor(streamerId);
+  if (state.playedGamesLoaded || state.playedGamesLoading) return;
+  const revision = state.playedGamesRevision;
+  state.playedGamesLoading = true; state.playedGamesError = '';
+  refreshPlayedGamesSection(streamerId);
+  try {
+    const result = (await callPlayedGames({ action: 'list', streamerId })).data;
+    const entries = Array.isArray(result.playedGames) ? result.playedGames : [];
+    if (state.playedGamesRevision === revision) rememberFanPageContent(streamerId, 'playedGames', entries);
+  } catch (error) {
+    state.playedGamesError = error.message || '플레이한 게임 목록을 불러오지 못했어요.';
+  } finally {
+    state.playedGamesLoading = false;
+    if (currentPage && currentPage.streamer.id === streamerId) {
+      currentPage.playedGames = state.playedGames;
+      refreshPlayedGamesSection(streamerId);
+    }
+  }
+}
+
 function fanPageMemoryStateFor(streamerId) {
   let state = fanPageMemoryStates.get(streamerId);
   if (!state) {
-    state = { saving: false, deletingId: '', thumbnailsLoaded: false, thumbnailsLoading: false };
+    state = { saving: false, deletingId: '', memories: [], loaded: false, loading: false, error: '', revision: 0 };
     fanPageMemoryStates.set(streamerId, state);
   }
   return state;
 }
 
 function renderMemoriesSection(page) {
-  const memories = Array.isArray(page.memories) ? page.memories : [];
   const state = fanPageMemoryStateFor(page.streamer.id);
+  const memories = Array.isArray(page.memories) ? page.memories : state.memories;
   const section = document.createElement('section');
   section.className = 'memory-moments-section content-card';
   section.id = 'memoryMomentsSection';
@@ -5565,9 +5667,20 @@ function renderMemoriesSection(page) {
 
   if (!memories.length) {
     const empty = document.createElement('p'); empty.className = 'memory-moments-empty';
-    empty.textContent = page.isOwner
-      ? '아직 등록된 기억의 순간이 없어요. 첫 기념 다시보기를 추가해 보세요.'
-      : '아직 등록된 기념 다시보기가 없어요.';
+    if (!state.loaded) {
+      if (state.loading) empty.textContent = '기억의 순간을 불러오고 있어요.';
+      else if (state.error) {
+        empty.textContent = state.error;
+        const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button memory-moments-retry-button';
+        retry.textContent = '다시 불러오기'; retry.addEventListener('click', () => loadFanPageMemories(page));
+        section.append(empty, retry);
+        return section;
+      } else empty.textContent = '기억의 순간을 불러옵니다.';
+    } else {
+      empty.textContent = page.isOwner
+        ? '아직 등록된 기억의 순간이 없어요. 첫 기념 다시보기를 추가해 보세요.'
+        : '아직 등록된 기념 다시보기가 없어요.';
+    }
     section.append(empty);
     return section;
   }
@@ -5641,8 +5754,10 @@ async function addMemoryMoment(page, titleInput, urlInput, button) {
       action: 'add', streamerId: page.streamer.id, title: titleInput.value.trim(), url: urlInput.value.trim(),
     })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    page.memories = Array.isArray(result.memories) ? result.memories : [];
-    currentPage.memories = page.memories;
+    state.memories = Array.isArray(result.memories) ? result.memories : [];
+    state.loaded = true; state.error = ''; state.revision += 1;
+    page.memories = state.memories;
+    currentPage.memories = state.memories;
     state.saving = false;
     refreshMemoriesSection(page.streamer.id);
     showToast('기억의 순간을 추가했어요.');
@@ -5654,28 +5769,35 @@ async function addMemoryMoment(page, titleInput, urlInput, button) {
   }
 }
 
-async function loadMemoryMomentThumbnails(page) {
+async function loadFanPageMemories(page) {
   const state = fanPageMemoryStateFor(page.streamer.id);
-  if (state.thumbnailsLoaded || state.thumbnailsLoading) return;
-  state.thumbnailsLoading = true;
+  if (state.loaded || state.loading) {
+    if (state.loaded) {
+      page.memories = state.memories;
+      if (currentPage && currentPage.streamer.id === page.streamer.id) currentPage.memories = state.memories;
+    }
+    return;
+  }
+  const revision = state.revision;
+  state.loading = true; state.error = '';
+  refreshMemoriesSection(page.streamer.id);
   try {
     const result = (await callMemories({ action: 'list', streamerId: page.streamer.id })).data;
-    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    const resolved = new Map((Array.isArray(result.memories) ? result.memories : []).map((memory) => [memory.id, memory]));
-    const currentMemories = Array.isArray(currentPage.memories) ? currentPage.memories : [];
-    currentPage.memories = currentMemories.map((memory) => {
-      const resolvedMemory = resolved.get(memory.id);
-      return resolvedMemory && resolvedMemory.thumbnailUrl
-        ? { ...memory, thumbnailUrl: resolvedMemory.thumbnailUrl }
-        : memory;
-    });
-    page.memories = currentPage.memories;
-    state.thumbnailsLoaded = true;
-    refreshMemoriesSection(page.streamer.id);
+    const entries = Array.isArray(result.memories) ? result.memories : [];
+    if (state.revision === revision) {
+      state.memories = entries;
+      state.loaded = true;
+      if (currentPage && currentPage.streamer.id === page.streamer.id) currentPage.memories = entries;
+      page.memories = entries;
+    }
   } catch (error) {
-    console.warn('Could not load memory moment thumbnails:', error.message || error);
+    state.error = error.message || '기억의 순간을 불러오지 못했어요.';
   } finally {
-    state.thumbnailsLoading = false;
+    state.loading = false;
+    if (currentPage && currentPage.streamer.id === page.streamer.id) {
+      currentPage.memories = state.memories;
+      refreshMemoriesSection(page.streamer.id);
+    }
   }
 }
 
@@ -5687,8 +5809,10 @@ async function deleteMemoryMoment(page, memory, button) {
   try {
     const result = (await callMemories({ action: 'delete', streamerId: page.streamer.id, id: memory.id })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-    page.memories = Array.isArray(result.memories) ? result.memories : [];
-    currentPage.memories = page.memories;
+    state.memories = Array.isArray(result.memories) ? result.memories : [];
+    state.loaded = true; state.error = ''; state.revision += 1;
+    page.memories = state.memories;
+    currentPage.memories = state.memories;
     showToast('기억의 순간을 삭제했어요.');
   } catch (error) {
     showToast(error.message || '기억의 순간을 삭제하지 못했어요.');
@@ -5783,7 +5907,7 @@ function refreshYouTubeSection(streamerId) {
 
 async function loadYouTubeVideos(streamerId, forceRefresh = false) {
   const state = youtubeStateFor(streamerId);
-  if (state.loading) return;
+  if (state.loading || (state.hasLoaded && !forceRefresh)) return;
   state.loading = true;
   state.error = '';
   refreshYouTubeSection(streamerId);
@@ -6016,6 +6140,8 @@ function renderGallerySection(page) {
   let galleryData = null;
   let isLoading = true;
   let errorMessage = '';
+  let hasLoaded = false;
+  let loadingPromise = null;
   const status = document.createElement('p'); status.className = 'fan-gallery-status';
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const grid = document.createElement('div'); grid.className = 'fan-gallery-grid';
@@ -6076,20 +6202,27 @@ function renderGallerySection(page) {
   }
 
   async function loadGallery() {
+    if (loadingPromise) return loadingPromise;
+    if (hasLoaded && !errorMessage) return;
     isLoading = true; errorMessage = ''; renderItems();
-    try {
-      const response = await callGallery({ streamerId: page.streamer.id });
-      if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-      galleryData = response.data || { totalCount: 0, items: [] };
-    } catch (error) {
-      if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
-      errorMessage = error.message || '갤러리를 불러오지 못했어요.';
-    } finally {
-      if (currentPage && currentPage.streamer.id === page.streamer.id) {
-        isLoading = false;
-        renderItems();
+    loadingPromise = (async () => {
+      try {
+        const response = await callGallery({ streamerId: page.streamer.id });
+        if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+        galleryData = response.data || { totalCount: 0, items: [] };
+        hasLoaded = true;
+      } catch (error) {
+        if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+        errorMessage = error.message || '갤러리를 불러오지 못했어요.';
+      } finally {
+        if (currentPage && currentPage.streamer.id === page.streamer.id) {
+          isLoading = false;
+          renderItems();
+        }
+        loadingPromise = null;
       }
-    }
+    })();
+    return loadingPromise;
   }
 
   categories.forEach(({ id, label }) => {
@@ -6099,7 +6232,7 @@ function renderGallerySection(page) {
     tabs.append(button);
   });
   section.append(heading, tabs, status, grid);
-  galleryLoadPromise = loadGallery();
+  section.loadGallery = loadGallery;
   return section;
 }
 
@@ -7089,7 +7222,6 @@ function showStartupError(error) {
   $('retryButton').classList.remove('hidden');
 }
 async function loadApp() {
-  galleryLoadPromise = Promise.resolve();
   $('startupCover').classList.remove('is-error');
   $('startupCover').classList.remove('is-not-found');
   $('retryButton').classList.add('hidden');
@@ -7113,7 +7245,12 @@ async function loadApp() {
     if (requestedId && !result.page) {
       throw Object.assign(new Error('팬페이지를 찾을 수 없습니다.'), { code: 'not-found' });
     }
-    const recentPromise = callRecent().then((value) => value.data.streamers);
+    const recentPromise = callRecent(requestedId ? { streamerId: requestedId } : {})
+      .then((value) => value.data.streamers)
+      .catch((error) => {
+        console.warn('Could not load recent fanpages:', error.message || error);
+        return [];
+      });
     if (!requestedId) {
       const directoryPromise = callSearch({ query: '', includeAll: true })
         .then((value) => Array.isArray(value.data.streamers) ? value.data.streamers : [])
@@ -7138,10 +7275,13 @@ async function loadApp() {
       // 관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
       page.isOwner = page.isStreamerOwner || result.isAdmin === true;
       setVisibleView(page);
-      const recent = await recentPromise;
-      renderList($('recentPages'), recent, true, '최근 방문한 팬페이지가 여기에 표시돼요.');
+      recentPromise.then((recent) => {
+        if (currentPage && currentPage.streamer.id === page.streamer.id) {
+          renderList($('recentPages'), recent, true, '최근 방문한 팬페이지가 여기에 표시돼요.');
+        }
+      });
     }
-    await Promise.all([waitForPageAssets(), galleryLoadPromise]);
+    void waitForPageAssets();
     $('startupCover').classList.add('hidden');
     $('siteShell').setAttribute('aria-hidden', 'false');
     $('siteShell').classList.add('is-ready');
