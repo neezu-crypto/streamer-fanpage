@@ -3752,11 +3752,6 @@ function normalizeFanpageVodComment(value, id) {
 exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
-  if (verified) {
-    await recordVerifiedStreamerFanPageVisit(verified).catch((error) => {
-      console.warn('Could not record the verified streamer fanpage visit:', error);
-    });
-  }
   const requestedId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
   if (verified && !isAdmin && requestedId !== verified.streamer.id) {
     return { verifiedStreamer: verified.streamer, isAdmin, redirectTo: verified.streamer.id };
@@ -3765,20 +3760,11 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
 
   const target = await findVerifiedBySoopId(requestedId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
-  const [pageSnap, vods, stockNamesSnap, songbookSnap, playedGamesSnap, memoriesSnap, fanpageEmotesSnap] = await Promise.all([
+  const [pageSnap, vods, stockNamesSnap, fanpageEmotesSnap] = await Promise.all([
     pageRef(target.streamer.id).get(),
     readVodPage(target.streamer.id),
     db.ref('streamerNames').get(),
-    songbookRef(target.streamer.id).get(),
-    playedGamesRef(target.streamer.id).get(),
-    fanPageMemoriesRef(target.streamer.id).get(),
     db.ref(`streamerFanPageEmotes/${target.streamer.id}`).get(),
-    recordRecentVisit(uid, target.streamer.id),
-    ...(!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)
-      ? [recordFanPageView(uid, target.streamer.id).catch((error) => {
-        console.warn('Could not record the fanpage view:', error);
-      })]
-      : []),
   ]);
   const stock = findStockForStreamer(target.streamer, stockNamesSnap.val());
   return {
@@ -3788,9 +3774,6 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
       ...normalizePage(target.streamer, pageSnap.val()),
       vods,
       stock,
-      songbook: normalizeSongbookEntries(songbookSnap.val()),
-      playedGames: normalizePlayedGames(playedGamesSnap.val()),
-      memories: normalizeFanPageMemories(memoriesSnap.val()),
       decorations: normalizeFanpageEmotes(fanpageEmotesSnap.val()),
     },
   };
@@ -4529,6 +4512,31 @@ exports.streamerFanPageViewerStatsJobCleanup = onSchedule({
 
 exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
+  const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
+  let verified = null;
+  if (streamerId) {
+    const [target, currentVerified, isAdmin] = await Promise.all([
+      findVerifiedBySoopId(streamerId),
+      findVerifiedByUid(uid),
+      isAdminUid(uid),
+    ]);
+    verified = currentVerified;
+    if (target) {
+      await recordRecentVisit(uid, target.streamer.id);
+      if (!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)) {
+        await recordFanPageView(uid, target.streamer.id).catch((error) => {
+          console.warn('Could not record the fanpage view:', error);
+        });
+      }
+    }
+  } else {
+    verified = await findVerifiedByUid(uid);
+  }
+  if (verified) {
+    await recordVerifiedStreamerFanPageVisit(verified).catch((error) => {
+      console.warn('Could not record the verified streamer fanpage visit:', error);
+    });
+  }
   // Read only the authenticated caller's own history.
   const snap = await db.ref(`streamerFanPageRecentVisits/${uid}`).get();
   const visits = Object.entries(snap.val() || {})
@@ -5500,6 +5508,12 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
 exports.streamerFanPageSongbook = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
+  const action = String(data.action || '');
+  if (action === 'list') {
+    const target = await findVerifiedBySoopId(String(data.streamerId || '').trim().toLowerCase());
+    if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+    return { songbook: normalizeSongbookEntries((await songbookRef(target.streamer.id).get()).val()) };
+  }
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   let targetStreamer;
   if (isAdmin) {
@@ -5512,7 +5526,6 @@ exports.streamerFanPageSongbook = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxI
     targetStreamer = verified;
   }
 
-  const action = String(data.action || '');
   const rootRef = songbookRef(targetStreamer.streamer.id);
   if (action === 'add') {
     const parsed = parseYouTubeVideoUrl(data.youtubeUrl);
@@ -5568,6 +5581,12 @@ exports.streamerFanPageSongbook = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxI
 exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
+  const action = String(data.action || '');
+  if (action === 'list') {
+    const target = await findVerifiedBySoopId(String(data.streamerId || '').trim().toLowerCase());
+    if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+    return { playedGames: normalizePlayedGames((await playedGamesRef(target.streamer.id).get()).val()) };
+  }
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   let targetStreamer;
   if (isAdmin) {
@@ -5580,7 +5599,6 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
     targetStreamer = verified;
   }
 
-  const action = String(data.action || '');
   const rootRef = playedGamesRef(targetStreamer.streamer.id);
   if (action === 'add-game') {
     const parsed = parseSteamGameUrl(data.steamUrl);
