@@ -2699,7 +2699,6 @@ function renderRollingPaperSection(page) {
       grid.append(card);
     });
     section.append(grid);
-    if (!state.topicsLoaded && !state.topicsLoading) void loadRollingPaperTopics(page);
     return section;
   }
 
@@ -3608,6 +3607,12 @@ function renderFanPage(page, options = {}) {
       if (!upboState.boardLoaded || upboState.error) loadUpboBoard(page.streamer.id);
     }
     if (tabKey === 'content') loadFanPageContent(page);
+    if (tabKey === 'rolling-paper') {
+      const rollingPaperState = rollingPaperStateFor(page.streamer.id);
+      if (!rollingPaperState.topicsLoaded || rollingPaperState.topicError) {
+        void loadRollingPaperTopics(page);
+      }
+    }
     if (tabKey === 'memories') loadFanPageMemories(page);
     if (moveFocus) tabButtons.get(tabKey)?.focus();
   }
