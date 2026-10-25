@@ -405,9 +405,9 @@ function renderSubscriptionDialogStatus(message = '') {
       const expired = subscriptionState.pendingCodeExpiresAt > 0 && subscriptionState.pendingCodeExpiresAt <= Date.now();
       const expires = subscriptionState.pendingCodeExpiresAt ? formatSubscriptionDate(subscriptionState.pendingCodeExpiresAt) : '';
       status.textContent = expired
-        ? '인증 코드가 만료됐어요. 새 코드를 발급해 구독자 전용 게시글에 다시 댓글로 남겨 주세요.'
-        : `${subscriptionState.pendingSoopId} 방송국 인증을 기다리고 있어요. 발급된 코드를 구독자 전용 인증 게시글에 댓글로 남겨 주세요${expires ? ` (코드 만료: ${expires})` : ''}.`;
-      $('viewerSubscriptionCodeHelp').textContent = '이 코드는 한 번만 사용할 수 있고 30분 후 만료됩니다. 코드를 잃어버렸거나 만료되면 새 코드를 발급해 기존 댓글을 수정해 주세요.';
+        ? '신청은 유지 중이지만 인증 코드가 만료됐어요. 새 코드를 발급해 구독자 전용 게시글 댓글을 수정해 주세요.'
+        : `${subscriptionState.pendingSoopId} 방송국 인증 신청은 유지 중이에요. 탭을 닫아도 사라지지 않으니 발급된 코드를 구독자 전용 인증 게시글 댓글에 남겨 주세요${expires ? ` (코드 만료: ${expires})` : ''}.`;
+      $('viewerSubscriptionCodeHelp').textContent = '신청은 로그인한 계정에 저장되어 탭을 닫아도 유지됩니다. 코드는 한 번만 사용할 수 있고 30분 후 만료돼요. 다시 접속했을 때 코드가 보이지 않거나 만료됐다면 새 코드를 발급해 댓글을 수정해 주세요.';
     } else {
       status.textContent = '이전 별풍선 방식 신청이 관리자 확인 대기 중입니다. 관리자가 기존 신청을 검토합니다.';
     }
