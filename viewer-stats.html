@@ -141,11 +141,13 @@
               <option value="date-asc">오래된 날짜순</option>
               <option value="peak-desc">최고 시청자 많은순</option>
               <option value="peak-asc">최고 시청자 적은순</option>
+              <option value="low-desc">최저 시청자 많은순</option>
+              <option value="low-asc">최저 시청자 적은순</option>
             </select>
             <span class="viewer-list-note">1분 단위 · 시작/종료 5분 제외</span>
           </div>
         </div>
-        <p class="viewer-vod-sort-hint">최신순·오래된 순은 방송국 전체 목록을 기준으로 30개씩 불러옵니다. 시청자순은 불러온 영상 중 분석된 영상이 위에 표시됩니다. 통계는 카드의 분석 버튼을 누른 영상만 계산하고, 완료된 결과는 모든 이용자가 재사용합니다.</p>
+        <p class="viewer-vod-sort-hint">날짜순은 방송국 전체 목록을 기준으로 30개씩 불러옵니다. 최고·최저 시청자순은 전체 다시보기를 훑어 정적 통계 캐시에 반영된 분석 결과로 정렬하고, 미분석 영상은 날짜순으로 뒤에 표시합니다. 정렬할 때 새 통계는 계산하지 않습니다.</p>
         <form class="viewer-vod-search-form" id="viewerVodSearchForm">
           <label class="viewer-vod-search-label" for="viewerVodSearchInput">다시보기 키워드 검색</label>
           <div class="viewer-vod-search-row">
@@ -391,6 +393,6 @@
       <p class="viewer-sponsor-dialog-status" id="sponsorRequestStatus" role="status" aria-live="polite"></p>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261025-vod-oldest-sort"></script>
+  <script type="module" src="viewer-stats.js?v=20261025-global-viewer-sort"></script>
 </body>
 </html>

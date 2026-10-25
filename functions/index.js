@@ -47,6 +47,7 @@ const FANPAGE_STATS_DAYS = 30;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const SOOP_VOD_PAGE_SIZE = 60;
 const VIEWER_VOD_PAGE_SIZE = 30;
+const VIEWER_SORT_CATALOG_MAX_PAGES = 400;
 const FANPAGE_VOD_PAGE_SIZE = 24;
 const MAX_LOADED_VIDEO_ITEMS = 500;
 const FANPAGE_VOD_COMMENT_PAGE_SIZE = 50;
@@ -408,6 +409,7 @@ function viewerStatsLimitMessage(action, isDayLimit) {
   const labels = {
     search: '검색',
     vods: '다시보기 목록 요청',
+    vodCatalog: '전체 다시보기 정렬 요청',
     stats: '통계 분석 요청',
   };
   return (isDayLimit ? '오늘 ' : '') + labels[action] + ' 한도에 도달했어요.';
@@ -513,7 +515,7 @@ async function enforceViewerStatsRateLimit(uid, action, usageContext = {}) {
   const minuteWindow = Math.floor(now / 60000);
   const dayKey = viewerStatsDayKey(now);
   const uidKey = viewerStatsUidKey(uid);
-  const selectedStreamerId = action === 'vods' && Number(usageContext.page) === 1
+  const selectedStreamerId = ['vods', 'vodCatalog'].includes(action) && Number(usageContext.page) === 1
     ? String(usageContext.streamerId || '').trim().toLowerCase()
     : '';
   const trackStreamerSelection = SOOP_ID_PATTERN.test(selectedStreamerId);
@@ -1660,6 +1662,65 @@ async function fetchSoopVodPage(soopId, page, keyword = '', pageSize = SOOP_VOD_
     throw new HttpsError('unavailable', 'SOOP 다시보기 응답 형식이 바뀌어 목록을 갱신하지 못했습니다.');
   }
   return { rows: payload.data, total: Math.max(0, Math.floor(Number(payload.meta.total))) };
+}
+
+async function fetchSoopVodCatalog(soopId, keyword = '') {
+  const firstPage = await fetchSoopVodPage(soopId, 1, keyword, SOOP_VOD_PAGE_SIZE, 'newest');
+  const pageCount = Math.ceil(firstPage.total / SOOP_VOD_PAGE_SIZE);
+  if (pageCount > VIEWER_SORT_CATALOG_MAX_PAGES) {
+    throw new HttpsError(
+      'resource-exhausted',
+      `전체 시청자순 정렬은 다시보기 ${(VIEWER_SORT_CATALOG_MAX_PAGES * SOOP_VOD_PAGE_SIZE).toLocaleString('ko-KR')}개까지 지원합니다. 키워드로 범위를 줄여 주세요.`,
+    );
+  }
+
+  const seenIds = new Set();
+  const vods = [];
+  const appendPage = (rows, page, total) => {
+    if (total !== firstPage.total) {
+      throw new HttpsError('aborted', '조회 중 다시보기 목록이 변경됐습니다. 정렬을 다시 시도해 주세요.');
+    }
+    const expectedRows = Math.max(0, Math.min(SOOP_VOD_PAGE_SIZE, total - ((page - 1) * SOOP_VOD_PAGE_SIZE)));
+    if (rows.length < expectedRows) {
+      throw new HttpsError('unavailable', '전체 다시보기 목록을 가져오지 못해 시청자순 정렬을 완료할 수 없습니다.');
+    }
+    const normalized = rows.slice(0, expectedRows).map((row) => normalizeSoopVod(row));
+    if (normalized.some((vod) => !vod)) {
+      throw new HttpsError('unavailable', '다시보기 항목 일부를 읽지 못해 시청자순 정렬을 완료할 수 없습니다.');
+    }
+    for (const vod of normalized) {
+      if (seenIds.has(vod.id)) {
+        throw new HttpsError('aborted', '조회 중 다시보기 목록이 변경되어 중복 항목이 발견됐습니다. 정렬을 다시 시도해 주세요.');
+      }
+      seenIds.add(vod.id);
+      vods.push(vod);
+    }
+  };
+
+  if (pageCount) appendPage(firstPage.rows, 1, firstPage.total);
+  const batchSize = 4;
+  for (let firstPageNumber = 2; firstPageNumber <= pageCount; firstPageNumber += batchSize) {
+    const pages = Array.from(
+      { length: Math.min(batchSize, pageCount - firstPageNumber + 1) },
+      (_, index) => firstPageNumber + index,
+    );
+    const results = await Promise.all(pages.map((page) => (
+      fetchSoopVodPage(soopId, page, keyword, SOOP_VOD_PAGE_SIZE, 'newest')
+    )));
+    results.forEach((result, index) => appendPage(result.rows, pages[index], result.total));
+  }
+  if (seenIds.size !== firstPage.total) {
+    throw new HttpsError('unavailable', '전체 다시보기 목록을 확인하지 못해 시청자순 정렬을 완료할 수 없습니다.');
+  }
+
+  vods.sort((a, b) => String(b.regDate).localeCompare(String(a.regDate)) || Number(b.id) - Number(a.id));
+  return {
+    vods,
+    total: firstPage.total,
+    nickname: firstPage.rows[0] && typeof firstPage.rows[0].user_nick === 'string'
+      ? firstPage.rows[0].user_nick.trim().slice(0, 40)
+      : '',
+  };
 }
 
 async function postSoopVodStar2Stats(values, titleNo) {
@@ -4454,11 +4515,26 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
       throw new HttpsError('invalid-argument', '검색어는 80자 이내로 입력해 주세요.');
     }
     const sortOrder = data.sortOrder === undefined ? 'newest' : String(data.sortOrder);
-    if (!['newest', 'oldest'].includes(sortOrder)) {
+    if (!['newest', 'oldest', 'catalog'].includes(sortOrder)) {
       throw new HttpsError('invalid-argument', '다시보기 정렬 기준을 확인해 주세요.');
     }
+    if (sortOrder === 'catalog' && page !== 1) {
+      throw new HttpsError('invalid-argument', '전체 다시보기 정렬 요청을 확인해 주세요.');
+    }
     const tier = await resolveViewerStatsTier(uid, request.auth);
-    await enforceViewerStatsRateLimit(uid, action, { streamerId, page, tier });
+    await enforceViewerStatsRateLimit(uid, sortOrder === 'catalog' ? 'vodCatalog' : action, { streamerId, page, tier });
+    if (sortOrder === 'catalog') {
+      const catalog = await fetchSoopVodCatalog(streamerId, keyword);
+      return {
+        streamerId,
+        nickname: catalog.nickname,
+        vods: catalog.vods,
+        total: catalog.total,
+        page: 1,
+        hasMore: false,
+        catalogComplete: true,
+      };
+    }
     const result = await fetchSoopVodPage(streamerId, page, keyword, VIEWER_VOD_PAGE_SIZE, sortOrder);
     const vods = result.rows.map((row) => normalizeSoopVod(row)).filter(Boolean);
     if (vods.length !== result.rows.length) {
