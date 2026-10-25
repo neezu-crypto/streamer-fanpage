@@ -147,6 +147,18 @@
       </div>
     </div>
   </dialog>
+  <dialog id="loginAssistCompleteDialog" class="account-dialog">
+    <div class="account-dialog-card">
+      <div class="profile-editor-heading">
+        <div><p class="eyebrow">LOGIN COMPLETE</p><h2>로그인 완료</h2></div>
+      </div>
+      <p>로그인이 완료됐어요. 원래 팬페이지 탭으로 돌아가세요. 이 탭이 자동으로 닫히지 않으면 아래 버튼으로 닫아 주세요.</p>
+      <div class="account-dialog-actions">
+        <button class="button button-primary" id="closeLoginAssistTab" type="button">이 탭 닫기</button>
+      </div>
+      <p id="loginAssistCloseStatus" role="status" aria-live="polite" style="margin-top:10px!important;"></p>
+    </div>
+  </dialog>
   <dialog id="streamerVerifyDialog" class="account-dialog">
     <form class="account-dialog-card verification-form" id="streamerVerificationForm" autocomplete="off" style="max-height:calc(100dvh - 32px);overflow-y:auto;">
       <div class="profile-editor-heading">
@@ -266,7 +278,7 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261026-tamagotchi-application"></script>
+  <script type="module" src="app.js?v=20261026-login-tab-autoclose"></script>
   <script type="module" src="https://neezu-crypto.github.io/streamer-game-series-shop/game-series-emotes.js?game=streamerFanPage&amp;v=20261021-decoration-layer-height"></script>
 </body>
 </html>

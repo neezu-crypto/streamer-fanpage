@@ -55,6 +55,17 @@ const callStreamerVerification = authenticatedCallable('requestStreamerVerificat
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
+const LOGIN_ASSIST_SESSION_KEY = 'streamerFanPage.loginAssistTab';
+const LOGIN_ASSIST_QUERY = new URLSearchParams(location.search).get('login') === '1';
+let loginAssistTab = (() => {
+  try {
+    if (LOGIN_ASSIST_QUERY) sessionStorage.setItem(LOGIN_ASSIST_SESSION_KEY, '1');
+    return LOGIN_ASSIST_QUERY || sessionStorage.getItem(LOGIN_ASSIST_SESSION_KEY) === '1';
+  } catch (_) {
+    return LOGIN_ASSIST_QUERY;
+  }
+})();
+let loginAssistCloseStarted = false;
 const MAX_LOADED_VIDEO_ITEMS = 500;
 const MAX_BANNER_IMAGE_ITEMS = 20;
 const MAX_UPBO_ITEMS = 100;
@@ -157,7 +168,7 @@ function showFanPageModal(dialog) {
   const isTouchLayout = window.matchMedia('(hover: none), (pointer: coarse)').matches;
   if (isTouchLayout) {
     const initialFocus = dialog.querySelector(
-      '.profile-settings-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch',
+      '.profile-settings-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
     ) || dialog;
     if (initialFocus === dialog) dialog.tabIndex = -1;
     initialFocus.setAttribute('autofocus', '');
@@ -165,12 +176,29 @@ function showFanPageModal(dialog) {
   dialog.showModal();
   if (isTouchLayout) {
     const initialFocus = dialog.querySelector(
-      '.profile-settings-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch',
+      '.profile-settings-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
     ) || dialog;
     initialFocus.focus({ preventScroll: true });
   }
   modalOpenGeneration += 1;
   if (activePointerSoundActivation?.soundType !== 'modal') playUiSound(modalOpenAudio);
+}
+function preserveLoginAssistTabForReload() {
+  if (!loginAssistTab) return;
+  try { sessionStorage.setItem(LOGIN_ASSIST_SESSION_KEY, '1'); } catch (_) { /* URL에도 로그인 탭 의도를 남긴다. */ }
+  const loginUrl = new URL(location.href);
+  loginUrl.searchParams.set('login', '1');
+  history.replaceState(null, '', loginUrl.href);
+}
+function completeLoginAssistTab() {
+  if (!loginAssistTab || loginAssistCloseStarted) return;
+  loginAssistCloseStarted = true;
+  loginAssistTab = false;
+  try { sessionStorage.removeItem(LOGIN_ASSIST_SESSION_KEY); } catch (_) {}
+  window.close();
+  window.setTimeout(() => {
+    if (!window.closed) showFanPageModal($('loginAssistCompleteDialog'));
+  }, 250);
 }
 window.streamerFanPageOpenLoginModal = () => showFanPageModal($('loginChoiceDialog'));
 
@@ -502,6 +530,7 @@ async function handleFanpageStreamerSwitchApproval(uid, requestId) {
       return;
     }
     await signInWithCustomToken(auth, response.data.customToken);
+    preserveLoginAssistTabForReload();
     location.reload();
   } catch (error) {
     try { localStorage.removeItem(lockKey); } catch (_) {}
@@ -539,6 +568,7 @@ onAuthStateChanged(auth, (user) => {
         if ($('streamerVerifyDialog').open) $('streamerVerifyDialog').close();
         showToast('스트리머 인증이 승인됐어요.');
       }
+      completeLoginAssistTab();
       if ($('siteShell').classList.contains('is-ready')) loadApp();
     }
     previousVerifiedValue = verified;
@@ -582,12 +612,14 @@ async function loginWithGoogle() {
     await linkWithPopup(auth.currentUser, googleProvider);
     await callLinkGoogle();
     showToast('Google 계정을 연결했어요.');
+    completeLoginAssistTab();
   } catch (error) {
     if (error && error.code === 'auth/credential-already-in-use') {
       if (!(await confirmAccountSwitch())) return;
       try {
         await signInWithPopup(auth, googleProvider);
         await callLinkGoogle();
+        preserveLoginAssistTabForReload();
         location.reload();
       } catch (switchError) {
         if (!isPopupCancelled(switchError)) showToast(switchError.message || 'Google 계정 전환에 실패했어요.');
@@ -622,11 +654,13 @@ async function loginWithKakao() {
           if (!(await confirmAccountSwitch())) return;
           const signedIn = await signInWithCustomToken(auth, result.data.customToken);
           localStorage.setItem(KAKAO_LINKED_UID_KEY, signedIn.user.uid);
+          preserveLoginAssistTabForReload();
           location.reload();
           return;
         }
         if (auth.currentUser && (action === 'linked' || action === 'already-linked')) {
           localStorage.setItem(KAKAO_LINKED_UID_KEY, auth.currentUser.uid);
+          completeLoginAssistTab();
         }
         renderAuthControls();
         if (vodCommentState) renderVodCommentsContents();
@@ -7659,15 +7693,14 @@ async function loadApp() {
     $('startupCover').classList.add('hidden');
     $('siteShell').setAttribute('aria-hidden', 'false');
     $('siteShell').classList.add('is-ready');
-    if (new URLSearchParams(location.search).get('login') === '1') {
+    if (LOGIN_ASSIST_QUERY) {
       const loginUrl = new URL(location.href);
       loginUrl.searchParams.delete('login');
       history.replaceState(null, '', loginUrl.href);
-      if (auth.currentUser && auth.currentUser.isAnonymous
-        && localStorage.getItem(KAKAO_LINKED_UID_KEY) !== auth.currentUser.uid
-        && verifiedStreamerUid !== auth.currentUser.uid) {
-        window.setTimeout(() => showFanPageModal($('loginChoiceDialog')), 120);
-      }
+    }
+    if (loginAssistTab) {
+      if (hasRecognizedFanpageAccount()) completeLoginAssistTab();
+      else window.setTimeout(() => showFanPageModal($('loginChoiceDialog')), 120);
     }
   } catch (error) { showStartupError(error); }
 }
@@ -7683,6 +7716,12 @@ $('openLoginOptions').addEventListener('click', () => showFanPageModal($('loginC
 $('closeLoginChoices').addEventListener('click', () => $('loginChoiceDialog').close());
 $('choiceGoogleLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithGoogle(); });
 $('choiceKakaoLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithKakao(); });
+$('closeLoginAssistTab').addEventListener('click', () => {
+  window.close();
+  window.setTimeout(() => {
+    if (!window.closed) $('loginAssistCloseStatus').textContent = '브라우저에서 자동 닫기를 허용하지 않으면 탭의 닫기 버튼을 눌러 주세요.';
+  }, 200);
+});
 $('openStreamerVerification').addEventListener('click', () => {
   $('loginChoiceDialog').close();
   showFanPageModal($('streamerVerifyDialog'));
@@ -7862,13 +7901,15 @@ async function submitOrCheckStreamerVerification(checkOnly, renewOnly = false) {
     const result = (await callStreamerVerification(payload)).data || {};
     if (result.action === 'already-verified' || result.action === 'auto-approved') {
       status.textContent = '인증이 확인됐어요. 본인 팬페이지로 이동합니다.';
-      setTimeout(() => location.reload(), 500);
+      if (loginAssistTab) completeLoginAssistTab();
+      else setTimeout(() => location.reload(), 500);
       return;
     }
     if (result.action === 'switch') {
       status.textContent = '이미 인증된 계정이 확인됐어요.';
       if (await confirmAccountSwitch()) {
         await signInWithCustomToken(auth, result.customToken);
+        preserveLoginAssistTabForReload();
         location.reload();
       }
       return;
