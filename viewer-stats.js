@@ -1289,8 +1289,8 @@ function isCurrentComparisonRequest(request) {
     && request.selectionKey === comparisonSelectionKey();
 }
 
-async function getViewerVodPage(streamerId, page, keyword = '') {
-  const response = await callViewerStats({ action: 'vods', streamerId, page, keyword });
+async function getViewerVodPage(streamerId, page, keyword = '', sortOrder = 'newest') {
+  const response = await callViewerStats({ action: 'vods', streamerId, page, keyword, sortOrder });
   return response.data || {};
 }
 
@@ -2179,13 +2179,14 @@ async function loadVodPage(loadToken, page) {
     ? (page === 1 ? '키워드 검색 결과를 불러오고 있어요.' : '다음 검색 결과를 불러오고 있어요.')
     : (page === 1 ? 'SOOP 다시보기 목록을 불러오고 있어요.' : '다음 다시보기를 불러오고 있어요.');
   try {
-    const payload = await getViewerVodPage(selectedStreamer.soopId, page, keyword);
+    const sortOrder = vodSortMode === 'date-asc' ? 'oldest' : 'newest';
+    const payload = await getViewerVodPage(selectedStreamer.soopId, page, keyword, sortOrder);
     if (loadToken !== activeLoadToken || requestToken !== vodListRequestToken || keyword !== vodSearchKeyword) return;
     const vods = Array.isArray(payload.vods) ? payload.vods : [];
     vodTotal = Math.max(0, Number(payload.total) || 0);
     nextPage = Number(payload.page) + 1;
     hasMoreVods = payload.hasMore === true;
-    if (!keyword) vodPagesByNumber.set(page, { vods, total: vodTotal, hasMore: hasMoreVods });
+    if (!keyword && sortOrder === 'newest') vodPagesByNumber.set(page, { vods, total: vodTotal, hasMore: hasMoreVods });
     if (page === 1 && !vods.length) {
       $('viewerVodStatus').textContent = keyword
         ? '“' + keyword + '” 검색 결과가 없어요.'
@@ -2598,6 +2599,20 @@ $('viewerLoadMore').addEventListener('click', () => {
   if (hasMoreVods && selectedStreamer) loadVodPage(activeLoadToken, nextPage);
 });
 
+async function reloadVodListForSort() {
+  if (!selectedStreamer) return;
+  vodListRequestToken += 1;
+  cancelQueuedStatsRequests();
+  $('viewerVodGrid').replaceChildren();
+  vodTotal = 0;
+  nextPage = 1;
+  hasMoreVods = false;
+  $('viewerLoadMore').classList.add('hidden');
+  $('viewerLoadMore').disabled = false;
+  updateVodHeading();
+  await loadVodPage(activeLoadToken, 1);
+}
+
 $('viewerVodSearchForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!selectedStreamer) return;
@@ -2621,7 +2636,12 @@ $('viewerVodSearchForm').addEventListener('submit', async (event) => {
 });
 
 $('viewerVodSort').addEventListener('change', (event) => {
+  const previousSortMode = vodSortMode;
   vodSortMode = event.target.value;
+  if (selectedStreamer && (vodSortMode === 'date-asc' || previousSortMode === 'date-asc')) {
+    reloadVodListForSort();
+    return;
+  }
   sortLoadedVodCards();
 });
 

@@ -1622,11 +1622,12 @@ async function fetchSoopLiveStatus(soopId) {
   };
 }
 
-async function fetchSoopVodPage(soopId, page, keyword = '', pageSize = SOOP_VOD_PAGE_SIZE) {
+async function fetchSoopVodPage(soopId, page, keyword = '', pageSize = SOOP_VOD_PAGE_SIZE, sortOrder = 'newest') {
   const url = new URL(`${SOOP_VOD_API}/${encodeURIComponent(soopId)}/vods/review`);
+  const oldestFirst = sortOrder === 'oldest';
   url.search = new URLSearchParams({
     keyword: String(keyword || '').trim(),
-    orderby: 'reg_date',
+    orderby: oldestFirst ? 'reg_date_asc' : 'reg_date',
     page: String(page),
     field: 'title,contents,user_nick,user_id',
     per_page: String(pageSize),
@@ -4452,9 +4453,13 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     if ((data.keyword !== undefined && typeof data.keyword !== 'string') || keyword.length > 80) {
       throw new HttpsError('invalid-argument', '검색어는 80자 이내로 입력해 주세요.');
     }
+    const sortOrder = data.sortOrder === undefined ? 'newest' : String(data.sortOrder);
+    if (!['newest', 'oldest'].includes(sortOrder)) {
+      throw new HttpsError('invalid-argument', '다시보기 정렬 기준을 확인해 주세요.');
+    }
     const tier = await resolveViewerStatsTier(uid, request.auth);
     await enforceViewerStatsRateLimit(uid, action, { streamerId, page, tier });
-    const result = await fetchSoopVodPage(streamerId, page, keyword, VIEWER_VOD_PAGE_SIZE);
+    const result = await fetchSoopVodPage(streamerId, page, keyword, VIEWER_VOD_PAGE_SIZE, sortOrder);
     const vods = result.rows.map((row) => normalizeSoopVod(row)).filter(Boolean);
     if (vods.length !== result.rows.length) {
       throw new HttpsError('unavailable', 'SOOP 다시보기 응답 일부를 읽지 못했습니다.');
