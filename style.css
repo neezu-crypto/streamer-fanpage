@@ -1294,8 +1294,8 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 #fanPageView .fanpage-tab-panel-grid>*{min-width:0;margin-top:0;scroll-margin-top:82px}
 #fanPageView.fanpage-layout-2 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section){grid-column:1/-1}
 @media(max-width:560px){
-  #fanPageView .fanpage-tab-nav{gap:4px;margin:14px 0 18px;padding:4px;border-radius:15px}
-  #fanPageView .fanpage-tab-button{min-height:42px;padding:7px 0;border-radius:11px;font-size:clamp(8px,2.4vw,10px)}
+  #fanPageView .fanpage-tab-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:14px 0 18px;padding:4px;border-radius:15px}
+  #fanPageView .fanpage-tab-button{min-height:42px;padding:7px 3px;border-radius:11px;font-size:clamp(10px,2.8vw,12px);white-space:nowrap}
   #fanPageView .fanpage-tab-panel-heading{margin-bottom:12px}
   #fanPageView .fanpage-tab-panel-heading>p:last-child{font-size:11px}
 }
