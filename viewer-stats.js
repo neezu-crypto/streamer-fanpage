@@ -151,6 +151,8 @@ let subscriptionState = {
   expiresAt: 0,
   pending: false,
   pendingRequestId: '',
+  pendingRequestStatus: '',
+  pendingCanRenewCode: false,
   pendingVerificationMethod: '',
   pendingSoopId: '',
   pendingCodeExpiresAt: 0,
@@ -314,6 +316,8 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
       expiresAt: Number(data.expiresAt) || 0,
       pending: data.pending === true,
       pendingRequestId: typeof data.pendingRequestId === 'string' ? data.pendingRequestId : '',
+      pendingRequestStatus: typeof data.pendingRequestStatus === 'string' ? data.pendingRequestStatus : '',
+      pendingCanRenewCode: data.pendingCanRenewCode === true,
       pendingVerificationMethod: typeof data.pendingVerificationMethod === 'string' ? data.pendingVerificationMethod : '',
       pendingSoopId: typeof data.pendingSoopId === 'string' ? data.pendingSoopId : '',
       pendingCodeExpiresAt: Number(data.pendingCodeExpiresAt) || 0,
@@ -374,6 +378,8 @@ function renderSubscriptionDialogStatus(message = '') {
   const purchaseInfo = $('viewerSubscriptionPurchaseInfo');
   const hasPending = subscriptionState.pending && subscriptionState.pendingRequestId;
   const isCodeRequest = hasPending && subscriptionState.pendingVerificationMethod === 'subscriber-comment-code';
+  const isProcessing = isCodeRequest && subscriptionState.pendingRequestStatus === 'processing' &&
+    !subscriptionState.pendingCanRenewCode;
   const codeStep = $('viewerSubscriptionCodeStep');
   const keywordComparisonContext = !!pendingKeywordComparisonRequest;
   const comparisonContext = !!pendingComparisonRequest || keywordComparisonContext;
@@ -383,14 +389,14 @@ function renderSubscriptionDialogStatus(message = '') {
     : '통합 구독 인증';
   $('viewerSubscriptionDialog').querySelector('.eyebrow').textContent = comparisonContext ? 'RESULT ACCESS' : 'STREAMER SERIES MEMBERSHIP';
   purchaseInfo.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
-  codeStep.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !isCodeRequest);
+  codeStep.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !isCodeRequest || isProcessing);
   loginNote.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.accountProtected);
   submit.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
-  cancel.classList.toggle('hidden', subscriptionState.isAdmin || !hasPending);
+  cancel.classList.toggle('hidden', subscriptionState.isAdmin || !hasPending || isProcessing);
   $('viewerSubscriptionSoopId').required = !hasPending;
   $('viewerSubscriptionCode').textContent = subscriptionVerificationCode || '코드를 다시 발급해 주세요';
-  $('viewerSubscriptionRenewCode').classList.toggle('hidden', !isCodeRequest);
-  $('viewerSubscriptionCopyCode').classList.toggle('hidden', !subscriptionVerificationCode || !isCodeRequest);
+  $('viewerSubscriptionRenewCode').classList.toggle('hidden', !isCodeRequest || !subscriptionState.pendingCanRenewCode);
+  $('viewerSubscriptionCopyCode').classList.toggle('hidden', !subscriptionVerificationCode || !isCodeRequest || isProcessing);
   submit.textContent = '인증 코드 발급';
   if (subscriptionState.isAdmin) {
     status.textContent = '관리자 권한으로 기간별 최고 순간과 스트리머 비교를 포함한 모든 분석 기능을 이용할 수 있어요.';
@@ -402,12 +408,16 @@ function renderSubscriptionDialogStatus(message = '') {
       : '익명 계정은 구독 권한을 구매할 수 없어요. Google·Kakao 로그인 또는 스트리머 인증 후 이용해 주세요.';
   } else if (hasPending) {
     if (isCodeRequest) {
-      const expired = subscriptionState.pendingCodeExpiresAt > 0 && subscriptionState.pendingCodeExpiresAt <= Date.now();
-      const expires = subscriptionState.pendingCodeExpiresAt ? formatSubscriptionDate(subscriptionState.pendingCodeExpiresAt) : '';
-      status.textContent = expired
-        ? '신청은 유지 중이지만 인증 코드가 만료됐어요. 새 코드를 발급해 구독자 전용 게시글 댓글을 수정해 주세요.'
-        : `${subscriptionState.pendingSoopId} 방송국 인증 신청은 유지 중이에요. 탭을 닫아도 사라지지 않으니 발급된 코드를 구독자 전용 인증 게시글 댓글에 남겨 주세요${expires ? ` (코드 만료: ${expires})` : ''}.`;
-      $('viewerSubscriptionCodeHelp').textContent = '신청은 로그인한 계정에 저장되어 탭을 닫아도 유지됩니다. 코드는 한 번만 사용할 수 있고 30분 후 만료돼요. 다시 접속했을 때 코드가 보이지 않거나 만료됐다면 새 코드를 발급해 댓글을 수정해 주세요.';
+      if (isProcessing) {
+        status.textContent = '관리자가 구독 인증 신청을 확인 중이에요. 처리가 끝나면 신청 상태가 자동으로 갱신됩니다.';
+      } else {
+        const expired = subscriptionState.pendingCodeExpiresAt > 0 && subscriptionState.pendingCodeExpiresAt <= Date.now();
+        const expires = subscriptionState.pendingCodeExpiresAt ? formatSubscriptionDate(subscriptionState.pendingCodeExpiresAt) : '';
+        status.textContent = expired
+          ? '신청은 유지 중이지만 인증 코드가 만료됐어요. 새 코드를 발급해 구독자 전용 게시글 댓글을 수정해 주세요.'
+          : `${subscriptionState.pendingSoopId} 방송국 인증 신청은 유지 중이에요. 탭을 닫아도 사라지지 않으니 발급된 코드를 구독자 전용 인증 게시글 댓글에 남겨 주세요${expires ? ` (코드 만료: ${expires})` : ''}.`;
+        $('viewerSubscriptionCodeHelp').textContent = '신청은 로그인한 계정에 저장되어 탭을 닫아도 유지됩니다. 코드는 한 번만 사용할 수 있고 30분 후 만료돼요. 다시 접속했을 때 코드가 보이지 않거나 만료됐다면 새 코드를 발급해 댓글을 수정해 주세요.';
+      }
     } else {
       status.textContent = '이전 별풍선 방식 신청이 관리자 확인 대기 중입니다. 관리자가 기존 신청을 검토합니다.';
     }
@@ -2966,16 +2976,23 @@ $('viewerSubscriptionCopyCode').addEventListener('click', async (event) => {
 $('viewerSubscriptionRenewCode').addEventListener('click', async (event) => {
   const button = event.currentTarget;
   if (!subscriptionState.pendingRequestId || subscriptionState.pendingVerificationMethod !== 'subscriber-comment-code') return;
+  const requestId = subscriptionState.pendingRequestId;
   button.disabled = true;
   button.textContent = '새 코드 발급 중…';
   try {
-    const response = await callViewerSubscription({ action: 'renewCode', requestId: subscriptionState.pendingRequestId });
+    const response = await callViewerSubscription({ action: 'renewCode', requestId });
     const result = response.data || {};
     subscriptionVerificationCode = String(result.code || '');
     await refreshSubscriptionStatus();
     renderSubscriptionDialogStatus('새 인증 코드를 발급했어요. 이전 코드는 사용할 수 없으니 새 코드로 댓글을 수정해 주세요.');
   } catch (error) {
-    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '새 코드를 발급하지 못했어요.'));
+    const message = viewerStatsErrorMessage(error, '새 코드를 발급하지 못했어요.');
+    await refreshSubscriptionStatus({ resumeComparison: false, resumeKeywordComparison: false });
+    if (subscriptionState.pending && subscriptionState.pendingRequestId === requestId) {
+      renderSubscriptionDialogStatus(message);
+    } else {
+      renderSubscriptionDialogStatus();
+    }
   } finally {
     button.disabled = false;
     button.textContent = '새 코드 발급';

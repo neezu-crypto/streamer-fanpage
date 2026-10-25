@@ -128,6 +128,13 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
       expiresAt: info.expiresAt,
       pending: isPending,
       pendingRequestId: isPending ? info.pendingRequestId : '',
+      pendingRequestStatus: isPending ? String(pendingRequest.status || '') : '',
+      pendingCanRenewCode: isPending && pendingRequest.verificationMethod === 'subscriber-comment-code' && (
+        pendingRequest.status === 'pending' || (
+          pendingRequest.status === 'processing' && Number(pendingRequest.processingAt) > 0 &&
+          now - Number(pendingRequest.processingAt) >= PROCESSING_STALE_MS
+        )
+      ),
       pendingRequestedAt: isPending ? Math.max(0, Number(pendingRequest.requestedAt) || 0) : 0,
       pendingVerificationMethod: isPending ? String(pendingRequest.verificationMethod || 'star-donation') : '',
       pendingSoopId: isPending ? String(pendingRequest.soopId || pendingRequest.donorSoopId || '').slice(0, 20) : '',
@@ -206,7 +213,9 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     const codeExpiresAt = now + VERIFICATION_CODE_TTL_MS;
     const requestRef = db.ref(`${REQUESTS_PATH}/${requestId}`);
     const result = await requestRef.transaction((current) => {
-      if (!current || current.requesterUid !== uid || current.status !== 'pending' ||
+      const staleProcessing = current && current.status === 'processing' &&
+        Number(current.processingAt) > 0 && now - Number(current.processingAt) >= PROCESSING_STALE_MS;
+      if (!current || current.requesterUid !== uid || (current.status !== 'pending' && !staleProcessing) ||
           current.verificationMethod !== 'subscriber-comment-code') return;
       const lastIssuedAt = Number(current.codeIssuedAt) || Number(current.requestedAt) || 0;
       const currentCodeExpiresAt = Number(current.codeExpiresAt) || 0;
@@ -215,6 +224,9 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
       if (currentCodeExpiresAt > now && now - lastIssuedAt < VERIFICATION_CODE_COOLDOWN_MS) return;
       return {
         ...current,
+        status: 'pending',
+        processingAt: null,
+        processingToken: null,
         verificationCodeHash: verificationCodeHash(requestId, code),
         codeExpiresAt,
         codeIssuedAt: now,
@@ -222,6 +234,10 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     });
     if (!result.committed) {
       const current = result.snapshot.val();
+      if (current && current.requesterUid === uid && current.status === 'processing' &&
+          current.verificationMethod === 'subscriber-comment-code') {
+        throw new HttpsError('failed-precondition', '관리자가 신청을 확인 중이에요. 확인이 끝난 뒤 상태를 새로고침해 주세요.');
+      }
       if (!current || current.requesterUid !== uid || current.status !== 'pending' ||
           current.verificationMethod !== 'subscriber-comment-code') {
         throw new HttpsError('failed-precondition', '코드를 다시 발급할 수 있는 대기 중 신청이 없습니다. 신청 상태를 새로고침해 주세요.');
@@ -234,6 +250,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
         { retryAfterSeconds: Math.max(1, retryAfterSeconds) },
       );
     }
+    await db.ref(`${PENDING_PATH}/${requestId}/status`).set('pending').catch(() => null);
     return { code, codeExpiresAt };
   }
 
