@@ -151,11 +151,15 @@ let subscriptionState = {
   expiresAt: 0,
   pending: false,
   pendingRequestId: '',
+  pendingVerificationMethod: '',
+  pendingSoopId: '',
+  pendingCodeExpiresAt: 0,
   pendingDonorSoopId: '',
   pendingBalloonCost: 33,
   pendingDonationCompletedAt: 0,
   lastRequestStatus: '',
 };
+let subscriptionVerificationCode = '';
 const viewerStatsMemoryCache = new Map();
 const viewerStatsInProgress = new Map();
 const viewerStatsStaticCache = new Map();
@@ -310,6 +314,9 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
       expiresAt: Number(data.expiresAt) || 0,
       pending: data.pending === true,
       pendingRequestId: typeof data.pendingRequestId === 'string' ? data.pendingRequestId : '',
+      pendingVerificationMethod: typeof data.pendingVerificationMethod === 'string' ? data.pendingVerificationMethod : '',
+      pendingSoopId: typeof data.pendingSoopId === 'string' ? data.pendingSoopId : '',
+      pendingCodeExpiresAt: Number(data.pendingCodeExpiresAt) || 0,
       pendingDonorSoopId: typeof data.pendingDonorSoopId === 'string' ? data.pendingDonorSoopId : '',
       pendingBalloonCost: Number(data.pendingBalloonCost) || 33,
       pendingDonationCompletedAt: Number(data.pendingDonationCompletedAt) || 0,
@@ -331,8 +338,8 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
       comparisonGateWaiting = true;
       setComparisonStatus(subscriptionState.accountProtected
         ? subscriptionState.pending
-          ? `구독 신청 승인 대기 중이에요. 관리자가 ${subscriptionState.pendingBalloonCost}개 후원을 확인해 승인하면 선택한 스트리머와 날짜의 비교 결과가 열립니다.`
-          : '로그인이 확인됐어요. 별풍선 33개 구독을 신청하면 승인 후 비교 결과가 자동으로 열립니다.'
+          ? '구독 인증 신청 승인 대기 중이에요. 관리자가 SOOP 구독 상태를 확인해 승인하면 선택한 스트리머와 날짜의 비교 결과가 열립니다.'
+          : '로그인이 확인됐어요. 방송국 구독 인증을 신청하면 승인 후 비교 결과가 자동으로 열립니다.'
         : '선택한 스트리머와 날짜는 유지돼요. 새 탭에서 로그인한 뒤 이 화면으로 돌아와 주세요.');
       renderComparisonSelection();
     }
@@ -340,8 +347,8 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
       keywordComparisonGateWaiting = true;
       setKeywordComparisonStatus(subscriptionState.accountProtected
         ? subscriptionState.pending
-          ? `구독 신청 승인 대기 중이에요. 관리자가 ${subscriptionState.pendingBalloonCost}개 후원을 확인해 승인하면 키워드 고점 비교 결과가 열립니다.`
-          : '로그인이 확인됐어요. 별풍선 33개 구독을 신청하면 승인 후 키워드 고점 비교 결과가 자동으로 열립니다.'
+          ? '구독 인증 신청 승인 대기 중이에요. 관리자가 SOOP 구독 상태를 확인해 승인하면 키워드 고점 비교 결과가 열립니다.'
+          : '로그인이 확인됐어요. 방송국 구독 인증을 신청하면 승인 후 키워드 고점 비교 결과가 자동으로 열립니다.'
         : '선택한 키워드와 스트리머는 유지돼요. 로그인한 뒤 이 화면으로 돌아와 주세요.');
       renderKeywordComparisonSelection();
     }
@@ -365,38 +372,26 @@ function renderSubscriptionDialogStatus(message = '') {
   const loginNote = $('viewerSubscriptionLoginNote');
   const offer = $('viewerSubscriptionOffer');
   const purchaseInfo = $('viewerSubscriptionPurchaseInfo');
-  const donationStep = $('viewerSubscriptionDonationStep');
-  const donationHelp = $('viewerSubscriptionDonationHelp');
-  const donationLink = $('viewerSubscriptionDonationLink');
-  const donationComplete = $('viewerSubscriptionDonationComplete');
   const hasPending = subscriptionState.pending && subscriptionState.pendingRequestId;
-  const donorDetailsAvailable = !!subscriptionState.pendingDonorSoopId;
-  const donationCompleted = subscriptionState.pendingDonationCompletedAt > 0;
-  const pendingBalloonCost = Number(subscriptionState.pendingBalloonCost) || 33;
+  const isCodeRequest = hasPending && subscriptionState.pendingVerificationMethod === 'subscriber-comment-code';
+  const codeStep = $('viewerSubscriptionCodeStep');
   const keywordComparisonContext = !!pendingKeywordComparisonRequest;
   const comparisonContext = !!pendingComparisonRequest || keywordComparisonContext;
   offer.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.subscribed || !!hasPending);
   $('viewerSubscriptionDialogTitle').textContent = comparisonContext
     ? keywordComparisonContext ? '키워드 비교 결과 확인' : '비교 결과 확인'
-    : '고점체크 구독';
-  $('viewerSubscriptionDialog').querySelector('.eyebrow').textContent = comparisonContext ? 'RESULT ACCESS' : '30-DAY PASS';
+    : '통합 구독 인증';
+  $('viewerSubscriptionDialog').querySelector('.eyebrow').textContent = comparisonContext ? 'RESULT ACCESS' : 'STREAMER SERIES MEMBERSHIP';
   purchaseInfo.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
-  donationStep.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !hasPending);
+  codeStep.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !isCodeRequest);
   loginNote.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.accountProtected);
   submit.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
   cancel.classList.toggle('hidden', subscriptionState.isAdmin || !hasPending);
-  donationLink.classList.toggle('hidden', !donorDetailsAvailable);
-  donationComplete.classList.toggle('hidden', !donorDetailsAvailable || donationCompleted);
-  donationComplete.disabled = false;
-  donationComplete.textContent = '후원 완료 알리기';
-  if (!donorDetailsAvailable) {
-    donationHelp.textContent = '이 신청에는 후원자 SOOP 아이디가 없습니다. 후원 내역은 관리자가 수동으로 확인합니다.';
-  } else if (donationCompleted) {
-    donationHelp.textContent = '후원 완료 알림을 전달했어요. 관리자가 후원 내역을 확인한 뒤 30일 이용권을 수동 승인합니다.';
-  } else {
-    donationHelp.textContent = `신청한 SOOP 계정으로 별풍선 ${pendingBalloonCost}개를 후원한 뒤 완료 알리기를 눌러 주세요. 후원 알림은 자동 감시·자동 승인하지 않으며, 관리자가 내역을 확인해 수동 승인합니다.`;
-  }
-  submit.textContent = subscriptionState.subscribed ? '신청 등록 · 30일 연장' : '구독 신청 등록';
+  $('viewerSubscriptionSoopId').required = !hasPending;
+  $('viewerSubscriptionCode').textContent = subscriptionVerificationCode || '코드를 다시 발급해 주세요';
+  $('viewerSubscriptionRenewCode').classList.toggle('hidden', !isCodeRequest);
+  $('viewerSubscriptionCopyCode').classList.toggle('hidden', !subscriptionVerificationCode || !isCodeRequest);
+  submit.textContent = '인증 코드 발급';
   if (subscriptionState.isAdmin) {
     status.textContent = '관리자 권한으로 기간별 최고 순간과 스트리머 비교를 포함한 모든 분석 기능을 이용할 수 있어요.';
   } else if (message) {
@@ -406,19 +401,24 @@ function renderSubscriptionDialogStatus(message = '') {
       ? '선택한 비교 조건은 유지됩니다. Google·Kakao 로그인 또는 스트리머 인증 후 구독을 신청할 수 있어요.'
       : '익명 계정은 구독 권한을 구매할 수 없어요. Google·Kakao 로그인 또는 스트리머 인증 후 이용해 주세요.';
   } else if (hasPending) {
-    status.textContent = donationCompleted
-      ? '후원 완료 알림을 접수했습니다. 관리자가 후원 내역을 확인한 뒤 수동 승인하면 신청한 분석 결과가 열립니다.'
-      : donorDetailsAvailable
-        ? `구독 신청 승인 대기 중이에요. 운영자 방송국에 별풍선 ${pendingBalloonCost}개를 후원한 뒤 완료 알리기를 눌러 주세요. 관리자가 후원 내역을 확인해 수동 승인합니다.`
-        : '이전 신청이 관리자 확인 대기 중입니다. 후원 내역을 수동 확인한 뒤 승인합니다.';
+    if (isCodeRequest) {
+      const expired = subscriptionState.pendingCodeExpiresAt > 0 && subscriptionState.pendingCodeExpiresAt <= Date.now();
+      const expires = subscriptionState.pendingCodeExpiresAt ? formatSubscriptionDate(subscriptionState.pendingCodeExpiresAt) : '';
+      status.textContent = expired
+        ? '인증 코드가 만료됐어요. 새 코드를 발급해 구독자 전용 게시글에 다시 댓글로 남겨 주세요.'
+        : `${subscriptionState.pendingSoopId} 방송국 인증을 기다리고 있어요. 발급된 코드를 구독자 전용 인증 게시글에 댓글로 남겨 주세요${expires ? ` (코드 만료: ${expires})` : ''}.`;
+      $('viewerSubscriptionCodeHelp').textContent = '이 코드는 한 번만 사용할 수 있고 30분 후 만료됩니다. 코드를 잃어버렸거나 만료되면 새 코드를 발급해 기존 댓글을 수정해 주세요.';
+    } else {
+      status.textContent = '이전 별풍선 방식 신청이 관리자 확인 대기 중입니다. 관리자가 기존 신청을 검토합니다.';
+    }
   } else if (subscriptionState.subscribed) {
-    status.textContent = formatSubscriptionDate(subscriptionState.expiresAt) + '까지 구독 중이에요. 미리 갱신해도 남은 기간에 30일이 더해집니다.';
+    status.textContent = formatSubscriptionDate(subscriptionState.expiresAt) + '까지 스트리머 시리즈 통합 구독 중이에요.';
   } else {
     status.textContent = comparisonContext
       ? keywordComparisonContext
-        ? '후원자 SOOP 정보를 입력해 신청한 뒤 관리자가 후원 내역을 확인해 승인하면 키워드 고점 비교 결과가 열립니다.'
-        : '후원자 SOOP 정보를 입력해 신청한 뒤 관리자가 후원 내역을 확인해 승인하면 비교 결과가 열립니다.'
-      : '신청한 SOOP 계정으로 별풍선 33개를 후원해 주세요. 후원 알림은 자동 감시·자동 승인하지 않으며, 완료 알리기를 전달하면 관리자가 후원 내역을 확인해 30일 이용권을 수동 승인합니다.';
+        ? '본인 SOOP 아이디로 인증 코드를 신청하고 게시글 댓글로 인증해 주세요. 관리자가 확인해 승인하면 키워드 고점 비교 결과가 열립니다.'
+        : '본인 SOOP 아이디로 인증 코드를 신청하고 게시글 댓글로 인증해 주세요. 관리자가 확인해 승인하면 비교 결과가 열립니다.'
+      : '본인 SOOP 아이디로 인증 코드를 신청한 뒤 구독자 전용 인증 게시글 댓글로 남겨 주세요. 관리자가 댓글 작성자와 구독 상태를 확인합니다.';
   }
 }
 
@@ -1829,7 +1829,7 @@ async function runComparison() {
     comparisonGateWaiting = true;
     setComparisonStatus(subscriptionState.accountProtected
       ? subscriptionState.pending
-        ? '구독 신청 승인 대기 중이에요. 승인되면 선택한 스트리머와 날짜의 비교 결과가 자동으로 열립니다.'
+        ? '구독 인증 신청 승인 대기 중이에요. 승인되면 선택한 스트리머와 날짜의 비교 결과가 자동으로 열립니다.'
         : '선택한 스트리머와 날짜는 유지됩니다. 로그인 계정에 구독을 신청하고 승인을 기다려 주세요.'
       : '선택한 스트리머와 날짜는 유지됩니다. 로그인한 뒤 구독 신청을 진행해 주세요.');
     renderComparisonSelection();
@@ -2204,7 +2204,7 @@ async function runKeywordComparison() {
     keywordComparisonGateWaiting = true;
     setKeywordComparisonStatus(subscriptionState.accountProtected
       ? subscriptionState.pending
-        ? '구독 신청 승인 대기 중이에요. 승인되면 키워드 고점 비교 결과가 자동으로 열립니다.'
+        ? '구독 인증 신청 승인 대기 중이에요. 승인되면 키워드 고점 비교 결과가 자동으로 열립니다.'
         : '선택한 키워드와 스트리머는 유지됩니다. 로그인 계정에 구독을 신청해 주세요.'
       : '선택한 키워드와 스트리머는 유지됩니다. 로그인한 뒤 구독 신청을 진행해 주세요.');
     renderKeywordComparisonSelection();
@@ -2927,24 +2927,20 @@ $('viewerSubscriptionForm').addEventListener('submit', async (event) => {
     renderSubscriptionDialogStatus('로그인 후 구독 신청을 할 수 있어요. 새 탭에서 로그인한 뒤 상태를 새로고침해 주세요.');
     return;
   }
-  const nickname = $('viewerSubscriptionNickname').value.trim();
-  if (!nickname || !$('viewerSubscriptionNickname').reportValidity()) return;
-  const donorSoopId = $('viewerSubscriptionSoopId').value.trim().toLowerCase();
-  if (!donorSoopId || !$('viewerSubscriptionSoopId').reportValidity()) return;
+  const soopId = $('viewerSubscriptionSoopId').value.trim().toLowerCase();
+  if (!soopId || !$('viewerSubscriptionSoopId').reportValidity()) return;
   const submit = $('viewerSubscriptionSubmit');
   submit.disabled = true;
   renderSubscriptionDialogStatus('신청을 등록하고 있어요.');
   try {
-    const response = await callViewerSubscription({ action: 'request', nickname, donorSoopId });
+    const response = await callViewerSubscription({ action: 'request', soopId });
     const result = response.data || {};
+    subscriptionVerificationCode = result.action === 'pending' ? String(result.code || '') : '';
     await refreshSubscriptionStatus();
     renderSubscriptionDialogStatus(result.action === 'already-pending'
-      ? '이미 대기 중인 신청이 있어요. 현재 신청 정보를 확인해 주세요.'
-      : '신청을 등록했어요. 운영자 방송국에 33개를 후원한 뒤 완료 알리기를 눌러 주세요. 관리자가 후원 내역을 확인해 수동 승인합니다.');
-    if (result.action === 'pending' || result.action === 'already-pending') {
-      $('viewerSubscriptionNickname').value = '';
-      $('viewerSubscriptionSoopId').value = '';
-    }
+      ? '이미 대기 중인 신청이 있어요. 새 코드가 필요하면 아래 버튼으로 발급해 주세요.'
+      : '인증 코드를 발급했어요. 구독자 전용 인증 게시글에 댓글로 남겨 주세요.');
+    if (result.action === 'pending' || result.action === 'already-pending') $('viewerSubscriptionSoopId').value = '';
   } catch (error) {
     renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '구독 신청을 접수하지 못했어요.'));
   } finally {
@@ -2953,34 +2949,49 @@ $('viewerSubscriptionForm').addEventListener('submit', async (event) => {
   }
 });
 
-$('viewerSubscriptionDonationComplete').addEventListener('click', async (event) => {
+$('viewerSubscriptionCopyCode').addEventListener('click', async (event) => {
   const button = event.currentTarget;
-  if (!subscriptionState.pendingRequestId || !subscriptionState.pendingDonorSoopId || subscriptionState.pendingDonationCompletedAt) return;
+  if (!subscriptionVerificationCode) return;
   button.disabled = true;
-  button.textContent = '후원 완료 시각을 알리고 있어요…';
   try {
-    await callViewerSubscription({ action: 'donationComplete', requestId: subscriptionState.pendingRequestId });
-    await refreshSubscriptionStatus();
-    renderSubscriptionDialogStatus('후원 완료 알림을 전달했어요. 관리자가 후원 내역을 확인해 수동 승인합니다.');
+    await navigator.clipboard.writeText(subscriptionVerificationCode);
+    renderSubscriptionDialogStatus('인증 코드를 복사했어요. 구독자 전용 게시글 댓글에 붙여 넣어 주세요.');
   } catch (error) {
-    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '후원 완료 알림을 전달하지 못했어요.'));
+    renderSubscriptionDialogStatus('코드를 복사하지 못했어요. 코드를 길게 눌러 직접 복사해 주세요.');
   } finally {
     button.disabled = false;
-    renderSubscriptionDialogStatus();
+  }
+});
+
+$('viewerSubscriptionRenewCode').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  if (!subscriptionState.pendingRequestId || subscriptionState.pendingVerificationMethod !== 'subscriber-comment-code') return;
+  button.disabled = true;
+  button.textContent = '새 코드 발급 중…';
+  try {
+    const response = await callViewerSubscription({ action: 'renewCode', requestId: subscriptionState.pendingRequestId });
+    const result = response.data || {};
+    subscriptionVerificationCode = String(result.code || '');
+    await refreshSubscriptionStatus();
+    renderSubscriptionDialogStatus('새 인증 코드를 발급했어요. 이전 코드는 사용할 수 없으니 새 코드로 댓글을 수정해 주세요.');
+  } catch (error) {
+    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '새 코드를 발급하지 못했어요.'));
+  } finally {
+    button.disabled = false;
+    button.textContent = '새 코드 발급';
   }
 });
 
 $('viewerSubscriptionCancel').addEventListener('click', async () => {
-  const cancelMessage = subscriptionState.pendingDonationCompletedAt
-    ? '이미 후원 완료를 알린 신청입니다. 취소하면 대기 신청이 철회됩니다. 취소할까요?'
-    : '구독 신청을 취소할까요? 이미 후원했다면 취소하지 말고 관리자에게 문의해 주세요.';
+  const cancelMessage = '구독 인증 신청과 발급 코드를 취소할까요?';
   if (!subscriptionState.pendingRequestId || !confirm(cancelMessage)) return;
   const cancel = $('viewerSubscriptionCancel');
   cancel.disabled = true;
   try {
     await callViewerSubscription({ action: 'cancel', requestId: subscriptionState.pendingRequestId });
+    subscriptionVerificationCode = '';
     await refreshSubscriptionStatus();
-    renderSubscriptionDialogStatus('신청을 취소했어요. 후원 후 다시 신청할 수 있습니다.');
+    renderSubscriptionDialogStatus('인증 신청을 취소했어요.');
   } catch (error) {
     renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '신청을 취소하지 못했어요.'));
   } finally {

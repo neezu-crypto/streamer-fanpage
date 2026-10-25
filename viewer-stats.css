@@ -258,7 +258,12 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 .viewer-stats-shell .footer{gap:16px;border-top:1px solid var(--viewer-line);background:#fff;color:#7a879a;font-size:11px;letter-spacing:0}
 .viewer-stats-shell .footer a{color:#596981;text-decoration:none}
 .viewer-stats-shell .footer a:hover{color:var(--viewer-blue);text-decoration:underline}
+.viewer-subscription-code-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.viewer-subscription-code-row code{display:flex;align-items:center;justify-content:center;min-height:45px;min-width:155px;flex:1;padding:8px 12px;border:1px dashed #e6a0b8;border-radius:9px;background:#fff7fa;color:#a34166;font:700 21px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.16em}
+.viewer-subscription-code-row .button{min-height:40px;padding:8px 10px;font-size:12px}
+.viewer-subscription-donation-step .viewer-subscription-code-row~.button{margin-top:2px}
 .viewer-subscription-dialog{border-color:#dce2ec;background:#fff;color:var(--viewer-ink);box-shadow:0 24px 90px #17243a33}
+.viewer-subscription-code-row code{border-color:#e7bdcb;background:#fff8fa;color:#9b3f60}
 .viewer-subscription-dialog::backdrop{background:#18243acc;backdrop-filter:blur(4px)}
 .viewer-subscription-dialog-card{scrollbar-color:#c0c9d8 #f2f4f8}
 .viewer-subscription-close{border-color:#e1e6ef;background:#f8f9fc;color:#485771}
