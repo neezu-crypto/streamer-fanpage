@@ -209,7 +209,10 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
       if (!current || current.requesterUid !== uid || current.status !== 'pending' ||
           current.verificationMethod !== 'subscriber-comment-code') return;
       const lastIssuedAt = Number(current.codeIssuedAt) || Number(current.requestedAt) || 0;
-      if (now - lastIssuedAt < VERIFICATION_CODE_COOLDOWN_MS) return;
+      const currentCodeExpiresAt = Number(current.codeExpiresAt) || 0;
+      // An expired code cannot be used, so let the requester replace it immediately.
+      // Keep the cooldown only while a previously issued code is still valid.
+      if (currentCodeExpiresAt > now && now - lastIssuedAt < VERIFICATION_CODE_COOLDOWN_MS) return;
       return {
         ...current,
         verificationCodeHash: verificationCodeHash(requestId, code),
@@ -217,7 +220,20 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
         codeIssuedAt: now,
       };
     });
-    if (!result.committed) throw new HttpsError('failed-precondition', '코드를 다시 발급할 수 없어요. 1분 후 신청 상태를 새로고침해 주세요.');
+    if (!result.committed) {
+      const current = result.snapshot.val();
+      if (!current || current.requesterUid !== uid || current.status !== 'pending' ||
+          current.verificationMethod !== 'subscriber-comment-code') {
+        throw new HttpsError('failed-precondition', '코드를 다시 발급할 수 있는 대기 중 신청이 없습니다. 신청 상태를 새로고침해 주세요.');
+      }
+      const lastIssuedAt = Number(current.codeIssuedAt) || Number(current.requestedAt) || 0;
+      const retryAfterSeconds = Math.ceil((VERIFICATION_CODE_COOLDOWN_MS - (now - lastIssuedAt)) / 1000);
+      throw new HttpsError(
+        'resource-exhausted',
+        '현재 인증 코드가 아직 유효해요. 잠시 후 다시 발급할 수 있습니다.',
+        { retryAfterSeconds: Math.max(1, retryAfterSeconds) },
+      );
+    }
     return { code, codeExpiresAt };
   }
 
