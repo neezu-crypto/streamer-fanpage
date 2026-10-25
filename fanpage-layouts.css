@@ -1409,6 +1409,30 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
   #fanPageView.fanpage-layout-1 .affiliate-promo-disclosure{font-size:8px}
 }
 
+/* Keep the custom Tamagotchi application in the pastel jelly card system. */
+#fanPageView.fanpage-layout-1 .tamagotchi-section{border-color:#dbe4f8;background:linear-gradient(145deg,#fff,#f8faff);box-shadow:0 6px 0 #dce5f4,0 14px 28px #6e7e9c0b;color:#51465d}
+#fanPageView.fanpage-layout-1 .tamagotchi-section>.eyebrow{color:#6484cf}
+#fanPageView.fanpage-layout-1 .tamagotchi-section-description,#fanPageView.fanpage-layout-1 .tamagotchi-form-intro,#fanPageView.fanpage-layout-1 .tamagotchi-state-message{color:#81758b}
+#fanPageView.fanpage-layout-1 .tamagotchi-empty-state,#fanPageView.fanpage-layout-1 .tamagotchi-approved-card{border-color:#dbe4f8;background:radial-gradient(ellipse at 82% 8%,#c5d6ff5c,transparent 45%),linear-gradient(145deg,#fff,#f7f9ff);box-shadow:0 4px 0 #dce5f4;color:#51465d}
+#fanPageView.fanpage-layout-1 .tamagotchi-placeholder-symbol{border-color:#d7e1ff;background:#edf2ff;color:#6484cf}
+#fanPageView.fanpage-layout-1 .tamagotchi-empty-state p,#fanPageView.fanpage-layout-1 .tamagotchi-approved-status{color:#81758b}
+#fanPageView.fanpage-layout-1 .tamagotchi-approved-description{color:#51465d}
+#fanPageView.fanpage-layout-1 .tamagotchi-tag-list span{border-color:#dbe4f8;background:#f4f7ff;color:#5974b3}
+#fanPageView.fanpage-layout-1 .tamagotchi-application-status{border-color:#dbe4f8;background:#f8faff;color:#51465d}
+#fanPageView.fanpage-layout-1 .tamagotchi-application-status span{color:#81758b}
+#fanPageView.fanpage-layout-1 .tamagotchi-application-status.is-pending{border-color:#f1dfab;background:#fffaf0}
+#fanPageView.fanpage-layout-1 .tamagotchi-application-status.is-rejected{border-color:#f0cdd8;background:#fff7fa}
+#fanPageView.fanpage-layout-1 .tamagotchi-application-form{border-color:#dbe4f8;background:#fff;color:#51465d;box-shadow:0 4px 0 #e5eaf5}
+#fanPageView.fanpage-layout-1 .tamagotchi-field,#fanPageView.fanpage-layout-1 .tamagotchi-interactions legend{color:#51465d}
+#fanPageView.fanpage-layout-1 .tamagotchi-field input,#fanPageView.fanpage-layout-1 .tamagotchi-field textarea{border-color:#d9dcec;background:#fff;color:#51465d}
+#fanPageView.fanpage-layout-1 .tamagotchi-field input:focus,#fanPageView.fanpage-layout-1 .tamagotchi-field textarea:focus{border-color:#8caaf0;box-shadow:0 0 0 3px #8caaf022}
+#fanPageView.fanpage-layout-1 .tamagotchi-field input::placeholder,#fanPageView.fanpage-layout-1 .tamagotchi-field textarea::placeholder{color:#a499ad}
+#fanPageView.fanpage-layout-1 .tamagotchi-interactions{border-color:#dbe4f8}
+#fanPageView.fanpage-layout-1 .tamagotchi-interaction-option{border-color:#e5e9f5;background:#fbfcff}
+#fanPageView.fanpage-layout-1 .tamagotchi-interaction-option strong{color:#51465d}
+#fanPageView.fanpage-layout-1 .tamagotchi-interaction-option small,#fanPageView.fanpage-layout-1 .tamagotchi-form-status{color:#81758b}
+#fanPageView.fanpage-layout-1 .tamagotchi-apply-button{border-color:#86a5ed;background:linear-gradient(180deg,#bfd2ff,#94b2f3);box-shadow:0 4px 0 #83a1e3;color:#304b83}
+
 #fanPageView.fanpage-layout-1 .rolling-paper-section{border-color:#dbe4f8;background:linear-gradient(145deg,#fff 0%,#f8faff 100%);box-shadow:0 7px 0 #dce5f4,0 14px 28px #6e7e9c10}
 #fanPageView.fanpage-layout-1 .rolling-paper-heading h2{color:#51465d}
 #fanPageView.fanpage-layout-1 .rolling-paper-subtitle,

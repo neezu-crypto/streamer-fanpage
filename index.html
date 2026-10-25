@@ -11,8 +11,8 @@
   <link rel="preload" as="image" href="assets/fanpage-kawaii/cat-paw-close.svg" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/GowunDodum-Regular.woff2?v=20261024-korean-fonts" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/Jua-Regular.woff2?v=20261024-korean-fonts" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css?v=20261024-memory-thumbnails">
-  <link rel="stylesheet" href="fanpage-layouts.css?v=20261024-memory-thumbnails">
+  <link rel="stylesheet" href="style.css?v=20261026-tamagotchi-application">
+  <link rel="stylesheet" href="fanpage-layouts.css?v=20261026-tamagotchi-application">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -238,6 +238,23 @@
         <p class="admin-viewer-subscription-status" id="viewerSubscriptionAdminStatus" role="status" aria-live="polite">구독 신청을 불러옵니다.</p>
         <div class="admin-viewer-subscription-list" id="viewerSubscriptionAdminList"></div>
       </section>
+      <section class="admin-tamagotchi-applications" aria-labelledby="adminTamagotchiApplicationsTitle">
+        <div class="admin-viewer-usage-heading">
+          <h3 id="adminTamagotchiApplicationsTitle">다마고치 디자인 신청</h3>
+          <div class="admin-tamagotchi-toolbar">
+            <label class="hidden" for="adminTamagotchiApplicationFilter">신청 상태 필터</label>
+            <select id="adminTamagotchiApplicationFilter" aria-label="다마고치 신청 상태 필터">
+              <option value="all">전체 신청</option>
+              <option value="pending">검토 대기</option>
+              <option value="approved">승인</option>
+              <option value="rejected">보완 요청</option>
+            </select>
+            <button class="button" id="refreshTamagotchiApplications" type="button">↻ 신청 새로고침</button>
+          </div>
+        </div>
+        <p class="admin-tamagotchi-admin-status" id="adminTamagotchiApplicationStatus" role="status" aria-live="polite">접수된 다마고치 신청서를 불러오세요.</p>
+        <div class="admin-tamagotchi-application-list" id="adminTamagotchiApplicationList"></div>
+      </section>
       <section class="admin-design-feedback" aria-labelledby="adminDesignFeedbackTitle">
         <div class="admin-viewer-usage-heading">
           <h3 id="adminDesignFeedbackTitle">디자인 문의 / 건의</h3>
@@ -249,7 +266,7 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261024-loading-speed-public-bootstrap"></script>
+  <script type="module" src="app.js?v=20261026-tamagotchi-application"></script>
   <script type="module" src="https://neezu-crypto.github.io/streamer-game-series-shop/game-series-emotes.js?game=streamerFanPage&amp;v=20261021-decoration-layer-height"></script>
 </body>
 </html>

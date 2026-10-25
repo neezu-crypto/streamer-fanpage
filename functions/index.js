@@ -79,6 +79,8 @@ const FANPAGE_PLAYED_GAMES_MAX_ITEMS = 100;
 const FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS = 20;
 const FANPAGE_MEMORY_MOMENTS_MAX_ITEMS = 50;
 const FANPAGE_MEMORY_MOMENT_TITLE_MAX_LENGTH = 80;
+const FANPAGE_TAMAGOTCHI_MAX_APPLICATIONS_PER_STREAMER = 20;
+const FANPAGE_TAMAGOTCHI_INTERACTIONS = new Set(['pet', 'feed', 'play', 'talk', 'live', 'idle', 'sound']);
 const FANPAGE_ROLLING_PAPER_MAX_ITEMS = 300;
 const FANPAGE_ROLLING_PAPER_MAX_LENGTH = 300;
 const FANPAGE_ROLLING_PAPER_MAX_NICKNAME_LENGTH = 20;
@@ -5772,6 +5774,210 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
   }
 
   throw new HttpsError('invalid-argument', '플레이한 게임 요청을 확인해 주세요.');
+});
+
+function normalizeTamagotchiApplication(id, value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const status = ['pending', 'approved', 'rejected'].includes(value.status) ? value.status : '';
+  const characterName = typeof value.characterName === 'string' ? value.characterName.slice(0, 24) : '';
+  const visualConcept = typeof value.visualConcept === 'string' ? value.visualConcept.slice(0, 800) : '';
+  const interactionPreferences = Array.isArray(value.interactionPreferences)
+    ? [...new Set(value.interactionPreferences.filter((item) => FANPAGE_TAMAGOTCHI_INTERACTIONS.has(item)))].slice(0, 7)
+    : [];
+  const createdAt = Number(value.createdAt);
+  if (!status || !characterName || !visualConcept || !interactionPreferences.length || !Number.isFinite(createdAt)) return null;
+  const referenceImageUrl = typeof value.referenceImageUrl === 'string' ? value.referenceImageUrl.slice(0, 500) : '';
+  return {
+    id,
+    streamerId: String(value.streamerId || '').toLowerCase(),
+    streamerNickname: String(value.streamerNickname || '').slice(0, 40),
+    streamerSoopId: String(value.streamerSoopId || '').slice(0, 20),
+    characterName,
+    visualConcept,
+    interactionPreferences,
+    referenceImageUrl,
+    notes: typeof value.notes === 'string' ? value.notes.slice(0, 1000) : '',
+    status,
+    createdAt,
+    updatedAt: Number(value.updatedAt) || createdAt,
+    reviewedAt: Number(value.reviewedAt) || 0,
+    reviewNote: typeof value.reviewNote === 'string' ? value.reviewNote.slice(0, 1000) : '',
+  };
+}
+
+exports.streamerFanPageTamagotchiApplications = onCall({ maxInstances: 10 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  const action = String(data.action || 'status');
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(streamerId)) throw new HttpsError('invalid-argument', '스트리머 팬페이지를 확인해 주세요.');
+
+  const [target, verified, isAdmin] = await Promise.all([
+    findVerifiedBySoopId(streamerId),
+    findVerifiedByUid(uid),
+    isAdminUid(uid),
+  ]);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  const isStreamerOwner = !!(verified && verified.streamer.id === target.streamer.id);
+  const applicationsRef = db.ref(`streamerFanPageTamagotchiApplications/${target.streamer.id}`);
+  const profileRef = db.ref(`streamerFanPageTamagotchiProfiles/${target.streamer.id}`);
+
+  if (action === 'status') {
+    const [applicationsSnapshot, profileSnapshot] = await Promise.all([applicationsRef.get(), profileRef.get()]);
+    const applications = Object.entries(applicationsSnapshot.val() || {})
+      .map(([id, value]) => normalizeTamagotchiApplication(id, value))
+      .filter(Boolean)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    const profileValue = profileSnapshot.val();
+    const profile = profileValue && profileValue.status === 'approved'
+      ? {
+        characterName: String(profileValue.characterName || '').slice(0, 24),
+        visualConcept: String(profileValue.visualConcept || '').slice(0, 800),
+        interactionPreferences: Array.isArray(profileValue.interactionPreferences)
+          ? [...new Set(profileValue.interactionPreferences.filter((item) => FANPAGE_TAMAGOTCHI_INTERACTIONS.has(item)))].slice(0, 7)
+          : [],
+      }
+      : null;
+    const ownApplication = isStreamerOwner || isAdmin ? applications[0] || null : null;
+    return { application: ownApplication, profile };
+  }
+
+  if (action === 'submit') {
+    if (!isStreamerOwner) {
+      throw new HttpsError('permission-denied', '인증된 스트리머 본인만 자신의 팬페이지에 다마고치를 신청할 수 있습니다.');
+    }
+    const payload = data.application && typeof data.application === 'object' && !Array.isArray(data.application)
+      ? data.application
+      : {};
+    const cleanText = (value, maxLength) => typeof value === 'string'
+      ? value.normalize('NFC').trim().replace(/\r\n?/g, '\n').slice(0, maxLength)
+      : '';
+    const characterName = cleanText(payload.characterName, 24);
+    const visualConcept = cleanText(payload.visualConcept, 800);
+    const notes = cleanText(payload.notes, 1000);
+    const interactionPreferences = Array.isArray(payload.interactionPreferences)
+      ? [...new Set(payload.interactionPreferences.filter((item) => typeof item === 'string' && FANPAGE_TAMAGOTCHI_INTERACTIONS.has(item)))]
+      : [];
+    let referenceImageUrl = '';
+    if (typeof payload.referenceImageUrl === 'string' && payload.referenceImageUrl.trim()) {
+      try {
+        const rawReferenceUrl = payload.referenceImageUrl.trim();
+        if (rawReferenceUrl.length > 500) throw new Error('invalid URL');
+        const parsedUrl = new URL(rawReferenceUrl);
+        if (parsedUrl.protocol !== 'https:' || parsedUrl.username || parsedUrl.password || parsedUrl.port) throw new Error('invalid URL');
+        referenceImageUrl = parsedUrl.href.slice(0, 500);
+      } catch (_) {
+        throw new HttpsError('invalid-argument', '참고 이미지에는 올바른 HTTPS 링크를 입력해 주세요.');
+      }
+    }
+    if (Array.from(characterName).length < 2) throw new HttpsError('invalid-argument', '캐릭터 이름은 2자 이상 입력해 주세요.');
+    if (Array.from(visualConcept).length < 10) throw new HttpsError('invalid-argument', '디자인 설명은 10자 이상 입력해 주세요.');
+    if (!interactionPreferences.length) throw new HttpsError('invalid-argument', '원하는 상호작용을 하나 이상 선택해 주세요.');
+    if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(characterName + visualConcept + notes)) {
+      throw new HttpsError('invalid-argument', '입력 내용에 사용할 수 없는 문자가 있습니다.');
+    }
+
+    const rootRef = db.ref('streamerFanPageTamagotchiApplications');
+    const streamerApplicationsRef = rootRef.child(target.streamer.id);
+    const applicationId = streamerApplicationsRef.push().key;
+    const createdAt = Date.now();
+    const application = {
+      streamerId: target.streamer.id,
+      streamerNickname: target.streamer.nickname,
+      streamerSoopId: target.streamer.soopId,
+      requesterUid: uid,
+      characterName,
+      visualConcept,
+      interactionPreferences,
+      referenceImageUrl,
+      notes,
+      status: 'pending',
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const reservation = await streamerApplicationsRef.transaction((current) => {
+      const entries = current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {};
+      if (Object.values(entries).some((entry) => entry && ['pending', 'approved'].includes(entry.status))) return;
+      const historicalEntries = Object.entries(entries)
+        .filter(([, entry]) => entry && typeof entry === 'object')
+        .sort((a, b) => (Number(a[1].createdAt) || 0) - (Number(b[1].createdAt) || 0));
+      while (historicalEntries.length >= FANPAGE_TAMAGOTCHI_MAX_APPLICATIONS_PER_STREAMER) {
+        const [oldestId, oldest] = historicalEntries[0];
+        if (oldest.status !== 'rejected') return;
+        delete entries[oldestId];
+        historicalEntries.shift();
+      }
+      return { ...entries, [applicationId]: application };
+    });
+    if (!reservation.committed) {
+      const existing = Object.values(reservation.snapshot.val() || {});
+      if (existing.some((entry) => entry && entry.status === 'pending')) {
+        throw new HttpsError('already-exists', '이미 검토 중인 다마고치 신청서가 있어요.');
+      }
+      if (existing.some((entry) => entry && entry.status === 'approved')) {
+        throw new HttpsError('already-exists', '이미 승인된 다마고치 디자인이 있어요.');
+      }
+      throw new HttpsError('resource-exhausted', '신청 기록이 가득 찼어요. 관리자에게 문의해 주세요.');
+    }
+    return { submitted: true, applicationId };
+  }
+
+  if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 신청서를 검토할 수 있습니다.');
+  if (action === 'list') {
+    const snapshot = await db.ref('streamerFanPageTamagotchiApplications').get();
+    const items = [];
+    Object.entries(snapshot.val() || {}).forEach(([entryStreamerId, streamerEntries]) => {
+      Object.entries(streamerEntries && typeof streamerEntries === 'object' ? streamerEntries : {}).forEach(([id, value]) => {
+        const item = normalizeTamagotchiApplication(id, value);
+        if (!item) return;
+        item.streamerId = SOOP_ID_PATTERN.test(entryStreamerId) ? entryStreamerId.toLowerCase() : '';
+        items.push(item);
+      });
+    });
+    items.sort((a, b) => b.createdAt - a.createdAt);
+    return { items: items.slice(0, 100) };
+  }
+  if (action === 'review') {
+    const applicationId = String(data.applicationId || '').trim();
+    const decision = data.decision === 'approve' ? 'approved' : data.decision === 'reject' ? 'rejected' : '';
+    const reviewNote = typeof data.reviewNote === 'string'
+      ? data.reviewNote.normalize('NFC').trim().slice(0, 1000)
+      : '';
+    if (!decision || !/^[A-Za-z0-9_-]{15,30}$/.test(applicationId)) {
+      throw new HttpsError('invalid-argument', '검토할 신청서와 처리 결과를 확인해 주세요.');
+    }
+    const entryRef = applicationsRef.child(applicationId);
+    const snapshot = await entryRef.get();
+    const application = normalizeTamagotchiApplication(applicationId, snapshot.val());
+    if (!application) throw new HttpsError('not-found', '신청서를 찾을 수 없습니다.');
+    if (application.status !== 'pending') throw new HttpsError('failed-precondition', '이미 검토가 끝난 신청서입니다.');
+    if (decision === 'reject' && !reviewNote) throw new HttpsError('invalid-argument', '보완 요청 사유를 입력해 주세요.');
+    const reviewedAt = Date.now();
+    const updated = await entryRef.transaction((current) => {
+      if (!current || current.status !== 'pending') return;
+      return {
+        ...current,
+        status: decision,
+        reviewNote,
+        reviewedAt,
+        reviewedBy: uid,
+        updatedAt: reviewedAt,
+      };
+    });
+    if (!updated.committed) throw new HttpsError('failed-precondition', '다른 관리자가 먼저 이 신청서를 검토했어요. 목록을 새로고침해 주세요.');
+    if (decision === 'approved') {
+      await profileRef.set({
+        status: 'approved',
+        applicationId,
+        characterName: application.characterName,
+        visualConcept: application.visualConcept,
+        interactionPreferences: application.interactionPreferences,
+        approvedAt: reviewedAt,
+      });
+    }
+    return { reviewed: true, status: decision };
+  }
+  throw new HttpsError('invalid-argument', '다마고치 신청 요청을 확인해 주세요.');
 });
 
 exports.streamerFanPageMemories = onCall({ maxInstances: 20 }, async (request) => {
