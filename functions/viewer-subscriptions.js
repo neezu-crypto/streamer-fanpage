@@ -119,7 +119,8 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     const info = subscriptionInfo(subscription, now);
     const pendingRequest = await getRequest(db, info.pendingRequestId);
     const lastRequest = await getRequest(db, info.lastRequestId);
-    const isPending = !!(pendingRequest && ['pending', 'processing'].includes(pendingRequest.status));
+    const isPending = !!(pendingRequest && pendingRequest.requesterUid === uid &&
+      ['pending', 'processing'].includes(pendingRequest.status));
     if (info.pendingRequestId && !isPending) await clearPending(db, info.pendingRequestId, uid).catch(() => null);
     return {
       accountProtected: access.accountProtected,
