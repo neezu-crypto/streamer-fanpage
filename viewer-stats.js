@@ -2475,8 +2475,9 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
   $('viewerPeriodScanButton').disabled = true;
   $('viewerPeriodScanButton').textContent = '분석 중…';
   $('viewerPeriodStatus').classList.remove('is-error');
-  $('viewerPeriodStatus').textContent = '최근 1년 다시보기 목록을 확인하고 있어요.';
+  $('viewerPeriodStatus').textContent = '저장된 통계와 최근 1년 다시보기를 함께 확인하고 있어요.';
   renderPeriodPeakCards(peaks, vodCounts, true);
+  const staticStatsPromise = readStaticVodStatsIndex(streamerId);
 
   try {
     try {
@@ -2496,30 +2497,63 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
       console.warn('기간별 공용 결과를 확인하지 못해 개별 통계 캐시로 분석을 이어갑니다.', cacheError);
     }
 
-    const scanData = await fetchRecentYearVods(scanToken, loadToken, yearCutoff);
+    const [scanData, staticStatsByVodId] = await Promise.all([
+      fetchRecentYearVods(scanToken, loadToken, yearCutoff),
+      staticStatsPromise,
+    ]);
     if (!scanData || !isCurrentPeriodScan(scanToken, loadToken)) return;
     const { vods, pageLimitReached } = scanData;
     VIEWER_PEAK_PERIODS.forEach((period) => {
       const cutoff = cutoffByDays.get(period.days);
       vodCounts.set(period.days, vods.filter((item) => item.timestamp >= cutoff).length);
     });
-    renderPeriodPeakCards(peaks, vodCounts, true);
-
     if (!vods.length) {
       $('viewerPeriodStatus').textContent = '최근 1년 안에 분석할 다시보기가 없습니다.';
       renderPeriodPeakCards(peaks, vodCounts, false);
       return;
     }
 
-    let cursor = 0;
+    const reusableStatsByVodId = new Map();
     let completed = 0;
-    let failed = 0;
     let succeeded = 0;
+    vods.forEach((item) => {
+      const vodId = String(item.vod.id);
+      const stats = staticStatsByVodId.get(vodId)
+        || viewerStatsMemoryCache.get(streamerId.toLowerCase() + ':' + vodId);
+      if (!stats || !stats.highest
+        || !Number.isFinite(Number(stats.highest.viewers))
+        || !Number.isFinite(Number(stats.highest.second))) return;
+      reusableStatsByVodId.set(vodId, stats);
+      completed += 1;
+      succeeded += 1;
+      const peakViewers = Number(stats.highest.viewers);
+      const peakSecond = Number(stats.highest.second);
+      VIEWER_PEAK_PERIODS.forEach((period) => {
+        if (item.timestamp < cutoffByDays.get(period.days)) return;
+        const currentPeak = peaks.get(period.days);
+        if (!currentPeak || peakViewers > currentPeak.viewers) {
+          peaks.set(period.days, {
+            vod: item.vod,
+            viewers: peakViewers,
+            second: peakSecond,
+            timestamp: item.timestamp,
+          });
+        }
+      });
+    });
+
+    const vodsToAnalyze = vods.filter((item) => !reusableStatsByVodId.has(String(item.vod.id)));
+    renderPeriodPeakCards(peaks, vodCounts, true);
+    $('viewerPeriodStatus').textContent = '저장된 분석 ' + completed.toLocaleString('ko-KR') + '개 반영 · 미분석 '
+      + vodsToAnalyze.length.toLocaleString('ko-KR') + '개 분석을 진행합니다.';
+
+    let cursor = 0;
+    let failed = 0;
     let rateLimitMessage = '';
     let hasUnrenderedPeak = false;
     const worker = async () => {
-      while (isCurrentPeriodScan(scanToken, loadToken) && !rateLimitMessage && cursor < vods.length) {
-        const item = vods[cursor];
+      while (isCurrentPeriodScan(scanToken, loadToken) && !rateLimitMessage && cursor < vodsToAnalyze.length) {
+        const item = vodsToAnalyze[cursor];
         cursor += 1;
         try {
           const stats = await loadVodStats(
@@ -2536,6 +2570,7 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
           const peakSecond = Number(stats.highest.second);
           if (Number.isFinite(peakViewers) && peakViewers >= 0 && Number.isFinite(peakSecond) && peakSecond >= 0) {
             succeeded += 1;
+            reusableStatsByVodId.set(String(item.vod.id), stats);
             VIEWER_PEAK_PERIODS.forEach((period) => {
               if (item.timestamp < cutoffByDays.get(period.days)) return;
               const currentPeak = peaks.get(period.days);
@@ -2556,13 +2591,14 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
           if (!isCurrentPeriodScan(scanToken, loadToken)) return;
           if (error && error.code === 'functions/resource-exhausted') {
             rateLimitMessage = viewerStatsErrorMessage(error, '요청 한도에 도달했어요.');
-            cursor = vods.length;
+            cursor = vodsToAnalyze.length;
           } else {
             failed += 1;
           }
         }
         completed += 1;
-        $('viewerPeriodStatus').textContent = '최근 1년 다시보기 분석 중 · ' + completed.toLocaleString('ko-KR') + '/' + vods.length.toLocaleString('ko-KR') + '개 완료';
+        $('viewerPeriodStatus').textContent = '최근 1년 다시보기 분석 중 · 저장 결과 포함 '
+          + completed.toLocaleString('ko-KR') + '/' + vods.length.toLocaleString('ko-KR') + '개 확인';
         if (hasUnrenderedPeak) {
           renderPeriodPeakCards(peaks, vodCounts, true);
           hasUnrenderedPeak = false;
@@ -2570,7 +2606,7 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
       }
     };
 
-    await Promise.all(Array.from({ length: Math.min(2, vods.length) }, () => worker()));
+    await Promise.all(Array.from({ length: Math.min(2, vodsToAnalyze.length) }, () => worker()));
     if (!isCurrentPeriodScan(scanToken, loadToken)) return;
     renderPeriodPeakCards(peaks, vodCounts, false);
     const suffix = failed ? ' · 통계 미제공/오류 ' + failed.toLocaleString('ko-KR') + '개 제외' : '';
