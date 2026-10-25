@@ -159,6 +159,9 @@ let subscriptionState = {
 const viewerStatsMemoryCache = new Map();
 const viewerStatsInProgress = new Map();
 const viewerStatsStaticCache = new Map();
+const viewerStatsStaticIndexCache = new Map();
+let viewerVodCatalogCache = null;
+let viewerVodCatalogPromise = null;
 const sponsorLiveStatusCache = new Map();
 const SPONSOR_PENDING_REQUEST_KEY = 'streamerFanPage.sponsor.pendingRequest.v1';
 let sponsorRequestId = '';
@@ -863,6 +866,10 @@ function parseVodTimestamp(value) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function isGlobalViewerSort(sortMode = vodSortMode) {
+  return ['peak-desc', 'peak-asc', 'low-desc', 'low-asc'].includes(sortMode);
+}
+
 function sortLoadedVodCards() {
   const grid = $('viewerVodGrid');
   if (!grid) return;
@@ -876,14 +883,16 @@ function sortLoadedVodCards() {
     return (ascending ? difference : -difference) || a.index - b.index;
   };
   cards.sort((a, b) => {
-    if (vodSortMode === 'peak-desc' || vodSortMode === 'peak-asc') {
-      const peakA = Number(a.card._peakViewers);
-      const peakB = Number(b.card._peakViewers);
-      const hasPeakA = Number.isFinite(peakA);
-      const hasPeakB = Number.isFinite(peakB);
-      if (hasPeakA !== hasPeakB) return hasPeakA ? -1 : 1;
-      if (hasPeakA && peakA !== peakB) {
-        return vodSortMode === 'peak-desc' ? peakB - peakA : peakA - peakB;
+    if (isGlobalViewerSort()) {
+      const usePeak = vodSortMode.startsWith('peak-');
+      const descending = vodSortMode.endsWith('-desc');
+      const metricA = Number(usePeak ? a.card._peakViewers : a.card._lowViewers);
+      const metricB = Number(usePeak ? b.card._peakViewers : b.card._lowViewers);
+      const hasMetricA = Number.isFinite(metricA);
+      const hasMetricB = Number.isFinite(metricB);
+      if (hasMetricA !== hasMetricB) return hasMetricA ? -1 : 1;
+      if (hasMetricA && metricA !== metricB) {
+        return descending ? metricB - metricA : metricA - metricB;
       }
       return compareDate(a, b);
     }
@@ -953,12 +962,9 @@ function renderSearchResults(streamers) {
   results._streamers = streamers;
 }
 
-function readStaticVodStats(streamerId, vodId) {
+function readStaticVodStatsIndex(streamerId) {
   const normalizedStreamerId = String(streamerId || '').trim().toLowerCase();
-  const normalizedVodId = String(vodId || '').trim();
-  if (!SOOP_ID_PATTERN.test(normalizedStreamerId) || !/^\d{1,20}$/.test(normalizedVodId)) {
-    return Promise.resolve(null);
-  }
+  if (!SOOP_ID_PATTERN.test(normalizedStreamerId)) return Promise.resolve(new Map());
 
   let cachePromise = viewerStatsStaticCache.get(normalizedStreamerId);
   if (!cachePromise) {
@@ -978,20 +984,35 @@ function readStaticVodStats(streamerId, vodId) {
     viewerStatsStaticCache.set(normalizedStreamerId, cachePromise);
   }
 
-  return cachePromise.then((vods) => {
-    const stats = vods && vods[normalizedVodId];
-    const validPoint = (point) => point
+  let indexPromise = viewerStatsStaticIndexCache.get(normalizedStreamerId);
+  if (!indexPromise) {
+    indexPromise = cachePromise.then((vods) => {
+      const statsByVodId = new Map();
+      const validPoint = (point) => point
       && Number.isFinite(Number(point.second)) && Number(point.second) >= 0
       && Number.isFinite(Number(point.viewers)) && Number(point.viewers) >= 0;
-    if (!stats || !validPoint(stats.highest) || !validPoint(stats.lowest)) return null;
-    return {
-      streamerId: normalizedStreamerId,
-      vodId: normalizedVodId,
-      highest: { second: Number(stats.highest.second), viewers: Number(stats.highest.viewers) },
-      lowest: { second: Number(stats.lowest.second), viewers: Number(stats.lowest.viewers) },
-      checkedAt: Number(stats.checkedAt) || 0,
-    };
-  });
+      Object.entries(vods || {}).forEach(([rawVodId, stats]) => {
+        const vodId = String(rawVodId || '').trim();
+        if (!/^\d{1,20}$/.test(vodId) || !stats || !validPoint(stats.highest) || !validPoint(stats.lowest)) return;
+        statsByVodId.set(vodId, {
+          streamerId: normalizedStreamerId,
+          vodId,
+          highest: { second: Number(stats.highest.second), viewers: Number(stats.highest.viewers) },
+          lowest: { second: Number(stats.lowest.second), viewers: Number(stats.lowest.viewers) },
+          checkedAt: Number(stats.checkedAt) || 0,
+        });
+      });
+      return statsByVodId;
+    });
+    viewerStatsStaticIndexCache.set(normalizedStreamerId, indexPromise);
+  }
+  return indexPromise;
+}
+
+function readStaticVodStats(streamerId, vodId) {
+  const normalizedVodId = String(vodId || '').trim();
+  if (!/^\d{1,20}$/.test(normalizedVodId)) return Promise.resolve(null);
+  return readStaticVodStatsIndex(streamerId).then((statsByVodId) => statsByVodId.get(normalizedVodId) || null);
 }
 
 function hydrateVodCardFromStaticCache(card, streamerId, loadToken) {
@@ -1082,6 +1103,7 @@ function createVodCard(vod, loadToken, streamerId) {
 
 function showStatsLinks(card, stats) {
   card._peakViewers = Number(stats.highest && stats.highest.viewers);
+  card._lowViewers = Number(stats.lowest && stats.lowest.viewers);
   const highestUrl = playbackUrl(card._vod.id, stats.highest.second);
   const lowestUrl = playbackUrl(card._vod.id, stats.lowest.second);
   card._openLink.href = highestUrl;
@@ -1105,7 +1127,6 @@ function showStatsLinks(card, stats) {
   lowest.textContent = '최저 ' + Number(stats.lowest.viewers).toLocaleString('ko-KR') + '명 · ' + formatClock(stats.lowest.second);
   card._statsActions.append(highest, lowest);
   card.dataset.statsState = 'ready';
-  if (vodSortMode === 'peak-desc' || vodSortMode === 'peak-asc') sortLoadedVodCards();
 }
 
 function showQueueWaitMessage(card, loadToken) {
@@ -1292,6 +1313,82 @@ function isCurrentComparisonRequest(request) {
 async function getViewerVodPage(streamerId, page, keyword = '', sortOrder = 'newest') {
   const response = await callViewerStats({ action: 'vods', streamerId, page, keyword, sortOrder });
   return response.data || {};
+}
+
+async function getGlobalVodCatalog(streamerId, keyword) {
+  const normalizedStreamerId = String(streamerId || '').trim().toLowerCase();
+  const normalizedKeyword = String(keyword || '').trim();
+  const cacheKey = normalizedStreamerId + ':' + normalizedKeyword;
+  if (viewerVodCatalogCache && viewerVodCatalogCache.key === cacheKey) return viewerVodCatalogCache;
+  if (viewerVodCatalogPromise && viewerVodCatalogPromise.key === cacheKey) return viewerVodCatalogPromise.promise;
+
+  const pending = { key: cacheKey, promise: null };
+  pending.promise = Promise.all([
+    getViewerVodPage(normalizedStreamerId, 1, normalizedKeyword, 'catalog'),
+    readStaticVodStatsIndex(normalizedStreamerId),
+  ]).then(([payload, statsByVodId]) => {
+    const vods = Array.isArray(payload.vods) ? payload.vods : [];
+    const total = Math.max(0, Number(payload.total) || 0);
+    if (payload.catalogComplete !== true || vods.length !== total) {
+      const error = new Error('전체 다시보기 목록을 확인하지 못해 시청자순 정렬을 완료할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+      error.code = 'viewer-stats/incomplete-catalog';
+      throw error;
+    }
+
+    viewerVodCatalogCache = { key: cacheKey, streamerId: normalizedStreamerId, vods, total, statsByVodId };
+    return viewerVodCatalogCache;
+  }).finally(() => {
+    if (viewerVodCatalogPromise === pending) viewerVodCatalogPromise = null;
+  });
+  viewerVodCatalogPromise = pending;
+  return pending.promise;
+}
+
+function sortVodCatalogForViewerCount(catalog, sortMode) {
+  const usePeak = sortMode.startsWith('peak-');
+  const descending = sortMode.endsWith('-desc');
+  return [...catalog.vods].sort((a, b) => {
+    const statsA = catalog.statsByVodId.get(String(a.id));
+    const statsB = catalog.statsByVodId.get(String(b.id));
+    const valueA = statsA ? Number(usePeak ? statsA.highest.viewers : statsA.lowest.viewers) : NaN;
+    const valueB = statsB ? Number(usePeak ? statsB.highest.viewers : statsB.lowest.viewers) : NaN;
+    const knownA = Number.isFinite(valueA);
+    const knownB = Number.isFinite(valueB);
+    if (knownA !== knownB) return knownA ? -1 : 1;
+    if (knownA && valueA !== valueB) return descending ? valueB - valueA : valueA - valueB;
+    const dateA = parseVodTimestamp(a.regDate);
+    const dateB = parseVodTimestamp(b.regDate);
+    return dateB - dateA || Number(b.id) - Number(a.id);
+  });
+}
+
+function appendGlobalVodPage(catalog, loadToken, page) {
+  const sortedVods = sortVodCatalogForViewerCount(catalog, vodSortMode);
+  const start = (page - 1) * VIEWER_VOD_PAGE_SIZE;
+  const vods = sortedVods.slice(start, start + VIEWER_VOD_PAGE_SIZE);
+  const grid = $('viewerVodGrid');
+  const knownIds = new Set([...grid.querySelectorAll('[data-vod-id]')].map((card) => card.dataset.vodId));
+  vods.forEach((vod) => {
+    const vodId = String(vod && vod.id || '');
+    if (!/^\d{1,20}$/.test(vodId) || knownIds.has(vodId)) return;
+    knownIds.add(vodId);
+    const card = createVodCard(vod, loadToken, catalog.streamerId);
+    grid.append(card);
+    const cachedStats = catalog.statsByVodId.get(vodId);
+    if (cachedStats) showStatsLinks(card, cachedStats);
+  });
+
+  vodTotal = catalog.total;
+  nextPage = page + 1;
+  hasMoreVods = start + vods.length < sortedVods.length;
+  const analyzedCount = catalog.vods.reduce((count, vod) => (
+    count + (catalog.statsByVodId.has(String(vod.id)) ? 1 : 0)
+  ), 0);
+  $('viewerVodStatus').textContent = (vodSearchKeyword ? '검색된 ' : '전체 ') + catalog.total.toLocaleString('ko-KR')
+    + '개 중 저장된 통계 ' + analyzedCount.toLocaleString('ko-KR')
+    + '개를 반영해 정렬했습니다. 미분석 영상은 날짜순으로 뒤에 표시됩니다.';
+  updateVodHeading();
+  $('viewerLoadMore').classList.toggle('hidden', !hasMoreVods);
 }
 
 function comparisonMetric(label, value, isPeak = false) {
@@ -2172,13 +2269,25 @@ function updateVodHeading() {
 async function loadVodPage(loadToken, page) {
   const requestToken = vodListRequestToken;
   const keyword = vodSearchKeyword;
+  const globalViewerSort = isGlobalViewerSort();
   if (!selectedStreamer || loadToken !== activeLoadToken) return;
   $('viewerLoadMore').disabled = true;
-  $('viewerLoadMore').textContent = page === 1 ? '다시보기를 불러오는 중…' : '불러오는 중…';
-  $('viewerVodStatus').textContent = keyword
+  $('viewerLoadMore').textContent = page === 1
+    ? (globalViewerSort ? '전체 다시보기 정렬 중…' : '다시보기를 불러오는 중…')
+    : '불러오는 중…';
+  $('viewerVodStatus').textContent = globalViewerSort
+    ? '전체 다시보기 목록과 저장된 통계를 확인해 정렬하고 있어요. 새로운 통계는 계산하지 않습니다.'
+    : keyword
     ? (page === 1 ? '키워드 검색 결과를 불러오고 있어요.' : '다음 검색 결과를 불러오고 있어요.')
     : (page === 1 ? 'SOOP 다시보기 목록을 불러오고 있어요.' : '다음 다시보기를 불러오고 있어요.');
   try {
+    if (globalViewerSort) {
+      const catalog = await getGlobalVodCatalog(selectedStreamer.soopId, keyword);
+      if (loadToken !== activeLoadToken || requestToken !== vodListRequestToken || keyword !== vodSearchKeyword) return;
+      appendGlobalVodPage(catalog, loadToken, page);
+      return;
+    }
+
     const sortOrder = vodSortMode === 'date-asc' ? 'oldest' : 'newest';
     const payload = await getViewerVodPage(selectedStreamer.soopId, page, keyword, sortOrder);
     if (loadToken !== activeLoadToken || requestToken !== vodListRequestToken || keyword !== vodSearchKeyword) return;
@@ -2497,6 +2606,7 @@ async function selectStreamer(streamer) {
   vodListRequestToken += 1;
   periodScanToken += 1;
   cancelQueuedStatsRequests();
+  viewerVodCatalogCache = null;
   vodPagesByNumber = new Map();
   vodPagesStreamerId = String(streamer.soopId || '').toLowerCase();
   selectedStreamer = streamer;
@@ -2636,9 +2746,8 @@ $('viewerVodSearchForm').addEventListener('submit', async (event) => {
 });
 
 $('viewerVodSort').addEventListener('change', (event) => {
-  const previousSortMode = vodSortMode;
   vodSortMode = event.target.value;
-  if (selectedStreamer && (vodSortMode === 'date-asc' || previousSortMode === 'date-asc')) {
+  if (selectedStreamer) {
     reloadVodListForSort();
     return;
   }

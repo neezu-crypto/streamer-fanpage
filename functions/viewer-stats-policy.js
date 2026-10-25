@@ -17,16 +17,19 @@ const VIEWER_STATS_RATE_LIMITS = Object.freeze({
   anonymous: Object.freeze({
     search: Object.freeze({ perMinute: 5, perDay: 40 }),
     vods: Object.freeze({ perMinute: 12, perDay: 80 }),
+    vodCatalog: Object.freeze({ perMinute: 1, perDay: 4 }),
     stats: Object.freeze({ perMinute: 120, perDay: 600 }),
   }),
   account: Object.freeze({
     search: Object.freeze({ perMinute: 10, perDay: 100 }),
     vods: Object.freeze({ perMinute: 30, perDay: 200 }),
+    vodCatalog: Object.freeze({ perMinute: 2, perDay: 10 }),
     stats: Object.freeze({ perMinute: 300, perDay: 1500 }),
   }),
   subscriber: Object.freeze({
     search: Object.freeze({ perMinute: 20, perDay: 200 }),
     vods: Object.freeze({ perMinute: 60, perDay: 500 }),
+    vodCatalog: Object.freeze({ perMinute: 3, perDay: 20 }),
     stats: Object.freeze({ perMinute: 600, perDay: 3000 }),
   }),
   admin: Object.freeze({}),
