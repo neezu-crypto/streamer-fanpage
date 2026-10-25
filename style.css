@@ -1279,7 +1279,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 @media(max-width:720px){.registered-section{margin-top:28px}.registered-section-actions{gap:7px}.registered-streamers-toggle{min-height:31px;padding:5px 9px;font-size:9px}}
 
 /* Fanpage content is grouped into four focused views. */
-#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 #fanPageView .fanpage-tab-button{min-width:0;min-height:44px;padding:8px 12px;border:1px solid transparent;border-radius:13px;background:transparent;color:#c7c0cf;font:700 13px var(--font);cursor:pointer;transition:background .16s,border-color .16s,color .16s,box-shadow .16s}
 #fanPageView .fanpage-tab-button:hover{border-color:#ffffff24;background:#ffffff0b;color:var(--text)}
 #fanPageView .fanpage-tab-button[aria-selected=true]{border-color:#ffffff26;background:linear-gradient(180deg,#ffffff18,#ffffff0b);color:var(--text);box-shadow:inset 0 1px 0 #ffffff22}
@@ -1300,3 +1300,70 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
   #fanPageView .fanpage-tab-panel-heading>p:last-child{font-size:11px}
 }
 @media(max-width:900px){#fanPageView .fanpage-tab-nav{padding-right:56px}}
+
+/* Streamer-specific Tamagotchi design applications */
+#fanPageView .tamagotchi-section{grid-column:1/-1;display:grid;gap:9px}
+#fanPageView .tamagotchi-section>.eyebrow{margin:0;color:var(--pink);font-size:9px;letter-spacing:.2em}
+#fanPageView .tamagotchi-section>h2{margin:0;font:24px var(--display)}
+#fanPageView .tamagotchi-section-description{margin:0;color:var(--muted);font-size:12px;line-height:1.65}
+#fanPageView .tamagotchi-section-content{display:grid;justify-items:center;gap:13px;min-width:0;margin-top:5px}
+#fanPageView .tamagotchi-empty-state,#fanPageView .tamagotchi-approved-card{display:grid;width:min(100%,620px);min-height:260px;align-content:center;justify-items:center;gap:12px;padding:28px;border:1px solid #ffffff16;border-radius:20px;background:radial-gradient(ellipse at 80% 8%,#b6a3ff12,transparent 42%),linear-gradient(145deg,#ffffff05,#ffffff02);text-align:center}
+#fanPageView .tamagotchi-placeholder-symbol{display:grid;width:52px;height:52px;place-items:center;border:1px solid #b6a3ff35;border-radius:50%;background:#b6a3ff14;color:#b6a3ff;font-size:25px}
+#fanPageView .tamagotchi-empty-state p,#fanPageView .tamagotchi-approved-status{max-width:420px;margin:0;color:var(--muted);font-size:12px;line-height:1.7}
+#fanPageView .tamagotchi-approved-card{min-height:240px}
+#fanPageView .tamagotchi-approved-card h3{margin:0;font:23px var(--display)}
+#fanPageView .tamagotchi-approved-description{max-width:540px;margin:0;color:var(--text);font-size:14px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+#fanPageView .tamagotchi-tag-list{display:flex;flex-wrap:wrap;gap:7px}
+#fanPageView .tamagotchi-tag-list span{padding:6px 10px;border:1px solid #b6a3ff35;border-radius:99px;background:#b6a3ff10;color:#d8caff;font-size:10px}
+#fanPageView .tamagotchi-application-status{display:grid;width:min(100%,620px);gap:5px;padding:13px 15px;border:1px solid #ffffff18;border-radius:12px;background:#ffffff06}
+#fanPageView .tamagotchi-application-status strong{font-size:12px}
+#fanPageView .tamagotchi-application-status span{color:var(--muted);font-size:11px;line-height:1.6}
+#fanPageView .tamagotchi-application-status.is-pending{border-color:#f7d89035;background:#f7d8900a}
+#fanPageView .tamagotchi-application-status.is-rejected{border-color:#f58cac35;background:#f58cac0a}
+#fanPageView .tamagotchi-state-message{margin:0;padding:20px;color:var(--muted);font-size:12px;text-align:center}
+#fanPageView .tamagotchi-state-message.is-error{color:#ffb7c9}
+#fanPageView .tamagotchi-apply-button{min-width:min(100%,280px)}
+#fanPageView .tamagotchi-application-form{display:grid;width:min(100%,720px);gap:14px;padding:20px;border:1px solid #ffffff18;border-radius:16px;background:#ffffff04}
+#fanPageView .tamagotchi-application-form h3{margin:0;font:19px var(--display)}
+#fanPageView .tamagotchi-form-intro{margin:-8px 0 0;color:var(--muted);font-size:11px;line-height:1.65}
+#fanPageView .tamagotchi-field{display:grid;gap:7px;color:var(--text);font-size:11px;font-weight:700}
+#fanPageView .tamagotchi-field input,#fanPageView .tamagotchi-field textarea{width:100%;min-width:0;padding:11px 12px;border:1px solid #ffffff20;border-radius:10px;outline:0;background:#100f16;color:var(--text);font-size:12px;font-weight:400;line-height:1.6}
+#fanPageView .tamagotchi-field textarea{resize:vertical;min-height:82px}
+#fanPageView .tamagotchi-field input:focus,#fanPageView .tamagotchi-field textarea:focus{border-color:#b6a3ff99;box-shadow:0 0 0 3px #b6a3ff16}
+#fanPageView .tamagotchi-field input::placeholder,#fanPageView .tamagotchi-field textarea::placeholder{color:#77717f}
+#fanPageView .tamagotchi-interactions{min-width:0;margin:0;padding:12px;border:1px solid #ffffff18;border-radius:12px}
+#fanPageView .tamagotchi-interactions legend{padding:0 5px;color:var(--text);font-size:11px;font-weight:700}
+#fanPageView .tamagotchi-interaction-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#fanPageView .tamagotchi-interaction-option{display:flex;min-width:0;align-items:flex-start;gap:9px;padding:10px;border:1px solid #ffffff12;border-radius:10px;background:#ffffff04;cursor:pointer}
+#fanPageView .tamagotchi-interaction-option input{margin:3px 0 0;accent-color:var(--pink)}
+#fanPageView .tamagotchi-interaction-option span{display:grid;gap:3px;min-width:0}
+#fanPageView .tamagotchi-interaction-option strong{font-size:11px}
+#fanPageView .tamagotchi-interaction-option small{color:var(--muted);font-size:10px;line-height:1.5}
+#fanPageView .tamagotchi-form-status{margin:0;color:var(--muted);font-size:11px;line-height:1.5}
+#fanPageView .tamagotchi-form-status.is-error{color:#ffb7c9}
+#fanPageView .tamagotchi-form-actions{display:flex;justify-content:flex-end;gap:8px}
+#fanPageView .tamagotchi-form-actions .button:disabled{opacity:.58;cursor:wait}
+.admin-tamagotchi-applications{margin:0 0 22px;padding:14px;border:1px solid #b6a3ff30;border-radius:13px;background:linear-gradient(135deg,#b6a3ff0b,#ffffff03)}
+.admin-tamagotchi-applications .admin-viewer-usage-heading{align-items:center}
+.admin-tamagotchi-applications .admin-viewer-usage-heading h3{margin:0;font:17px var(--display)}
+.admin-tamagotchi-toolbar{display:flex;align-items:center;gap:7px}
+.admin-tamagotchi-toolbar select{min-height:34px;padding:5px 8px;border:1px solid #ffffff20;border-radius:8px;background:#100f16;color:var(--text);font-size:10px}
+.admin-tamagotchi-toolbar .button{min-height:34px;padding:6px 9px;font-size:10px}
+.admin-tamagotchi-admin-status{margin:10px 0;color:#a69cab;font-size:11px;line-height:1.5}
+.admin-tamagotchi-application-list{display:grid;max-height:min(50vh,520px);gap:9px;overflow:auto;overscroll-behavior:contain;padding:1px 4px 3px 1px;scrollbar-width:thin;scrollbar-color:#66505f #ffffff08}
+.admin-tamagotchi-empty{margin:0;padding:17px;border:1px dashed #ffffff18;border-radius:10px;color:var(--muted);font-size:12px;text-align:center}
+.admin-tamagotchi-item{display:grid;gap:8px;padding:13px;border:1px solid #ffffff14;border-radius:11px;background:#100f16}
+.admin-tamagotchi-item-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.admin-tamagotchi-item-heading strong{min-width:0;font:16px var(--display);overflow-wrap:anywhere}
+.admin-tamagotchi-status{flex:none;padding:4px 8px;border:1px solid #f7d89044;border-radius:99px;color:#f7d890;font-size:10px}
+.admin-tamagotchi-item.is-approved .admin-tamagotchi-status{border-color:#82d5a544;color:#9edbb3}
+.admin-tamagotchi-item.is-rejected .admin-tamagotchi-status{border-color:#f58cac44;color:#f3a4bf}
+.admin-tamagotchi-streamer,.admin-tamagotchi-concept,.admin-tamagotchi-review-note{margin:0;color:#a69cab;font-size:11px;line-height:1.65;overflow-wrap:anywhere}
+.admin-tamagotchi-concept{color:#e2dce6;white-space:pre-wrap}
+.admin-tamagotchi-reference{width:max-content;color:#c6b8ff;font-size:11px;text-decoration:none}
+.admin-tamagotchi-reference:hover{text-decoration:underline}
+.admin-tamagotchi-notes{display:grid;gap:4px;margin:0;padding:9px;border-radius:8px;background:#ffffff06;color:#e2dce6;font-size:11px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.admin-tamagotchi-notes strong{color:#a69cab;font-size:10px}
+.admin-tamagotchi-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:2px}
+.admin-tamagotchi-actions .button{min-height:34px;padding:6px 10px;font-size:10px}
+@media(max-width:560px){#fanPageView .tamagotchi-application-form{padding:14px}#fanPageView .tamagotchi-interaction-options{grid-template-columns:1fr}.admin-tamagotchi-applications{padding:11px}.admin-tamagotchi-applications .admin-viewer-usage-heading{align-items:flex-start;flex-direction:column}.admin-tamagotchi-toolbar{width:100%}.admin-tamagotchi-toolbar select{flex:1;min-width:0}.admin-tamagotchi-toolbar .button{white-space:nowrap}.admin-tamagotchi-item-heading{align-items:flex-start}.admin-tamagotchi-actions{display:grid;grid-template-columns:1fr 1fr}.admin-tamagotchi-actions .button{width:100%}}

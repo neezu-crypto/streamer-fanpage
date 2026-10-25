@@ -31,6 +31,7 @@ const callSave = authenticatedCallable('streamerFanPageSave');
 const callSongbook = authenticatedCallable('streamerFanPageSongbook');
 const callPlayedGames = authenticatedCallable('streamerFanPagePlayedGames');
 const callMemories = authenticatedCallable('streamerFanPageMemories');
+const callTamagotchiApplications = authenticatedCallable('streamerFanPageTamagotchiApplications');
 const callRollingPaper = authenticatedCallable('streamerFanPageRollingPaper');
 const callVodPage = authenticatedCallable('streamerFanPageVodPage');
 const callVodComments = authenticatedCallable('streamerFanPageVodComments');
@@ -330,6 +331,8 @@ let adminStatsLoading = false;
 let adminStatsData = null;
 let adminViewerSubscriptionsLoading = false;
 let adminDesignFeedbackLoading = false;
+let adminTamagotchiApplicationsLoading = false;
+let adminTamagotchiApplications = [];
 let verifiedStatusUnsubscribe = null;
 let switchApprovalUnsubscribe = null;
 let switchHandoffInProgress = false;
@@ -345,6 +348,7 @@ const rouletteStates = new Map();
 const upboStates = new Map();
 const rollingPaperStates = new Map();
 const fanPageMemoryStates = new Map();
+const tamagotchiApplicationStates = new Map();
 const fanPageContentStates = new Map();
 
 function ensureKakaoSdk() {
@@ -1195,6 +1199,91 @@ async function loadAdminDesignFeedback() {
     $('refreshDesignFeedback').disabled = false;
     $('refreshDesignFeedback').textContent = '↻ 건의 새로고침';
   }
+}
+function renderAdminTamagotchiApplications() {
+  const container = $('adminTamagotchiApplicationList');
+  if (!container) return;
+  container.replaceChildren();
+  const filter = $('adminTamagotchiApplicationFilter')?.value || 'all';
+  const items = adminTamagotchiApplications.filter((item) => filter === 'all' || item.status === filter);
+  if (!items.length) {
+    const empty = document.createElement('p'); empty.className = 'admin-tamagotchi-empty';
+    empty.textContent = filter === 'pending' ? '검토 대기 중인 신청서가 없어요.' : '표시할 신청서가 없어요.';
+    container.append(empty); return;
+  }
+  const statusLabels = { pending: '검토 대기', approved: '승인', rejected: '보완 요청' };
+  items.forEach((item) => {
+    const article = document.createElement('article'); article.className = `admin-tamagotchi-item is-${item.status}`;
+    const heading = document.createElement('div'); heading.className = 'admin-tamagotchi-item-heading';
+    const title = document.createElement('strong'); title.textContent = item.characterName || '(캐릭터 이름 없음)';
+    const status = document.createElement('span'); status.className = 'admin-tamagotchi-status'; status.textContent = statusLabels[item.status] || '확인 필요';
+    heading.append(title, status);
+    const streamer = document.createElement('p'); streamer.className = 'admin-tamagotchi-streamer';
+    streamer.textContent = `${item.streamerNickname || '알 수 없는 스트리머'}${item.streamerSoopId ? ` (@${item.streamerSoopId})` : ''} · 신청 ${formatCommentDate(item.createdAt)}`;
+    const concept = document.createElement('p'); concept.className = 'admin-tamagotchi-concept'; concept.textContent = item.visualConcept || '';
+    const interactions = document.createElement('div'); interactions.className = 'tamagotchi-tag-list';
+    (Array.isArray(item.interactionPreferences) ? item.interactionPreferences : []).forEach((key) => {
+      const option = TAMAGOTCHI_INTERACTIONS.find(([interactionKey]) => interactionKey === key);
+      if (!option) return;
+      const tag = document.createElement('span'); tag.textContent = option[1]; interactions.append(tag);
+    });
+    article.append(heading, streamer, concept, interactions);
+    if (item.referenceImageUrl) {
+      const reference = document.createElement('a'); reference.className = 'admin-tamagotchi-reference';
+      reference.href = item.referenceImageUrl; reference.target = '_blank'; reference.rel = 'noopener noreferrer';
+      reference.textContent = '참고 이미지 열기 ↗'; article.append(reference);
+    }
+    if (item.notes) {
+      const notes = document.createElement('p'); notes.className = 'admin-tamagotchi-notes';
+      const label = document.createElement('strong'); label.textContent = '추가 요청';
+      const text = document.createElement('span'); text.textContent = item.notes;
+      notes.append(label, text); article.append(notes);
+    }
+    if (item.reviewNote) {
+      const reviewNote = document.createElement('p'); reviewNote.className = 'admin-tamagotchi-review-note';
+      reviewNote.textContent = `검토 메모: ${item.reviewNote}`; article.append(reviewNote);
+    }
+    if (item.status === 'pending') {
+      const actions = document.createElement('div'); actions.className = 'admin-tamagotchi-actions';
+      [['approve', '승인'], ['reject', '보완 요청']].forEach(([action, label]) => {
+        const button = document.createElement('button'); button.type = 'button';
+        button.className = `button${action === 'approve' ? ' button-primary' : ''}`;
+        button.dataset.tamagotchiAction = action; button.dataset.streamerId = item.streamerId; button.dataset.applicationId = item.id;
+        button.textContent = label; actions.append(button);
+      });
+      article.append(actions);
+    }
+    container.append(article);
+  });
+}
+async function loadAdminTamagotchiApplications() {
+  if (!isAdminUser || adminTamagotchiApplicationsLoading) return;
+  adminTamagotchiApplicationsLoading = true;
+  const refresh = $('refreshTamagotchiApplications');
+  if (refresh) { refresh.disabled = true; refresh.textContent = '불러오는 중…'; }
+  $('adminTamagotchiApplicationStatus').textContent = '신청서를 불러오고 있어요.';
+  try {
+    const result = await callTamagotchiApplications({ action: 'list' });
+    if (!isAdminUser) return;
+    adminTamagotchiApplications = Array.isArray(result.data?.items) ? result.data.items : [];
+    renderAdminTamagotchiApplications();
+    const pending = adminTamagotchiApplications.filter((item) => item.status === 'pending').length;
+    $('adminTamagotchiApplicationStatus').textContent = `최근 신청 ${adminTamagotchiApplications.length}건 · 검토 대기 ${pending}건 · 최대 100건 표시`;
+  } catch (error) {
+    $('adminTamagotchiApplicationStatus').textContent = error.message || '신청서를 불러오지 못했어요.';
+  } finally {
+    adminTamagotchiApplicationsLoading = false;
+    if (refresh) { refresh.disabled = false; refresh.textContent = '↻ 신청 새로고침'; }
+  }
+}
+function openTamagotchiAdminFromDeepLink() {
+  if (!isAdminUser || new URLSearchParams(location.search).get('admin') !== 'tamagotchi') return false;
+  const currentUrl = new URL(location.href);
+  currentUrl.searchParams.delete('admin');
+  history.replaceState(null, '', currentUrl.href);
+  showFanPageModal($('adminStatsDialog'));
+  loadAdminTamagotchiApplications();
+  return true;
 }
 async function waitForPageAssets() {
   const images = [...document.querySelectorAll('#mainContent img')]
@@ -3318,6 +3407,229 @@ function renderAffiliatePromoCard() {
   return card;
 }
 
+const TAMAGOTCHI_INTERACTIONS = [
+  ['pet', '쓰다듬기', '캐릭터를 누르거나 쓰다듬으면 표정·반응이 바뀌어요.'],
+  ['feed', '먹이 주기', '간식이나 음식을 주고 캐릭터의 반응을 볼 수 있어요.'],
+  ['play', '놀아주기', '간단한 놀이를 함께하고 친밀도를 쌓아요.'],
+  ['talk', '인사와 대화', '인사하거나 말을 걸면 짧은 대사로 답해요.'],
+  ['live', '방송 반응', '방송 시작·종료나 방송 상태에 맞춰 반응해요.'],
+  ['idle', '휴식과 수면', '잠시 자리를 비우거나 쉬는 모습을 보여줘요.'],
+  ['sound', '소리 효과', '상호작용에 맞는 짧은 효과음을 재생해요.'],
+];
+
+function tamagotchiApplicationStateFor(streamerId) {
+  const key = String(streamerId || '').trim().toLowerCase();
+  let state = tamagotchiApplicationStates.get(key);
+  if (!state) {
+    state = { loaded: false, loading: false, saving: false, formOpen: false, application: null, profile: null, error: '' };
+    tamagotchiApplicationStates.set(key, state);
+  }
+  return state;
+}
+
+function renderTamagotchiApplicationForm(page, state, onChange) {
+  const form = document.createElement('form');
+  form.className = 'tamagotchi-application-form';
+  const heading = document.createElement('h3');
+  heading.textContent = state.application ? '신청 내용 수정' : '다마고치 디자인 신청';
+  const intro = document.createElement('p');
+  intro.className = 'tamagotchi-form-intro';
+  intro.textContent = '캐릭터의 모습과 원하는 상호작용을 적어 주세요. 신청 내용은 관리자 검토를 위해 서버에 저장됩니다.';
+
+  const characterLabel = document.createElement('label');
+  characterLabel.className = 'tamagotchi-field';
+  characterLabel.textContent = '캐릭터 이름';
+  const characterInput = document.createElement('input');
+  characterInput.name = 'characterName'; characterInput.type = 'text'; characterInput.required = true;
+  characterInput.maxLength = 24; characterInput.minLength = 2; characterInput.autocomplete = 'off';
+  characterInput.placeholder = '예: 유하띠의 작은 구름 친구';
+  characterInput.value = state.application?.characterName || '';
+  characterLabel.append(characterInput);
+
+  const designLabel = document.createElement('label');
+  designLabel.className = 'tamagotchi-field';
+  designLabel.textContent = '원하는 디자인';
+  const designInput = document.createElement('textarea');
+  designInput.name = 'visualConcept'; designInput.required = true; designInput.minLength = 10;
+  designInput.maxLength = 800; designInput.rows = 4;
+  designInput.placeholder = '외형, 성격, 의상, 표정, 색상처럼 캐릭터를 만들 때 필요한 특징을 적어 주세요.';
+  designInput.value = state.application?.visualConcept || '';
+  designLabel.append(designInput);
+
+  const interactions = document.createElement('fieldset');
+  interactions.className = 'tamagotchi-interactions';
+  const legend = document.createElement('legend'); legend.textContent = '원하는 상호작용 (하나 이상 선택)';
+  const interactionGrid = document.createElement('div'); interactionGrid.className = 'tamagotchi-interaction-options';
+  const selectedInteractions = new Set(Array.isArray(state.application?.interactionPreferences) ? state.application.interactionPreferences : []);
+  TAMAGOTCHI_INTERACTIONS.forEach(([key, label, description]) => {
+    const option = document.createElement('label'); option.className = 'tamagotchi-interaction-option';
+    const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.name = 'interactionPreferences'; checkbox.value = key;
+    checkbox.checked = selectedInteractions.has(key);
+    const copy = document.createElement('span');
+    const title = document.createElement('strong'); title.textContent = label;
+    const detail = document.createElement('small'); detail.textContent = description;
+    copy.append(title, detail); option.append(checkbox, copy); interactionGrid.append(option);
+  });
+  interactions.append(legend, interactionGrid);
+
+  const referenceLabel = document.createElement('label');
+  referenceLabel.className = 'tamagotchi-field';
+  referenceLabel.textContent = '참고 이미지 링크 (선택)';
+  const referenceInput = document.createElement('input');
+  referenceInput.name = 'referenceImageUrl'; referenceInput.type = 'url'; referenceInput.maxLength = 500;
+  referenceInput.placeholder = 'https://'; referenceInput.value = state.application?.referenceImageUrl || '';
+  referenceLabel.append(referenceInput);
+
+  const notesLabel = document.createElement('label');
+  notesLabel.className = 'tamagotchi-field';
+  notesLabel.textContent = '추가 요청 (선택)';
+  const notesInput = document.createElement('textarea');
+  notesInput.name = 'notes'; notesInput.maxLength = 1000; notesInput.rows = 3;
+  notesInput.placeholder = '움직임이나 대사 등 더 전달하고 싶은 내용을 적어 주세요.';
+  notesInput.value = state.application?.notes || '';
+  notesLabel.append(notesInput);
+
+  const status = document.createElement('p'); status.className = 'tamagotchi-form-status';
+  status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+  const actions = document.createElement('div'); actions.className = 'tamagotchi-form-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '닫기';
+  cancel.addEventListener('click', () => { state.formOpen = false; onChange(); });
+  const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
+  submit.textContent = state.application ? '수정해 재신청' : '신청서 보내기';
+  actions.append(cancel, submit);
+  form.append(heading, intro, characterLabel, designLabel, interactions, referenceLabel, notesLabel, status, actions);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity() || state.saving) return;
+    const interactionPreferences = [...form.querySelectorAll('input[name="interactionPreferences"]:checked')].map((input) => input.value);
+    if (!interactionPreferences.length) {
+      status.textContent = '상호작용을 하나 이상 선택해 주세요.';
+      status.classList.add('is-error');
+      return;
+    }
+    state.saving = true; submit.disabled = true; submit.textContent = '신청서를 저장하고 있어요…';
+    status.classList.remove('is-error'); status.textContent = '신청서를 안전하게 저장하고 있어요.';
+    try {
+      await callTamagotchiApplications({
+        action: 'submit',
+        streamerId: page.streamer.id,
+        application: {
+          characterName: characterInput.value.trim(),
+          visualConcept: designInput.value.trim(),
+          interactionPreferences,
+          referenceImageUrl: referenceInput.value.trim(),
+          notes: notesInput.value.trim(),
+        },
+      });
+      state.saving = false;
+      state.formOpen = false;
+      await loadTamagotchiApplication(page, page._tamagotchiSection, true);
+      showToast('다마고치 신청서를 접수했어요.');
+    } catch (error) {
+      state.saving = false;
+      status.textContent = error.message || '신청서를 보내지 못했어요. 잠시 후 다시 시도해 주세요.';
+      status.classList.add('is-error');
+      submit.disabled = false; submit.textContent = state.application ? '수정해 재신청' : '신청서 보내기';
+    }
+  });
+  return form;
+}
+
+function renderTamagotchiApplication(page, section) {
+  const state = tamagotchiApplicationStateFor(page.streamer.id);
+  const content = section.querySelector('.tamagotchi-section-content');
+  content.replaceChildren();
+  const rerender = () => renderTamagotchiApplication(page, section);
+  if (state.loading || !state.loaded) {
+    const message = document.createElement('p'); message.className = 'tamagotchi-state-message';
+    message.textContent = '다마고치 신청 상태를 확인하고 있어요.'; content.append(message); return;
+  }
+  if (state.error) {
+    const message = document.createElement('p'); message.className = 'tamagotchi-state-message is-error'; message.textContent = state.error;
+    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button'; retry.textContent = '다시 불러오기';
+    retry.addEventListener('click', () => loadTamagotchiApplication(page, section, true));
+    content.append(message, retry); return;
+  }
+
+  const profile = state.profile;
+  const application = state.application;
+  const isOwner = page.isStreamerOwner === true;
+  if (profile) {
+    const approved = document.createElement('article'); approved.className = 'tamagotchi-approved-card';
+    const symbol = document.createElement('span'); symbol.className = 'tamagotchi-placeholder-symbol'; symbol.setAttribute('aria-hidden', 'true'); symbol.textContent = '✦';
+    const title = document.createElement('h3'); title.textContent = profile.characterName || '다마고치 디자인';
+    const status = document.createElement('p'); status.className = 'tamagotchi-approved-status'; status.textContent = '디자인 신청이 승인되었어요 · 캐릭터를 준비하고 있어요.';
+    const description = document.createElement('p'); description.className = 'tamagotchi-approved-description'; description.textContent = profile.visualConcept || '';
+    const interactions = document.createElement('div'); interactions.className = 'tamagotchi-tag-list';
+    (Array.isArray(profile.interactionPreferences) ? profile.interactionPreferences : []).forEach((key) => {
+      const match = TAMAGOTCHI_INTERACTIONS.find(([interactionKey]) => interactionKey === key);
+      if (!match) return;
+      const tag = document.createElement('span'); tag.textContent = match[1]; interactions.append(tag);
+    });
+    approved.append(symbol, status, title, description, interactions); content.append(approved);
+    return;
+  } else if (!isOwner) {
+    const empty = document.createElement('div'); empty.className = 'tamagotchi-empty-state';
+    const symbol = document.createElement('span'); symbol.className = 'tamagotchi-placeholder-symbol'; symbol.setAttribute('aria-hidden', 'true'); symbol.textContent = '✦';
+    const message = document.createElement('p'); message.textContent = '아직 다마고치가 없어요. 스트리머가 디자인과 상호작용을 신청하면 이곳에서 만날 수 있어요.';
+    empty.append(symbol, message); content.append(empty); return;
+  }
+
+  if (application?.status === 'pending') {
+    const status = document.createElement('div'); status.className = 'tamagotchi-application-status is-pending';
+    const title = document.createElement('strong'); title.textContent = '신청서를 검토하고 있어요';
+    const detail = document.createElement('span'); detail.textContent = `신청 캐릭터: ${application.characterName || '이름 미정'} · ${formatCommentDate(application.createdAt)}`;
+    status.append(title, detail); content.append(status); return;
+  }
+  if (application?.status === 'rejected') {
+    const status = document.createElement('div'); status.className = 'tamagotchi-application-status is-rejected';
+    const title = document.createElement('strong'); title.textContent = '신청 내용을 조금 더 다듬어 주세요';
+    const detail = document.createElement('span'); detail.textContent = application.reviewNote || '관리자가 검토한 뒤 재신청을 요청했어요.';
+    status.append(title, detail); content.append(status);
+  }
+  if (state.formOpen) {
+    content.append(renderTamagotchiApplicationForm(page, state, rerender));
+    return;
+  }
+  const apply = document.createElement('button'); apply.type = 'button'; apply.className = 'button button-primary tamagotchi-apply-button';
+  apply.textContent = application?.status === 'rejected' ? '신청 내용 수정하기' : '내 다마고치 디자인 신청';
+  apply.addEventListener('click', () => { state.formOpen = true; rerender(); }); content.append(apply);
+}
+
+async function loadTamagotchiApplication(page, section, force = false) {
+  if (!page || !section) return;
+  const state = tamagotchiApplicationStateFor(page.streamer.id);
+  if (state.loading || (state.loaded && !force)) return;
+  state.loading = true; state.error = '';
+  renderTamagotchiApplication(page, section);
+  try {
+    const result = await callTamagotchiApplications({ action: 'status', streamerId: page.streamer.id });
+    if (currentPage?.streamer.id !== page.streamer.id) return;
+    state.application = result.data?.application || null;
+    state.profile = result.data?.profile || null;
+    state.loaded = true;
+  } catch (error) {
+    state.error = error.message || '다마고치 정보를 불러오지 못했어요.';
+  } finally {
+    state.loading = false;
+    if (currentPage?.streamer.id === page.streamer.id) renderTamagotchiApplication(page, section);
+  }
+}
+
+function renderTamagotchiSection(page) {
+  const section = document.createElement('section'); section.className = 'tamagotchi-section content-card';
+  section.id = 'tamagotchiSection';
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'STREAMER TAMAGOTCHI';
+  const title = document.createElement('h2'); title.textContent = '다마고치';
+  const description = document.createElement('p'); description.className = 'tamagotchi-section-description';
+  description.textContent = '스트리머마다 다른 모습과 상호작용을 가진 다마고치를 준비하고 있어요.';
+  const content = document.createElement('div'); content.className = 'tamagotchi-section-content';
+  section.append(eyebrow, title, description, content);
+  page._tamagotchiSection = section;
+  renderTamagotchiApplication(page, section);
+  return section;
+}
+
 function renderFanPage(page, options = {}) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
@@ -3504,12 +3816,14 @@ function renderFanPage(page, options = {}) {
   const rollingPaperSection = renderRollingPaperSection(page);
   const memoriesSection = renderMemoriesSection(page);
   const competitionHistorySection = renderCompetitionHistorySection(page);
+  const tamagotchiSection = renderTamagotchiSection(page);
   const tabDefinitions = [
     { key: 'home', label: '홈', eyebrow: 'YOUR HOME', title: '방송과 최신 소식', description: '방송 상태와 일정, 최근 다시보기를 모아 보여드려요.' },
     { key: 'activity', label: '팬 활동', eyebrow: 'FAN ACTIVITY', title: '팬들과 함께하는 공간', description: '팬 참여와 소통, 함께 만든 추억을 둘러보세요.' },
     { key: 'content', label: '콘텐츠', eyebrow: 'STREAMER CONTENTS', title: '다시보기와 활동 기록', description: '영상, 대회 이력, 플레이한 게임을 모아봤어요.' },
     { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 응원 메시지를 남겨 보세요.' },
     { key: 'memories', label: '기억의 순간', eyebrow: 'MEMORY MOMENTS', title: '기억의 순간', description: '100일·200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아봤어요.' },
+    { key: 'tamagotchi', label: '다마고치', eyebrow: 'STREAMER TAMAGOTCHI', title: '다마고치', description: '스트리머의 개성을 담은 캐릭터와 원하는 상호작용을 신청해 보세요.' },
   ];
   const tabNav = document.createElement('div');
   tabNav.className = 'fanpage-tab-nav';
@@ -3603,6 +3917,7 @@ function renderFanPage(page, options = {}) {
       : [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
     ['rolling-paper', createFanPageTabPanel(tabDefinitions[3], [rollingPaperSection])],
     ['memories', createFanPageTabPanel(tabDefinitions[4], [memoriesSection])],
+    ['tamagotchi', createFanPageTabPanel(tabDefinitions[5], [tamagotchiSection])],
   ]);
   function selectFanPageTab(tabKey, moveFocus = false) {
     if (!tabPanels.has(tabKey)) return;
@@ -3633,6 +3948,7 @@ function renderFanPage(page, options = {}) {
       }
     }
     if (tabKey === 'memories') loadFanPageMemories(page);
+    if (tabKey === 'tamagotchi') loadTamagotchiApplication(page, tamagotchiSection);
     if (moveFocus) tabButtons.get(tabKey)?.focus();
   }
   view._selectFanPageTab = selectFanPageTab;
@@ -7306,6 +7622,7 @@ async function loadApp() {
       // 관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
       page.isOwner = page.isStreamerOwner || result.isAdmin === true;
       setVisibleView(page);
+      openTamagotchiAdminFromDeepLink();
       recentPromise.then((recent) => {
         if (currentPage && currentPage.streamer.id === page.streamer.id) {
           renderList($('recentPages'), recent, true, '최근 방문한 팬페이지가 여기에 표시돼요.');
@@ -7334,6 +7651,7 @@ async function loadApp() {
           if (wasOwner !== currentPage.isOwner || wasStreamerOwner !== currentPage.isStreamerOwner) {
             renderFanPage(currentPage);
           }
+          openTamagotchiAdminFromDeepLink();
         }).catch((error) => console.warn('로그인 상태에 따른 팬페이지 권한 확인 실패:', error.message || error));
       }
     }
@@ -7382,6 +7700,7 @@ $('openAdminStats').addEventListener('click', () => {
   showFanPageModal($('adminStatsDialog'));
   loadAdminStats();
   loadAdminDesignFeedback();
+  loadAdminTamagotchiApplications();
 });
 $('closeAdminStats').addEventListener('click', () => $('adminStatsDialog').close());
 $('refreshAdminStats').addEventListener('click', loadAdminStats);
@@ -7389,6 +7708,36 @@ $('viewerStatsAdminDataRange').addEventListener('change', () => {
   if (latestViewerStatsAdminUsage) renderViewerStatsUsage(latestViewerStatsAdminUsage);
 });
 $('refreshDesignFeedback').addEventListener('click', loadAdminDesignFeedback);
+$('refreshTamagotchiApplications').addEventListener('click', loadAdminTamagotchiApplications);
+$('adminTamagotchiApplicationFilter').addEventListener('change', renderAdminTamagotchiApplications);
+$('adminTamagotchiApplicationList').addEventListener('click', async (event) => {
+  const button = event.target.closest('button[data-tamagotchi-action][data-streamer-id][data-application-id]');
+  if (!button || !isAdminUser) return;
+  const action = button.dataset.tamagotchiAction;
+  const reviewNote = prompt(action === 'approve'
+    ? '신청자에게 전달할 승인 메모 (선택 사항)'
+    : '신청자에게 전달할 보완 요청 내용을 적어 주세요.');
+  if (reviewNote === null) return;
+  if (action === 'reject' && !reviewNote.trim()) {
+    $('adminTamagotchiApplicationStatus').textContent = '보완 요청 사유를 입력해 주세요.';
+    return;
+  }
+  button.disabled = true;
+  $('adminTamagotchiApplicationStatus').textContent = action === 'approve' ? '신청서를 승인하고 있어요.' : '보완 요청을 보내고 있어요.';
+  try {
+    await callTamagotchiApplications({
+      action: 'review',
+      streamerId: button.dataset.streamerId,
+      applicationId: button.dataset.applicationId,
+      decision: action,
+      reviewNote: reviewNote.trim(),
+    });
+    await loadAdminTamagotchiApplications();
+  } catch (error) {
+    $('adminTamagotchiApplicationStatus').textContent = error.message || '신청서를 처리하지 못했어요.';
+    button.disabled = false;
+  }
+});
 $('openDesignFeedback').addEventListener('click', () => {
   const activeId = routeId().toLowerCase();
   const streamer = currentPage?.streamer && String(currentPage.streamer.id || '').toLowerCase() === activeId
