@@ -270,6 +270,15 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 .viewer-subscription-code-row code{border-color:#e7bdcb;background:#fff8fa;color:#9b3f60}
 .viewer-subscription-dialog::backdrop{background:#18243acc;backdrop-filter:blur(4px)}
 .viewer-subscription-dialog-card{scrollbar-color:#c0c9d8 #f2f4f8}
+.viewer-subscription-dialog .button{min-height:44px;border-color:#c5cfdf;background:#fff;color:#34435a;font-weight:800}
+.viewer-subscription-dialog .button:hover:not(:disabled){border-color:#9caec9;background:#f5f7fb}
+.viewer-subscription-dialog .button:disabled{opacity:.72;cursor:wait}
+.viewer-subscription-dialog .button-primary,
+.viewer-subscription-dialog #viewerSubscriptionCopyCode{border-color:#486bd6;background:#486bd6;color:#fff;box-shadow:0 3px 9px #486bd633}
+.viewer-subscription-dialog .button-primary:hover:not(:disabled),
+.viewer-subscription-dialog #viewerSubscriptionCopyCode:hover:not(:disabled){border-color:#3658c2;background:#3658c2}
+.viewer-subscription-dialog #viewerSubscriptionCancel{border-color:#d7a0ad;background:#fff8fa;color:#913f5a}
+.viewer-subscription-dialog #viewerSubscriptionCancel:hover:not(:disabled){border-color:#c77d91;background:#fff0f4}
 .viewer-subscription-close{border-color:#e1e6ef;background:#f8f9fc;color:#485771}
 .viewer-subscription-dialog-card>.eyebrow{color:#a34166}
 .viewer-subscription-dialog-card h2{color:#25344d;font:700 24px/1.35 'DM Sans',system-ui,-apple-system,'Segoe UI','Gowun Dodum',sans-serif}
@@ -286,6 +295,7 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 .viewer-subscription-dialog-card input:focus{outline:2px solid #486bd633;border-color:#7188d1}
 .viewer-subscription-dialog-status{color:#8b3658;font-size:13px}
 .viewer-subscription-login-note{color:#5e6c82;font-size:13px}
+@media(max-width:620px){.viewer-subscription-dialog .viewer-subscription-code-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.viewer-subscription-dialog .viewer-subscription-code-row code{grid-column:1/-1;width:100%;min-width:0;min-height:50px}.viewer-subscription-dialog .viewer-subscription-code-row .button{width:100%;min-height:46px;padding:10px 8px;font-size:13px}.viewer-subscription-dialog-actions .button{min-height:46px;font-size:13px}}
 @media(max-width:620px){.viewer-stats-shell .viewer-subscription-code-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.viewer-stats-shell .viewer-subscription-code-row code{grid-column:1/-1;width:100%;min-width:0;min-height:50px}.viewer-stats-shell .viewer-subscription-code-row .button{width:100%;min-height:46px;padding:10px 8px;font-size:13px}}
 @media(max-width:980px){.viewer-workspace{grid-template-columns:1fr;gap:22px;align-items:start}.viewer-stats-hero{max-width:760px}.viewer-search-panel{max-width:none}.viewer-stats-hero h1{font-size:40px}}
 @media(max-width:800px){.viewer-vod-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.viewer-period-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
