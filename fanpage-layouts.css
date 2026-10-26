@@ -1423,6 +1423,13 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .tamagotchi-application-status.is-pending{border-color:#f1dfab;background:#fffaf0}
 #fanPageView.fanpage-layout-1 .tamagotchi-application-status.is-rejected{border-color:#f0cdd8;background:#fff7fa}
 #fanPageView.fanpage-layout-1 .tamagotchi-application-form{border-color:#dbe4f8;background:#fff;color:#51465d;box-shadow:0 4px 0 #e5eaf5}
+#fanPageView.fanpage-layout-1 .tamagotchi-request-modes{border-color:#dbe4f8}
+#fanPageView.fanpage-layout-1 .tamagotchi-request-modes legend{color:#51465d}
+#fanPageView.fanpage-layout-1 .tamagotchi-request-mode-option{border-color:#e5e9f5;background:#fbfcff}
+#fanPageView.fanpage-layout-1 .tamagotchi-request-mode-option.is-selected{border-color:#8caaf0;background:#f1f5ff;box-shadow:0 0 0 2px #8caaf018}
+#fanPageView.fanpage-layout-1 .tamagotchi-request-mode-option strong{color:#51465d}
+#fanPageView.fanpage-layout-1 .tamagotchi-request-mode-option small{color:#81758b}
+#fanPageView.fanpage-layout-1 .tamagotchi-delegated-note{border-color:#dbe4f8;background:#f4f7ff;color:#5974b3}
 #fanPageView.fanpage-layout-1 .tamagotchi-field,#fanPageView.fanpage-layout-1 .tamagotchi-interactions legend{color:#51465d}
 #fanPageView.fanpage-layout-1 .tamagotchi-field input,#fanPageView.fanpage-layout-1 .tamagotchi-field textarea{border-color:#d9dcec;background:#fff;color:#51465d}
 #fanPageView.fanpage-layout-1 .tamagotchi-field input:focus,#fanPageView.fanpage-layout-1 .tamagotchi-field textarea:focus{border-color:#8caaf0;box-shadow:0 0 0 3px #8caaf022}

@@ -5781,17 +5781,20 @@ function normalizeTamagotchiApplication(id, value) {
   const status = ['pending', 'approved', 'rejected'].includes(value.status) ? value.status : '';
   const characterName = typeof value.characterName === 'string' ? value.characterName.slice(0, 24) : '';
   const visualConcept = typeof value.visualConcept === 'string' ? value.visualConcept.slice(0, 800) : '';
+  const requestMode = typeof value.requestMode === 'string' ? value.requestMode : 'custom';
   const interactionPreferences = Array.isArray(value.interactionPreferences)
     ? [...new Set(value.interactionPreferences.filter((item) => FANPAGE_TAMAGOTCHI_INTERACTIONS.has(item)))].slice(0, 7)
     : [];
   const createdAt = Number(value.createdAt);
-  if (!status || !characterName || !visualConcept || !interactionPreferences.length || !Number.isFinite(createdAt)) return null;
+  const hasRequiredInteractions = requestMode === 'delegate' || interactionPreferences.length > 0;
+  if (!status || !['custom', 'delegate'].includes(requestMode) || !characterName || !visualConcept || !hasRequiredInteractions || !Number.isFinite(createdAt)) return null;
   const referenceImageUrl = typeof value.referenceImageUrl === 'string' ? value.referenceImageUrl.slice(0, 500) : '';
   return {
     id,
     streamerId: String(value.streamerId || '').toLowerCase(),
     streamerNickname: String(value.streamerNickname || '').slice(0, 40),
     streamerSoopId: String(value.streamerSoopId || '').slice(0, 20),
+    requestMode,
     characterName,
     visualConcept,
     interactionPreferences,
@@ -5803,6 +5806,51 @@ function normalizeTamagotchiApplication(id, value) {
     reviewedAt: Number(value.reviewedAt) || 0,
     reviewNote: typeof value.reviewNote === 'string' ? value.reviewNote.slice(0, 1000) : '',
   };
+}
+
+function normalizeTamagotchiApplicationInput(payload, streamer) {
+  const requestMode = typeof payload.requestMode === 'string' ? payload.requestMode : 'custom';
+  if (!['custom', 'delegate'].includes(requestMode)) {
+    throw new HttpsError('invalid-argument', '신청 방식을 선택해 주세요.');
+  }
+  const cleanText = (value, maxLength) => typeof value === 'string'
+    ? value.normalize('NFC').trim().replace(/\r\n?/g, '\n').slice(0, maxLength)
+    : '';
+  const notes = requestMode === 'custom' ? cleanText(payload.notes, 1000) : '';
+  const interactionPreferences = requestMode === 'custom' && Array.isArray(payload.interactionPreferences)
+    ? [...new Set(payload.interactionPreferences.filter((item) => typeof item === 'string' && FANPAGE_TAMAGOTCHI_INTERACTIONS.has(item)))]
+    : [];
+  const characterName = requestMode === 'delegate'
+    ? cleanText(`${streamer.nickname || '스트리머'} 다마고치`, 24)
+    : cleanText(payload.characterName, 24);
+  const visualConcept = requestMode === 'delegate'
+    ? '캐릭터 디자인과 상호작용은 개발자에게 맡깁니다.'
+    : cleanText(payload.visualConcept, 800);
+  let referenceImageUrl = '';
+  if (requestMode === 'custom' && typeof payload.referenceImageUrl === 'string' && payload.referenceImageUrl.trim()) {
+    try {
+      const rawReferenceUrl = payload.referenceImageUrl.trim();
+      if (rawReferenceUrl.length > 500) throw new Error('invalid URL');
+      const parsedUrl = new URL(rawReferenceUrl);
+      if (parsedUrl.protocol !== 'https:' || parsedUrl.username || parsedUrl.password || parsedUrl.port) throw new Error('invalid URL');
+      referenceImageUrl = parsedUrl.href.slice(0, 500);
+    } catch (_) {
+      throw new HttpsError('invalid-argument', '참고 이미지에는 올바른 HTTPS 링크를 입력해 주세요.');
+    }
+  }
+  if (requestMode === 'custom' && Array.from(characterName).length < 2) {
+    throw new HttpsError('invalid-argument', '캐릭터 이름은 2자 이상 입력해 주세요.');
+  }
+  if (requestMode === 'custom' && Array.from(visualConcept).length < 10) {
+    throw new HttpsError('invalid-argument', '디자인 설명은 10자 이상 입력해 주세요.');
+  }
+  if (requestMode === 'custom' && !interactionPreferences.length) {
+    throw new HttpsError('invalid-argument', '원하는 상호작용을 하나 이상 선택해 주세요.');
+  }
+  if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(characterName + visualConcept + notes)) {
+    throw new HttpsError('invalid-argument', '입력 내용에 사용할 수 없는 문자가 있습니다.');
+  }
+  return { requestMode, characterName, visualConcept, interactionPreferences, referenceImageUrl, notes };
 }
 
 exports.streamerFanPageTamagotchiApplications = onCall({ maxInstances: 10 }, async (request) => {
@@ -5849,33 +5897,8 @@ exports.streamerFanPageTamagotchiApplications = onCall({ maxInstances: 10 }, asy
     const payload = data.application && typeof data.application === 'object' && !Array.isArray(data.application)
       ? data.application
       : {};
-    const cleanText = (value, maxLength) => typeof value === 'string'
-      ? value.normalize('NFC').trim().replace(/\r\n?/g, '\n').slice(0, maxLength)
-      : '';
-    const characterName = cleanText(payload.characterName, 24);
-    const visualConcept = cleanText(payload.visualConcept, 800);
-    const notes = cleanText(payload.notes, 1000);
-    const interactionPreferences = Array.isArray(payload.interactionPreferences)
-      ? [...new Set(payload.interactionPreferences.filter((item) => typeof item === 'string' && FANPAGE_TAMAGOTCHI_INTERACTIONS.has(item)))]
-      : [];
-    let referenceImageUrl = '';
-    if (typeof payload.referenceImageUrl === 'string' && payload.referenceImageUrl.trim()) {
-      try {
-        const rawReferenceUrl = payload.referenceImageUrl.trim();
-        if (rawReferenceUrl.length > 500) throw new Error('invalid URL');
-        const parsedUrl = new URL(rawReferenceUrl);
-        if (parsedUrl.protocol !== 'https:' || parsedUrl.username || parsedUrl.password || parsedUrl.port) throw new Error('invalid URL');
-        referenceImageUrl = parsedUrl.href.slice(0, 500);
-      } catch (_) {
-        throw new HttpsError('invalid-argument', '참고 이미지에는 올바른 HTTPS 링크를 입력해 주세요.');
-      }
-    }
-    if (Array.from(characterName).length < 2) throw new HttpsError('invalid-argument', '캐릭터 이름은 2자 이상 입력해 주세요.');
-    if (Array.from(visualConcept).length < 10) throw new HttpsError('invalid-argument', '디자인 설명은 10자 이상 입력해 주세요.');
-    if (!interactionPreferences.length) throw new HttpsError('invalid-argument', '원하는 상호작용을 하나 이상 선택해 주세요.');
-    if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(characterName + visualConcept + notes)) {
-      throw new HttpsError('invalid-argument', '입력 내용에 사용할 수 없는 문자가 있습니다.');
-    }
+    const { requestMode, characterName, visualConcept, interactionPreferences, referenceImageUrl, notes } =
+      normalizeTamagotchiApplicationInput(payload, target.streamer);
 
     const rootRef = db.ref('streamerFanPageTamagotchiApplications');
     const streamerApplicationsRef = rootRef.child(target.streamer.id);
@@ -5886,6 +5909,7 @@ exports.streamerFanPageTamagotchiApplications = onCall({ maxInstances: 10 }, asy
       streamerNickname: target.streamer.nickname,
       streamerSoopId: target.streamer.soopId,
       requesterUid: uid,
+      requestMode,
       characterName,
       visualConcept,
       interactionPreferences,
