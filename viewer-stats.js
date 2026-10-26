@@ -3003,17 +3003,25 @@ $('viewerSubscriptionCancel').addEventListener('click', async () => {
   const cancelMessage = '구독 인증 신청과 발급 코드를 취소할까요?';
   if (!subscriptionState.pendingRequestId || !confirm(cancelMessage)) return;
   const cancel = $('viewerSubscriptionCancel');
+  const requestId = subscriptionState.pendingRequestId;
   cancel.disabled = true;
+  cancel.textContent = '취소 중…';
   try {
-    await callViewerSubscription({ action: 'cancel', requestId: subscriptionState.pendingRequestId });
+    await callViewerSubscription({ action: 'cancel', requestId });
     subscriptionVerificationCode = '';
     await refreshSubscriptionStatus();
     renderSubscriptionDialogStatus('인증 신청을 취소했어요.');
   } catch (error) {
-    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '신청을 취소하지 못했어요.'));
+    const message = viewerStatsErrorMessage(error, '신청을 취소하지 못했어요.');
+    await refreshSubscriptionStatus({ resumeComparison: false, resumeKeywordComparison: false });
+    if (subscriptionState.pending && subscriptionState.pendingRequestId === requestId) {
+      renderSubscriptionDialogStatus(message);
+    } else {
+      renderSubscriptionDialogStatus();
+    }
   } finally {
     cancel.disabled = false;
-    renderSubscriptionDialogStatus();
+    cancel.textContent = '대기 신청 취소';
   }
 });
 

@@ -213,6 +213,15 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     const now = Date.now();
     const codeExpiresAt = now + VERIFICATION_CODE_TTL_MS;
     const requestRef = db.ref(`${REQUESTS_PATH}/${requestId}`);
+    // Load the existing record before starting a transaction on an older request.
+    // Without this read, a cold RTDB connection can start the transaction with null
+    // and abort before it sees the server-side pending record.
+    const initialRequest = (await requestRef.get()).val();
+    if (!initialRequest || initialRequest.requesterUid !== uid ||
+        !['pending', 'processing'].includes(initialRequest.status) ||
+        initialRequest.verificationMethod !== 'subscriber-comment-code') {
+      throw new HttpsError('failed-precondition', '코드를 다시 발급할 수 있는 대기 중 신청이 없습니다. 신청 상태를 새로고침해 주세요.');
+    }
     const result = await requestRef.transaction((current) => {
       const staleProcessing = current && current.status === 'processing' &&
         Number(current.processingAt) > 0 && now - Number(current.processingAt) >= PROCESSING_STALE_MS;
@@ -282,6 +291,11 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     const requestId = typeof data.requestId === 'string' ? data.requestId.trim() : '';
     if (!REQUEST_ID_RE.test(requestId)) throw new HttpsError('invalid-argument', '신청 번호를 확인해 주세요.');
     const requestRef = db.ref(`${REQUESTS_PATH}/${requestId}`);
+    // Prime the RTDB transaction cache so a cold connection sees the pending record.
+    const initialRequest = (await requestRef.get()).val();
+    if (!initialRequest || initialRequest.requesterUid !== uid || initialRequest.status !== 'pending') {
+      throw new HttpsError('failed-precondition', '취소할 수 있는 대기 중 신청이 없습니다.');
+    }
     const canceledAt = Date.now();
     const result = await requestRef.transaction((current) => {
       if (!current || current.requesterUid !== uid || current.status !== 'pending') return;
