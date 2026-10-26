@@ -1251,7 +1251,11 @@ function renderAdminTamagotchiApplications() {
     const heading = document.createElement('div'); heading.className = 'admin-tamagotchi-item-heading';
     const title = document.createElement('strong'); title.textContent = item.characterName || '(캐릭터 이름 없음)';
     const status = document.createElement('span'); status.className = 'admin-tamagotchi-status'; status.textContent = statusLabels[item.status] || '확인 필요';
-    heading.append(title, status);
+    const badges = document.createElement('div'); badges.className = 'admin-tamagotchi-item-badges';
+    const requestMode = document.createElement('span'); requestMode.className = 'admin-tamagotchi-mode';
+    requestMode.textContent = item.requestMode === 'delegate' ? '개발자 자율 제작' : '기존 신청양식';
+    badges.append(requestMode, status);
+    heading.append(title, badges);
     const streamer = document.createElement('p'); streamer.className = 'admin-tamagotchi-streamer';
     streamer.textContent = `${item.streamerNickname || '알 수 없는 스트리머'}${item.streamerSoopId ? ` (@${item.streamerSoopId})` : ''} · 신청 ${formatCommentDate(item.createdAt)}`;
     const concept = document.createElement('p'); concept.className = 'admin-tamagotchi-concept'; concept.textContent = item.visualConcept || '';
@@ -3468,7 +3472,30 @@ function renderTamagotchiApplicationForm(page, state, onChange) {
   heading.textContent = state.application ? '신청 내용 수정' : '다마고치 디자인 신청';
   const intro = document.createElement('p');
   intro.className = 'tamagotchi-form-intro';
-  intro.textContent = '캐릭터의 모습과 원하는 상호작용을 적어 주세요. 신청 내용은 관리자 검토를 위해 서버에 저장됩니다.';
+  intro.textContent = '신청 방식을 선택해 주세요. 신청 내용은 관리자 검토를 위해 서버에 저장됩니다.';
+
+  const requestModeFieldset = document.createElement('fieldset');
+  requestModeFieldset.className = 'tamagotchi-request-modes';
+  const requestModeLegend = document.createElement('legend'); requestModeLegend.textContent = '신청 방식';
+  const requestModeOptions = document.createElement('div'); requestModeOptions.className = 'tamagotchi-request-mode-options';
+  const delegatedModeNote = document.createElement('p'); delegatedModeNote.className = 'tamagotchi-delegated-note';
+  delegatedModeNote.textContent = '디자인과 상호작용을 모두 개발자가 정해요. 추가 입력 없이 이 선택만으로 신청할 수 있어요.';
+  const initialRequestMode = state.application?.requestMode === 'delegate' ? 'delegate' : 'custom';
+  const requestModeInputs = [];
+  [
+    ['custom', '기존 신청양식', '캐릭터 이름, 디자인, 상호작용을 직접 정해요.'],
+    ['delegate', '그냥 알아서 만들어 주세요.', '디자인과 상호작용 모두 개발자에게 맡겨요.'],
+  ].forEach(([value, titleText, descriptionText]) => {
+    const option = document.createElement('label'); option.className = 'tamagotchi-request-mode-option';
+    const input = document.createElement('input'); input.type = 'radio'; input.name = 'requestMode'; input.value = value;
+    input.checked = initialRequestMode === value;
+    const copy = document.createElement('span');
+    const title = document.createElement('strong'); title.textContent = titleText;
+    const description = document.createElement('small'); description.textContent = descriptionText;
+    copy.append(title, description); option.append(input, copy); requestModeOptions.append(option);
+    requestModeInputs.push(input);
+  });
+  requestModeFieldset.append(requestModeLegend, requestModeOptions);
 
   const characterLabel = document.createElement('label');
   characterLabel.className = 'tamagotchi-field';
@@ -3490,6 +3517,10 @@ function renderTamagotchiApplicationForm(page, state, onChange) {
   designInput.value = state.application?.visualConcept || '';
   designLabel.append(designInput);
 
+  const customDesignFields = document.createElement('div');
+  customDesignFields.className = 'tamagotchi-custom-design-fields';
+  customDesignFields.append(characterLabel, designLabel);
+
   const interactions = document.createElement('fieldset');
   interactions.className = 'tamagotchi-interactions';
   const legend = document.createElement('legend'); legend.textContent = '원하는 상호작용 (하나 이상 선택)';
@@ -3505,6 +3536,7 @@ function renderTamagotchiApplicationForm(page, state, onChange) {
     copy.append(title, detail); option.append(checkbox, copy); interactionGrid.append(option);
   });
   interactions.append(legend, interactionGrid);
+  customDesignFields.append(interactions);
 
   const referenceLabel = document.createElement('label');
   referenceLabel.className = 'tamagotchi-field';
@@ -3516,12 +3548,25 @@ function renderTamagotchiApplicationForm(page, state, onChange) {
 
   const notesLabel = document.createElement('label');
   notesLabel.className = 'tamagotchi-field';
-  notesLabel.textContent = '추가 요청 (선택)';
+  const notesTitle = document.createElement('span'); notesTitle.textContent = '추가 요청 (선택)';
   const notesInput = document.createElement('textarea');
   notesInput.name = 'notes'; notesInput.maxLength = 1000; notesInput.rows = 3;
   notesInput.placeholder = '움직임이나 대사 등 더 전달하고 싶은 내용을 적어 주세요.';
   notesInput.value = state.application?.notes || '';
-  notesLabel.append(notesInput);
+  notesLabel.append(notesTitle, notesInput);
+  customDesignFields.append(referenceLabel, notesLabel);
+
+  const syncRequestMode = () => {
+    const mode = requestModeInputs.find((input) => input.checked)?.value || 'custom';
+    const isCustom = mode === 'custom';
+    customDesignFields.hidden = !isCustom;
+    delegatedModeNote.hidden = isCustom;
+    characterInput.required = isCustom;
+    designInput.required = isCustom;
+    requestModeInputs.forEach((input) => input.closest('.tamagotchi-request-mode-option')?.classList.toggle('is-selected', input.checked));
+  };
+  requestModeInputs.forEach((input) => input.addEventListener('change', syncRequestMode));
+  syncRequestMode();
 
   const status = document.createElement('p'); status.className = 'tamagotchi-form-status';
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
@@ -3531,12 +3576,15 @@ function renderTamagotchiApplicationForm(page, state, onChange) {
   const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
   submit.textContent = state.application ? '수정해 재신청' : '신청서 보내기';
   actions.append(cancel, submit);
-  form.append(heading, intro, characterLabel, designLabel, interactions, referenceLabel, notesLabel, status, actions);
+  form.append(heading, intro, requestModeFieldset, delegatedModeNote, customDesignFields, status, actions);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity() || state.saving) return;
-    const interactionPreferences = [...form.querySelectorAll('input[name="interactionPreferences"]:checked')].map((input) => input.value);
-    if (!interactionPreferences.length) {
+    const requestMode = requestModeInputs.find((input) => input.checked)?.value || 'custom';
+    const interactionPreferences = requestMode === 'custom'
+      ? [...form.querySelectorAll('input[name="interactionPreferences"]:checked')].map((input) => input.value)
+      : [];
+    if (requestMode === 'custom' && !interactionPreferences.length) {
       status.textContent = '상호작용을 하나 이상 선택해 주세요.';
       status.classList.add('is-error');
       return;
@@ -3548,11 +3596,12 @@ function renderTamagotchiApplicationForm(page, state, onChange) {
         action: 'submit',
         streamerId: page.streamer.id,
         application: {
-          characterName: characterInput.value.trim(),
-          visualConcept: designInput.value.trim(),
+          requestMode,
+          characterName: requestMode === 'custom' ? characterInput.value.trim() : '',
+          visualConcept: requestMode === 'custom' ? designInput.value.trim() : '',
           interactionPreferences,
-          referenceImageUrl: referenceInput.value.trim(),
-          notes: notesInput.value.trim(),
+          referenceImageUrl: requestMode === 'custom' ? referenceInput.value.trim() : '',
+          notes: requestMode === 'custom' ? notesInput.value.trim() : '',
         },
       });
       state.saving = false;
@@ -3612,7 +3661,8 @@ function renderTamagotchiApplication(page, section) {
   if (application?.status === 'pending') {
     const status = document.createElement('div'); status.className = 'tamagotchi-application-status is-pending';
     const title = document.createElement('strong'); title.textContent = '신청서를 검토하고 있어요';
-    const detail = document.createElement('span'); detail.textContent = `신청 캐릭터: ${application.characterName || '이름 미정'} · ${formatCommentDate(application.createdAt)}`;
+    const requestModeLabel = application.requestMode === 'delegate' ? '개발자 자율 제작' : '기존 신청양식';
+    const detail = document.createElement('span'); detail.textContent = `${requestModeLabel} · 신청 캐릭터: ${application.characterName || '이름 미정'} · ${formatCommentDate(application.createdAt)}`;
     status.append(title, detail); content.append(status); return;
   }
   if (application?.status === 'rejected') {
