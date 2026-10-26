@@ -100,8 +100,26 @@ async function clearPending(db, requestId, requesterUid) {
   };
   await db.ref().update(updates);
   if (requesterUid) {
-    await db.ref(`${SUBSCRIPTIONS_PATH}/${requesterUid}/pendingRequestId`)
-      .transaction((current) => current === requestId ? null : current);
+    await transactionWithCachedValue(
+      db.ref(`${SUBSCRIPTIONS_PATH}/${requesterUid}/pendingRequestId`),
+      (current) => current === requestId ? null : current,
+    );
+  }
+}
+
+async function transactionWithCachedValue(ref, update) {
+  const listener = () => {};
+  const cancelListener = () => {};
+
+  // Keep a listener active while get() fetches the server value. A listener's
+  // first callback can be an incomplete local null; get() waits for a complete
+  // server value and populates the active listener cache used by transaction().
+  ref.on('value', listener, cancelListener);
+  try {
+    await ref.get();
+    return await ref.transaction(update);
+  } finally {
+    ref.off('value', listener);
   }
 }
 
@@ -162,7 +180,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     const requestId = requestRef.key;
     const code = createVerificationCode();
     const codeExpiresAt = now + VERIFICATION_CODE_TTL_MS;
-    const claim = await subscriptionRef.transaction((current) => {
+    const claim = await transactionWithCachedValue(subscriptionRef, (current) => {
       const previous = current && typeof current === 'object' ? current : {};
       if (previous.pendingRequestId) return;
       const lastRequestedAt = Number(previous.lastRequestedAt) || 0;
@@ -199,7 +217,10 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
         [`${SIGNALS_PATH}/${requestId}`]: { requestedAt: now },
       });
     } catch (error) {
-      await subscriptionRef.child('pendingRequestId').transaction((current) => current === requestId ? null : current);
+      await transactionWithCachedValue(
+        subscriptionRef.child('pendingRequestId'),
+        (current) => current === requestId ? null : current,
+      );
       throw error;
     }
     return { action: 'pending', requestId, soopId, code, codeExpiresAt, requestedAt: now };
@@ -213,16 +234,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     const now = Date.now();
     const codeExpiresAt = now + VERIFICATION_CODE_TTL_MS;
     const requestRef = db.ref(`${REQUESTS_PATH}/${requestId}`);
-    // Load the existing record before starting a transaction on an older request.
-    // Without this read, a cold RTDB connection can start the transaction with null
-    // and abort before it sees the server-side pending record.
-    const initialRequest = (await requestRef.get()).val();
-    if (!initialRequest || initialRequest.requesterUid !== uid ||
-        !['pending', 'processing'].includes(initialRequest.status) ||
-        initialRequest.verificationMethod !== 'subscriber-comment-code') {
-      throw new HttpsError('failed-precondition', '코드를 다시 발급할 수 있는 대기 중 신청이 없습니다. 신청 상태를 새로고침해 주세요.');
-    }
-    const result = await requestRef.transaction((current) => {
+    const result = await transactionWithCachedValue(requestRef, (current) => {
       const staleProcessing = current && current.status === 'processing' &&
         Number(current.processingAt) > 0 && now - Number(current.processingAt) >= PROCESSING_STALE_MS;
       if (!current || current.requesterUid !== uid || (current.status !== 'pending' && !staleProcessing) ||
@@ -270,7 +282,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     if (!REQUEST_ID_RE.test(requestId)) throw new HttpsError('invalid-argument', '신청 번호를 확인해 주세요.');
     const requestRef = db.ref(`${REQUESTS_PATH}/${requestId}`);
     const now = Date.now();
-    const result = await requestRef.transaction((current) => {
+    const result = await transactionWithCachedValue(requestRef, (current) => {
       if (!current || current.requesterUid !== uid || current.status !== 'pending' ||
           current.verificationMethod === 'subscriber-comment-code' ||
           !SOOP_ID_RE.test(String(current.donorSoopId || '')) ||
@@ -291,13 +303,9 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     const requestId = typeof data.requestId === 'string' ? data.requestId.trim() : '';
     if (!REQUEST_ID_RE.test(requestId)) throw new HttpsError('invalid-argument', '신청 번호를 확인해 주세요.');
     const requestRef = db.ref(`${REQUESTS_PATH}/${requestId}`);
-    // Prime the RTDB transaction cache so a cold connection sees the pending record.
-    const initialRequest = (await requestRef.get()).val();
-    if (!initialRequest || initialRequest.requesterUid !== uid || initialRequest.status !== 'pending') {
-      throw new HttpsError('failed-precondition', '취소할 수 있는 대기 중 신청이 없습니다.');
-    }
+    // Keep the RTDB value listener active until the conditional transaction finishes.
     const canceledAt = Date.now();
-    const result = await requestRef.transaction((current) => {
+    const result = await transactionWithCachedValue(requestRef, (current) => {
       if (!current || current.requesterUid !== uid || current.status !== 'pending') return;
       return { ...current, status: 'cancelled', canceledAt, verificationCodeHash: null };
     });
@@ -386,7 +394,7 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
   }
 
   if (action === 'reject') {
-    const result = await requestRef.transaction((current) => {
+    const result = await transactionWithCachedValue(requestRef, (current) => {
       if (!current || current.status !== 'pending') return;
       return { ...current, status: 'rejected', reviewedAt: now, reviewedBy: adminUid, verificationCodeHash: null };
     });
@@ -396,7 +404,7 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
   }
 
   const claimToken = crypto.randomBytes(16).toString('hex');
-  const claim = await requestRef.transaction((current) => {
+  const claim = await transactionWithCachedValue(requestRef, (current) => {
     const staleProcessing = current && current.status === 'processing' &&
       now - (Number(current.processingAt) || 0) >= PROCESSING_STALE_MS;
     if (!current || (current.status !== 'pending' && !staleProcessing)) return;
@@ -418,7 +426,7 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
   let previousSoopClaim = null;
   try {
     previousSoopClaim = (await soopClaimRef.get()).val();
-    const soopClaim = await soopClaimRef.transaction((current) => {
+    const soopClaim = await transactionWithCachedValue(soopClaimRef, (current) => {
       if (current && current.uid && current.uid !== record.requesterUid) return;
       if (current && current.uid === record.requesterUid) return current;
       return {
@@ -436,7 +444,7 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
 
     await db.ref(`${PENDING_PATH}/${requestId}/status`).set('processing');
     const subscriptionRef = db.ref(`${SUBSCRIPTIONS_PATH}/${record.requesterUid}`);
-    const entitlement = await subscriptionRef.transaction((current) => {
+    const entitlement = await transactionWithCachedValue(subscriptionRef, (current) => {
       const previous = current && typeof current === 'object' ? current : {};
       if (previous.lastApprovedRequestId === requestId) return previous;
       if (previous.pendingRequestId && previous.pendingRequestId !== requestId) return;
@@ -458,7 +466,7 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
       throw new HttpsError('aborted', '구독 기간 갱신을 완료하지 못했습니다. 다시 승인 처리해 주세요.');
     }
     const expiresAt = Number(entitlement.snapshot.val() && entitlement.snapshot.val().expiresAt) || 0;
-    const finalized = await requestRef.transaction((current) => {
+    const finalized = await transactionWithCachedValue(requestRef, (current) => {
       if (!current || current.status !== 'processing' || current.processingToken !== claimToken) return;
       return {
         ...current,
@@ -480,9 +488,9 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
     return { ok: true, status: 'approved', expiresAt };
   } catch (error) {
     if (claimedSoopId) {
-      await soopClaimRef.transaction((current) => current && current.requestId === requestId ? previousSoopClaim : current).catch(() => null);
+      await transactionWithCachedValue(soopClaimRef, (current) => current && current.requestId === requestId ? previousSoopClaim : current).catch(() => null);
     }
-    const restored = await requestRef.transaction((current) => {
+    const restored = await transactionWithCachedValue(requestRef, (current) => {
       if (!current || current.status !== 'processing' || current.processingToken !== claimToken) return;
       return { ...current, status: 'pending', processingAt: null, processingToken: null };
     }).catch(() => null);
