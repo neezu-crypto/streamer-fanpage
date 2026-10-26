@@ -285,6 +285,10 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 .viewer-subscription-offer{margin:14px 0 16px;padding:13px 14px;border:1px solid #ecd5df;background:#fff8fb;color:#5c5261;font-size:13px;line-height:1.7}
 .viewer-subscription-offer p{margin:0}
 .viewer-subscription-offer p+p{margin-top:7px;color:#7b5264}
+.viewer-subscription-benefits{margin:0 0 16px;padding:13px 14px;border:1px solid #cad4e6;border-radius:11px;background:#f5f8fd;color:#45546c;font-size:13px;line-height:1.65}
+.viewer-subscription-benefits strong{display:block;margin-bottom:6px;color:#2e508d;font-size:13px}
+.viewer-subscription-benefits ul{margin:0;padding-left:19px}
+.viewer-subscription-benefits li+li{margin-top:5px}
 .viewer-subscription-dialog-intro{color:#5c6b82;font-size:14px}
 .viewer-subscription-steps{border-color:#e1e6ef;background:#f8f9fc;color:#45546c;font-size:13px}
 .viewer-subscription-steps a,.viewer-subscription-login-note a{color:#a53660}
