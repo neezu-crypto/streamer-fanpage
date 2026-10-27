@@ -7658,7 +7658,15 @@ async function loadApp() {
     const authReady = ensureAuthReady();
     let result;
     if (requestedId) {
-      result = (await callBootstrap({ streamerId: requestedId })).data;
+      try {
+        result = (await callBootstrap({ streamerId: requestedId })).data;
+      } catch (error) {
+        // Older deployed bootstrap revisions still require the anonymous session;
+        // retry after Auth restores so a fresh visitor does not get stuck at startup.
+        if (hadAuthAtBootstrap || !['functions/unauthenticated', 'unauthenticated'].includes(error.code)) throw error;
+        await authReady;
+        result = (await callBootstrap({ streamerId: requestedId })).data;
+      }
     } else {
       await authReady;
       result = (await callBootstrap({ streamerId: requestedId })).data;
