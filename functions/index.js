@@ -2568,6 +2568,48 @@ exports.streamerFanPageViewerStatsWorker = onTaskDispatched({
   await viewerStatsWorkerClaimRef(taskId).remove();
 }));
 
+// Internal bridge for Messenger's broadcast-history cards. This task deliberately
+// bypasses the user-facing subscription/rate-limit callable: it only reuses the
+// same server-side VOD cache and never returns viewer statistics to a browser.
+exports.streamerFanPageMessengerVodAnalysisWorker = onTaskDispatched({
+  region: 'us-central1',
+  memory: '256MiB',
+  timeoutSeconds: 120,
+  maxInstances: 2,
+  concurrency: 1,
+  rateLimits: { maxConcurrentDispatches: 2, maxDispatchesPerSecond: 1 },
+  retryConfig: {
+    maxAttempts: 3,
+    maxRetrySeconds: 300,
+    minBackoffSeconds: 30,
+    maxBackoffSeconds: 120,
+    maxDoublings: 2,
+  },
+}, async (request) => {
+  const streamerId = String(request.data && request.data.streamerId || '').trim().toLowerCase();
+  const vodId = String(request.data && request.data.vodId || '').trim();
+  if (!SOOP_ID_PATTERN.test(streamerId) || !/^\d{1,20}$/.test(vodId)) {
+    console.warn('Skipped invalid Messenger VOD analysis task payload.');
+    return;
+  }
+
+  await runViewerStatsTelemetry({ uidKey: 'worker', action: 'worker', source: 'worker' }, async () => {
+    try {
+      await getOrFetchViewerStats(streamerId, vodId);
+    } catch (error) {
+      // Permanent graph-unavailable cases are not cached; Messenger applies its
+      // own bounded retry policy using the shared cache as the completion signal.
+      console.warn('Messenger broadcast VOD viewer analysis did not complete.', {
+        streamerId,
+        vodId,
+        code: String(error && error.code || 'unknown'),
+        message: String(error && error.message || error).slice(0, 160),
+      });
+    }
+    return null;
+  });
+});
+
 async function getViewerStatsJobResult(uid, jobId) {
   const jobRef = viewerStatsJobRef(jobId);
   const snapshot = await jobRef.get();
