@@ -1,11 +1,13 @@
 'use strict';
 
 const { initializeApp } = require('firebase-admin/app');
-const { getDatabase } = require('firebase-admin/database');
+const { getDatabase, ServerValue } = require('firebase-admin/database');
 const { getFunctions: getAdminFunctions } = require('firebase-admin/functions');
+const { getStorage } = require('firebase-admin/storage');
 const { HttpsError, onCall, onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onTaskDispatched } = require('firebase-functions/v2/tasks');
+const { onValueWritten } = require('firebase-functions/v2/database');
 const { defineSecret } = require('firebase-functions/params');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { createHash, randomUUID } = require('node:crypto');
@@ -34,10 +36,17 @@ const {
   pruneVerifiedStreamerVisitDedup,
   recordVerifiedStreamerVisit,
 } = require('./verified-streamer-visits');
+const {
+  ADMIN_STATS_DAYS,
+  FANPAGE_METRICS_ROOT,
+  isAdminStatsSnapshotStale,
+  validateAdminStatsSnapshot,
+} = require('./admin-stats-snapshot');
 
 initializeApp();
 const db = getDatabase();
 const adminFunctions = getAdminFunctions();
+const cloudStorage = getStorage();
 exports.streamerFanPageViewerSubscription = streamerFanPageViewerSubscription;
 exports.streamerFanPageAdminViewerSubscriptionRequests = streamerFanPageAdminViewerSubscriptionRequests;
 exports.streamerFanPageSponsorAds = streamerFanPageSponsorAds;
@@ -48,6 +57,9 @@ const FANPAGE_COMPETITION_HISTORY_MAX_ITEMS = 30;
 const FANPAGE_COMPETITION_HISTORY_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const RECENT_PAGE_LIMIT = 8;
 const FANPAGE_STATS_DAYS = 30;
+const FANPAGE_ADMIN_STATS_BUCKET = 'soop-stock-market-fanpage-admin-stats';
+const FANPAGE_ADMIN_STATS_OBJECT = 'admin-stats/v1/latest.json';
+const ADMIN_STATS_PROJECTION_ROOT = FANPAGE_METRICS_ROOT;
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const SOOP_VOD_PAGE_SIZE = 60;
 const VIEWER_VOD_PAGE_SIZE = 30;
@@ -147,23 +159,11 @@ const VIEWER_STATS_INSUFFICIENT_WINDOW_CODE = 'insufficient-analysis-window';
 const VIEWER_STATS_INSUFFICIENT_WINDOW_MESSAGE = '시작과 종료 5분을 제외하면 통계 구간이 남지 않는 짧은 다시보기예요.';
 let lastViewerStatsJobCleanupAt = 0;
 let viewerStatsJobCleanupPromise = null;
-const VIEWER_STATS_USAGE_ACTIONS = Object.freeze(['search', 'vods', 'stats']);
 const VIEWER_STATS_DATA_METRIC_KEYS = Object.freeze([
   'calls', 'runtimeMs', 'callableCalls', 'callableRuntimeMs', 'workerCalls', 'workerRuntimeMs',
   'requestBytes', 'responseBytes', 'rtdbReadBytes', 'rtdbWriteBytes', 'soopRequestBytes', 'soopResponseBytes',
   'staticExportRuns', 'staticExportReadBytes',
 ]);
-// USD list rates checked 2026-10-20: RTDB $1/GB downloaded; Cloud Run us-central1 active CPU,
-// memory, and request rates. Shared free tiers, discounts, egress, Cloud Tasks, and storage are excluded.
-// Sources: https://firebase.google.com/pricing and https://cloud.google.com/run/pricing
-const VIEWER_STATS_COST_RATES = Object.freeze({
-  realtimeDatabaseUsdPerGb: 1,
-  cloudRunCpuUsdPerVcpuSecond: 0.000024,
-  cloudRunMemoryUsdPerGibSecond: 0.0000025,
-  cloudRunRequestUsdPerMillion: 0.4,
-  functionCpuCount: 1,
-  functionMemoryGib: 0.25,
-});
 const viewerStatsTelemetryStorage = new AsyncLocalStorage();
 const viewerStatsReferenceProxyCache = new WeakMap();
 
@@ -274,6 +274,7 @@ async function recordViewerStatsTelemetry(telemetry) {
     staticExportRuns: telemetry.action === 'staticExport' ? 1 : 0,
     staticExportReadBytes: Math.max(0, Number(telemetry.staticExportReadBytes) || 0),
   };
+  let projectionUpdates = {};
   const reference = db.ref('streamerFanPageViewerStatsLimits/' + telemetry.uidKey + '/recentUsageByDay/' + dateKey);
   await reference.transaction((current) => {
     const usageDay = current && typeof current === 'object'
@@ -282,11 +283,6 @@ async function recordViewerStatsTelemetry(telemetry) {
     const dataMetrics = usageDay.dataMetrics && typeof usageDay.dataMetrics === 'object'
       ? { ...usageDay.dataMetrics }
       : {};
-    const metricValues = { ...values };
-    metricValues.rtdbReadBytes += viewerStatsJsonBytes(current);
-    metricKeys.forEach((key) => {
-      dataMetrics[key] = Math.max(0, Number(dataMetrics[key]) || 0) + metricValues[key];
-    });
     const actionMetrics = usageDay.dataByAction && typeof usageDay.dataByAction === 'object'
       ? { ...usageDay.dataByAction }
       : {};
@@ -294,11 +290,45 @@ async function recordViewerStatsTelemetry(telemetry) {
     const actionRecord = actionMetrics[action] && typeof actionMetrics[action] === 'object'
       ? { ...actionMetrics[action] }
       : {};
+    const sourceReadBytes = viewerStatsJsonBytes(current);
+    let projectionWriteBytes = 0;
+    let writeBytes = 0;
+    let sourceMetricValues = { ...values, rtdbReadBytes: values.rtdbReadBytes + sourceReadBytes };
+    for (let pass = 0; pass < 6; pass += 1) {
+      sourceMetricValues = {
+        ...values,
+        rtdbReadBytes: values.rtdbReadBytes + sourceReadBytes,
+        rtdbWriteBytes: values.rtdbWriteBytes + projectionWriteBytes,
+      };
+      const nextDataMetrics = { ...dataMetrics };
+      const nextActionRecord = { ...actionRecord };
+      metricKeys.forEach((key) => {
+        nextDataMetrics[key] = Math.max(0, Number(nextDataMetrics[key]) || 0) + sourceMetricValues[key];
+        nextActionRecord[key] = Math.max(0, Number(nextActionRecord[key]) || 0) + sourceMetricValues[key];
+      });
+      writeBytes = viewerStatsJsonBytes({
+        ...usageDay,
+        dataMetrics: nextDataMetrics,
+        dataByAction: { ...actionMetrics, [action]: nextActionRecord },
+      });
+      const projectionMetricValues = { ...sourceMetricValues, rtdbWriteBytes: sourceMetricValues.rtdbWriteBytes + writeBytes };
+      const nextProjectionUpdates = buildAdminViewerDailyUpdates(dateKey, {
+        dataMetrics: projectionMetricValues,
+        dataByAction: { [action]: projectionMetricValues },
+      });
+      const nextProjectionWriteBytes = viewerStatsJsonBytes(nextProjectionUpdates);
+      if (nextProjectionWriteBytes === projectionWriteBytes) {
+        projectionUpdates = nextProjectionUpdates;
+        break;
+      }
+      projectionWriteBytes = nextProjectionWriteBytes;
+      projectionUpdates = nextProjectionUpdates;
+    }
     metricKeys.forEach((key) => {
-      actionRecord[key] = Math.max(0, Number(actionRecord[key]) || 0) + metricValues[key];
+      dataMetrics[key] = Math.max(0, Number(dataMetrics[key]) || 0) + sourceMetricValues[key];
+      actionRecord[key] = Math.max(0, Number(actionRecord[key]) || 0) + sourceMetricValues[key];
     });
     actionMetrics[action] = actionRecord;
-    const writeBytes = viewerStatsJsonBytes({ ...usageDay, dataMetrics, dataByAction: actionMetrics });
     dataMetrics.rtdbWriteBytes += writeBytes;
     actionRecord.rtdbWriteBytes += writeBytes;
     actionMetrics[action] = actionRecord;
@@ -306,6 +336,7 @@ async function recordViewerStatsTelemetry(telemetry) {
     usageDay.dataByAction = actionMetrics;
     return usageDay;
   });
+  if (Object.keys(projectionUpdates).length) await db.ref().update(projectionUpdates);
 }
 
 async function runViewerStatsTelemetry({
@@ -342,36 +373,6 @@ async function runViewerStatsTelemetry({
       });
     }
   });
-}
-
-function viewerStatsCostEstimate(dataMetrics) {
-  const metrics = dataMetrics && typeof dataMetrics === 'object' ? dataMetrics : {};
-  const runtimeSeconds = Math.max(0, Number(metrics.runtimeMs) || 0) / 1000;
-  const realtimeDatabaseGb = Math.max(0, Number(metrics.rtdbReadBytes) || 0) / 1_000_000_000;
-  const functionCalls = Math.max(0, Number(metrics.calls) || 0);
-  const functionCost = functionCalls * VIEWER_STATS_COST_RATES.cloudRunRequestUsdPerMillion / 1_000_000
-    + runtimeSeconds * (VIEWER_STATS_COST_RATES.functionCpuCount * VIEWER_STATS_COST_RATES.cloudRunCpuUsdPerVcpuSecond
-      + VIEWER_STATS_COST_RATES.functionMemoryGib * VIEWER_STATS_COST_RATES.cloudRunMemoryUsdPerGibSecond);
-  const realtimeDatabaseCost = realtimeDatabaseGb * VIEWER_STATS_COST_RATES.realtimeDatabaseUsdPerGb;
-  return { functionCost, realtimeDatabaseCost, totalCost: functionCost + realtimeDatabaseCost };
-}
-
-function emptyViewerStatsDataMetrics() {
-  return Object.fromEntries(VIEWER_STATS_DATA_METRIC_KEYS.map((key) => [key, 0]));
-}
-
-function addViewerStatsDataMetrics(target, source) {
-  VIEWER_STATS_DATA_METRIC_KEYS.forEach((key) => {
-    target[key] = Math.max(0, Number(target[key]) || 0) + Math.max(0, Number(source && source[key]) || 0);
-  });
-  return target;
-}
-
-function sumViewerStatsDailyDataMetrics(days) {
-  return (Array.isArray(days) ? days : []).reduce((sum, day) => {
-    addViewerStatsDataMetrics(sum, day && day.dataMetrics);
-    return sum;
-  }, emptyViewerStatsDataMetrics());
 }
 
 function requireAuth(request) {
@@ -469,6 +470,7 @@ async function updateViewerStatsQueueMetrics(uidKey, dateKey, updates) {
     recentUsageByDay[dateKey] = usageDay;
     return { ...previous, recentUsageByDay, updatedAt: Date.now() };
   });
+  await incrementAdminViewerDaily(dateKey, { queueMetrics: updates });
 }
 
 async function cleanupOldViewerStatsJobs(now = Date.now()) {
@@ -493,7 +495,7 @@ async function cleanupOldViewerStatsJobs(now = Date.now()) {
           .endAt(oldestQueueKey)
           .get();
         const oldQueue = oldQueueSnapshot.val() || {};
-        await Promise.all(Object.keys(oldQueue).map((queueKey) => viewerStatsQueueRef(tier, queueKey).remove()));
+        await Promise.all(Object.keys(oldQueue).map((queueKey) => removeViewerStatsQueueEntry(tier, queueKey)));
       }));
 
       const claimsSnapshot = await viewerStatsRef(VIEWER_STATS_WORKER_CLAIMS_PATH).get();
@@ -590,7 +592,15 @@ async function enforceViewerStatsRateLimit(uid, action, usageContext = {}) {
     };
   });
 
-  if (result.committed) return;
+  if (result.committed) {
+    await incrementAdminViewerDaily(dayKey, {
+      actions: ['search', 'vods', 'stats'].includes(action) ? { [action]: 1 } : {},
+      tiers: ['search', 'vods', 'stats'].includes(action) ? { [tier]: { [action]: 1 } } : {},
+      streamers: trackStreamerSelection ? { [selectedStreamerId]: 1 } : {},
+      queueMetrics: usageContext.cacheHit === true ? { cacheHits: 1 } : {},
+    }).catch((error) => console.warn('Could not update projected viewer stats usage:', error));
+    return;
+  }
 
   const current = result.snapshot.val() || {};
   const currentMinuteCounts = Number(current.minuteWindow) === minuteWindow && current.minuteCounts
@@ -795,6 +805,102 @@ function metricCount(value) {
   return Number.isSafeInteger(count) && count > 0 ? count : 0;
 }
 
+function addIncrement(updates, path, value) {
+  const amount = Number(value);
+  if (Number.isFinite(amount) && amount !== 0) updates[path] = ServerValue.increment(amount);
+}
+
+function buildAdminViewerDailyUpdates(dateKey, { actions, tiers, streamers, queueMetrics, dataMetrics, dataByAction } = {}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return;
+  const updates = {};
+  const path = `${ADMIN_STATS_PROJECTION_ROOT}/viewerStats/dailyLive/${dateKey}`;
+  Object.entries(actions || {}).forEach(([action, count]) => {
+    if (['search', 'vods', 'stats'].includes(action)) addIncrement(updates, `${path}/${action}`, count);
+  });
+  Object.entries(tiers || {}).forEach(([tier, counts]) => {
+    if (!['anonymous', 'account', 'subscriber', 'admin'].includes(tier)) return;
+    Object.entries(counts || {}).forEach(([action, count]) => {
+      if (['search', 'vods', 'stats'].includes(action)) addIncrement(updates, `${path}/tiers/${tier}/${action}`, count);
+    });
+  });
+  Object.entries(streamers || {}).forEach(([id, count]) => {
+    if (SOOP_ID_PATTERN.test(id)) addIncrement(updates, `${path}/streamers/${id.toLowerCase()}`, count);
+  });
+  Object.entries(queueMetrics || {}).forEach(([key, count]) => {
+    if (['enqueued', 'completed', 'failed', 'cancelled', 'queueWaitMs', 'cacheHits'].includes(key)) {
+      addIncrement(updates, `${path}/queueMetrics/${key}`, count);
+    }
+  });
+  Object.entries(dataMetrics || {}).forEach(([key, count]) => {
+    if (VIEWER_STATS_DATA_METRIC_KEYS.includes(key)) addIncrement(updates, `${path}/dataMetrics/${key}`, count);
+  });
+  Object.entries(dataByAction || {}).forEach(([action, metrics]) => {
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,40}$/.test(action)) return;
+    Object.entries(metrics || {}).forEach(([key, count]) => {
+      if (VIEWER_STATS_DATA_METRIC_KEYS.includes(key)) {
+        addIncrement(updates, `${path}/dataByAction/${action}/${key}`, count);
+      }
+    });
+  });
+  return updates;
+}
+
+async function incrementAdminViewerDaily(dateKey, data) {
+  const updates = buildAdminViewerDailyUpdates(dateKey, data);
+  if (Object.keys(updates).length) await db.ref().update(updates);
+  trackViewerStatsTelemetry('rtdbWriteBytes', viewerStatsJsonBytes(updates));
+}
+
+async function incrementAdminFanPageView(streamerId, dateKey, unique) {
+  const normalizedId = String(streamerId || '').trim().toLowerCase();
+  if (!SOOP_ID_PATTERN.test(normalizedId) || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+  const root = `${ADMIN_STATS_PROJECTION_ROOT}/fanpage/statsLive/${normalizedId}`;
+  const updates = {};
+  addIncrement(updates, `${root}/summary/totalViews`, 1);
+  addIncrement(updates, `${root}/daily/${dateKey}/views`, 1);
+  if (unique) addIncrement(updates, `${root}/daily/${dateKey}/uniqueVisitors`, 1);
+  await db.ref().update(updates);
+}
+
+async function changeAdminStatsQueueNow(tier, delta) {
+  if (!['anonymous', 'account', 'subscriber', 'admin'].includes(tier) || !Number.isFinite(Number(delta)) || !Number(delta)) return;
+  const ref = db.ref(`${ADMIN_STATS_PROJECTION_ROOT}/viewerStats/queueLive/${tier}`);
+  await ref.transaction((current) => Math.max(0, (Number(current) || 0) + Number(delta)));
+}
+
+async function removeViewerStatsQueueEntry(tier, queueKey) {
+  return removeViewerStatsQueueReference(viewerStatsQueueRef(tier, queueKey), tier);
+}
+
+async function removeViewerStatsQueueReference(ref, tier) {
+  const result = await ref.transaction((current) => current ? null : undefined);
+  if (result.committed) {
+    await changeAdminStatsQueueNow(tier, -1).catch((error) => {
+      console.warn('Could not update projected viewer stats queue size:', error);
+    });
+  }
+  return result.committed;
+}
+
+async function ensureViewerStatsQueueEntry(tier, queueKey, jobId) {
+  const ref = viewerStatsQueueRef(tier, queueKey);
+  let added = false;
+  const result = await ref.transaction((current) => {
+    if (current) {
+      added = false;
+      return;
+    }
+    added = true;
+    return jobId;
+  });
+  if (result.committed && added) {
+    await changeAdminStatsQueueNow(tier, 1).catch((error) => {
+      console.warn('Could not update projected viewer stats queue size:', error);
+    });
+  }
+  return result.committed && added;
+}
+
 async function pruneFanPageDailyStats(streamerId, today) {
   const cutoffDate = new Date(`${today}T00:00:00Z`);
   cutoffDate.setUTCDate(cutoffDate.getUTCDate() - (FANPAGE_STATS_DAYS - 1));
@@ -835,6 +941,8 @@ async function recordFanPageView(uid, streamerId) {
       };
     }),
   ]);
+  await incrementAdminFanPageView(streamerId, date, visitorResult.committed)
+    .catch((error) => console.warn('Could not update projected fanpage statistics:', error));
   await pruneFanPageDailyStats(streamerId, date);
 }
 
@@ -1865,7 +1973,7 @@ async function enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiu
   const jobRef = viewerStatsJobRef(jobId);
   const uidKey = viewerStatsUidKey(uid);
   const queueKey = makeViewerStatsQueueKey(now, jobId);
-  const queueRef = viewerStatsQueueRef(tier, queueKey);
+  let queueEntryCreated = false;
   try {
     await jobRef.set({
       requesterKey: uidKey,
@@ -1878,7 +1986,11 @@ async function enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiu
       createdAt: now,
       expiresAt: now + VIEWER_STATS_JOB_TTL_MS,
     });
-    await queueRef.set(jobId);
+    const queueUpdates = {};
+    queueUpdates[`${VIEWER_STATS_QUEUE_PATH}/${tier}/${queueKey}`] = jobId;
+    queueUpdates[`${ADMIN_STATS_PROJECTION_ROOT}/viewerStats/queueLive/${tier}`] = ServerValue.increment(1);
+    await db.ref().update(queueUpdates);
+    queueEntryCreated = true;
     await adminFunctions.taskQueue(VIEWER_STATS_WORKER_FUNCTION)
       .enqueue({ wakeJobId: jobId }, { dispatchDeadlineSeconds: 120 });
     await updateViewerStatsQueueMetrics(uidKey, dayKey, { enqueued: 1 }).catch((error) => {
@@ -1886,7 +1998,7 @@ async function enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiu
     });
     return { jobId, status: 'queued', tier };
   } catch (error) {
-    await queueRef.remove().catch(() => {});
+    if (queueEntryCreated) await removeViewerStatsQueueEntry(tier, queueKey).catch(() => {});
     await jobRef.remove().catch(() => {});
     console.error('Could not enqueue viewer stats job:', error);
     throw new HttpsError('unavailable', '집계 대기열을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -2325,13 +2437,13 @@ async function readOldestViewerStatsCandidateForTier(tier, now = Date.now()) {
       jobRef = viewerStatsJobRef(jobId);
       viewerStatsQueueRef(tier, queueKey);
     } catch {
-      await queueRoot.child(queueKey).remove();
+      await removeViewerStatsQueueReference(queueRoot.child(queueKey), tier);
       continue;
     }
     const jobSnapshot = await jobRef.get();
     const job = jobSnapshot.val();
     if (!job || job.status !== 'queued' || job.tier !== tier || job.queueKey !== queueKey) {
-      await queueRoot.child(queueKey).remove();
+      await removeViewerStatsQueueReference(queueRoot.child(queueKey), tier);
       continue;
     }
     if (Number(job.expiresAt) <= now) {
@@ -2339,7 +2451,7 @@ async function readOldestViewerStatsCandidateForTier(tier, now = Date.now()) {
         if (!current || current.status !== 'queued' || Number(current.expiresAt) > now) return;
         return { ...current, status: 'expired', finishedAt: now, errorMessage: '집계 요청이 만료됐어요. 다시 요청해 주세요.' };
       });
-      await queueRoot.child(queueKey).remove();
+      await removeViewerStatsQueueReference(queueRoot.child(queueKey), tier);
       continue;
     }
     return { jobId, queueKey, tier, createdAt: Number(job.createdAt) || now };
@@ -2363,7 +2475,7 @@ async function claimViewerStatsJob(candidate, taskId) {
   if (!job || job.status !== 'processing' || job.claimedBy !== taskId) {
     return null;
   }
-  await viewerStatsQueueRef(candidate.tier, candidate.queueKey).remove();
+  await removeViewerStatsQueueEntry(candidate.tier, candidate.queueKey);
   console.info('Viewer stats job claim succeeded.', { tier: candidate.tier });
   return { ...candidate, job };
 }
@@ -2427,7 +2539,7 @@ async function claimNextViewerStatsJob(taskId) {
       continue;
     }
     await claimRef.remove();
-    await viewerStatsQueueRef(candidate.tier, candidate.queueKey).remove().catch(() => {});
+    await removeViewerStatsQueueEntry(candidate.tier, candidate.queueKey).catch(() => {});
   }
   return null;
 }
@@ -2523,9 +2635,8 @@ exports.streamerFanPageViewerStatsWorker = onTaskDispatched({
     const wakeJob = wakeSnapshot.val();
     const wakeCandidate = viewerStatsWakeCandidate(wakeJobId, wakeJob);
     if (wakeCandidate && Number(wakeSnapshot.val().expiresAt) > Date.now()) {
-      const queueRef = viewerStatsQueueRef(wakeCandidate.tier, wakeCandidate.queueKey);
-      const restoredQueueEntry = await queueRef.transaction((current) => current || wakeJobId);
-      if (restoredQueueEntry.committed) {
+      const restored = await ensureViewerStatsQueueEntry(wakeCandidate.tier, wakeCandidate.queueKey, wakeJobId);
+      if (restored) {
         console.warn('Recovered a queued viewer stats job with a missing queue index.');
       }
       claimed = await claimNextViewerStatsJob(taskId);
@@ -2629,7 +2740,7 @@ async function cancelViewerStatsJob(uid, jobId) {
   }
   const job = result.snapshot.val();
   if (job.status === 'cancelled' && job.queueKey && job.tier) {
-    await viewerStatsQueueRef(job.tier, job.queueKey).remove().catch((error) => {
+    await removeViewerStatsQueueEntry(job.tier, job.queueKey).catch((error) => {
       console.warn(`Could not remove cancelled viewer stats queue entry ${jobId}:`, error);
     });
     if (job.cancelMetricRecorded === true) {
@@ -4708,200 +4819,93 @@ exports.streamerFanPageViewerStatsExportUsage = onRequest({
   }
 });
 
+exports.streamerFanPageAdminStatsRosterProjection = onValueWritten({
+  ref: 'streamerVerifications/{verificationKey}',
+  region: 'us-central1',
+  retry: true,
+}, async (event) => {
+  const key = String(event.params.verificationKey || '');
+  const before = event.data.before.val();
+  const after = event.data.after.val();
+  const previous = publicStreamer(key, before);
+  const current = publicStreamer(key, after);
+  const updates = {};
+  if (previous && (!current || previous.id !== current.id)) {
+    updates[`${ADMIN_STATS_PROJECTION_ROOT}/fanpage/rosterLive/${previous.id}`] = { active: false };
+  }
+  if (current) {
+    updates[`${ADMIN_STATS_PROJECTION_ROOT}/fanpage/rosterLive/${current.id}`] = {
+      active: true,
+      id: current.id,
+      nickname: current.nickname,
+      soopId: current.soopId,
+      avatarUrl: current.avatarUrl,
+      soopUrl: current.soopUrl,
+    };
+  }
+  if (Object.keys(updates).length) await db.ref().update(updates);
+});
+
+exports.streamerFanPageAdminStatsProjectionCleanup = onSchedule({
+  schedule: 'every day 04:10',
+  timeZone: 'Asia/Seoul',
+  region: 'us-central1',
+  maxInstances: 1,
+}, async () => {
+  const cutoff = new Date(`${fanPageStatsDateKey()}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - (ADMIN_STATS_DAYS - 1));
+  const cutoffKey = fanPageStatsDateKey(cutoff.getTime());
+  const root = `${ADMIN_STATS_PROJECTION_ROOT}`;
+  const [fanPageBaseline, fanPageLive, viewerBaseline, viewerLive] = await Promise.all([
+    db.ref(`${root}/fanpage/statsBaseline`).get(),
+    db.ref(`${root}/fanpage/statsLive`).get(),
+    db.ref(`${root}/viewerStats/dailyBaseline`).get(),
+    db.ref(`${root}/viewerStats/dailyLive`).get(),
+  ]);
+  const updates = {};
+  [fanPageBaseline.val() || {}, fanPageLive.val() || {}].forEach((streamers, index) => {
+    const branch = index === 0 ? 'statsBaseline' : 'statsLive';
+    Object.entries(streamers).forEach(([streamerId, record]) => {
+      Object.keys(record && record.daily || {}).forEach((date) => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date) && date < cutoffKey) {
+          updates[`${root}/fanpage/${branch}/${streamerId}/daily/${date}`] = null;
+        }
+      });
+    });
+  });
+  [viewerBaseline.val() || {}, viewerLive.val() || {}].forEach((days, index) => {
+    const branch = index === 0 ? 'dailyBaseline' : 'dailyLive';
+    Object.keys(days).forEach((date) => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && date < cutoffKey) {
+        updates[`${root}/viewerStats/${branch}/${date}`] = null;
+      }
+    });
+  });
+  if (Object.keys(updates).length) await db.ref().update(updates);
+});
+
+async function readPrivateAdminStatsSnapshot() {
+  try {
+    const file = cloudStorage.bucket(FANPAGE_ADMIN_STATS_BUCKET).file(FANPAGE_ADMIN_STATS_OBJECT);
+    const [contents] = await file.download({ validation: 'crc32c' });
+    const snapshot = JSON.parse(contents.toString('utf8'));
+    validateAdminStatsSnapshot(snapshot);
+    return {
+      ...snapshot,
+      snapshotStale: isAdminStatsSnapshotStale(snapshot),
+    };
+  } catch (error) {
+    console.error('Could not read the private fanpage admin stats snapshot:', error);
+    throw new HttpsError('unavailable', '관리자 통계 스냅샷을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+}
+
 exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request) => {
   const uid = requireAuth(request);
   if (!await isAdminUid(uid)) {
     throw new HttpsError('permission-denied', '관리자만 팬페이지 통계를 볼 수 있습니다.');
   }
-
-  const today = new Date(`${fanPageStatsDateKey()}T00:00:00Z`);
-  const dateKeys = Array.from({ length: FANPAGE_STATS_DAYS }, (_, index) =>
-    fanPageStatsDateKey(today.getTime() - (FANPAGE_STATS_DAYS - index - 1) * 24 * 60 * 60 * 1000));
-  const [verifiedSnap, statsSnap, viewerLimitsSnap, streamerNamesSnap, viewerQueueSnap] = await Promise.all([
-    db.ref('streamerVerifications').get(),
-    db.ref('streamerFanPageStats').get(),
-    db.ref('streamerFanPageViewerStatsLimits').get(),
-    db.ref('streamerNames').get(),
-    db.ref(VIEWER_STATS_QUEUE_PATH).get(),
-  ]);
-  const verifiedById = new Map();
-  Object.entries(verifiedSnap.val() || {}).forEach(([key, record]) => {
-    const streamer = publicStreamer(key, record);
-    if (streamer) verifiedById.set(streamer.id, streamer);
-  });
-  const streamerNameById = new Map([...verifiedById.values()].map((streamer) => [streamer.id, streamer.nickname]));
-  Object.entries(streamerNamesSnap.val() || {}).forEach(([soopId, nickname]) => {
-    const normalizedId = String(soopId || '').trim().toLowerCase();
-    const normalizedNickname = typeof nickname === 'string' ? nickname.trim().slice(0, 40) : '';
-    if (SOOP_ID_PATTERN.test(normalizedId) && normalizedNickname && !streamerNameById.has(normalizedId)) {
-      streamerNameById.set(normalizedId, normalizedNickname);
-    }
-  });
-
-  const statsById = statsSnap.val() || {};
-  const streamers = [...verifiedById.values()].map((streamer) => {
-    const record = statsById[streamer.id] && typeof statsById[streamer.id] === 'object'
-      ? statsById[streamer.id]
-      : {};
-    const dailyRecords = record.daily && typeof record.daily === 'object' ? record.daily : {};
-    const daily = dateKeys.map((date) => {
-      const day = dailyRecords[date] && typeof dailyRecords[date] === 'object' ? dailyRecords[date] : {};
-      return {
-        date,
-        views: metricCount(day.views),
-        uniqueVisitors: metricCount(day.uniqueVisitors),
-      };
-    });
-    const last7 = daily.slice(-7);
-    return {
-      ...streamer,
-      totalViews: metricCount(record.summary && record.summary.totalViews),
-      last7Views: last7.reduce((total, day) => total + day.views, 0),
-      last30Views: daily.reduce((total, day) => total + day.views, 0),
-      last30DailyUniqueVisitors: daily.reduce((total, day) => total + day.uniqueVisitors, 0),
-      daily,
-    };
-  }).sort((a, b) => b.last30Views - a.last30Views
-    || b.totalViews - a.totalViews
-    || a.nickname.localeCompare(b.nickname, 'ko'));
-
-  const viewerUsageByDate = {};
-  const viewerDataUsageByDate = {};
-  const viewerDataUsageByAction = {};
-  const searchedStreamerCounts = {};
-  const viewerTierUsage = Object.fromEntries(['anonymous', 'account', 'subscriber', 'admin']
-    .map((tier) => [tier, { search: 0, vods: 0, stats: 0, total: 0 }]));
-  const viewerQueueMetrics = { enqueued: 0, completed: 0, failed: 0, cancelled: 0, queueWaitMs: 0, cacheHits: 0 };
-  const includedDates = new Set(dateKeys);
-  Object.values(viewerLimitsSnap.val() || {}).forEach((record) => {
-    const recentUsageByDay = record && typeof record.recentUsageByDay === 'object'
-      ? record.recentUsageByDay
-      : {};
-    Object.entries(recentUsageByDay).forEach(([date, actions]) => {
-      if (!includedDates.has(date) || !actions || typeof actions !== 'object') return;
-      const day = viewerUsageByDate[date] || (viewerUsageByDate[date] = { search: 0, vods: 0, stats: 0 });
-      VIEWER_STATS_USAGE_ACTIONS.forEach((action) => { day[action] += metricCount(actions[action]); });
-      const tiers = actions.tiers && typeof actions.tiers === 'object' ? actions.tiers : {};
-      Object.entries(tiers).forEach(([tier, counts]) => {
-        if (!viewerTierUsage[tier] || !counts || typeof counts !== 'object') return;
-        VIEWER_STATS_USAGE_ACTIONS.forEach((action) => {
-          const count = metricCount(counts[action]);
-          viewerTierUsage[tier][action] += count;
-          viewerTierUsage[tier].total += count;
-        });
-      });
-      const queueMetrics = actions.queueMetrics && typeof actions.queueMetrics === 'object'
-        ? actions.queueMetrics
-        : {};
-      ['enqueued', 'completed', 'failed', 'cancelled', 'queueWaitMs', 'cacheHits'].forEach((key) => {
-        viewerQueueMetrics[key] += metricCount(queueMetrics[key]);
-      });
-      const streamers = actions.streamers && typeof actions.streamers === 'object' ? actions.streamers : {};
-      Object.entries(streamers).forEach(([rawStreamerId, count]) => {
-        const streamerId = String(rawStreamerId || '').trim().toLowerCase();
-        if (!SOOP_ID_PATTERN.test(streamerId)) return;
-        searchedStreamerCounts[streamerId] = (searchedStreamerCounts[streamerId] || 0) + metricCount(count);
-      });
-      const dataMetrics = actions.dataMetrics && typeof actions.dataMetrics === 'object'
-        ? actions.dataMetrics
-        : null;
-      if (dataMetrics) {
-        const dailyMetrics = viewerDataUsageByDate[date] || (viewerDataUsageByDate[date] = emptyViewerStatsDataMetrics());
-        addViewerStatsDataMetrics(dailyMetrics, dataMetrics);
-      }
-      const dataByAction = actions.dataByAction && typeof actions.dataByAction === 'object'
-        ? actions.dataByAction
-        : {};
-      Object.entries(dataByAction).forEach(([action, metrics]) => {
-        if (!metrics || typeof metrics !== 'object') return;
-        const actionMetrics = viewerDataUsageByAction[action]
-          || (viewerDataUsageByAction[action] = emptyViewerStatsDataMetrics());
-        addViewerStatsDataMetrics(actionMetrics, metrics);
-      });
-    });
-  });
-  const viewerUsageDaily = dateKeys.map((date) => {
-    const day = viewerUsageByDate[date] && typeof viewerUsageByDate[date] === 'object'
-      ? viewerUsageByDate[date]
-      : {};
-    const search = metricCount(day.search);
-    const vods = metricCount(day.vods);
-    const stats = metricCount(day.stats);
-    return { date, search, vods, stats, total: search + vods + stats };
-  });
-  const last7ViewerUsage = viewerUsageDaily.slice(-7);
-  const viewerUsageActions = viewerUsageDaily.reduce((totals, day) => ({
-    search: totals.search + day.search,
-    vods: totals.vods + day.vods,
-    stats: totals.stats + day.stats,
-  }), { search: 0, vods: 0, stats: 0 });
-  const viewerDataUsageDaily = dateKeys.map((date) => ({
-    date,
-    dataMetrics: viewerDataUsageByDate[date] || null,
-  }));
-  const viewerDataUsageLast7 = sumViewerStatsDailyDataMetrics(viewerDataUsageDaily.slice(-7));
-  const viewerDataUsageLast30 = sumViewerStatsDailyDataMetrics(viewerDataUsageDaily);
-  const viewerDataUsageToday = viewerDataUsageDaily.at(-1)?.dataMetrics || emptyViewerStatsDataMetrics();
-  const viewerDataUsageStartedAt = viewerDataUsageDaily.find((day) => day.dataMetrics && day.dataMetrics.calls > 0)?.date || null;
-  const viewerDataUsageActionTotals = Object.fromEntries(Object.entries(viewerDataUsageByAction)
-    .map(([action, metrics]) => [action, metrics]));
-  const queuedByTier = Object.fromEntries(['anonymous', 'account', 'subscriber', 'admin']
-    .map((tier) => [tier, Object.keys(viewerQueueSnap.val() && viewerQueueSnap.val()[tier] || {}).length]));
-  viewerQueueMetrics.queuedNow = Object.values(queuedByTier).reduce((total, count) => total + count, 0);
-  viewerQueueMetrics.queuedByTier = queuedByTier;
-  const topSearchedEntries = Object.entries(searchedStreamerCounts)
-    .map(([id, count]) => ({ id, count }))
-    .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id))
-    .slice(0, 30);
-  const missingStreamerIds = topSearchedEntries
-    .map(({ id }) => id)
-    .filter((id) => !streamerNameById.has(id));
-  const resolvedStreamerNames = await lookupSoopStreamerNicknames(missingStreamerIds);
-  resolvedStreamerNames.forEach((nickname, id) => streamerNameById.set(id, nickname));
-  const topSearchedStreamers = topSearchedEntries
-    .map(({ id, count }) => ({ id, soopId: id, nickname: streamerNameById.get(id) || `@${id}`, count }))
-    .sort((a, b) => b.count - a.count || a.nickname.localeCompare(b.nickname, 'ko'));
-
-  return {
-    generatedAt: Date.now(),
-    totals: {
-      streamerCount: streamers.length,
-      totalViews: streamers.reduce((total, streamer) => total + streamer.totalViews, 0),
-      last7Views: streamers.reduce((total, streamer) => total + streamer.last7Views, 0),
-      last30Views: streamers.reduce((total, streamer) => total + streamer.last30Views, 0),
-    },
-    viewerStatsUsage: {
-      totals: {
-        today: viewerUsageDaily[viewerUsageDaily.length - 1]?.total || 0,
-        last7: last7ViewerUsage.reduce((total, day) => total + day.total, 0),
-        last30: viewerUsageDaily.reduce((total, day) => total + day.total, 0),
-      },
-      actions30: viewerUsageActions,
-      tiers30: viewerTierUsage,
-      queue30: {
-        ...viewerQueueMetrics,
-        averageWaitMs: viewerQueueMetrics.completed
-          ? Math.round(viewerQueueMetrics.queueWaitMs / viewerQueueMetrics.completed)
-          : 0,
-      },
-      daily: viewerUsageDaily,
-      topSearchedStreamers,
-      dataUsage: {
-        startedAt: viewerDataUsageStartedAt,
-        today: viewerDataUsageToday,
-        last7: viewerDataUsageLast7,
-        last30: viewerDataUsageLast30,
-        daily: viewerDataUsageDaily,
-        byAction30: viewerDataUsageActionTotals,
-        estimatedCostUsd: {
-          today: viewerStatsCostEstimate(viewerDataUsageToday),
-          last7: viewerStatsCostEstimate(viewerDataUsageLast7),
-          last30: viewerStatsCostEstimate(viewerDataUsageLast30),
-        },
-      },
-    },
-    streamers,
-  };
+  return readPrivateAdminStatsSnapshot();
 });
 
 exports.streamerFanPageDesignFeedback = onCall({ maxInstances: 10 }, async (request) => {

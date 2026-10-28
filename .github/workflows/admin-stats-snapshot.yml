@@ -1,0 +1,56 @@
+name: Export private admin stats snapshot
+
+on:
+  schedule:
+    - cron: '10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: fanpage-private-admin-stats-snapshot
+  cancel-in-progress: false
+
+jobs:
+  export:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        id: google-auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/997788925900/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: fanpage-static-exporter@soop-stock-market.iam.gserviceaccount.com
+          project_id: soop-stock-market
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install exporter dependencies
+        run: npm ci --prefix functions
+      - name: Get usage reporter URL
+        id: usage-reporter
+        run: |
+          URL="https://us-central1-soop-stock-market.cloudfunctions.net/streamerFanPageViewerStatsExportUsage"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+      - name: Authenticate for usage report
+        id: usage-reporter-auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/997788925900/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: fanpage-static-exporter@soop-stock-market.iam.gserviceaccount.com
+          token_format: id_token
+          id_token_audience: ${{ steps.usage-reporter.outputs.url }}
+          id_token_include_email: true
+          create_credentials_file: false
+      - name: Export and replace the private snapshot
+        run: node functions/export-admin-stats.js
+        env:
+          FANPAGE_ADMIN_STATS_BUCKET: soop-stock-market-fanpage-admin-stats
+          VIEWER_STATS_USAGE_REPORT_URL: ${{ steps.usage-reporter.outputs.url }}
+          VIEWER_STATS_USAGE_REPORT_TOKEN: ${{ steps.usage-reporter-auth.outputs.id_token }}
