@@ -83,9 +83,9 @@ projection에는 관리자 화면이 필요로 하는 합계만 기록한다. �
 | 팬페이지 조회 | `streamerFanPageAdminMetrics/v1/fanpage/statsBaseline/{soopId}` + `statsLive/{soopId}` |
 | 고점체크 일별 사용량 | `streamerFanPageAdminMetrics/v1/viewerStats/dailyBaseline/{date}` + `dailyLive/{date}` |
 | 현재 대기 수 | `streamerFanPageAdminMetrics/v1/viewerStats/queueBaseline` + `queueLive` |
-| 스트리머 표시명 | `streamerFanPageAdminMetrics/v1/fanpage/namesBaseline` |
+| 스트리머 표시명 | `streamerFanPageAdminMetrics/v1/fanpage/namesBaseline` + `namesLive` |
 
-`functions/backfill-admin-stats-projection.js`는 초기 전환·복구 때만 기존 원본을 읽고, 현재 `live` 합계를 빼서 `baseline`을 만든 뒤 30일 snapshot 결과를 원본 집계와 비교한다. 비교가 다르면 실행을 실패 처리하고 관리자 callable은 아직 전환하지 않는다. 이후 정기 exporter는 위 projection 경로만 읽는다. `streamerVerifications` 변경은 `streamerFanPageAdminStatsRosterProjection`이 UID를 제외한 스트리머 표시 정보로 반영한다.
+`functions/backfill-admin-stats-projection.js`는 초기 전환·복구 때만 기존 원본을 읽고, 현재 `live` 합계를 빼서 `baseline`을 만든 뒤 30일 snapshot 결과를 원본 집계와 비교한다. 검색 선택 순위의 닉네임은 표시 정보이므로 검증은 SOOP ID와 횟수 기준으로 비교한다. 비교가 다르면 실행을 실패 처리하고 관리자 callable은 아직 전환하지 않는다. 이후 정기 exporter는 위 projection 경로만 읽는다. `streamerVerifications` 변경은 `streamerFanPageAdminStatsRosterProjection`이 UID를 제외한 스트리머 표시 정보로 반영하며, 고점체크 VOD 조회 응답에서 서버가 확인한 닉네임은 `namesLive`에 기록하고 90일 뒤 정리한다.
 
 조회·사용량 누적값은 다중 경로 업데이트에 `ServerValue.increment()`를 쓰고, 현재 대기 수는 RTDB transaction으로 음수가 되지 않게 유지한다. 스트리머 목록은 `streamerVerifications/{verificationKey}`의 재시도 가능한 writer trigger가 UID를 제외한 공개 필드만 live projection에 upsert/tombstone한다. 원본 writer와 projection writer는 별도 기록이므로 운영 중 projection 누락 여부를 주기적으로 확인하고, 대조·복구 때만 원본 전체 집계를 읽는다. 대조 작업이 평상시 관리자 화면의 대체 경로가 되어서는 안 된다.
 

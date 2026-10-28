@@ -862,6 +862,15 @@ async function incrementAdminFanPageView(streamerId, dateKey, unique) {
   await db.ref().update(updates);
 }
 
+async function recordAdminStatsStreamerNickname(soopId, nickname) {
+  const id = String(soopId || '').trim().toLowerCase();
+  const normalizedNickname = typeof nickname === 'string' ? nickname.trim().slice(0, 40) : '';
+  if (!SOOP_ID_PATTERN.test(id) || !normalizedNickname) return;
+  const value = { nickname: normalizedNickname, updatedAt: Date.now() };
+  await db.ref(`${ADMIN_STATS_PROJECTION_ROOT}/fanpage/namesLive/${id}`).set(value);
+  trackViewerStatsTelemetry('rtdbWriteBytes', viewerStatsJsonBytes(value));
+}
+
 async function changeAdminStatsQueueNow(tier, delta) {
   if (!['anonymous', 'account', 'subscriber', 'admin'].includes(tier) || !Number.isFinite(Number(delta)) || !Number(delta)) return;
   const ref = db.ref(`${ADMIN_STATS_PROJECTION_ROOT}/viewerStats/queueLive/${tier}`);
@@ -4651,9 +4660,15 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     await enforceViewerStatsRateLimit(uid, sortOrder === 'catalog' ? 'vodCatalog' : action, { streamerId, page, tier });
     if (sortOrder === 'catalog') {
       const catalog = await fetchSoopVodCatalog(streamerId, keyword);
+      const nickname = catalog.nickname || await lookupSoopStreamerNickname(streamerId);
+      if (nickname) {
+        await recordAdminStatsStreamerNickname(streamerId, nickname).catch((error) => {
+          console.warn('Could not project selected SOOP nickname:', error.message || error);
+        });
+      }
       return {
         streamerId,
-        nickname: catalog.nickname,
+        nickname,
         vods: catalog.vods,
         total: catalog.total,
         page: 1,
@@ -4666,9 +4681,18 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     if (vods.length !== result.rows.length) {
       throw new HttpsError('unavailable', 'SOOP 다시보기 응답 일부를 읽지 못했습니다.');
     }
+    const responseNickname = result.rows[0] && typeof result.rows[0].user_nick === 'string'
+      ? result.rows[0].user_nick.trim().slice(0, 40)
+      : '';
+    const nickname = responseNickname || (page === 1 ? await lookupSoopStreamerNickname(streamerId) : '');
+    if (page === 1 && nickname) {
+      await recordAdminStatsStreamerNickname(streamerId, nickname).catch((error) => {
+        console.warn('Could not project selected SOOP nickname:', error.message || error);
+      });
+    }
     return {
       streamerId,
-      nickname: result.rows[0] && typeof result.rows[0].user_nick === 'string' ? result.rows[0].user_nick.trim().slice(0, 40) : '',
+      nickname,
       vods,
       total: result.total,
       page,
@@ -4856,11 +4880,12 @@ exports.streamerFanPageAdminStatsProjectionCleanup = onSchedule({
   cutoff.setUTCDate(cutoff.getUTCDate() - (ADMIN_STATS_DAYS - 1));
   const cutoffKey = fanPageStatsDateKey(cutoff.getTime());
   const root = `${ADMIN_STATS_PROJECTION_ROOT}`;
-  const [fanPageBaseline, fanPageLive, viewerBaseline, viewerLive] = await Promise.all([
+  const [fanPageBaseline, fanPageLive, viewerBaseline, viewerLive, namesLive] = await Promise.all([
     db.ref(`${root}/fanpage/statsBaseline`).get(),
     db.ref(`${root}/fanpage/statsLive`).get(),
     db.ref(`${root}/viewerStats/dailyBaseline`).get(),
     db.ref(`${root}/viewerStats/dailyLive`).get(),
+    db.ref(`${root}/fanpage/namesLive`).get(),
   ]);
   const updates = {};
   [fanPageBaseline.val() || {}, fanPageLive.val() || {}].forEach((streamers, index) => {
@@ -4880,6 +4905,12 @@ exports.streamerFanPageAdminStatsProjectionCleanup = onSchedule({
         updates[`${root}/viewerStats/${branch}/${date}`] = null;
       }
     });
+  });
+  const nicknameCutoff = Date.now() - (90 * 24 * 60 * 60 * 1000);
+  Object.entries(namesLive.val() || {}).forEach(([streamerId, record]) => {
+    if (!record || Number(record.updatedAt) < nicknameCutoff) {
+      updates[`${root}/fanpage/namesLive/${streamerId}`] = null;
+    }
   });
   if (Object.keys(updates).length) await db.ref().update(updates);
 });

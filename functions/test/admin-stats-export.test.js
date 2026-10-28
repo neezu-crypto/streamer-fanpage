@@ -6,6 +6,7 @@ const { SOURCE_PATHS, uploadSnapshot } = require('../export-admin-stats');
 
 test('scheduled exporter reads only the server-side reporting projection', () => {
   assert.ok(Object.keys(SOURCE_PATHS).includes('metadata'));
+  assert.ok(Object.keys(SOURCE_PATHS).includes('namesLive'));
   assert.ok(Object.values(SOURCE_PATHS).length >= 8);
   assert.ok(Object.values(SOURCE_PATHS).every((path) => path.startsWith('streamerFanPageAdminMetrics/v1/')));
   assert.equal(Object.values(SOURCE_PATHS).some((path) => [

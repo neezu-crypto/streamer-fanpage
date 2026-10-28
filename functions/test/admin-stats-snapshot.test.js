@@ -135,3 +135,25 @@ test('one-time projection seed subtracts live writes and reconstructs the legacy
   assert.equal(JSON.stringify(seed).includes('privateUid'), false);
   assert.equal(JSON.stringify(seed).includes('privateUidHash'), false);
 });
+
+test('uses live SOOP nicknames for viewer-stat rankings while verified names stay authoritative', () => {
+  const snapshot = buildAdminStatsSnapshotFromProjection({
+    rosterBaseline: {
+      streamer01: { id: 'streamer01', nickname: '인증 닉네임', soopId: 'streamer01' },
+    },
+    namesBaseline: { regular02: '이전 닉네임' },
+    namesLive: {
+      regular02: { nickname: '현재 닉네임', updatedAt: 1_800_000_000_000 },
+      streamer01: { nickname: '오래된 SOOP 닉네임', updatedAt: 1_800_000_000_000 },
+    },
+    viewerStatsBaseline: {
+      '2026-10-30': {
+        vods: 1,
+        streamers: { regular02: 1, streamer01: 1 },
+      },
+    },
+  }, { dateKeys: dates, generatedAt: 1_800_000_000_000 });
+  const ranking = new Map(snapshot.viewerStatsUsage.topSearchedStreamers.map((item) => [item.id, item.nickname]));
+  assert.equal(ranking.get('regular02'), '현재 닉네임');
+  assert.equal(ranking.get('streamer01'), '인증 닉네임');
+});
