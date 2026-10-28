@@ -1155,15 +1155,18 @@ async function loadAdminStats() {
     renderAdminStats(adminStatsData);
     await loadAdminViewerSubscriptionRequests();
     const generatedAt = Number(adminStatsData.generatedAt);
-    $('adminStatsStatus').textContent = Number.isFinite(generatedAt)
-      ? `최근 집계 ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(generatedAt))} · 최근 30일 기준`
+    const generatedAtLabel = Number.isFinite(generatedAt)
+      ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(generatedAt))
+      : '';
+    $('adminStatsStatus').textContent = generatedAtLabel
+      ? `최근 집계 ${generatedAtLabel} · 최근 30일 기준${adminStatsData.snapshotStale ? ' · 집계 갱신 지연' : ''}`
       : '최근 30일 기준 집계예요.';
   } catch (error) {
     $('adminStatsStatus').textContent = error.message || '통계를 불러오지 못했어요.';
   } finally {
     adminStatsLoading = false;
     $('refreshAdminStats').disabled = false;
-    $('refreshAdminStats').textContent = '↻ 새로고침';
+    $('refreshAdminStats').textContent = '↻ 스냅샷 다시 불러오기';
   }
 }
 function renderAdminDesignFeedback(items) {

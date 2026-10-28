@@ -61,7 +61,7 @@ Cloud Storage 객체: `gs://<private-admin-stats-bucket>/admin-stats/v1/latest.j
 }
 ```
 
-`generatedAt`과 `schemaVersion`은 필수다. exporter는 완전한 JSON을 임시 객체에 올린 뒤 검증하고 `latest.json`을 교체한다. 반쯤 생성된 파일을 `latest.json`으로 노출하면 안 된다.
+`generatedAt`과 `schemaVersion`은 필수다. exporter는 업로드 전에 전체 schema·날짜·숫자·민감 필드를 검증한다. Cloud Storage generation precondition을 사용해 기존 객체를 조건부로 교체하므로 업로드 실패나 동시 실행 충돌은 마지막 정상 파일을 덮어쓰지 않는다.
 
 ## 집계 원본과 비용 절감 방식
 
@@ -69,13 +69,25 @@ Cloud Storage 객체: `gs://<private-admin-stats-bucket>/admin-stats/v1/latest.j
 
 | 원본 | 보고 projection | 쓰기 시점 |
 | --- | --- | --- |
-| `streamerFanPageStats/{soopId}` | `streamerFanPageAdminMetrics/v1/fanpage/streamers/{soopId}` | `recordFanPageView`가 조회를 확정한 뒤 같은 날짜의 조회·순방문·누적 카운터 갱신 |
-| `streamerFanPageViewerStatsLimits/{uidHash}` | `streamerFanPageAdminMetrics/v1/viewerStats/daily/{YYYY-MM-DD}` | 고점체크 요청/작업 사용량 계측이 성공한 뒤 액션·등급·payload·비용·스트리머 카운터 갱신 |
-| `streamerFanPageViewerStatsQueue` | `streamerFanPageAdminMetrics/v1/viewerStats/queue` | 대기열 등록·claim·완료·실패·취소 시 등급별 현재 수와 누적 지표 갱신 |
+| `streamerFanPageStats/{soopId}` | `streamerFanPageAdminMetrics/v1/fanpage/statsLive/{soopId}` | `recordFanPageView`가 조회를 확정한 뒤 같은 날짜의 조회·순방문·누적 카운터 갱신 |
+| `streamerFanPageViewerStatsLimits/{uidHash}` | `streamerFanPageAdminMetrics/v1/viewerStats/dailyLive/{YYYY-MM-DD}` | 고점체크 액션·등급·payload·비용·스트리머 카운터를 원본에 기록하는 시점에 익명화된 합계 갱신 |
+| `streamerFanPageViewerStatsQueue` | `streamerFanPageAdminMetrics/v1/viewerStats/queueLive/{tier}` | 대기열 등록·제거 시 등급별 현재 수 갱신. 완료·실패·취소·캐시 적중은 일별 usage projection에 기록 |
 
 projection에는 관리자 화면이 필요로 하는 합계만 기록한다. 사용자별 rate limit 원본과 작업 레코드는 그대로 서버 전용으로 유지하며 projection으로 대체하지 않는다.
 
-동시 요청에서 카운터가 누락되지 않도록 RTDB transaction 또는 `ServerValue.increment()`를 쓴다. 호출 재시도 때문에 같은 이벤트가 두 번 반영될 수 있는 경로는 요청/작업 ID를 키로 하는 짧은 보존기간의 idempotency 표식을 서버 전용으로 두고, 표식 확보와 projection 반영 순서를 테스트한다. 정확도를 확인하는 일일 대조 작업은 원본의 전날 데이터만 읽어 projection 차이를 보고하고, 차이가 있으면 관리자에게 알린다. 대조 작업이 평상시 관리자 화면의 대체 경로가 되어서는 안 된다.
+현재 구현은 아래 경로를 사용한다. `baseline`은 1회 초기화된 기존 데이터의 집계이고, `live`는 초기화 뒤 writer가 기록한 변화량이다. exporter는 두 값을 합쳐 기존 callable 응답 schema를 만든다.
+
+| projection | 경로 |
+| --- | --- |
+| 인증 스트리머 목록 | `streamerFanPageAdminMetrics/v1/fanpage/rosterBaseline` + `rosterLive` |
+| 팬페이지 조회 | `streamerFanPageAdminMetrics/v1/fanpage/statsBaseline/{soopId}` + `statsLive/{soopId}` |
+| 고점체크 일별 사용량 | `streamerFanPageAdminMetrics/v1/viewerStats/dailyBaseline/{date}` + `dailyLive/{date}` |
+| 현재 대기 수 | `streamerFanPageAdminMetrics/v1/viewerStats/queueBaseline` + `queueLive` |
+| 스트리머 표시명 | `streamerFanPageAdminMetrics/v1/fanpage/namesBaseline` |
+
+`functions/backfill-admin-stats-projection.js`는 초기 전환·복구 때만 기존 원본을 읽고, 현재 `live` 합계를 빼서 `baseline`을 만든 뒤 30일 snapshot 결과를 원본 집계와 비교한다. 비교가 다르면 실행을 실패 처리하고 관리자 callable은 아직 전환하지 않는다. 이후 정기 exporter는 위 projection 경로만 읽는다. `streamerVerifications` 변경은 `streamerFanPageAdminStatsRosterProjection`이 UID를 제외한 스트리머 표시 정보로 반영한다.
+
+조회·사용량 누적값은 다중 경로 업데이트에 `ServerValue.increment()`를 쓰고, 현재 대기 수는 RTDB transaction으로 음수가 되지 않게 유지한다. 스트리머 목록은 `streamerVerifications/{verificationKey}`의 재시도 가능한 writer trigger가 UID를 제외한 공개 필드만 live projection에 upsert/tombstone한다. 원본 writer와 projection writer는 별도 기록이므로 운영 중 projection 누락 여부를 주기적으로 확인하고, 대조·복구 때만 원본 전체 집계를 읽는다. 대조 작업이 평상시 관리자 화면의 대체 경로가 되어서는 안 된다.
 
 ## 실행 흐름
 
@@ -87,7 +99,7 @@ projection에는 관리자 화면이 필요로 하는 합계만 기록한다. �
 2. **비공개 exporter 추가**
    - `functions/export-admin-stats.js`에서 projection만 읽어 `latest.json`을 만든다.
    - VOD exporter와 달리 결과물을 `static-data/`에 쓰거나 Pages artifact에 복사하지 않는다.
-   - schema 검증, 숫자 범위 검증, 30일 날짜 배열 완전성 검증, UID 계열 키 부재 검증을 통과한 경우에만 최신 파일을 교체한다.
+   - schema 검증, 숫자 범위 검증, 30일 날짜 배열 완전성 검증, UID 계열 키 부재 검증을 통과한 경우에만 generation precondition으로 최신 파일을 교체한다.
 
 3. **정기 실행 구성**
    - GitHub Actions의 별도 workflow `admin-stats-snapshot.yml`을 만든다. Pages 배포 workflow와 결합하지 않는다.

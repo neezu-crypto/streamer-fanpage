@@ -73,6 +73,12 @@ jobs:
           git ls-files -z | tar --null -T - -cf - | tar -xf - -C _site
           mkdir -p _site/static-data/viewer-stats
           cp -a static-data/viewer-stats/. _site/static-data/viewer-stats/
+      - name: Guard private admin snapshots
+        run: |
+          if find _site -type f -path '*/admin-stats/*.json' -print -quit | grep -q .; then
+            echo "Private admin stats snapshots must not be published to Pages."
+            exit 1
+          fi
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
