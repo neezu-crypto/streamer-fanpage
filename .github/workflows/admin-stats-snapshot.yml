@@ -27,6 +27,10 @@ jobs:
           workload_identity_provider: projects/997788925900/locations/global/workloadIdentityPools/github-actions/providers/github
           service_account: fanpage-static-exporter@soop-stock-market.iam.gserviceaccount.com
           project_id: soop-stock-market
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: soop-stock-market
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -36,7 +40,8 @@ jobs:
       - name: Get usage reporter URL
         id: usage-reporter
         run: |
-          URL="https://us-central1-soop-stock-market.cloudfunctions.net/streamerFanPageViewerStatsExportUsage"
+          URL="$(gcloud functions describe streamerFanPageViewerStatsExportUsage --gen2 --region=us-central1 --project=soop-stock-market --format='value(serviceConfig.uri)')"
+          test -n "$URL"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
       - name: Authenticate for usage report
         id: usage-reporter-auth
