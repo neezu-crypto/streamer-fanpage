@@ -3,6 +3,7 @@ import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/12.16.
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
+import { createViewerStatsVisitNotifier } from './viewer-stats-visit.mjs';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -22,11 +23,16 @@ const auth = getAuth(app);
 const database = getDatabase(app);
 const functions = getFunctions(app, 'us-central1');
 const callViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats');
+const callViewerStatsVisit = httpsCallable(functions, 'streamerFanPageViewerStatsVisit');
 const callViewerSubscription = httpsCallable(functions, 'streamerFanPageViewerSubscription');
 const callSponsorAds = httpsCallable(functions, 'streamerFanPageSponsorAds');
 const callAdminSponsorAds = httpsCallable(functions, 'streamerFanPageAdminSponsorAds');
 const callSponsorLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
 const $ = (id) => document.getElementById(id);
+const notifyViewerStatsVisit = createViewerStatsVisitNotifier(
+  () => callViewerStatsVisit({}),
+  (error) => console.warn('고점체크 인증 스트리머 접속을 기록하지 못했습니다:', error.message || error),
+);
 
 function setupDevbarMarquee() {
   const viewport = $('devbar-viewport');
@@ -3569,6 +3575,9 @@ document.addEventListener('visibilitychange', () => {
 });
 
 let observedAuthIdentity = '';
+onAuthStateChanged(auth, (user) => {
+  void notifyViewerStatsVisit(user);
+});
 onAuthStateChanged(auth, (user) => {
   if (!user) return;
   const identity = user.uid + ':' + String(user.isAnonymous);
