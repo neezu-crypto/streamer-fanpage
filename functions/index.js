@@ -30,6 +30,10 @@ const {
   streamerFanPageSponsorAds,
   streamerFanPageAdminSponsorAds,
 } = require('./sponsor-ads');
+const {
+  pruneVerifiedStreamerVisitDedup,
+  recordVerifiedStreamerVisit,
+} = require('./verified-streamer-visits');
 
 initializeApp();
 const db = getDatabase();
@@ -313,7 +317,7 @@ async function runViewerStatsTelemetry({
 }, operation) {
   const telemetry = {
     uidKey,
-    action: ['search', 'vods', 'stats', 'periodPeaks', 'statsResult', 'cancelStatsJob', 'worker', 'staticExport'].includes(action)
+    action: ['search', 'vods', 'stats', 'periodPeaks', 'statsResult', 'cancelStatsJob', 'worker', 'staticExport', 'viewerVisit'].includes(action)
       ? action
       : 'other',
     source,
@@ -739,8 +743,8 @@ async function lookupSoopStreamerNicknames(soopIds, concurrency = 8) {
   return names;
 }
 
-async function findVerifiedByUid(uid) {
-  const snap = await db.ref('streamerVerifications')
+async function findVerifiedByUid(uid, ref = (path) => db.ref(path)) {
+  const snap = await ref('streamerVerifications')
     .orderByChild('uid').equalTo(uid).limitToFirst(1).get();
   if (!snap.exists()) return null;
   const [key, record] = Object.entries(snap.val())[0];
@@ -783,13 +787,7 @@ function fanPageStatsDateKey(timestamp = Date.now()) {
 }
 
 async function cleanupVerifiedStreamerVisitDedup(todayKey) {
-  const ref = db.ref('verifiedStreamerVisitDedup/streamerFanPage');
-  const snapshot = await ref.get();
-  const updates = {};
-  Object.keys(snapshot.val() || {}).forEach((key) => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || key < todayKey) updates[key] = null;
-  });
-  if (Object.keys(updates).length) await ref.update(updates);
+  await pruneVerifiedStreamerVisitDedup(db, ['streamerFanPage', 'viewerStats'], todayKey);
 }
 
 function metricCount(value) {
@@ -841,34 +839,7 @@ async function recordFanPageView(uid, streamerId) {
 }
 
 async function recordVerifiedStreamerFanPageVisit(verified) {
-  const dateKey = fanPageStatsDateKey();
-  const soopId = String(verified && verified.streamer && verified.streamer.soopId || '').trim().toLowerCase();
-  if (!SOOP_ID_PATTERN.test(soopId)) return false;
-
-  // 하루 단위로 공개 SOOP ID만 사용해 중복 알림을 막고, Firebase UID는 방문 기록에 넣지 않는다.
-  const dedupRef = db.ref(`verifiedStreamerVisitDedup/streamerFanPage/${dateKey}/${soopId}`);
-  let alreadyLogged = false;
-  const dedupResult = await dedupRef.transaction((current) => {
-    if (current) {
-      alreadyLogged = true;
-      return;
-    }
-    return true;
-  });
-  if (!dedupResult.committed || alreadyLogged) return false;
-
-  try {
-    await db.ref('verifiedStreamerVisits').push({
-      nickname: String(verified.streamer.nickname || '').slice(0, 40),
-      soopId,
-      market: 'streamerFanPage',
-      visitedAt: Date.now(),
-    });
-  } catch (error) {
-    await dedupRef.remove().catch(() => {});
-    throw error;
-  }
-  return true;
+  return recordVerifiedStreamerVisit(db, verified, 'streamerFanPage', fanPageStatsDateKey());
 }
 
 function pageRef(streamerId) {
@@ -4683,6 +4654,26 @@ exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => 
     return record ? { ...record.streamer, visitedAt: visit.visitedAt } : null;
   }));
   return { streamers: streamers.filter(Boolean) };
+});
+
+exports.streamerFanPageViewerStatsVisit = onCall({ maxInstances: 20, enforceAppCheck: true }, async (request) => {
+  const uid = requireAuth(request);
+  return runViewerStatsTelemetry({
+    uidKey: viewerStatsUidKey(uid),
+    action: 'viewerVisit',
+    requestData: request.data,
+  }, async () => {
+    const verified = await findVerifiedByUid(uid, viewerStatsRef);
+    if (!verified) return { ok: true, logged: false };
+
+    const logged = await recordVerifiedStreamerVisit(
+      { ref: viewerStatsRef },
+      verified,
+      'viewerStats',
+      fanPageStatsDateKey(),
+    );
+    return { ok: true, logged };
+  });
 });
 
 exports.streamerFanPageViewerStatsExportUsage = onRequest({
