@@ -13,6 +13,7 @@ const SOURCE_PATHS = Object.freeze({
   rosterBaseline: 'streamerFanPageAdminMetrics/v1/fanpage/rosterBaseline',
   rosterLive: 'streamerFanPageAdminMetrics/v1/fanpage/rosterLive',
   namesBaseline: 'streamerFanPageAdminMetrics/v1/fanpage/namesBaseline',
+  namesLive: 'streamerFanPageAdminMetrics/v1/fanpage/namesLive',
   fanPageBaseline: 'streamerFanPageAdminMetrics/v1/fanpage/statsBaseline',
   fanPageLive: 'streamerFanPageAdminMetrics/v1/fanpage/statsLive',
   viewerStatsBaseline: 'streamerFanPageAdminMetrics/v1/viewerStats/dailyBaseline',

@@ -48,6 +48,7 @@ async function readSources(accessToken) {
 async function readLiveProjection(accessToken) {
   const live = await readPaths(accessToken, {
     rosterLive: `${ROOT}/fanpage/rosterLive`,
+    namesLive: `${ROOT}/fanpage/namesLive`,
     fanPageStats: `${ROOT}/fanpage/statsLive`,
     viewerStatsDaily: `${ROOT}/viewerStats/dailyLive`,
     queueNow: `${ROOT}/viewerStats/queueLive`,
@@ -60,6 +61,7 @@ function projectionSnapshot(seed, live, dateKeys) {
     rosterBaseline: seed.fanpage.roster,
     rosterLive: live.rosterLive,
     namesBaseline: seed.fanpage.names,
+    namesLive: live.namesLive,
     fanPageBaseline: seed.fanpage.baseline,
     fanPageLive: live.fanPageStats,
     viewerStatsBaseline: seed.viewerStats.baseline,
@@ -76,7 +78,14 @@ function comparableSnapshot(snapshot) {
     if (!value || typeof value !== 'object') return value;
     return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortKeys(value[key])]));
   };
-  return JSON.stringify(sortKeys(rest));
+  const comparable = sortKeys(rest);
+  const rankings = comparable.viewerStatsUsage && comparable.viewerStatsUsage.topSearchedStreamers;
+  if (Array.isArray(rankings)) {
+    comparable.viewerStatsUsage.topSearchedStreamers = Object.fromEntries(rankings
+      .map((row) => [row.id, row.count])
+      .sort(([left], [right]) => left.localeCompare(right)));
+  }
+  return JSON.stringify(comparable);
 }
 
 async function seedProjection(accessToken = googleAccessToken(), { now = Date.now() } = {}) {

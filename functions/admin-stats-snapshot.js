@@ -399,6 +399,7 @@ function buildAdminStatsSnapshotFromProjection({
   rosterBaseline = {},
   rosterLive = {},
   namesBaseline = {},
+  namesLive = {},
   fanPageBaseline = {},
   fanPageLive = {},
   viewerStatsBaseline = {},
@@ -412,6 +413,12 @@ function buildAdminStatsSnapshotFromProjection({
     else if (value && typeof value === 'object') roster[id] = { ...value, id };
   });
   const names = { ...(namesBaseline || {}) };
+  Object.entries(namesLive || {}).forEach(([rawId, value]) => {
+    const id = String(rawId || '').trim().toLowerCase();
+    const nickname = typeof value === 'string' ? value.trim().slice(0, 40)
+      : typeof (value && value.nickname) === 'string' ? value.nickname.trim().slice(0, 40) : '';
+    if (SOOP_ID_PATTERN.test(id) && nickname) names[id] = nickname;
+  });
   const verified = Object.fromEntries(Object.entries(roster).map(([id, streamer]) => [id, {
     nickname: streamer.nickname,
     soopId: streamer.soopId || id,
