@@ -367,6 +367,18 @@
 .played-games-owner-hint{grid-column:1/-1;color:#8f8997;font-size:11px;line-height:1.5}
 .played-games-empty-state{margin:0;padding:15px;border-radius:10px;background:#ffffff04;color:#96909d;text-align:center;font-size:12px}
 .played-games-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px}
+.played-game-record{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0;padding:10px 11px;border:1px solid #ffffff18;border-radius:10px;background:#ffffff06}
+.played-game-record-copy{display:grid;gap:3px;min-width:0}
+.played-game-record-label{color:#e783a5;font-size:10px;font-weight:700;letter-spacing:.04em}
+.played-game-record-value{color:var(--text);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.played-game-record-copy.is-empty{color:#9a92a1;font-size:11px;line-height:1.5}
+.played-game-record-edit{flex:0 0 auto;padding:7px 10px;font-size:10px}
+.played-game-record-editor{display:grid;grid-template-columns:110px minmax(0,1fr);gap:7px;width:100%}
+.played-game-record-editor[hidden]{display:none}
+.played-game-record-editor select,.played-game-record-editor input{min-width:0;min-height:36px;padding:8px 10px;border:1px solid #ffffff20;border-radius:9px;background:#111018;color:var(--text);outline:0;font:11px var(--font)}
+.played-game-record-editor select:focus,.played-game-record-editor input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.played-game-record-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:6px}
+.played-game-record-editor small{grid-column:1/-1;color:#9991a0;font-size:10px;line-height:1.4}
 .played-game-card{min-width:0;padding:10px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff04}
 .played-game-main{display:flex;align-items:flex-start;gap:7px;min-width:0}
 .played-game-steam-link{display:grid;flex:1;min-width:0;color:var(--text);text-decoration:none}

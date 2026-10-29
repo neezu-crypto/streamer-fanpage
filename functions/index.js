@@ -12,6 +12,7 @@ const { defineSecret } = require('firebase-functions/params');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
+const { normalizePlayedGameBestRecord, updatePlayedGameBestRecord } = require('./played-games-record');
 const {
   VIEWER_STATS_QUEUE_MAX_CONCURRENT,
   VIEWER_STATS_QUEUE_MAX_INSTANCES,
@@ -3248,6 +3249,7 @@ function normalizePlayedGames(value) {
         steamUrl: `https://store.steampowered.com/app/${key}/`,
         thumbnailUrl,
         createdAt: Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : 0,
+        bestRecord: normalizePlayedGameBestRecord(raw.bestRecord),
         vods,
       };
     })
@@ -5761,6 +5763,26 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
   }
 
   const rootRef = playedGamesRef(targetStreamer.streamer.id);
+  if (action === 'set-record') {
+    const appId = String(data.appId || '').trim();
+    const type = String(data.recordType || '').trim();
+    const value = typeof data.recordValue === 'string' ? data.recordValue.trim() : '';
+    if (!/^[1-9]\d{0,9}$/.test(appId)) throw new HttpsError('invalid-argument', '기록을 수정할 게임을 확인해 주세요.');
+    if (value.length > 100) throw new HttpsError('invalid-argument', '최고기록은 100자 이내로 입력해 주세요.');
+    if (value && !['rank', 'record'].includes(type)) throw new HttpsError('invalid-argument', '기록 종류를 선택해 주세요.');
+    const gameRef = rootRef.child(appId);
+    if (!(await gameRef.get()).exists()) throw new HttpsError('not-found', '기록을 수정할 게임을 찾을 수 없습니다.');
+    const transaction = await gameRef.transaction((current) => {
+      if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
+      return updatePlayedGameBestRecord(current, value ? { type, value } : null);
+    });
+    if (!transaction.committed) {
+      if (!(await gameRef.get()).exists()) throw new HttpsError('not-found', '기록을 수정할 게임을 찾을 수 없습니다.');
+      throw new HttpsError('aborted', '기록이 동시에 변경됐어요. 다시 시도해 주세요.');
+    }
+    return { playedGames: normalizePlayedGames((await rootRef.get()).val()) };
+  }
+
   if (action === 'add-game') {
     const parsed = parseSteamGameUrl(data.steamUrl);
     if (!parsed) throw new HttpsError('invalid-argument', 'Steam 게임 링크를 확인해 주세요.');

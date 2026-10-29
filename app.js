@@ -5902,6 +5902,50 @@ function renderPlayedGamesSection(page) {
     }
     card.append(top);
 
+    const record = game.bestRecord && typeof game.bestRecord === 'object' ? game.bestRecord : null;
+    if (record || page.isOwner) {
+    const recordSection = document.createElement('div'); recordSection.className = 'played-game-record';
+    const recordCopy = document.createElement('div'); recordCopy.className = 'played-game-record-copy';
+    const recordLabel = document.createElement('span'); recordLabel.className = 'played-game-record-label';
+    const recordValue = document.createElement('strong'); recordValue.className = 'played-game-record-value';
+    if (record && ['rank', 'record'].includes(record.type) && typeof record.value === 'string' && record.value.trim()) {
+      recordLabel.textContent = record.type === 'rank' ? '최고랭크' : '최고기록';
+      recordValue.textContent = record.value;
+      recordCopy.append(recordLabel, recordValue);
+    } else {
+      recordCopy.classList.add('is-empty');
+      recordCopy.textContent = '최고기록이나 최고랭크를 등록해 보세요.';
+    }
+    recordSection.append(recordCopy);
+    if (page.isOwner) {
+      const editor = document.createElement('form'); editor.className = 'played-game-record-editor'; editor.hidden = true;
+      const type = document.createElement('select'); type.name = 'recordType'; type.setAttribute('aria-label', '기록 종류');
+      [['record', '최고기록'], ['rank', '최고랭크']].forEach(([value, label]) => {
+        const option = document.createElement('option'); option.value = value; option.textContent = label;
+        if (record && record.type === value) option.selected = true;
+        type.append(option);
+      });
+      const value = document.createElement('input'); value.type = 'text'; value.name = 'recordValue';
+      value.maxLength = 100; value.value = record && typeof record.value === 'string' ? record.value : '';
+      value.placeholder = '예: 다이아몬드 2 또는 12,500점'; value.setAttribute('aria-label', `${game.name || '게임'} 최고기록 또는 최고랭크`);
+      const actions = document.createElement('div'); actions.className = 'played-game-record-actions';
+      const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = '저장';
+      const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
+      cancel.addEventListener('click', () => { editor.hidden = true; recordSection.querySelector('.played-game-record-edit').hidden = false; });
+      actions.append(save, cancel);
+      const hint = document.createElement('small'); hint.textContent = '내용을 비우고 저장하면 기록을 삭제해요.';
+      editor.append(type, value, actions, hint);
+      const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'button played-game-record-edit';
+      edit.textContent = record ? '기록 수정' : '기록 추가';
+      edit.addEventListener('click', () => { edit.hidden = true; editor.hidden = false; value.focus(); });
+      editor.addEventListener('submit', (event) => {
+        event.preventDefault(); savePlayedGameRecord(page, appId, type, value, save);
+      });
+      recordSection.append(edit, editor);
+    }
+    card.append(recordSection);
+    }
+
     const vods = Array.isArray(game.vods) ? game.vods : [];
     const vodHeading = document.createElement('div'); vodHeading.className = 'played-game-vods-heading';
     const vodLabel = document.createElement('strong'); vodLabel.textContent = '다시보기';
@@ -5982,6 +6026,24 @@ async function addPlayedGameVod(page, appId, input, button) {
     showToast(error.message || '다시보기를 연결하지 못했어요.');
   } finally {
     button.disabled = false; button.textContent = '링크 연결';
+  }
+}
+
+async function savePlayedGameRecord(page, appId, type, input, button) {
+  if (!page.isOwner || button.disabled) return;
+  button.disabled = true; button.textContent = '저장 중…';
+  try {
+    const result = (await callPlayedGames({
+      action: 'set-record', streamerId: page.streamer.id, appId,
+      recordType: type.value, recordValue: input.value.trim(),
+    })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    currentPage.playedGames = rememberFanPageContent(page.streamer.id, 'playedGames', result.playedGames, true);
+    refreshPlayedGamesSection(page.streamer.id);
+    showToast(input.value.trim() ? '게임 최고기록을 저장했어요.' : '게임 최고기록을 삭제했어요.');
+  } catch (error) {
+    showToast(error.message || '게임 최고기록을 저장하지 못했어요.');
+    button.disabled = false; button.textContent = '저장';
   }
 }
 
