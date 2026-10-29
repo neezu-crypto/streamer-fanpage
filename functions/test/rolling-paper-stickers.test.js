@@ -79,6 +79,43 @@ test('signed-in account can place one sticker, then move and remove it', async (
   assert.ok(replacementId);
 });
 
+test('move retries against the server value when the local transaction cache starts empty', async () => {
+  const database = createDatabase();
+  const id = await addRollingPaperSticker(database.ref, 'fan-hash', '✨', 20, 30, 1_800_000_000_000);
+  const baseRootChild = database.ref.child.bind(database.ref);
+  const stickersRef = baseRootChild('stickers');
+  const baseStickersChild = stickersRef.child.bind(stickersRef);
+  const stickerRef = baseStickersChild(id);
+  let updateCalls = 0;
+  stickerRef.transaction = async (update) => {
+    const runUpdate = (value) => { updateCalls += 1; return update(value); };
+    assert.equal(runUpdate(null), null);
+    const serverValueUpdate = runUpdate((await stickerRef.get()).val());
+    await stickerRef.set(serverValueUpdate);
+    return { committed: true, snapshot: { val: () => serverValueUpdate } };
+  };
+  stickersRef.child = (childId) => childId === id ? stickerRef : baseStickersChild(childId);
+  database.ref.child = (key) => key === 'stickers' ? stickersRef : baseRootChild(key);
+
+  const moved = await moveRollingPaperSticker(database.ref, id, 74, 81, 1_800_000_000_100);
+
+  assert.equal(updateCalls, 2);
+  assert.equal(moved.x, 74);
+  assert.equal(moved.y, 81);
+  assert.equal((await stickerRef.get()).val().updatedAt, 1_800_000_000_100);
+});
+
+test('move reports not found when both the local cache and server have no sticker', async () => {
+  const database = createDatabase();
+  const missingId = '123e4567-e89b-42d3-a456-426614174000';
+
+  await assert.rejects(
+    moveRollingPaperSticker(database.ref, missingId, 74, 81),
+    { code: 'not-found' },
+  );
+  assert.deepEqual(normalizeRollingPaperStickers(database.data.stickers), []);
+});
+
 test('streamer or admin manager can remove another account\'s sticker', async () => {
   const database = createDatabase();
   const id = await addRollingPaperSticker(database.ref, 'fan-hash', '🐰', 50, 50, 1_800_000_000_000);
