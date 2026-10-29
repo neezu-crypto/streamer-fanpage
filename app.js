@@ -2687,8 +2687,9 @@ function rollingPaperStateFor(streamerId) {
       galleryNextOffset: 0, galleryTotalCount: 0, selectedGalleryImage: null,
       stickers: [], stickersLoaded: false, stickersLoading: false, stickerError: '', ownStickerId: '',
       canPlaceSticker: false, canManageStickers: false, stickerChoices: [], stickerPaletteOpen: false,
-      selectedStickerEmoji: '', stickerPlacing: false, stickerEditing: false, stickerHideMode: false,
-      showHiddenStickers: false, draggingStickerId: '',
+      selectedStickerEmoji: '', stickerPlacing: false, stickerActionMenuOpen: false,
+      showHiddenStickers: false, selectedStickerMenuId: '', movingStickerId: '', draggingStickerId: '',
+      stickerMoveOriginal: null,
       savingSticker: false, stickerMoveQueue: new Map(), stickerMovePromise: null,
     };
     rollingPaperStates.set(streamerId, state);
@@ -2956,6 +2957,18 @@ function rollingPaperStickerPosition(board, clientX, clientY) {
   return { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
 }
 
+function cancelRollingPaperStickerMove(page, stickerId) {
+  const state = rollingPaperStateFor(page.streamer.id);
+  const original = state.stickerMoveOriginal;
+  const sticker = state.stickers.find((item) => item.id === stickerId);
+  if (original && original.id === stickerId && sticker) {
+    sticker.x = original.x; sticker.y = original.y;
+  }
+  state.stickerMoveOriginal = null;
+  state.movingStickerId = ''; state.draggingStickerId = '';
+  refreshRollingPaperSection(page.streamer.id);
+}
+
 function renderRollingPaperStickerBoard(page, state) {
   const streamerId = page.streamer.id;
   const section = document.createElement('section'); section.className = 'rolling-paper-sticker-panel';
@@ -2965,125 +2978,22 @@ function renderRollingPaperStickerBoard(page, state) {
   const count = document.createElement('span');
   count.textContent = state.stickersLoading && !state.stickersLoaded ? '불러오는 중' : `${state.stickers.length}개`;
   summary.append(title, count); toolbar.append(summary);
-  const actions = document.createElement('div'); actions.className = 'rolling-paper-sticker-actions';
-  const more = document.createElement('details'); more.className = 'rolling-paper-sticker-menu';
-  const moreToggle = document.createElement('summary'); moreToggle.textContent = '⋯'; moreToggle.setAttribute('aria-label', '스티커 설정');
-  const moreItems = document.createElement('div'); moreItems.className = 'rolling-paper-sticker-menu-items';
-  more.append(moreToggle, moreItems);
-  const appendMenuAction = (button) => { button.classList.add('rolling-paper-sticker-menu-item'); moreItems.append(button); };
-
   const hidden = rollingPaperStickersAreHidden(streamerId);
   const storedHiddenStickerIds = rollingPaperHiddenStickerIds(streamerId);
   const availableStickerIds = new Set(state.stickers.map((sticker) => sticker.id));
   const hiddenStickerIds = new Set([...storedHiddenStickerIds].filter((id) => availableStickerIds.has(id)));
-  const visibility = document.createElement('button'); visibility.type = 'button'; visibility.className = 'button rolling-paper-sticker-action';
-  visibility.textContent = hidden ? '모든 스티커 보이기' : '모든 스티커 숨기기';
-  visibility.setAttribute('aria-pressed', String(hidden));
-  visibility.addEventListener('click', () => {
-    try { localStorage.setItem(rollingPaperStickerHiddenKey(streamerId), hidden ? '0' : '1'); } catch (_) { /* Keep the current view if storage is unavailable. */ }
-    state.stickerHideMode = false; state.showHiddenStickers = false;
-    refreshRollingPaperSection(streamerId);
-  });
-  appendMenuAction(visibility);
-
-  const hideMode = document.createElement('button'); hideMode.type = 'button'; hideMode.className = 'button rolling-paper-sticker-action';
-  hideMode.textContent = state.stickerHideMode ? '선택 끝내기' : '숨길 스티커 선택';
-  hideMode.setAttribute('aria-pressed', String(state.stickerHideMode));
-  hideMode.addEventListener('click', () => {
-    if (hidden) {
-      try { localStorage.setItem(rollingPaperStickerHiddenKey(streamerId), '0'); } catch (_) { /* Continue with the current view. */ }
-    }
-    state.stickerHideMode = !state.stickerHideMode;
-    state.stickerEditing = false; state.showHiddenStickers = false;
-    state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
-    refreshRollingPaperSection(streamerId);
-  });
-  appendMenuAction(hideMode);
-  if (hiddenStickerIds.size) {
-    const showHidden = document.createElement('button'); showHidden.type = 'button'; showHidden.className = 'button rolling-paper-sticker-action';
-    showHidden.textContent = state.showHiddenStickers ? '숨김 스티커 감추기' : `숨긴 스티커 보기 ${hiddenStickerIds.size}개`;
-    showHidden.setAttribute('aria-pressed', String(state.showHiddenStickers));
-    showHidden.addEventListener('click', () => {
-      if (hidden) {
-        try { localStorage.setItem(rollingPaperStickerHiddenKey(streamerId), '0'); } catch (_) { /* Continue with the current view. */ }
-      }
-      state.showHiddenStickers = !state.showHiddenStickers;
-      state.stickerHideMode = false; state.stickerEditing = false;
-      state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
-      refreshRollingPaperSection(streamerId);
-    });
-    appendMenuAction(showHidden);
-  }
-
-  if (state.ownStickerId) {
-    const removeOwn = document.createElement('button'); removeOwn.type = 'button'; removeOwn.className = 'button rolling-paper-sticker-action';
-    removeOwn.textContent = '내 스티커 떼기';
-    removeOwn.addEventListener('click', () => deleteRollingPaperStickerFromBoard(page, state.ownStickerId, removeOwn));
-    actions.append(removeOwn);
-  } else if (state.canPlaceSticker) {
-    const attach = document.createElement('button'); attach.type = 'button'; attach.className = 'button button-primary rolling-paper-sticker-action';
-    attach.textContent = state.stickerPlacing ? '붙이기 취소' : state.stickerPaletteOpen ? '선택 취소' : '＋ 스티커 붙이기';
-    attach.disabled = state.savingSticker;
-    attach.addEventListener('click', () => {
-      try { localStorage.setItem(rollingPaperStickerHiddenKey(streamerId), '0'); } catch (_) { /* Placement can continue without a persisted visibility preference. */ }
-      state.stickerHideMode = false; state.showHiddenStickers = false; state.stickerEditing = false;
-      if (state.stickerPlacing) {
-        state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
-      } else if (state.stickerPaletteOpen) state.stickerPaletteOpen = false;
-      else state.stickerPaletteOpen = true;
-      refreshRollingPaperSection(streamerId);
-    });
-    actions.append(attach);
-  } else if (!hasRecognizedFanpageAccount()) {
-    const login = document.createElement('button'); login.type = 'button'; login.className = 'button button-primary rolling-paper-sticker-action';
-    login.textContent = '로그인하고 스티커 붙이기';
-    login.addEventListener('click', () => showFanPageModal($('loginChoiceDialog')));
-    actions.append(login);
-  }
-
-  if (state.canManageStickers) {
-    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'button rolling-paper-sticker-action';
-    edit.textContent = state.stickerEditing ? '배치 편집 완료' : '배치 편집';
-    edit.setAttribute('aria-pressed', String(state.stickerEditing));
-    edit.addEventListener('click', () => {
-      state.stickerEditing = !state.stickerEditing;
-      state.stickerHideMode = false; state.showHiddenStickers = false;
-      state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
-      refreshRollingPaperSection(streamerId);
-    });
-    appendMenuAction(edit);
-  }
-  if (state.stickers.length) actions.append(more);
-  toolbar.append(actions); section.append(toolbar);
-
-  if (state.stickerPaletteOpen && state.canPlaceSticker) {
-    const palette = document.createElement('div'); palette.className = 'rolling-paper-sticker-palette';
-    const paletteLabel = document.createElement('span'); paletteLabel.textContent = '스티커를 고른 다음, 보드에서 붙일 곳을 눌러 주세요'; palette.append(paletteLabel);
-    state.stickerChoices.forEach((emoji) => {
-      const choice = document.createElement('button'); choice.type = 'button'; choice.className = 'rolling-paper-sticker-choice';
-      choice.textContent = emoji; choice.setAttribute('aria-label', `${emoji} 스티커 선택`);
-      choice.addEventListener('click', () => {
-        state.selectedStickerEmoji = emoji; state.stickerPlacing = true; state.stickerPaletteOpen = false;
-        refreshRollingPaperSection(streamerId);
-        requestAnimationFrame(() => $('rollingPaperSection')?.querySelector('.rolling-paper-sticker-board')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
-      });
-      palette.append(choice);
-    });
-    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button rolling-paper-sticker-action';
-    cancel.textContent = '취소'; cancel.addEventListener('click', () => { state.stickerPaletteOpen = false; refreshRollingPaperSection(streamerId); });
-    palette.append(cancel); section.append(palette);
-  }
-
   if (state.stickerPlacing) {
-    const placementHint = document.createElement('p'); placementHint.className = 'rolling-paper-sticker-hint';
-    placementHint.textContent = `${state.selectedStickerEmoji} 붙일 곳을 누르면 바로 저장돼요. 취소하려면 위 버튼을 누르세요.`;
+    const placementHint = document.createElement('p'); placementHint.className = 'rolling-paper-sticker-hint is-floating';
+    placementHint.textContent = `${state.selectedStickerEmoji} 붙일 위치를 화면에서 누르세요. 취소는 오른쪽 스티커 버튼에서 할 수 있어요.`;
     section.append(placementHint);
-  } else if (state.stickerHideMode) {
-    const hideHint = document.createElement('p'); hideHint.className = 'rolling-paper-sticker-hint';
-    hideHint.textContent = '내 화면에서 숨길 스티커를 눌러 주세요.'; section.append(hideHint);
-  } else if (state.showHiddenStickers) {
-    const restoreHint = document.createElement('p'); restoreHint.className = 'rolling-paper-sticker-hint';
-    restoreHint.textContent = '다시 표시할 스티커를 눌러 주세요.'; section.append(restoreHint);
+  } else if (state.movingStickerId) {
+    const moveHint = document.createElement('p'); moveHint.className = 'rolling-paper-sticker-hint is-floating';
+    moveHint.textContent = '노란 테두리 스티커를 드래그하세요. 취소하려면 Esc를 누르세요.';
+    section.append(moveHint);
+  } else if (state.showHiddenStickers && hiddenStickerIds.size) {
+    const restoreHint = document.createElement('p'); restoreHint.className = 'rolling-paper-sticker-hint is-floating';
+    restoreHint.textContent = '흐리게 표시된 숨김 스티커를 누르고 “다시 표시”를 선택하세요.';
+    section.append(restoreHint);
   }
   if (state.stickerError) {
     const error = document.createElement('p'); error.className = 'rolling-paper-sticker-hint is-error'; error.textContent = state.stickerError;
@@ -3097,76 +3007,140 @@ function renderRollingPaperStickerBoard(page, state) {
   board.setAttribute('role', 'group'); board.setAttribute('aria-label', '응원 스티커 보드');
   board.classList.toggle('is-hidden', hidden);
   board.classList.toggle('is-placing', state.stickerPlacing);
-  board.classList.toggle('is-editing', state.stickerEditing && state.canManageStickers);
   if (!hidden) {
+    const liveBoardBounds = $('rollingPaperSection')?.querySelector('.rolling-paper-sticker-board')?.getBoundingClientRect();
     state.stickers.forEach((sticker) => {
       const hiddenForViewer = hiddenStickerIds.has(sticker.id);
       if (hiddenForViewer && !state.showHiddenStickers) return;
       const item = document.createElement('div'); item.className = 'rolling-paper-sticker';
-      const canMove = state.stickerEditing && state.canManageStickers && !state.stickerHideMode && !state.showHiddenStickers;
-      const canHide = state.stickerHideMode && !hiddenForViewer;
-      const canRestore = state.showHiddenStickers && hiddenForViewer;
+      const canMove = state.canManageStickers && state.movingStickerId === sticker.id;
+      const menuOpen = state.selectedStickerMenuId === sticker.id;
       item.classList.toggle('is-movable', canMove);
-      item.classList.toggle('is-hide-selectable', canHide || canRestore);
+      item.classList.toggle('is-menu-open', menuOpen);
       item.classList.toggle('is-viewer-hidden', hiddenForViewer);
       item.classList.toggle('is-own', sticker.id === state.ownStickerId);
       item.classList.toggle('is-dragging', sticker.id === state.draggingStickerId);
       item.dataset.stickerId = sticker.id;
       item.style.left = `${sticker.x}%`; item.style.top = `${sticker.y}%`;
-      item.textContent = sticker.emoji;
-      item.setAttribute('role', canMove || (state.canManageStickers && (canHide || canRestore)) ? 'group' : (canHide || canRestore) ? 'button' : 'img');
-      item.setAttribute('aria-label', `${sticker.emoji} 응원 스티커${sticker.id === state.ownStickerId ? ', 내가 붙인 스티커' : ''}${hiddenForViewer ? ', 내 화면에서 숨김' : ''}`);
-      if (canHide || canRestore) {
-        item.tabIndex = 0;
-        const toggleViewerHidden = (event) => {
-          if (event.target.closest('.rolling-paper-sticker-remove')) return;
-          event.stopPropagation();
-          const updated = rollingPaperHiddenStickerIds(streamerId);
-          if (hiddenForViewer) updated.delete(sticker.id); else updated.add(sticker.id);
-          saveRollingPaperHiddenStickerIds(streamerId, updated);
-          refreshRollingPaperSection(streamerId);
-        };
-        item.addEventListener('click', toggleViewerHidden);
-        item.addEventListener('keydown', (event) => {
-          if (event.key !== 'Enter' && event.key !== ' ') return;
-          event.preventDefault(); toggleViewerHidden(event);
+      const menuCenterX = liveBoardBounds ? liveBoardBounds.left + liveBoardBounds.width * sticker.x / 100 : window.innerWidth / 2;
+      const menuCenterY = liveBoardBounds ? liveBoardBounds.top + liveBoardBounds.height * sticker.y / 100 : window.innerHeight / 2;
+      const menuWidth = Math.max(120, Math.min(190, window.innerWidth - 28));
+      const menuActionCount = 1 + (state.canManageStickers ? 1 : 0)
+        + (state.canManageStickers || sticker.id === state.ownStickerId ? 1 : 0);
+      const menuHeight = menuActionCount * 43 + 14;
+      item.dataset.menuSide = menuCenterX + 28 + menuWidth > window.innerWidth - 8 ? 'left' : 'right';
+      const menuWouldOverflowBottom = menuCenterY + 35 + menuHeight > window.innerHeight - 8;
+      const menuWouldOverflowTop = menuCenterY - 35 - menuHeight < 8;
+      item.dataset.menuVertical = menuWouldOverflowBottom && !menuWouldOverflowTop ? 'above' : 'below';
+      const trigger = document.createElement('button'); trigger.type = 'button';
+      trigger.className = 'rolling-paper-sticker-trigger'; trigger.textContent = sticker.emoji;
+      trigger.setAttribute('aria-label', `${sticker.emoji} 응원 스티커 메뉴 열기${sticker.id === state.ownStickerId ? ', 내가 붙인 스티커' : ''}${hiddenForViewer ? ', 내 화면에서 숨김' : ''}`);
+      trigger.setAttribute('aria-haspopup', 'menu'); trigger.setAttribute('aria-expanded', String(menuOpen));
+      trigger.title = canMove ? '드래그해 위치를 옮기세요. 취소하려면 Esc를 누르세요.' : '스티커 작업 보기';
+      item.append(trigger);
+      const contextMenu = document.createElement('div'); contextMenu.className = 'rolling-paper-sticker-context-menu';
+      contextMenu.setAttribute('role', 'menu'); contextMenu.setAttribute('aria-label', '스티커 작업');
+      contextMenu.hidden = !menuOpen;
+      const addContextAction = (label, action, primary = false) => {
+        const button = document.createElement('button'); button.type = 'button';
+        button.className = `rolling-paper-sticker-context-action${primary ? ' is-primary' : ''}`;
+        button.setAttribute('role', 'menuitem'); button.textContent = label;
+        button.disabled = state.savingSticker;
+        button.addEventListener('click', (event) => { event.stopPropagation(); action(button); });
+        contextMenu.append(button);
+      };
+      addContextAction(hiddenForViewer ? '다시 표시' : '내 화면에서 숨기기', () => {
+        const updated = rollingPaperHiddenStickerIds(streamerId);
+        if (hiddenForViewer) updated.delete(sticker.id); else updated.add(sticker.id);
+        saveRollingPaperHiddenStickerIds(streamerId, updated);
+        state.selectedStickerMenuId = '';
+        if (hiddenForViewer && !updated.size) state.showHiddenStickers = false;
+        refreshRollingPaperSection(streamerId);
+      });
+      if (state.canManageStickers) {
+        if (canMove) {
+          addContextAction('이동 취소', () => cancelRollingPaperStickerMove(page, sticker.id));
+        } else {
+          addContextAction('위치 옮기기', () => {
+            state.movingStickerId = sticker.id;
+            state.stickerMoveOriginal = { id: sticker.id, x: sticker.x, y: sticker.y };
+            state.selectedStickerMenuId = ''; state.showHiddenStickers = false;
+            refreshRollingPaperSection(streamerId);
+          }, true);
+        }
+      }
+      if (state.canManageStickers || sticker.id === state.ownStickerId) {
+        addContextAction(sticker.id === state.ownStickerId ? '내 스티커 떼기' : '스티커 삭제', (button) => {
+          state.selectedStickerMenuId = '';
+          void deleteRollingPaperStickerFromBoard(page, sticker.id, button);
         });
       }
+      item.append(contextMenu);
+      trigger.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (state.stickerPlacing && !state.savingSticker) {
+          const position = rollingPaperStickerPosition(board, event.clientX, event.clientY);
+          state.selectedStickerMenuId = '';
+          void addRollingPaperStickerToBoard(page, state.selectedStickerEmoji, position);
+          return;
+        }
+        if (state.draggingStickerId === sticker.id || trigger.dataset.dragMoved === '1') {
+          trigger.dataset.dragMoved = '0'; return;
+        }
+        state.selectedStickerMenuId = menuOpen ? '' : sticker.id;
+        state.stickerActionMenuOpen = false;
+        refreshRollingPaperSection(streamerId);
+      });
       if (canMove) {
-        item.tabIndex = 0;
-        item.addEventListener('pointerdown', (event) => {
-          if (event.target.closest('.rolling-paper-sticker-remove')) return;
+        trigger.addEventListener('pointerdown', (event) => {
           if (state.savingSticker && !state.stickerMovePromise) return;
-          event.preventDefault(); item.setPointerCapture(event.pointerId);
+          event.preventDefault();
+          try { trigger.setPointerCapture(event.pointerId); } catch (_) { /* pointer capture may not be available */ }
           state.draggingStickerId = sticker.id;
-          item.dataset.pointerId = String(event.pointerId);
-          item.dataset.dragMoved = '0';
+          trigger.dataset.pointerId = String(event.pointerId);
+          trigger.dataset.dragMoved = '0';
           item.classList.add('is-dragging');
         });
-        item.addEventListener('pointermove', (event) => {
-          if (state.draggingStickerId !== sticker.id || item.dataset.pointerId !== String(event.pointerId)) return;
+        trigger.addEventListener('pointermove', (event) => {
+          if (state.draggingStickerId !== sticker.id || trigger.dataset.pointerId !== String(event.pointerId)) return;
           const position = rollingPaperStickerPosition(board, event.clientX, event.clientY);
-          if (Math.abs(position.x - sticker.x) + Math.abs(position.y - sticker.y) > 0.2) item.dataset.dragMoved = '1';
+          if (Math.abs(position.x - sticker.x) + Math.abs(position.y - sticker.y) > 0.2) trigger.dataset.dragMoved = '1';
           sticker.x = position.x; sticker.y = position.y;
           item.style.left = `${position.x}%`; item.style.top = `${position.y}%`;
         });
         const finishDrag = (event) => {
-          if (state.draggingStickerId !== sticker.id || item.dataset.pointerId !== String(event.pointerId)) return;
+          if (state.draggingStickerId !== sticker.id || trigger.dataset.pointerId !== String(event.pointerId)) return;
           if (event.type === 'pointerup') {
+            const bounds = board.getBoundingClientRect();
+            const droppedInside = event.clientX >= bounds.left && event.clientX <= bounds.right
+              && event.clientY >= bounds.top && event.clientY <= bounds.bottom;
+            if (!droppedInside) {
+              try { if (trigger.hasPointerCapture(event.pointerId)) trigger.releasePointerCapture(event.pointerId); } catch (_) { /* capture may already be released */ }
+              cancelRollingPaperStickerMove(page, sticker.id);
+              return;
+            }
             const position = rollingPaperStickerPosition(board, event.clientX, event.clientY);
-            if (Math.abs(position.x - sticker.x) + Math.abs(position.y - sticker.y) > 0.2) item.dataset.dragMoved = '1';
+            if (Math.abs(position.x - sticker.x) + Math.abs(position.y - sticker.y) > 0.2) trigger.dataset.dragMoved = '1';
             sticker.x = position.x; sticker.y = position.y;
             item.style.left = `${position.x}%`; item.style.top = `${position.y}%`;
+          } else {
+            try { if (trigger.hasPointerCapture(event.pointerId)) trigger.releasePointerCapture(event.pointerId); } catch (_) { /* capture may already be released */ }
+            cancelRollingPaperStickerMove(page, sticker.id);
+            return;
           }
-          const moved = item.dataset.dragMoved === '1';
+          const moved = trigger.dataset.dragMoved === '1';
           state.draggingStickerId = '';
-          if (item.hasPointerCapture(event.pointerId)) item.releasePointerCapture(event.pointerId);
+          try { if (trigger.hasPointerCapture(event.pointerId)) trigger.releasePointerCapture(event.pointerId); } catch (_) { /* capture may already be released */ }
           item.classList.remove('is-dragging');
           if (moved) void moveRollingPaperStickerOnBoard(page, sticker, item);
+          else cancelRollingPaperStickerMove(page, sticker.id);
         };
-        item.addEventListener('pointerup', finishDrag);
-        item.addEventListener('pointercancel', finishDrag);
-        item.addEventListener('keydown', (event) => {
+        trigger.addEventListener('pointerup', finishDrag);
+        trigger.addEventListener('pointercancel', finishDrag);
+        trigger.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault(); cancelRollingPaperStickerMove(page, sticker.id); return;
+          }
           if (state.savingSticker && !state.stickerMovePromise) return;
           const step = event.shiftKey ? 5 : 1;
           const next = { x: sticker.x, y: sticker.y };
@@ -3175,22 +3149,18 @@ function renderRollingPaperStickerBoard(page, state) {
           else if (event.key === 'ArrowUp') next.y -= step;
           else if (event.key === 'ArrowDown') next.y += step;
           else return;
-          event.preventDefault(); sticker.x = Math.max(4, Math.min(96, next.x)); sticker.y = Math.max(4, Math.min(96, next.y));
+          event.preventDefault();
+          if (!state.stickerMoveOriginal) state.stickerMoveOriginal = { id: sticker.id, x: sticker.x, y: sticker.y };
+          sticker.x = Math.max(4, Math.min(96, next.x)); sticker.y = Math.max(4, Math.min(96, next.y));
           void moveRollingPaperStickerOnBoard(page, sticker, item);
         });
-      }
-      if (state.canManageStickers || sticker.id === state.ownStickerId) {
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'rolling-paper-sticker-remove';
-        remove.textContent = '×'; remove.setAttribute('aria-label', '스티커 떼기');
-        remove.addEventListener('pointerdown', (event) => event.stopPropagation());
-        remove.addEventListener('click', (event) => { event.stopPropagation(); deleteRollingPaperStickerFromBoard(page, sticker.id, remove); });
-        item.append(remove);
       }
       board.append(item);
     });
   }
   board.addEventListener('click', (event) => {
     if (!state.stickerPlacing || state.savingSticker) return;
+    if (event.target.closest('.rolling-paper-sticker')) return;
     const position = rollingPaperStickerPosition(board, event.clientX, event.clientY);
     void addRollingPaperStickerToBoard(page, state.selectedStickerEmoji, position);
   });
@@ -3270,6 +3240,8 @@ async function moveRollingPaperStickerOnBoard(page, sticker, item) {
     } finally {
       state.savingSticker = false;
       state.stickerMovePromise = null;
+      state.movingStickerId = '';
+      state.stickerMoveOriginal = null;
       if (item) item.classList.remove('is-dragging');
       refreshRollingPaperSection(page.streamer.id);
       if (reloadAfterFailure) {
@@ -3280,6 +3252,7 @@ async function moveRollingPaperStickerOnBoard(page, sticker, item) {
       }
     }
   })();
+  refreshRollingPaperSection(page.streamer.id);
   return state.stickerMovePromise;
 }
 
@@ -3593,6 +3566,7 @@ function refreshRollingPaperSection(streamerId) {
     if (keepTopicInputFocus) nextTopicInput.focus({ preventScroll: true });
   }
   section.replaceWith(nextSection);
+  $('fanPageView')?._syncRollingPaperStickerQuickTools?.();
 }
 
 function renderCompetitionHistorySection(page) {
@@ -4414,6 +4388,18 @@ function renderFanPage(page, options = {}) {
       refreshRollingPaperSection(page.streamer.id);
     }
     view.dataset.fanpageActiveTab = tabKey;
+    if (tabKey !== 'rolling-paper') {
+      const stickerState = rollingPaperStateFor(page.streamer.id);
+      stickerState.stickerActionMenuOpen = false; stickerState.selectedStickerMenuId = '';
+      stickerState.stickerPaletteOpen = false; stickerState.stickerPlacing = false;
+      stickerState.selectedStickerEmoji = '';
+      if (stickerState.movingStickerId && !stickerState.savingSticker) {
+        const original = stickerState.stickerMoveOriginal;
+        const sticker = stickerState.stickers.find((item) => item.id === stickerState.movingStickerId);
+        if (original && sticker && original.id === sticker.id) { sticker.x = original.x; sticker.y = original.y; }
+        stickerState.stickerMoveOriginal = null; stickerState.movingStickerId = ''; stickerState.draggingStickerId = '';
+      }
+    }
     tabDefinitions.forEach((tab) => {
       const selected = tab.key === tabKey;
       const button = tabButtons.get(tab.key);
@@ -4421,6 +4407,7 @@ function renderFanPage(page, options = {}) {
       button.tabIndex = selected ? 0 : -1;
       tabPanels.get(tab.key).hidden = !selected;
     });
+    view._syncRollingPaperStickerQuickTools?.();
     if (tabKey === 'activity') {
       gallerySection.loadGallery?.();
       const upboState = upboStateFor(page.streamer.id);
@@ -4696,6 +4683,164 @@ function createFanPageQuickRemote(view) {
   fullscreenButton.setAttribute('aria-label', '전체 화면 보기');
   fullscreenButton.title = '전체 화면 보기';
   fullscreenButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4"/></svg>';
+  const stickerControl = document.createElement('div'); stickerControl.className = 'fan-quick-sticker-control';
+  stickerControl.hidden = true;
+  const stickerButton = document.createElement('button'); stickerButton.type = 'button';
+  stickerButton.className = 'fan-quick-sticker-button'; stickerButton.textContent = '✨';
+  stickerButton.setAttribute('aria-label', '응원 스티커 도구 열기'); stickerButton.setAttribute('aria-expanded', 'false');
+  stickerButton.setAttribute('aria-controls', 'fanQuickStickerMenu');
+  const stickerMenu = document.createElement('div'); stickerMenu.id = 'fanQuickStickerMenu';
+  stickerMenu.className = 'fan-quick-sticker-menu'; stickerMenu.hidden = true;
+  stickerControl.append(stickerButton, stickerMenu);
+  const syncStickerTools = () => {
+    const isRollingPaperTab = view.dataset.fanpageActiveTab === 'rolling-paper';
+    stickerControl.hidden = !isRollingPaperTab;
+    const stickerState = currentPage ? rollingPaperStateFor(currentPage.streamer.id) : null;
+    if (!stickerState || !isRollingPaperTab) {
+      stickerMenu.hidden = true; stickerButton.setAttribute('aria-expanded', 'false');
+      stickerMenu.replaceChildren(); return;
+    }
+    const open = stickerState.stickerActionMenuOpen;
+    stickerMenu.hidden = !open; stickerButton.setAttribute('aria-expanded', String(open));
+    stickerButton.classList.toggle('is-active', open || stickerState.stickerPlacing || !!stickerState.movingStickerId);
+    stickerButton.setAttribute('aria-label', stickerState.stickerPlacing
+      ? '스티커 붙이는 중: 취소 또는 도구 열기' : stickerState.movingStickerId
+        ? '스티커 이동 중: 취소 또는 도구 열기' : open ? '응원 스티커 도구 닫기' : '응원 스티커 도구 열기');
+    if (!open) { stickerMenu.replaceChildren(); return; }
+
+    const header = document.createElement('div'); header.className = 'fan-quick-sticker-menu-heading';
+    const menuTitle = document.createElement('strong'); menuTitle.textContent = '응원 스티커';
+    const menuCount = document.createElement('span');
+    menuCount.textContent = stickerState.stickersLoading && !stickerState.stickersLoaded
+      ? '불러오는 중' : `${stickerState.stickers.length}개`;
+    header.append(menuTitle, menuCount); stickerMenu.replaceChildren(header);
+    const addAction = (label, handler, primary = false, disabled = false) => {
+      const action = document.createElement('button'); action.type = 'button';
+      action.className = `fan-quick-sticker-action${primary ? ' is-primary' : ''}`;
+      action.textContent = label; action.disabled = disabled || stickerState.savingSticker;
+      action.addEventListener('click', handler); stickerMenu.append(action); return action;
+    };
+    const addNote = (text, isError = false) => {
+      const note = document.createElement('p'); note.className = `fan-quick-sticker-note${isError ? ' is-error' : ''}`;
+      note.textContent = text; stickerMenu.append(note);
+    };
+    if (stickerState.stickersLoading && !stickerState.stickersLoaded) {
+      addNote('스티커 목록을 불러오고 있어요.');
+    } else if (stickerState.stickerPaletteOpen && stickerState.canPlaceSticker) {
+      addNote('붙일 스티커를 골라 주세요.');
+      const palette = document.createElement('div'); palette.className = 'fan-quick-sticker-palette';
+      stickerState.stickerChoices.forEach((emoji) => {
+        const choice = document.createElement('button'); choice.type = 'button';
+        choice.className = 'fan-quick-sticker-choice'; choice.textContent = emoji;
+        choice.setAttribute('aria-label', `${emoji} 스티커 선택`);
+        choice.addEventListener('click', () => {
+          try { localStorage.setItem(rollingPaperStickerHiddenKey(currentPage.streamer.id), '0'); } catch (_) { /* The visible board still works without storage. */ }
+          stickerState.showHiddenStickers = false; stickerState.selectedStickerMenuId = '';
+          stickerState.selectedStickerEmoji = emoji; stickerState.stickerPlacing = true;
+          stickerState.stickerPaletteOpen = false; stickerState.stickerActionMenuOpen = false;
+          refreshRollingPaperSection(currentPage.streamer.id);
+        });
+        palette.append(choice);
+      });
+      stickerMenu.append(palette);
+      addAction('취소', () => { stickerState.stickerPaletteOpen = false; syncStickerTools(); });
+    } else if (stickerState.stickerPlacing) {
+      addNote(`${stickerState.selectedStickerEmoji} 붙일 위치를 화면에서 누르세요.`);
+      addAction('붙이기 취소', () => {
+        stickerState.stickerPlacing = false; stickerState.selectedStickerEmoji = '';
+        stickerState.stickerActionMenuOpen = false; refreshRollingPaperSection(currentPage.streamer.id);
+      });
+    } else if (stickerState.movingStickerId && stickerState.canManageStickers) {
+      addNote('노란 테두리 스티커를 드래그해 위치를 옮기세요.');
+      addAction('이동 취소', () => cancelRollingPaperStickerMove(currentPage, stickerState.movingStickerId));
+    } else {
+      if (stickerState.canPlaceSticker && !stickerState.ownStickerId) {
+        addAction('＋ 스티커 붙이기', () => {
+          stickerState.stickerActionMenuOpen = true; stickerState.stickerPaletteOpen = true;
+          stickerState.selectedStickerMenuId = ''; stickerState.movingStickerId = '';
+          refreshRollingPaperSection(currentPage.streamer.id);
+        }, true);
+      } else if (!hasRecognizedFanpageAccount() && !stickerState.ownStickerId && stickerState.stickersLoaded) {
+        addAction('로그인하고 스티커 붙이기', () => {
+          stickerState.stickerActionMenuOpen = false; syncStickerTools(); showFanPageModal($('loginChoiceDialog'));
+        }, true);
+      } else if (stickerState.ownStickerId) {
+        addNote('이 계정은 스티커를 하나 붙였어요.');
+      } else if (!stickerState.stickers.length) {
+        addNote('아직 붙은 스티커가 없어요.');
+      }
+      if (stickerState.stickers.length) {
+        const hiddenAll = rollingPaperStickersAreHidden(currentPage.streamer.id);
+        addAction(hiddenAll ? '모든 스티커 보이기' : '모든 스티커 숨기기', () => {
+          try { localStorage.setItem(rollingPaperStickerHiddenKey(currentPage.streamer.id), hiddenAll ? '0' : '1'); } catch (_) { /* Keep the current board usable if storage is unavailable. */ }
+          stickerState.stickerPlacing = false; stickerState.selectedStickerEmoji = '';
+          stickerState.showHiddenStickers = false; stickerState.selectedStickerMenuId = '';
+          stickerState.stickerActionMenuOpen = false; refreshRollingPaperSection(currentPage.streamer.id);
+        });
+      }
+      const hiddenIds = rollingPaperHiddenStickerIds(currentPage.streamer.id);
+      const available = new Set(stickerState.stickers.map((item) => item.id));
+      const hiddenCount = [...hiddenIds].filter((id) => available.has(id)).length;
+      if (hiddenCount) {
+        addAction(stickerState.showHiddenStickers ? '숨김 스티커 감추기' : `숨긴 스티커 보기 ${hiddenCount}개`, () => {
+          stickerState.showHiddenStickers = !stickerState.showHiddenStickers;
+          stickerState.stickerPlacing = false; stickerState.selectedStickerEmoji = '';
+          stickerState.stickerPaletteOpen = false; stickerState.selectedStickerMenuId = '';
+          stickerState.stickerActionMenuOpen = false; refreshRollingPaperSection(currentPage.streamer.id);
+        });
+        addAction('숨김 모두 해제', () => {
+          saveRollingPaperHiddenStickerIds(currentPage.streamer.id, new Set());
+          stickerState.showHiddenStickers = false; stickerState.selectedStickerMenuId = '';
+          stickerState.stickerActionMenuOpen = false; refreshRollingPaperSection(currentPage.streamer.id);
+        });
+      }
+    }
+    if (stickerState.stickerError) addNote(stickerState.stickerError, true);
+    if (stickerState.savingSticker) addNote('저장 중이에요. 잠시만 기다려 주세요.');
+    if (stickerState.stickerError && !stickerState.savingSticker) {
+      addAction('다시 불러오기', () => { void loadRollingPaperStickers(currentPage, true); });
+    }
+  };
+  stickerButton.addEventListener('click', () => {
+    if (!currentPage) return;
+    const stickerState = rollingPaperStateFor(currentPage.streamer.id);
+    stickerState.stickerActionMenuOpen = !stickerState.stickerActionMenuOpen;
+    if (stickerState.stickerActionMenuOpen) stickerState.selectedStickerMenuId = '';
+    syncStickerTools();
+  });
+  const onStickerToolsOutsidePointer = (event) => {
+    if (!currentPage) return;
+    const stickerState = rollingPaperStateFor(currentPage.streamer.id);
+    if (stickerState.selectedStickerMenuId && !event.target.closest?.('.rolling-paper-sticker')) {
+      stickerState.selectedStickerMenuId = '';
+      requestAnimationFrame(() => refreshRollingPaperSection(currentPage?.streamer.id));
+    }
+    if (stickerControl.contains(event.target) || !stickerState.stickerActionMenuOpen) return;
+    stickerState.stickerActionMenuOpen = false; syncStickerTools();
+  };
+  const onStickerToolsKeydown = (event) => {
+    if (event.key !== 'Escape' || !currentPage) return;
+    const stickerState = rollingPaperStateFor(currentPage.streamer.id);
+    if (stickerState.movingStickerId && !stickerState.savingSticker) {
+      stickerState.stickerActionMenuOpen = false;
+      cancelRollingPaperStickerMove(currentPage, stickerState.movingStickerId);
+      stickerButton.focus({ preventScroll: true });
+      return;
+    }
+    if (stickerState.stickerPlacing && !stickerState.savingSticker) {
+      stickerState.stickerPlacing = false; stickerState.selectedStickerEmoji = '';
+      stickerState.stickerPaletteOpen = false; stickerState.stickerActionMenuOpen = false;
+      refreshRollingPaperSection(currentPage.streamer.id);
+      stickerButton.focus({ preventScroll: true });
+      return;
+    }
+    const closeStickerAction = stickerState.stickerActionMenuOpen;
+    if (!closeStickerAction && !stickerState.selectedStickerMenuId) return;
+    stickerState.stickerActionMenuOpen = false; stickerState.selectedStickerMenuId = '';
+    refreshRollingPaperSection(currentPage.streamer.id); stickerButton.focus({ preventScroll: true });
+  };
+  document.addEventListener('pointerdown', onStickerToolsOutsidePointer);
+  document.addEventListener('keydown', onStickerToolsKeydown);
   const close = document.createElement('button'); close.type = 'button'; close.className = 'fan-quick-close';
   close.setAttribute('aria-label', '빠른 이동 리모콘 닫기'); close.textContent = '×';
   header.append(title, soundSettingsButton, close);
@@ -4769,8 +4914,10 @@ function createFanPageQuickRemote(view) {
   scrubber.append(rail, thumb); body.append(nav, scrubber); panel.append(header, body);
   soundDialog.id = 'fanSoundSettingsDialog';
   toggle.setAttribute('aria-controls', panel.id);
-  mobileActions.append(toggle, fullscreenButton);
+  mobileActions.append(stickerControl, toggle, fullscreenButton);
   remote.append(mobileActions, panel); view.append(remote, soundDialog);
+  view._syncRollingPaperStickerQuickTools = syncStickerTools;
+  syncStickerTools();
 
   let expanded = false;
   let scrollFrame = 0;
@@ -5004,6 +5151,8 @@ function createFanPageQuickRemote(view) {
     window.removeEventListener('resize', onResize);
     document.removeEventListener('fullscreenchange', syncFullscreenButton);
     document.removeEventListener('webkitfullscreenchange', syncFullscreenButton);
+    document.removeEventListener('pointerdown', onStickerToolsOutsidePointer);
+    document.removeEventListener('keydown', onStickerToolsKeydown);
     fullscreenButton.removeEventListener('click', toggleFullscreen);
     header.removeEventListener('pointerdown', startRemoteDrag);
     header.removeEventListener('pointermove', moveRemoteDrag);
@@ -5017,6 +5166,7 @@ function createFanPageQuickRemote(view) {
       emoteLauncher.classList.remove('fanpage-emote-remote-attached');
     }
     if (view._selectFanPageTab) delete view._selectFanPageTab;
+    if (view._syncRollingPaperStickerQuickTools) delete view._syncRollingPaperStickerQuickTools;
     if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
     if (resizeObserver) resizeObserver.disconnect();
   };
