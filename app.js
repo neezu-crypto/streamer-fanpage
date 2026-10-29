@@ -2725,16 +2725,6 @@ function renderRollingPaperSection(page) {
   const actions = document.createElement('div'); actions.className = 'rolling-paper-heading-actions';
   const count = document.createElement('span'); count.className = 'rolling-paper-count';
   count.textContent = `${(activeTopic ? Number(activeTopic.count) || 0 : totalCount).toLocaleString('ko-KR')}개`;
-  if (!activeTopic && page.isOwner) {
-    const addTopic = document.createElement('button'); addTopic.type = 'button';
-    addTopic.className = 'button button-primary rolling-paper-topic-add'; addTopic.textContent = '+ 주제 추가';
-    addTopic.addEventListener('click', () => {
-      state.showTopicForm = !state.showTopicForm;
-      refreshRollingPaperSection(streamerId);
-      if (state.showTopicForm) requestAnimationFrame(() => $('rollingPaperTopicTitle')?.focus());
-    });
-    actions.append(addTopic);
-  }
   const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'button rolling-paper-refresh';
   const loading = activeTopic ? state.loadingTopicId === activeTopic.id : state.topicsLoading;
   refresh.textContent = loading ? '불러오는 중…' : '↻ 새로고침';
@@ -2773,22 +2763,6 @@ function renderRollingPaperSection(page) {
   if (!state.stickersLoaded && !state.stickersLoading && !state.stickerError) void loadRollingPaperStickers(page);
 
   if (!activeTopic) {
-    if (state.showTopicForm && page.isOwner) {
-      const topicForm = document.createElement('form'); topicForm.className = 'rolling-paper-topic-form';
-      const topicTitle = document.createElement('input'); topicTitle.id = 'rollingPaperTopicTitle'; topicTitle.name = 'title';
-      topicTitle.type = 'text'; topicTitle.maxLength = 32; topicTitle.required = true;
-      topicTitle.placeholder = '예: 100일 롤링페이퍼, 생일 축하'; topicTitle.setAttribute('aria-label', '새 롤링페이퍼 주제');
-      topicTitle.disabled = state.creatingTopic;
-      const topicSubmit = document.createElement('button'); topicSubmit.type = 'submit';
-      topicSubmit.className = 'button button-primary'; topicSubmit.textContent = state.creatingTopic ? '만드는 중…' : '주제 페이지 만들기';
-      topicSubmit.disabled = state.creatingTopic;
-      topicForm.append(topicTitle, topicSubmit);
-      topicForm.addEventListener('submit', (event) => {
-        event.preventDefault();
-        if (topicForm.reportValidity() && !topicSubmit.disabled) createRollingPaperTopic(page, topicTitle, topicSubmit);
-      });
-      section.append(topicForm);
-    }
     const status = document.createElement('p'); status.className = 'rolling-paper-status';
     status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const loadingTopics = state.topicsLoading || (!state.topicsLoaded && !state.topicError);
@@ -2855,6 +2829,49 @@ function renderRollingPaperSection(page) {
       }
       grid.append(card);
     });
+    if (page.isOwner) {
+      const addCard = document.createElement('article');
+      addCard.className = 'rolling-paper-topic-card rolling-paper-topic-add-card';
+      if (state.showTopicForm) {
+        addCard.classList.add('is-topic-form-open');
+        const addTitle = document.createElement('strong');
+        addTitle.className = 'rolling-paper-topic-title'; addTitle.textContent = '새 주제 만들기';
+        const topicForm = document.createElement('form'); topicForm.className = 'rolling-paper-topic-form rolling-paper-topic-add-form';
+        const topicTitle = document.createElement('input'); topicTitle.id = 'rollingPaperTopicTitle'; topicTitle.name = 'title';
+        topicTitle.type = 'text'; topicTitle.maxLength = 32; topicTitle.required = true;
+        topicTitle.placeholder = '예: 100일 롤링페이퍼, 생일 축하'; topicTitle.setAttribute('aria-label', '새 롤링페이퍼 주제');
+        topicTitle.disabled = state.creatingTopic;
+        const formActions = document.createElement('div'); formActions.className = 'rolling-paper-topic-add-form-actions';
+        const topicSubmit = document.createElement('button'); topicSubmit.type = 'submit';
+        topicSubmit.className = 'button button-primary'; topicSubmit.textContent = state.creatingTopic ? '만드는 중…' : '주제 페이지 만들기';
+        topicSubmit.disabled = state.creatingTopic;
+        const cancelTopic = document.createElement('button'); cancelTopic.type = 'button';
+        cancelTopic.className = 'button rolling-paper-topic-add-cancel'; cancelTopic.textContent = '취소';
+        cancelTopic.disabled = state.creatingTopic;
+        cancelTopic.addEventListener('click', () => {
+          state.showTopicForm = false; state.topicError = '';
+          refreshRollingPaperSection(streamerId);
+        });
+        formActions.append(topicSubmit, cancelTopic);
+        topicForm.append(topicTitle, formActions);
+        topicForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          if (topicForm.reportValidity() && !topicSubmit.disabled) createRollingPaperTopic(page, topicTitle, topicSubmit);
+        });
+        addCard.append(addTitle, topicForm);
+      } else {
+        const addTopic = document.createElement('button'); addTopic.type = 'button';
+        addTopic.className = 'button button-primary rolling-paper-topic-add-card-button'; addTopic.textContent = '+ 주제 추가';
+        addTopic.setAttribute('aria-label', '새 롤링페이퍼 주제 추가');
+        addTopic.addEventListener('click', () => {
+          state.showTopicForm = true; state.topicError = '';
+          refreshRollingPaperSection(streamerId);
+          requestAnimationFrame(() => $('rollingPaperTopicTitle')?.focus());
+        });
+        addCard.append(addTopic);
+      }
+      grid.append(addCard);
+    }
     section.append(grid);
     return section;
   }
