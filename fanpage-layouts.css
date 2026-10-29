@@ -460,6 +460,13 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
 #fanPageView.fanpage-layout-1 .songbook-entry-details > span,
 #fanPageView.fanpage-layout-1 .songbook-owner-hint { color: #81758b; }
 #fanPageView.fanpage-layout-1 .played-game-card { border-color: #e8deea; background: #fffafd; }
+#fanPageView.fanpage-layout-1 .played-game-record { border-color: #e8deea; background: #fff; }
+#fanPageView.fanpage-layout-1 .played-game-record-label { color: #cc6388; }
+#fanPageView.fanpage-layout-1 .played-game-record-value { color: #51465d; }
+#fanPageView.fanpage-layout-1 .played-game-record-copy.is-empty,
+#fanPageView.fanpage-layout-1 .played-game-record-editor small { color: #81758b; }
+#fanPageView.fanpage-layout-1 .played-game-record-editor select,
+#fanPageView.fanpage-layout-1 .played-game-record-editor input { border-color: #e8deea; background: #fff; color: #51465d; }
 #fanPageView.fanpage-layout-1 .played-game-steam-link,
 #fanPageView.fanpage-layout-1 .played-game-vods-heading strong { color: #51465d; }
 #fanPageView.fanpage-layout-1 .played-game-details > span,
