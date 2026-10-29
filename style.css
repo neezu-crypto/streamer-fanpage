@@ -360,7 +360,7 @@
 .played-games-heading h2{display:inline-block;margin:0;font:23px var(--display)}
 .played-games-count{margin-left:9px;color:var(--muted);font-size:12px}
 .played-games-description{margin:8px 0 14px;color:#aaa3b1;font-size:12px;line-height:1.6}
-.played-games-add-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:14px}
+.played-games-add-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;margin-bottom:14px}
 .played-games-add-form input,.played-game-vod-form input{width:100%;min-width:0;min-height:40px;padding:9px 11px;border:1px solid #ffffff20;border-radius:10px;background:#111018;color:var(--text);outline:0;font:12px var(--font)}
 .played-games-add-form input:focus,.played-game-vod-form input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
 .played-games-add-form .button{white-space:nowrap}
@@ -383,7 +383,7 @@
 .played-game-main{display:flex;align-items:flex-start;gap:7px;min-width:0}
 .played-game-steam-link{display:grid;flex:1;min-width:0;color:var(--text);text-decoration:none}
 .played-game-thumbnail-frame{position:relative;display:grid;place-items:center;aspect-ratio:460/215;overflow:hidden;border:1px solid #ffffff12;border-radius:9px;background:linear-gradient(135deg,#302631,#17151e)}
-.played-game-thumbnail-frame.is-missing::after{content:'STEAM GAME';color:#ffffff55;font-size:10px;font-weight:800;letter-spacing:.14em}
+.played-game-thumbnail-frame.is-missing::after{content:attr(data-label);color:#ffffff55;font-size:10px;font-weight:800;letter-spacing:.14em}
 .played-game-thumbnail{width:100%;height:100%;object-fit:cover}
 .played-game-details{display:grid;gap:5px;min-width:0;padding:9px 2px 0}
 .played-game-details strong{overflow:hidden;font-size:14px;text-overflow:ellipsis;white-space:nowrap;transition:color .18s}

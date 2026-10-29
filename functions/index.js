@@ -12,7 +12,13 @@ const { defineSecret } = require('firebase-functions/params');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
-const { normalizePlayedGameBestRecord, updatePlayedGameBestRecord } = require('./played-games-record');
+const {
+  isPlayedGameId,
+  normalizePlayedGameBestRecord,
+  normalizePlayedGameLink,
+  parseCustomPlayedGameLink,
+  updatePlayedGameBestRecord,
+} = require('./played-games-record');
 const {
   VIEWER_STATS_QUEUE_MAX_CONCURRENT,
   VIEWER_STATS_QUEUE_MAX_INSTANCES,
@@ -3224,7 +3230,8 @@ function normalizePlayedGames(value) {
   const entries = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return Object.entries(entries)
     .map(([key, raw]) => {
-      if (!/^[1-9]\d{0,9}$/.test(key) || !raw || typeof raw !== 'object') return null;
+      if (!isPlayedGameId(key) || !raw || typeof raw !== 'object') return null;
+      const isSteam = /^[1-9]\d{0,9}$/.test(key);
       const rawThumbnail = typeof raw.thumbnailUrl === 'string' ? raw.thumbnailUrl : '';
       let thumbnailUrl = '';
       try {
@@ -3245,8 +3252,9 @@ function normalizePlayedGames(value) {
         .slice(-FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS);
       return {
         appId: key,
-        name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 200) : `Steam 게임 ${key}`,
-        steamUrl: `https://store.steampowered.com/app/${key}/`,
+        isSteam,
+        name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 100) : (isSteam ? `Steam 게임 ${key}` : '게임'),
+        gameUrl: normalizePlayedGameLink(raw.gameUrl, key),
         thumbnailUrl,
         createdAt: Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : 0,
         bestRecord: normalizePlayedGameBestRecord(raw.bestRecord),
@@ -5767,7 +5775,7 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
     const appId = String(data.appId || '').trim();
     const type = String(data.recordType || '').trim();
     const value = typeof data.recordValue === 'string' ? data.recordValue.trim() : '';
-    if (!/^[1-9]\d{0,9}$/.test(appId)) throw new HttpsError('invalid-argument', '기록을 수정할 게임을 확인해 주세요.');
+    if (!isPlayedGameId(appId)) throw new HttpsError('invalid-argument', '기록을 수정할 게임을 확인해 주세요.');
     if (value.length > 100) throw new HttpsError('invalid-argument', '최고기록은 100자 이내로 입력해 주세요.');
     if (value && !['rank', 'record'].includes(type)) throw new HttpsError('invalid-argument', '기록 종류를 선택해 주세요.');
     const gameRef = rootRef.child(appId);
@@ -5784,27 +5792,45 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
   }
 
   if (action === 'add-game') {
-    const parsed = parseSteamGameUrl(data.steamUrl);
-    if (!parsed) throw new HttpsError('invalid-argument', 'Steam 게임 링크를 확인해 주세요.');
+    const gameUrlInput = typeof data.gameUrl === 'string' ? data.gameUrl.trim() : String(data.steamUrl || '').trim();
+    const parsedSteam = parseSteamGameUrl(gameUrlInput);
+    const gameNameInput = typeof data.gameName === 'string' ? data.gameName.trim() : '';
+    let gameId;
+    let gameUrl;
+    if (parsedSteam) {
+      gameId = parsedSteam.appId;
+      gameUrl = parsedSteam.url;
+    } else {
+      gameUrl = parseCustomPlayedGameLink(gameUrlInput);
+      if (!gameUrl) throw new HttpsError('invalid-argument', 'Steam 또는 다른 게임의 HTTPS 링크를 입력해 주세요.');
+      if (!gameNameInput || gameNameInput.length > 100) throw new HttpsError('invalid-argument', '게임 이름을 1~100자로 입력해 주세요.');
+      gameId = `custom_${randomUUID().replace(/-/g, '')}`;
+    }
     const existing = (await rootRef.get()).val();
     const entries = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
-    if (Object.prototype.hasOwnProperty.call(entries, parsed.appId)) {
+    if (Object.prototype.hasOwnProperty.call(entries, gameId)) {
       throw new HttpsError('already-exists', '이미 추가한 게임이에요.');
     }
     if (Object.keys(entries).length >= FANPAGE_PLAYED_GAMES_MAX_ITEMS) {
       throw new HttpsError('resource-exhausted', `게임은 최대 ${FANPAGE_PLAYED_GAMES_MAX_ITEMS}개까지 등록할 수 있어요.`);
     }
+    if (!parsedSteam && Object.values(entries).some((entry) => normalizePlayedGameLink(entry && entry.gameUrl, '') === gameUrl)) {
+      throw new HttpsError('already-exists', '이미 추가한 게임 링크예요.');
+    }
 
-    const metadata = await fetchSteamGameMetadata(parsed.appId);
-    const entry = { ...metadata, createdAt: Date.now(), vods: {} };
+    const metadata = parsedSteam ? await fetchSteamGameMetadata(parsedSteam.appId) : null;
+    const entry = parsedSteam
+      ? { ...metadata, gameUrl, createdAt: Date.now(), vods: {} }
+      : { name: gameNameInput, gameUrl, thumbnailUrl: '', createdAt: Date.now(), vods: {} };
+
     const transaction = await rootRef.transaction((current) => {
       const games = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
-      if (Object.prototype.hasOwnProperty.call(games, parsed.appId) || Object.keys(games).length >= FANPAGE_PLAYED_GAMES_MAX_ITEMS) return undefined;
-      return { ...games, [parsed.appId]: entry };
+      if (Object.prototype.hasOwnProperty.call(games, gameId) || Object.keys(games).length >= FANPAGE_PLAYED_GAMES_MAX_ITEMS) return undefined;
+      return { ...games, [gameId]: entry };
     });
     if (!transaction.committed) {
       const latest = (await rootRef.get()).val() || {};
-      if (Object.prototype.hasOwnProperty.call(latest, parsed.appId)) throw new HttpsError('already-exists', '이미 추가한 게임이에요.');
+      if (Object.prototype.hasOwnProperty.call(latest, gameId)) throw new HttpsError('already-exists', '이미 추가한 게임이에요.');
       throw new HttpsError('resource-exhausted', `게임은 최대 ${FANPAGE_PLAYED_GAMES_MAX_ITEMS}개까지 등록할 수 있어요.`);
     }
     return { playedGames: normalizePlayedGames(transaction.snapshot.val()) };
@@ -5812,7 +5838,7 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
 
   if (action === 'delete-game') {
     const appId = String(data.appId || '').trim();
-    if (!/^[1-9]\d{0,9}$/.test(appId)) throw new HttpsError('invalid-argument', '삭제할 게임을 확인해 주세요.');
+    if (!isPlayedGameId(appId)) throw new HttpsError('invalid-argument', '삭제할 게임을 확인해 주세요.');
     const current = (await rootRef.child(appId).get()).val();
     if (!current) throw new HttpsError('not-found', '삭제할 게임을 찾을 수 없습니다.');
     await rootRef.child(appId).remove();
@@ -5822,8 +5848,8 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
   if (action === 'add-vod') {
     const appId = String(data.appId || '').trim();
     const parsed = parseSoopVodUrl(data.vodUrl);
-    if (!/^[1-9]\d{0,9}$/.test(appId) || !parsed) {
-      throw new HttpsError('invalid-argument', 'Steam 게임과 SOOP 다시보기 링크를 확인해 주세요.');
+    if (!isPlayedGameId(appId) || !parsed) {
+      throw new HttpsError('invalid-argument', '게임과 SOOP 다시보기 링크를 확인해 주세요.');
     }
     const gameSnapshot = await rootRef.child(appId).get();
     const game = gameSnapshot.val();
@@ -5854,7 +5880,7 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
   if (action === 'delete-vod') {
     const appId = String(data.appId || '').trim();
     const vodId = String(data.vodId || '').trim();
-    if (!/^[1-9]\d{0,9}$/.test(appId) || !/^\d{1,20}$/.test(vodId)) {
+    if (!isPlayedGameId(appId) || !/^\d{1,20}$/.test(vodId)) {
       throw new HttpsError('invalid-argument', '삭제할 게임이나 다시보기를 확인해 주세요.');
     }
     const vodRef = rootRef.child(appId).child('vods').child(vodId);
