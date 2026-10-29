@@ -1520,3 +1520,26 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button::before{color:var(--jelly-accent-deep)}
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button:hover{border-color:color-mix(in srgb,var(--jelly-accent),white 38%);box-shadow:0 6px 0 #dfd8e8,0 9px 14px #75608018,inset 0 2px 0 #fff}
 }
+
+/* Rolling paper sticker tools stay beside the quick remote while that tab is active. */
+#fanPageView[data-fanpage-active-tab="rolling-paper"] .fan-quick-sticker-control{display:flex}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-button{border-color:#eadfeb;background:linear-gradient(180deg,#fffdf6,#fff6d9);color:#655733;box-shadow:0 3px 0 #ead99d,0 6px 12px #75608016,inset 0 2px 0 #fff}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-button:hover,
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-button.is-active{border-color:#edc7d2;background:linear-gradient(180deg,#fff,#fff2f7);box-shadow:0 3px 0 #ecdce8,0 7px 14px #75608018,inset 0 2px 0 #fff}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-menu{border-color:#dbe4f8;background:#fffefdF5;color:#51465d;box-shadow:0 12px 30px #536f9a22}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-menu-heading{border-color:#e5eaf7;color:#51465d}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-menu-heading span,
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-note{color:#81758b}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-action{border-color:#dbe4f8;background:#fff;color:#51465d}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-action:hover,
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-action:focus-visible{border-color:#a9bce9;background:#f3f6ff}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-action.is-primary{border-color:#f0c7d7;background:linear-gradient(180deg,#fff4f8,#fff);color:#64566f}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-choice{border-color:#dbe4f8;background:#fff}
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-choice:hover,
+#fanPageView.fanpage-layout-1 .fan-quick-sticker-choice:focus-visible{border-color:#7696df;box-shadow:0 0 0 2px #7696df25}
+#fanPageView.fanpage-layout-1 .rolling-paper-sticker-context-menu{border-color:#dbe4f8;background:#fffefd;box-shadow:0 10px 26px #536f9a28}
+#fanPageView.fanpage-layout-1 .rolling-paper-sticker-context-action{color:#51465d}
+#fanPageView.fanpage-layout-1 .rolling-paper-sticker-context-action:hover,
+#fanPageView.fanpage-layout-1 .rolling-paper-sticker-context-action:focus-visible{background:#edf2ff}
+#fanPageView.fanpage-layout-1 .rolling-paper-sticker-context-action.is-primary{background:#edf2ff;color:#4c659d}
+@media(prefers-reduced-motion:reduce){#fanPageView.fanpage-layout-1 .fan-quick-sticker-button{transition-duration:.01ms}}
