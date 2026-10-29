@@ -2684,6 +2684,11 @@ function rollingPaperStateFor(streamerId) {
       entryError: '', canDelete: false, canManageTopics: false, submitting: false,
       galleryItems: null, galleryLoading: false, galleryError: '', galleryOpen: false, galleryHasMore: false,
       galleryNextOffset: 0, galleryTotalCount: 0, selectedGalleryImage: null,
+      stickers: [], stickersLoaded: false, stickersLoading: false, stickerError: '', ownStickerId: '',
+      canPlaceSticker: false, canManageStickers: false, stickerChoices: [], stickerPaletteOpen: false,
+      selectedStickerEmoji: '', stickerPlacing: false, stickerEditing: false, stickerHideMode: false,
+      showHiddenStickers: false, draggingStickerId: '',
+      savingSticker: false,
     };
     rollingPaperStates.set(streamerId, state);
   }
@@ -2733,9 +2738,11 @@ function renderRollingPaperSection(page) {
   const loading = activeTopic ? state.loadingTopicId === activeTopic.id : state.topicsLoading;
   refresh.textContent = loading ? '불러오는 중…' : '↻ 새로고침';
   refresh.disabled = loading;
-  refresh.addEventListener('click', () => activeTopic
-    ? loadRollingPaperEntries(page, activeTopic.id, true)
-    : loadRollingPaperTopics(page, true));
+  refresh.addEventListener('click', () => {
+    const tasks = [loadRollingPaperStickers(page, true)];
+    tasks.push(activeTopic ? loadRollingPaperEntries(page, activeTopic.id, true) : loadRollingPaperTopics(page, true));
+    void Promise.all(tasks);
+  });
   actions.append(count);
   if (activeTopic && !page.isStreamerOwner) {
     const composerOpen = state.composeTopicId === activeTopic.id;
@@ -2761,6 +2768,8 @@ function renderRollingPaperSection(page) {
   actions.append(refresh);
   heading.append(headingCopy, actions);
   section.append(heading);
+  section.append(renderRollingPaperStickerBoard(page, state));
+  if (!state.stickersLoaded && !state.stickersLoading && !state.stickerError) void loadRollingPaperStickers(page);
 
   if (!activeTopic) {
     if (state.showTopicForm && page.isOwner) {
@@ -2901,6 +2910,337 @@ function renderRollingPaperSection(page) {
   section.append(list);
   if (!state.loadedTopicIds.has(activeTopic.id) && state.loadingTopicId !== activeTopic.id) void loadRollingPaperEntries(page, activeTopic.id);
   return section;
+}
+
+function rollingPaperStickerHiddenKey(streamerId) {
+  return `streamerFanPageRollingPaperStickersHidden:${streamerId}`;
+}
+
+function rollingPaperStickersAreHidden(streamerId) {
+  try { return localStorage.getItem(rollingPaperStickerHiddenKey(streamerId)) === '1'; } catch (_) { return false; }
+}
+
+function rollingPaperHiddenStickerIds(streamerId) {
+  try {
+    const value = JSON.parse(localStorage.getItem(`streamerFanPageRollingPaperHiddenStickerIds:${streamerId}`) || '[]');
+    return new Set(Array.isArray(value) ? value.filter((id) => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)).slice(0, 250) : []);
+  } catch (_) { return new Set(); }
+}
+
+function saveRollingPaperHiddenStickerIds(streamerId, ids) {
+  try { localStorage.setItem(`streamerFanPageRollingPaperHiddenStickerIds:${streamerId}`, JSON.stringify([...ids].slice(0, 250))); } catch (_) { /* Keep the board usable when browser storage is unavailable. */ }
+}
+
+function rollingPaperStickerPosition(board, clientX, clientY) {
+  const bounds = board.getBoundingClientRect();
+  const x = Math.max(4, Math.min(96, ((clientX - bounds.left) / Math.max(1, bounds.width)) * 100));
+  const y = Math.max(4, Math.min(96, ((clientY - bounds.top) / Math.max(1, bounds.height)) * 100));
+  return { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
+}
+
+function renderRollingPaperStickerBoard(page, state) {
+  const streamerId = page.streamer.id;
+  const section = document.createElement('section'); section.className = 'rolling-paper-sticker-panel';
+  const toolbar = document.createElement('div'); toolbar.className = 'rolling-paper-sticker-toolbar';
+  const summary = document.createElement('div'); summary.className = 'rolling-paper-sticker-summary';
+  const title = document.createElement('strong'); title.textContent = '응원 스티커';
+  const count = document.createElement('span');
+  count.textContent = state.stickersLoading && !state.stickersLoaded ? '불러오는 중' : `${state.stickers.length}개`;
+  summary.append(title, count); toolbar.append(summary);
+  const actions = document.createElement('div'); actions.className = 'rolling-paper-sticker-actions';
+
+  const hidden = rollingPaperStickersAreHidden(streamerId);
+  const storedHiddenStickerIds = rollingPaperHiddenStickerIds(streamerId);
+  const availableStickerIds = new Set(state.stickers.map((sticker) => sticker.id));
+  const hiddenStickerIds = new Set([...storedHiddenStickerIds].filter((id) => availableStickerIds.has(id)));
+  const visibility = document.createElement('button'); visibility.type = 'button'; visibility.className = 'button rolling-paper-sticker-action';
+  visibility.textContent = hidden ? '모든 스티커 보이기' : '모든 스티커 숨기기';
+  visibility.setAttribute('aria-pressed', String(hidden));
+  visibility.addEventListener('click', () => {
+    try { localStorage.setItem(rollingPaperStickerHiddenKey(streamerId), hidden ? '0' : '1'); } catch (_) { /* Keep the current view if storage is unavailable. */ }
+    state.stickerHideMode = false; state.showHiddenStickers = false;
+    refreshRollingPaperSection(streamerId);
+  });
+  actions.append(visibility);
+
+  const hideMode = document.createElement('button'); hideMode.type = 'button'; hideMode.className = 'button rolling-paper-sticker-action';
+  hideMode.textContent = state.stickerHideMode ? '선택 끝내기' : '숨길 스티커 선택';
+  hideMode.setAttribute('aria-pressed', String(state.stickerHideMode));
+  hideMode.addEventListener('click', () => {
+    if (hidden) {
+      try { localStorage.setItem(rollingPaperStickerHiddenKey(streamerId), '0'); } catch (_) { /* Continue with the current view. */ }
+    }
+    state.stickerHideMode = !state.stickerHideMode;
+    state.stickerEditing = false; state.showHiddenStickers = false;
+    state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
+    refreshRollingPaperSection(streamerId);
+  });
+  actions.append(hideMode);
+  if (hiddenStickerIds.size) {
+    const showHidden = document.createElement('button'); showHidden.type = 'button'; showHidden.className = 'button rolling-paper-sticker-action';
+    showHidden.textContent = state.showHiddenStickers ? '숨김 스티커 감추기' : `숨긴 스티커 보기 ${hiddenStickerIds.size}개`;
+    showHidden.setAttribute('aria-pressed', String(state.showHiddenStickers));
+    showHidden.addEventListener('click', () => {
+      if (hidden) {
+        try { localStorage.setItem(rollingPaperStickerHiddenKey(streamerId), '0'); } catch (_) { /* Continue with the current view. */ }
+      }
+      state.showHiddenStickers = !state.showHiddenStickers;
+      state.stickerHideMode = false; state.stickerEditing = false;
+      state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
+      refreshRollingPaperSection(streamerId);
+    });
+    actions.append(showHidden);
+  }
+
+  if (state.ownStickerId) {
+    const removeOwn = document.createElement('button'); removeOwn.type = 'button'; removeOwn.className = 'button rolling-paper-sticker-action';
+    removeOwn.textContent = '내 스티커 떼기';
+    removeOwn.addEventListener('click', () => deleteRollingPaperStickerFromBoard(page, state.ownStickerId, removeOwn));
+    actions.append(removeOwn);
+  } else if (state.canPlaceSticker) {
+    const attach = document.createElement('button'); attach.type = 'button'; attach.className = 'button button-primary rolling-paper-sticker-action';
+    attach.textContent = state.stickerPlacing ? '위치 선택 중…' : '＋ 스티커 붙이기';
+    attach.disabled = state.savingSticker;
+    attach.addEventListener('click', () => {
+      try { localStorage.setItem(rollingPaperStickerHiddenKey(streamerId), '0'); } catch (_) { /* Placement can continue without a persisted visibility preference. */ }
+      state.stickerHideMode = false; state.showHiddenStickers = false; state.stickerEditing = false;
+      state.stickerPaletteOpen = !state.stickerPaletteOpen;
+      state.stickerPlacing = false; state.selectedStickerEmoji = '';
+      refreshRollingPaperSection(streamerId);
+    });
+    actions.append(attach);
+  } else if (!hasRecognizedFanpageAccount()) {
+    const login = document.createElement('button'); login.type = 'button'; login.className = 'button button-primary rolling-paper-sticker-action';
+    login.textContent = '로그인하고 붙이기';
+    login.addEventListener('click', () => showFanPageModal($('loginChoiceDialog')));
+    actions.append(login);
+  }
+
+  if (state.canManageStickers) {
+    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'button rolling-paper-sticker-action';
+    edit.textContent = state.stickerEditing ? '배치 편집 완료' : '배치 편집';
+    edit.setAttribute('aria-pressed', String(state.stickerEditing));
+    edit.addEventListener('click', () => {
+      state.stickerEditing = !state.stickerEditing;
+      state.stickerHideMode = false; state.showHiddenStickers = false;
+      state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
+      refreshRollingPaperSection(streamerId);
+    });
+    actions.append(edit);
+  }
+  toolbar.append(actions); section.append(toolbar);
+
+  if (state.stickerPaletteOpen && state.canPlaceSticker) {
+    const palette = document.createElement('div'); palette.className = 'rolling-paper-sticker-palette';
+    const paletteLabel = document.createElement('span'); paletteLabel.textContent = '붙일 스티커를 골라 주세요'; palette.append(paletteLabel);
+    state.stickerChoices.forEach((emoji) => {
+      const choice = document.createElement('button'); choice.type = 'button'; choice.className = 'rolling-paper-sticker-choice';
+      choice.textContent = emoji; choice.setAttribute('aria-label', `${emoji} 스티커 선택`);
+      choice.addEventListener('click', () => {
+        state.selectedStickerEmoji = emoji; state.stickerPlacing = true; state.stickerPaletteOpen = false;
+        refreshRollingPaperSection(streamerId);
+      });
+      palette.append(choice);
+    });
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button rolling-paper-sticker-action';
+    cancel.textContent = '취소'; cancel.addEventListener('click', () => { state.stickerPaletteOpen = false; refreshRollingPaperSection(streamerId); });
+    palette.append(cancel); section.append(palette);
+  }
+
+  if (state.stickerPlacing) {
+    const placementHint = document.createElement('p'); placementHint.className = 'rolling-paper-sticker-hint';
+    placementHint.textContent = `${state.selectedStickerEmoji} 스티커를 붙일 위치를 눌러 주세요.`;
+    section.append(placementHint);
+  } else if (state.stickerHideMode) {
+    const hideHint = document.createElement('p'); hideHint.className = 'rolling-paper-sticker-hint';
+    hideHint.textContent = '내 화면에서 숨길 스티커를 눌러 주세요.'; section.append(hideHint);
+  } else if (state.showHiddenStickers) {
+    const restoreHint = document.createElement('p'); restoreHint.className = 'rolling-paper-sticker-hint';
+    restoreHint.textContent = '다시 표시할 스티커를 눌러 주세요.'; section.append(restoreHint);
+  }
+  if (state.stickerError) {
+    const error = document.createElement('p'); error.className = 'rolling-paper-sticker-hint is-error'; error.textContent = state.stickerError;
+    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button rolling-paper-sticker-action';
+    retry.textContent = '다시 불러오기'; retry.disabled = state.stickersLoading;
+    retry.addEventListener('click', () => { void loadRollingPaperStickers(page, true); });
+    section.append(error, retry);
+  }
+
+  const board = document.createElement('div'); board.className = 'rolling-paper-sticker-board';
+  board.setAttribute('role', 'group'); board.setAttribute('aria-label', '응원 스티커 보드');
+  board.classList.toggle('is-hidden', hidden);
+  board.classList.toggle('is-placing', state.stickerPlacing);
+  board.classList.toggle('is-editing', state.stickerEditing && state.canManageStickers);
+  if (!hidden) {
+    state.stickers.forEach((sticker) => {
+      const hiddenForViewer = hiddenStickerIds.has(sticker.id);
+      if (hiddenForViewer && !state.showHiddenStickers) return;
+      const item = document.createElement('div'); item.className = 'rolling-paper-sticker';
+      const canMove = state.stickerEditing && state.canManageStickers && !state.stickerHideMode && !state.showHiddenStickers;
+      const canHide = state.stickerHideMode && !hiddenForViewer;
+      const canRestore = state.showHiddenStickers && hiddenForViewer;
+      item.classList.toggle('is-movable', canMove);
+      item.classList.toggle('is-hide-selectable', canHide || canRestore);
+      item.classList.toggle('is-viewer-hidden', hiddenForViewer);
+      item.classList.toggle('is-own', sticker.id === state.ownStickerId);
+      item.classList.toggle('is-dragging', sticker.id === state.draggingStickerId);
+      item.dataset.stickerId = sticker.id;
+      item.style.left = `${sticker.x}%`; item.style.top = `${sticker.y}%`;
+      item.textContent = sticker.emoji;
+      item.setAttribute('role', canMove || (state.canManageStickers && (canHide || canRestore)) ? 'group' : (canHide || canRestore) ? 'button' : 'img');
+      item.setAttribute('aria-label', `${sticker.emoji} 응원 스티커${sticker.id === state.ownStickerId ? ', 내가 붙인 스티커' : ''}${hiddenForViewer ? ', 내 화면에서 숨김' : ''}`);
+      if (canHide || canRestore) {
+        item.tabIndex = 0;
+        const toggleViewerHidden = (event) => {
+          if (event.target.closest('.rolling-paper-sticker-remove')) return;
+          event.stopPropagation();
+          const updated = rollingPaperHiddenStickerIds(streamerId);
+          if (hiddenForViewer) updated.delete(sticker.id); else updated.add(sticker.id);
+          saveRollingPaperHiddenStickerIds(streamerId, updated);
+          refreshRollingPaperSection(streamerId);
+        };
+        item.addEventListener('click', toggleViewerHidden);
+        item.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault(); toggleViewerHidden(event);
+        });
+      }
+      if (canMove) {
+        item.tabIndex = 0;
+        item.addEventListener('pointerdown', (event) => {
+          if (event.target.closest('.rolling-paper-sticker-remove')) return;
+          event.preventDefault(); item.setPointerCapture(event.pointerId);
+          state.draggingStickerId = sticker.id;
+          item.dataset.pointerId = String(event.pointerId);
+          item.dataset.dragMoved = '0';
+          item.classList.add('is-dragging');
+        });
+        item.addEventListener('pointermove', (event) => {
+          if (state.draggingStickerId !== sticker.id || item.dataset.pointerId !== String(event.pointerId)) return;
+          const position = rollingPaperStickerPosition(board, event.clientX, event.clientY);
+          if (Math.abs(position.x - sticker.x) + Math.abs(position.y - sticker.y) > 0.2) item.dataset.dragMoved = '1';
+          sticker.x = position.x; sticker.y = position.y;
+          item.style.left = `${position.x}%`; item.style.top = `${position.y}%`;
+        });
+        const finishDrag = (event) => {
+          if (state.draggingStickerId !== sticker.id || item.dataset.pointerId !== String(event.pointerId)) return;
+          const moved = item.dataset.dragMoved === '1';
+          state.draggingStickerId = '';
+          if (item.hasPointerCapture(event.pointerId)) item.releasePointerCapture(event.pointerId);
+          item.classList.remove('is-dragging');
+          if (moved) void moveRollingPaperStickerOnBoard(page, sticker, item);
+        };
+        item.addEventListener('pointerup', finishDrag);
+        item.addEventListener('pointercancel', finishDrag);
+        item.addEventListener('keydown', (event) => {
+          const step = event.shiftKey ? 5 : 1;
+          const next = { x: sticker.x, y: sticker.y };
+          if (event.key === 'ArrowLeft') next.x -= step;
+          else if (event.key === 'ArrowRight') next.x += step;
+          else if (event.key === 'ArrowUp') next.y -= step;
+          else if (event.key === 'ArrowDown') next.y += step;
+          else return;
+          event.preventDefault(); sticker.x = Math.max(4, Math.min(96, next.x)); sticker.y = Math.max(4, Math.min(96, next.y));
+          void moveRollingPaperStickerOnBoard(page, sticker, item);
+        });
+      }
+      if (state.canManageStickers || sticker.id === state.ownStickerId) {
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'rolling-paper-sticker-remove';
+        remove.textContent = '×'; remove.setAttribute('aria-label', '스티커 떼기');
+        remove.addEventListener('pointerdown', (event) => event.stopPropagation());
+        remove.addEventListener('click', (event) => { event.stopPropagation(); deleteRollingPaperStickerFromBoard(page, sticker.id, remove); });
+        item.append(remove);
+      }
+      board.append(item);
+    });
+  }
+  board.addEventListener('click', (event) => {
+    if (!state.stickerPlacing || state.savingSticker) return;
+    const position = rollingPaperStickerPosition(board, event.clientX, event.clientY);
+    void addRollingPaperStickerToBoard(page, state.selectedStickerEmoji, position);
+  });
+  section.append(board);
+  return section;
+}
+
+async function loadRollingPaperStickers(page, force = false) {
+  const streamerId = page.streamer.id;
+  const state = rollingPaperStateFor(streamerId);
+  if (state.stickersLoading || (state.stickersLoaded && !force)) return;
+  state.stickersLoading = true; state.stickerError = '';
+  refreshRollingPaperSection(streamerId);
+  try {
+    const result = (await callRollingPaper({ action: 'list-stickers', streamerId })).data;
+    state.stickers = Array.isArray(result.stickers) ? result.stickers : [];
+    state.ownStickerId = typeof result.ownStickerId === 'string' ? result.ownStickerId : '';
+    state.canPlaceSticker = result.canPlace === true;
+    state.canManageStickers = result.canManage === true;
+    state.stickerChoices = Array.isArray(result.stickerChoices) ? result.stickerChoices : [];
+    state.stickersLoaded = true;
+  } catch (error) {
+    state.stickerError = error.message || '응원 스티커를 불러오지 못했어요.';
+  } finally {
+    state.stickersLoading = false;
+    refreshRollingPaperSection(streamerId);
+  }
+}
+
+async function addRollingPaperStickerToBoard(page, emoji, position) {
+  const state = rollingPaperStateFor(page.streamer.id);
+  if (state.savingSticker || !state.canPlaceSticker || !emoji) return;
+  state.savingSticker = true; state.stickerError = '';
+  refreshRollingPaperSection(page.streamer.id);
+  try {
+    const result = (await callRollingPaper({ action: 'add-sticker', streamerId: page.streamer.id, emoji, ...position })).data;
+    state.stickers = Array.isArray(result.stickers) ? result.stickers : state.stickers;
+    state.ownStickerId = result.ownStickerId || '';
+    state.canPlaceSticker = result.canPlace === true;
+    state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
+    state.stickersLoaded = true;
+    showToast('응원 스티커를 붙였어요.');
+  } catch (error) {
+    state.stickerError = error.message || '스티커를 붙이지 못했어요.';
+  } finally {
+    state.savingSticker = false;
+    refreshRollingPaperSection(page.streamer.id);
+  }
+}
+
+async function moveRollingPaperStickerOnBoard(page, sticker, item) {
+  const state = rollingPaperStateFor(page.streamer.id);
+  if (!state.canManageStickers || state.savingSticker) return;
+  state.savingSticker = true; state.stickerError = '';
+  try {
+    const result = (await callRollingPaper({ action: 'move-sticker', streamerId: page.streamer.id, stickerId: sticker.id, x: sticker.x, y: sticker.y })).data;
+    state.stickers = Array.isArray(result.stickers) ? result.stickers : state.stickers;
+    showToast('스티커 위치를 옮겼어요.');
+  } catch (error) {
+    state.stickerError = error.message || '스티커를 옮기지 못했어요.';
+    void loadRollingPaperStickers(page, true);
+  } finally {
+    state.savingSticker = false;
+    if (item) item.classList.remove('is-dragging');
+    refreshRollingPaperSection(page.streamer.id);
+  }
+}
+
+async function deleteRollingPaperStickerFromBoard(page, stickerId, button) {
+  const state = rollingPaperStateFor(page.streamer.id);
+  if (state.savingSticker || !confirm('이 스티커를 롤링페이퍼에서 뗄까요?')) return;
+  state.savingSticker = true; state.stickerError = '';
+  if (button) button.disabled = true;
+  try {
+    const result = (await callRollingPaper({ action: 'delete-sticker', streamerId: page.streamer.id, stickerId })).data;
+    state.stickers = Array.isArray(result.stickers) ? result.stickers : [];
+    state.ownStickerId = result.ownStickerId || '';
+    state.canPlaceSticker = result.canPlace === true;
+    showToast('스티커를 뗐어요.');
+  } catch (error) {
+    state.stickerError = error.message || '스티커를 떼지 못했어요.';
+  } finally {
+    state.savingSticker = false;
+    refreshRollingPaperSection(page.streamer.id);
+  }
 }
 
 function createRollingPaperComposer(page, topicId, imageActionSlot = null, isDetail = false) {
