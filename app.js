@@ -2,6 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/fireba
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signInWithCustomToken, linkWithPopup, signOut, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
+import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -2688,7 +2689,7 @@ function rollingPaperStateFor(streamerId) {
       canPlaceSticker: false, canManageStickers: false, stickerChoices: [], stickerPaletteOpen: false,
       selectedStickerEmoji: '', stickerPlacing: false, stickerEditing: false, stickerHideMode: false,
       showHiddenStickers: false, draggingStickerId: '',
-      savingSticker: false,
+      savingSticker: false, stickerMoveQueue: new Map(), stickerMovePromise: null,
     };
     rollingPaperStates.set(streamerId, state);
   }
@@ -3109,6 +3110,7 @@ function renderRollingPaperStickerBoard(page, state) {
         item.tabIndex = 0;
         item.addEventListener('pointerdown', (event) => {
           if (event.target.closest('.rolling-paper-sticker-remove')) return;
+          if (state.savingSticker && !state.stickerMovePromise) return;
           event.preventDefault(); item.setPointerCapture(event.pointerId);
           state.draggingStickerId = sticker.id;
           item.dataset.pointerId = String(event.pointerId);
@@ -3124,6 +3126,12 @@ function renderRollingPaperStickerBoard(page, state) {
         });
         const finishDrag = (event) => {
           if (state.draggingStickerId !== sticker.id || item.dataset.pointerId !== String(event.pointerId)) return;
+          if (event.type === 'pointerup') {
+            const position = rollingPaperStickerPosition(board, event.clientX, event.clientY);
+            if (Math.abs(position.x - sticker.x) + Math.abs(position.y - sticker.y) > 0.2) item.dataset.dragMoved = '1';
+            sticker.x = position.x; sticker.y = position.y;
+            item.style.left = `${position.x}%`; item.style.top = `${position.y}%`;
+          }
           const moved = item.dataset.dragMoved === '1';
           state.draggingStickerId = '';
           if (item.hasPointerCapture(event.pointerId)) item.releasePointerCapture(event.pointerId);
@@ -3133,6 +3141,7 @@ function renderRollingPaperStickerBoard(page, state) {
         item.addEventListener('pointerup', finishDrag);
         item.addEventListener('pointercancel', finishDrag);
         item.addEventListener('keydown', (event) => {
+          if (state.savingSticker && !state.stickerMovePromise) return;
           const step = event.shiftKey ? 5 : 1;
           const next = { x: sticker.x, y: sticker.y };
           if (event.key === 'ArrowLeft') next.x -= step;
@@ -3208,20 +3217,44 @@ async function addRollingPaperStickerToBoard(page, emoji, position) {
 
 async function moveRollingPaperStickerOnBoard(page, sticker, item) {
   const state = rollingPaperStateFor(page.streamer.id);
-  if (!state.canManageStickers || state.savingSticker) return;
+  if (!state.canManageStickers || (state.savingSticker && !state.stickerMovePromise)) return;
+  state.stickerMoveQueue.set(sticker.id, { x: sticker.x, y: sticker.y });
+  if (state.stickerMovePromise) return state.stickerMovePromise;
+
   state.savingSticker = true; state.stickerError = '';
-  try {
-    const result = (await callRollingPaper({ action: 'move-sticker', streamerId: page.streamer.id, stickerId: sticker.id, x: sticker.x, y: sticker.y })).data;
-    state.stickers = Array.isArray(result.stickers) ? result.stickers : state.stickers;
-    showToast('스티커 위치를 옮겼어요.');
-  } catch (error) {
-    state.stickerError = error.message || '스티커를 옮기지 못했어요.';
-    void loadRollingPaperStickers(page, true);
-  } finally {
-    state.savingSticker = false;
-    if (item) item.classList.remove('is-dragging');
-    refreshRollingPaperSection(page.streamer.id);
-  }
+  state.stickerMovePromise = (async () => {
+    let latestResult = null;
+    let reloadAfterFailure = false;
+    let failureMessage = '';
+    try {
+      latestResult = await drainRollingPaperStickerMoveQueue(state.stickerMoveQueue, async (stickerId, position) => {
+        const response = (await callRollingPaper({
+          action: 'move-sticker', streamerId: page.streamer.id, stickerId, ...position,
+        })).data;
+        if (Array.isArray(response.stickers)) latestResult = response;
+        return response;
+      });
+      state.stickers = Array.isArray(latestResult?.stickers) ? latestResult.stickers : state.stickers;
+      showToast('스티커 위치를 옮겼어요.');
+    } catch (error) {
+      state.stickerMoveQueue.clear();
+      failureMessage = error.message || '스티커를 옮기지 못했어요.';
+      state.stickerError = failureMessage;
+      reloadAfterFailure = true;
+    } finally {
+      state.savingSticker = false;
+      state.stickerMovePromise = null;
+      if (item) item.classList.remove('is-dragging');
+      refreshRollingPaperSection(page.streamer.id);
+      if (reloadAfterFailure) {
+        void loadRollingPaperStickers(page, true).then(() => {
+          state.stickerError = failureMessage;
+          refreshRollingPaperSection(page.streamer.id);
+        });
+      }
+    }
+  })();
+  return state.stickerMovePromise;
 }
 
 async function deleteRollingPaperStickerFromBoard(page, stickerId, button) {
