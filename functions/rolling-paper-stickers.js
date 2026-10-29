@@ -90,11 +90,16 @@ async function moveRollingPaperSticker(rootRef, id, x, y, now = Date.now()) {
   const position = validateStickerInput('✨', x, y);
   const stickerRef = rootRef.child('stickers').child(id);
   const transaction = await stickerRef.transaction((current) => {
-    if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
+    // A server transaction can start from an empty local cache even when the
+    // sticker exists remotely. Returning null lets RTDB compare with the server
+    // value and rerun this callback with the current sticker if needed.
+    if (current === null) return null;
+    if (typeof current !== 'object' || Array.isArray(current)) return undefined;
     return { ...current, ...position, updatedAt: now };
   });
-  if (!transaction.committed) throw stickerError('not-found', '이동할 스티커를 찾을 수 없습니다.');
-  return normalizeRollingPaperSticker(id, transaction.snapshot.val());
+  const moved = transaction.committed ? normalizeRollingPaperSticker(id, transaction.snapshot.val()) : null;
+  if (!moved) throw stickerError('not-found', '이동할 스티커를 찾을 수 없습니다.');
+  return moved;
 }
 
 async function deleteRollingPaperSticker(rootRef, id, ownerKey, canManage) {
