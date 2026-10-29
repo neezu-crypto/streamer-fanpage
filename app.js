@@ -5835,18 +5835,21 @@ function renderPlayedGamesSection(page) {
 
   if (page.isOwner) {
     const form = document.createElement('form'); form.className = 'played-games-add-form';
-    const input = document.createElement('input'); input.type = 'url'; input.name = 'steamUrl';
-    input.required = true; input.maxLength = 500; input.placeholder = 'Steam 게임 링크를 붙여 넣어 주세요';
-    input.setAttribute('aria-label', '추가할 Steam 게임 링크');
+    const nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.name = 'gameName';
+    nameInput.maxLength = 100; nameInput.placeholder = '게임 이름 (Steam은 자동으로 가져와요)';
+    nameInput.setAttribute('aria-label', '추가할 게임 이름');
+    const linkInput = document.createElement('input'); linkInput.type = 'url'; linkInput.name = 'gameUrl';
+    linkInput.required = true; linkInput.maxLength = 500; linkInput.placeholder = 'Steam 등 게임 페이지 링크';
+    linkInput.setAttribute('aria-label', '추가할 게임 링크');
     const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary';
     add.textContent = '＋ 게임 추가';
-    form.append(input, add);
+    form.append(nameInput, linkInput, add);
     const hint = document.createElement('small'); hint.className = 'played-games-owner-hint';
-    hint.textContent = 'Steam 게임 링크를 확인해 이름과 썸네일을 가져옵니다. 게임마다 SOOP 다시보기를 연결할 수 있어요.';
+    hint.textContent = 'Steam은 이름과 썸네일을 자동으로 가져오고, 다른 게임은 이름과 HTTPS 링크를 직접 입력해 주세요. 게임마다 SOOP 다시보기를 연결할 수 있어요.';
     form.append(hint);
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      if (form.reportValidity()) addPlayedGame(page, input, add);
+      if (form.reportValidity()) addPlayedGame(page, nameInput, linkInput, add);
     });
     section.append(form);
   }
@@ -5863,7 +5866,7 @@ function renderPlayedGamesSection(page) {
         return section;
       } else empty.textContent = '플레이한 게임 목록을 불러옵니다.';
     } else {
-      empty.textContent = page.isOwner ? '아직 추가한 게임이 없어요. Steam 링크로 첫 게임을 등록해 보세요.' : '아직 등록된 게임이 없어요.';
+      empty.textContent = page.isOwner ? '아직 추가한 게임이 없어요. 게임 링크로 첫 게임을 등록해 보세요.' : '아직 등록된 게임이 없어요.';
     }
     section.append(empty);
     return section;
@@ -5873,13 +5876,13 @@ function renderPlayedGamesSection(page) {
   const cachedVods = page.vods && Array.isArray(page.vods.items) ? page.vods.items : [];
   games.forEach((game) => {
     const appId = String(game && game.appId || '');
-    if (!/^[1-9]\d{0,9}$/.test(appId)) return;
+    if (!/^(?:[1-9]\d{0,9}|custom_[a-f0-9]{32})$/.test(appId)) return;
     const card = document.createElement('article'); card.className = 'played-game-card';
     const top = document.createElement('div'); top.className = 'played-game-main';
     const link = document.createElement('a'); link.className = 'played-game-steam-link';
-    link.href = `https://store.steampowered.com/app/${encodeURIComponent(appId)}/`;
+    link.href = typeof game.gameUrl === 'string' && /^https:\/\//i.test(game.gameUrl) ? game.gameUrl : '#';
     link.target = '_blank'; link.rel = 'noopener noreferrer';
-    link.setAttribute('aria-label', `${game.name || 'Steam 게임'} Steam 페이지 열기`);
+    link.setAttribute('aria-label', `${game.name || '게임'} 게임 페이지 열기`);
     const frame = document.createElement('span'); frame.className = 'played-game-thumbnail-frame';
     if (typeof game.thumbnailUrl === 'string' && /^https:\/\/(?:[^/]+\.)?steamstatic\.com\//i.test(game.thumbnailUrl)) {
       const image = document.createElement('img'); image.className = 'played-game-thumbnail';
@@ -5888,10 +5891,11 @@ function renderPlayedGamesSection(page) {
       frame.append(image);
     } else {
       frame.classList.add('is-missing');
+      frame.dataset.label = game.isSteam ? 'STEAM GAME' : 'GAME';
     }
     const details = document.createElement('span'); details.className = 'played-game-details';
     const name = document.createElement('strong'); name.textContent = game.name || 'Steam 게임';
-    const shortcut = document.createElement('span'); shortcut.textContent = 'Steam에서 게임 보기 ↗';
+    const shortcut = document.createElement('span'); shortcut.textContent = game.isSteam ? 'Steam에서 게임 보기 ↗' : '게임 링크 열기 ↗';
     details.append(name, shortcut); link.append(frame, details); top.append(link);
     if (page.isOwner) {
       const removeGame = document.createElement('button'); removeGame.type = 'button';
@@ -5997,11 +6001,14 @@ function renderPlayedGamesSection(page) {
   return section;
 }
 
-async function addPlayedGame(page, input, button) {
+async function addPlayedGame(page, nameInput, linkInput, button) {
   if (!page.isOwner || button.disabled) return;
   button.disabled = true; button.textContent = '게임 확인 중…';
   try {
-    const result = (await callPlayedGames({ action: 'add-game', streamerId: page.streamer.id, steamUrl: input.value.trim() })).data;
+    const result = (await callPlayedGames({
+      action: 'add-game', streamerId: page.streamer.id,
+      gameName: nameInput.value.trim(), gameUrl: linkInput.value.trim(),
+    })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
     currentPage.playedGames = rememberFanPageContent(page.streamer.id, 'playedGames', result.playedGames, true);
     refreshPlayedGamesSection(page.streamer.id);

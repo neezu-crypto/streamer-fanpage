@@ -3,7 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  isPlayedGameId,
   normalizePlayedGameBestRecord,
+  normalizePlayedGameLink,
+  parseCustomPlayedGameLink,
   updatePlayedGameBestRecord,
 } = require('../played-games-record');
 
@@ -25,4 +28,15 @@ test('게임 최고기록을 저장하거나 지워도 게임과 다시보기 �
   });
   assert.deepEqual(updatePlayedGameBestRecord({ ...game, bestRecord: { type: 'rank', value: '골드' } }, null), game);
   assert.equal(updatePlayedGameBestRecord(null, { type: 'rank', value: '골드' }), null);
+});
+
+test('Steam 외 HTTPS 게임 링크를 안전한 사용자 등록 게임으로 지원한다', () => {
+  const link = parseCustomPlayedGameLink('https://www.riotgames.com/ko');
+  assert.equal(link, 'https://www.riotgames.com/ko');
+  assert.equal(parseCustomPlayedGameLink('http://example.com/game'), null);
+  assert.equal(parseCustomPlayedGameLink('https://user:password@example.com/game'), null);
+  assert.equal(isPlayedGameId('custom_0123456789abcdef0123456789abcdef'), true);
+  assert.equal(isPlayedGameId('custom_bad/id'), false);
+  assert.equal(normalizePlayedGameLink(link, 'custom_0123456789abcdef0123456789abcdef'), link);
+  assert.equal(normalizePlayedGameLink('', '123456'), 'https://store.steampowered.com/app/123456/');
 });
