@@ -20,6 +20,13 @@ const {
   updatePlayedGameBestRecord,
 } = require('./played-games-record');
 const {
+  ROLLING_PAPER_STICKER_SET,
+  addRollingPaperSticker,
+  deleteRollingPaperSticker,
+  moveRollingPaperSticker,
+  normalizeRollingPaperStickers,
+} = require('./rolling-paper-stickers');
+const {
   VIEWER_STATS_QUEUE_MAX_CONCURRENT,
   VIEWER_STATS_QUEUE_MAX_INSTANCES,
   VIEWER_STATS_QUEUE_MAX_PER_SECOND,
@@ -3128,6 +3135,40 @@ function rollingPaperRef(streamerId) {
   return db.ref(`streamerFanPageRollingPapers/${streamerId}`);
 }
 
+function rollingPaperStickerRef(streamerId) {
+  return db.ref(`streamerFanPageRollingPaperStickers/${streamerId}`);
+}
+
+function rollingPaperStickerOwnerKey(uid) {
+  return createHash('sha256').update(`streamerFanPageRollingPaperSticker:${uid}`).digest('hex');
+}
+
+async function readRollingPaperStickerState(rootRef, ownerKey, canPlace, canManage) {
+  const [stickersSnapshot, ownerSnapshot] = await Promise.all([
+    rootRef.child('stickers').get(),
+    rootRef.child('owners').child(ownerKey).get(),
+  ]);
+  const stickerId = typeof ownerSnapshot.val() === 'string' ? ownerSnapshot.val() : '';
+  const stickers = normalizeRollingPaperStickers(stickersSnapshot.val());
+  const ownStickerId = stickers.some((item) => item.id === stickerId) ? stickerId : '';
+  return {
+    stickers,
+    ownStickerId,
+    canPlace: canPlace && !ownStickerId,
+    canManage,
+    count: stickers.length,
+    stickerChoices: ROLLING_PAPER_STICKER_SET,
+  };
+}
+
+function throwRollingPaperStickerHttpsError(error) {
+  const stickerErrorCodes = new Set(['already-exists', 'invalid-argument', 'not-found', 'permission-denied', 'resource-exhausted']);
+  if (error && stickerErrorCodes.has(error.code) && error.message) {
+    throw new HttpsError(error.code, error.message);
+  }
+  throw error;
+}
+
 function normalizeRollingPaperEntry(value, id) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || !/^[0-9]{13}_[0-9a-f-]{36}$/i.test(id)) return null;
@@ -6201,6 +6242,43 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
   const canDelete = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
   const rootRef = rollingPaperRef(target.streamer.id);
   const canManageTopics = canDelete;
+  const signInProvider = String(request.auth.token && request.auth.token.firebase && request.auth.token.firebase.sign_in_provider || '');
+  const canPlaceSticker = !!signInProvider && signInProvider !== 'anonymous';
+  const stickerOwnerKey = rollingPaperStickerOwnerKey(uid);
+  const stickersRef = rollingPaperStickerRef(target.streamer.id);
+
+  if (action === 'list-stickers') {
+    return readRollingPaperStickerState(stickersRef, stickerOwnerKey, canPlaceSticker, canDelete);
+  }
+
+  if (action === 'add-sticker') {
+    if (!canPlaceSticker) throw new HttpsError('unauthenticated', '로그인한 계정으로 접속한 뒤 스티커를 붙여 주세요.');
+    try {
+      await addRollingPaperSticker(stickersRef, stickerOwnerKey, data.emoji, data.x, data.y);
+      return readRollingPaperStickerState(stickersRef, stickerOwnerKey, canPlaceSticker, canDelete);
+    } catch (error) {
+      return throwRollingPaperStickerHttpsError(error);
+    }
+  }
+
+  if (action === 'move-sticker') {
+    if (!canDelete) throw new HttpsError('permission-denied', '해당 스트리머와 관리자만 스티커를 이동할 수 있습니다.');
+    try {
+      await moveRollingPaperSticker(stickersRef, String(data.stickerId || ''), data.x, data.y);
+      return readRollingPaperStickerState(stickersRef, stickerOwnerKey, canPlaceSticker, canDelete);
+    } catch (error) {
+      return throwRollingPaperStickerHttpsError(error);
+    }
+  }
+
+  if (action === 'delete-sticker') {
+    try {
+      await deleteRollingPaperSticker(stickersRef, String(data.stickerId || ''), stickerOwnerKey, canDelete);
+      return readRollingPaperStickerState(stickersRef, stickerOwnerKey, canPlaceSticker, canDelete);
+    } catch (error) {
+      return throwRollingPaperStickerHttpsError(error);
+    }
+  }
 
   if (action === 'list-topics') {
     const snapshot = await rootRef.get();
