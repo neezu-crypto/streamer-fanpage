@@ -2949,6 +2949,11 @@ function renderRollingPaperStickerBoard(page, state) {
   count.textContent = state.stickersLoading && !state.stickersLoaded ? '불러오는 중' : `${state.stickers.length}개`;
   summary.append(title, count); toolbar.append(summary);
   const actions = document.createElement('div'); actions.className = 'rolling-paper-sticker-actions';
+  const more = document.createElement('details'); more.className = 'rolling-paper-sticker-menu';
+  const moreToggle = document.createElement('summary'); moreToggle.textContent = '⋯'; moreToggle.setAttribute('aria-label', '스티커 설정');
+  const moreItems = document.createElement('div'); moreItems.className = 'rolling-paper-sticker-menu-items';
+  more.append(moreToggle, moreItems);
+  const appendMenuAction = (button) => { button.classList.add('rolling-paper-sticker-menu-item'); moreItems.append(button); };
 
   const hidden = rollingPaperStickersAreHidden(streamerId);
   const storedHiddenStickerIds = rollingPaperHiddenStickerIds(streamerId);
@@ -2962,7 +2967,7 @@ function renderRollingPaperStickerBoard(page, state) {
     state.stickerHideMode = false; state.showHiddenStickers = false;
     refreshRollingPaperSection(streamerId);
   });
-  actions.append(visibility);
+  appendMenuAction(visibility);
 
   const hideMode = document.createElement('button'); hideMode.type = 'button'; hideMode.className = 'button rolling-paper-sticker-action';
   hideMode.textContent = state.stickerHideMode ? '선택 끝내기' : '숨길 스티커 선택';
@@ -2976,7 +2981,7 @@ function renderRollingPaperStickerBoard(page, state) {
     state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
     refreshRollingPaperSection(streamerId);
   });
-  actions.append(hideMode);
+  appendMenuAction(hideMode);
   if (hiddenStickerIds.size) {
     const showHidden = document.createElement('button'); showHidden.type = 'button'; showHidden.className = 'button rolling-paper-sticker-action';
     showHidden.textContent = state.showHiddenStickers ? '숨김 스티커 감추기' : `숨긴 스티커 보기 ${hiddenStickerIds.size}개`;
@@ -2990,7 +2995,7 @@ function renderRollingPaperStickerBoard(page, state) {
       state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
       refreshRollingPaperSection(streamerId);
     });
-    actions.append(showHidden);
+    appendMenuAction(showHidden);
   }
 
   if (state.ownStickerId) {
@@ -3000,19 +3005,21 @@ function renderRollingPaperStickerBoard(page, state) {
     actions.append(removeOwn);
   } else if (state.canPlaceSticker) {
     const attach = document.createElement('button'); attach.type = 'button'; attach.className = 'button button-primary rolling-paper-sticker-action';
-    attach.textContent = state.stickerPlacing ? '위치 선택 중…' : '＋ 스티커 붙이기';
+    attach.textContent = state.stickerPlacing ? '붙이기 취소' : state.stickerPaletteOpen ? '선택 취소' : '＋ 스티커 붙이기';
     attach.disabled = state.savingSticker;
     attach.addEventListener('click', () => {
       try { localStorage.setItem(rollingPaperStickerHiddenKey(streamerId), '0'); } catch (_) { /* Placement can continue without a persisted visibility preference. */ }
       state.stickerHideMode = false; state.showHiddenStickers = false; state.stickerEditing = false;
-      state.stickerPaletteOpen = !state.stickerPaletteOpen;
-      state.stickerPlacing = false; state.selectedStickerEmoji = '';
+      if (state.stickerPlacing) {
+        state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
+      } else if (state.stickerPaletteOpen) state.stickerPaletteOpen = false;
+      else state.stickerPaletteOpen = true;
       refreshRollingPaperSection(streamerId);
     });
     actions.append(attach);
   } else if (!hasRecognizedFanpageAccount()) {
     const login = document.createElement('button'); login.type = 'button'; login.className = 'button button-primary rolling-paper-sticker-action';
-    login.textContent = '로그인하고 붙이기';
+    login.textContent = '로그인하고 스티커 붙이기';
     login.addEventListener('click', () => showFanPageModal($('loginChoiceDialog')));
     actions.append(login);
   }
@@ -3027,19 +3034,21 @@ function renderRollingPaperStickerBoard(page, state) {
       state.stickerPlacing = false; state.selectedStickerEmoji = ''; state.stickerPaletteOpen = false;
       refreshRollingPaperSection(streamerId);
     });
-    actions.append(edit);
+    appendMenuAction(edit);
   }
+  if (state.stickers.length) actions.append(more);
   toolbar.append(actions); section.append(toolbar);
 
   if (state.stickerPaletteOpen && state.canPlaceSticker) {
     const palette = document.createElement('div'); palette.className = 'rolling-paper-sticker-palette';
-    const paletteLabel = document.createElement('span'); paletteLabel.textContent = '붙일 스티커를 골라 주세요'; palette.append(paletteLabel);
+    const paletteLabel = document.createElement('span'); paletteLabel.textContent = '스티커를 고른 다음, 보드에서 붙일 곳을 눌러 주세요'; palette.append(paletteLabel);
     state.stickerChoices.forEach((emoji) => {
       const choice = document.createElement('button'); choice.type = 'button'; choice.className = 'rolling-paper-sticker-choice';
       choice.textContent = emoji; choice.setAttribute('aria-label', `${emoji} 스티커 선택`);
       choice.addEventListener('click', () => {
         state.selectedStickerEmoji = emoji; state.stickerPlacing = true; state.stickerPaletteOpen = false;
         refreshRollingPaperSection(streamerId);
+        requestAnimationFrame(() => $('rollingPaperSection')?.querySelector('.rolling-paper-sticker-board')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
       });
       palette.append(choice);
     });
@@ -3050,7 +3059,7 @@ function renderRollingPaperStickerBoard(page, state) {
 
   if (state.stickerPlacing) {
     const placementHint = document.createElement('p'); placementHint.className = 'rolling-paper-sticker-hint';
-    placementHint.textContent = `${state.selectedStickerEmoji} 스티커를 붙일 위치를 눌러 주세요.`;
+    placementHint.textContent = `${state.selectedStickerEmoji} 붙일 곳을 누르면 바로 저장돼요. 취소하려면 위 버튼을 누르세요.`;
     section.append(placementHint);
   } else if (state.stickerHideMode) {
     const hideHint = document.createElement('p'); hideHint.className = 'rolling-paper-sticker-hint';
