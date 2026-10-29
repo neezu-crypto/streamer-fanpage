@@ -105,6 +105,64 @@ test('move retries against the server value when the local transaction cache sta
   assert.equal((await stickerRef.get()).val().updatedAt, 1_800_000_000_100);
 });
 
+test('delete retries against the server value when the local transaction cache starts empty', async () => {
+  const database = createDatabase();
+  const ownerKey = 'fan-hash';
+  const id = await addRollingPaperSticker(database.ref, ownerKey, '✨', 20, 30, 1_800_000_000_000);
+  const baseRootChild = database.ref.child.bind(database.ref);
+  const stickersRef = baseRootChild('stickers');
+  const baseStickersChild = stickersRef.child.bind(stickersRef);
+  const stickerRef = baseStickersChild(id);
+  let updateCalls = 0;
+  stickerRef.transaction = async (update) => {
+    const runUpdate = (value) => { updateCalls += 1; return update(value); };
+    assert.equal(runUpdate(null), null);
+    const serverValueUpdate = runUpdate((await stickerRef.get()).val());
+    await stickerRef.set(serverValueUpdate);
+    return { committed: true, snapshot: { val: () => serverValueUpdate } };
+  };
+  stickersRef.child = (childId) => childId === id ? stickerRef : baseStickersChild(childId);
+  database.ref.child = (key) => key === 'stickers' ? stickersRef : baseRootChild(key);
+
+  assert.equal(await deleteRollingPaperSticker(database.ref, id, ownerKey, false), true);
+
+  assert.equal(updateCalls, 2);
+  assert.equal(database.data.count, 0);
+  assert.equal(database.data.owners[ownerKey], undefined);
+  assert.deepEqual(normalizeRollingPaperStickers(database.data.stickers), []);
+});
+
+test('delete does not decrement the count again if another request already removed the sticker', async () => {
+  const database = createDatabase();
+  const ownerKey = 'fan-hash';
+  const id = await addRollingPaperSticker(database.ref, ownerKey, '✨', 20, 30, 1_800_000_000_000);
+  const baseRootChild = database.ref.child.bind(database.ref);
+  const stickersRef = baseRootChild('stickers');
+  const baseStickersChild = stickersRef.child.bind(stickersRef);
+  const stickerRef = baseStickersChild(id);
+  const baseGet = stickerRef.get.bind(stickerRef);
+  let firstRead = true;
+  stickerRef.get = async () => {
+    if (firstRead) {
+      firstRead = false;
+      const snapshot = await baseGet();
+      await stickerRef.set(null);
+      await baseRootChild('owners').child(ownerKey).set(null);
+      await baseRootChild('count').set(0);
+      return snapshot;
+    }
+    return baseGet();
+  };
+  stickersRef.child = (childId) => childId === id ? stickerRef : baseStickersChild(childId);
+  database.ref.child = (key) => key === 'stickers' ? stickersRef : baseRootChild(key);
+
+  await assert.rejects(deleteRollingPaperSticker(database.ref, id, ownerKey, false), { code: 'not-found' });
+
+  assert.equal(database.data.count, 0);
+  assert.equal(database.data.owners[ownerKey], undefined);
+  assert.deepEqual(normalizeRollingPaperStickers(database.data.stickers), []);
+});
+
 test('move reports not found when both the local cache and server have no sticker', async () => {
   const database = createDatabase();
   const missingId = '123e4567-e89b-42d3-a456-426614174000';

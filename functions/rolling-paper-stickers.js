@@ -109,11 +109,17 @@ async function deleteRollingPaperSticker(rootRef, id, ownerKey, canManage) {
   const initial = (await stickerRef.get()).val();
   if (!initial || typeof initial !== 'object') throw stickerError('not-found', '삭제할 스티커를 찾을 수 없습니다.');
   if (!canManage && initial.ownerKey !== ownerKey) throw stickerError('permission-denied', '본인이 붙인 스티커만 뗄 수 있어요.');
+  let foundStickerInTransaction = false;
   const deletion = await stickerRef.transaction((current) => {
+    // A transaction may start with an empty local cache even when the prior
+    // get() found the sticker remotely. Returning null asks RTDB to compare
+    // with the server value and rerun this callback with the current sticker.
+    if (current === null) return null;
     if (!current || typeof current !== 'object' || (!canManage && current.ownerKey !== ownerKey)) return undefined;
+    foundStickerInTransaction = true;
     return null;
   });
-  if (!deletion.committed) throw stickerError('not-found', '삭제할 스티커를 찾을 수 없습니다.');
+  if (!deletion.committed || !foundStickerInTransaction) throw stickerError('not-found', '삭제할 스티커를 찾을 수 없습니다.');
   const ownerRef = rootRef.child('owners').child(String(initial.ownerKey || ''));
   const countRef = rootRef.child('count');
   await Promise.all([
