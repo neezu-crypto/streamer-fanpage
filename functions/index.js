@@ -1576,6 +1576,32 @@ function fanPageSchedulesRef(streamerId) {
   return db.ref(`streamerFanPageSchedules/${streamerId}`);
 }
 
+function fanPageWeeklySchedulesRef(streamerId, weekStart) {
+  return db.ref(`streamerFanPageWeeklySchedules/${streamerId}/${weekStart}`);
+}
+
+function isValidWeeklyScheduleWeekStart(value) {
+  if (!isValidCalendarDate(value)) return false;
+  return new Date(`${value}T00:00:00Z`).getUTCDay() === 1;
+}
+
+function normalizeWeeklyScheduleEntries(value) {
+  if (!Array.isArray(value) || value.length !== 7) {
+    throw new HttpsError('invalid-argument', '월요일부터 일요일까지 일정을 모두 확인해 주세요.');
+  }
+  return value.map((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new HttpsError('invalid-argument', '요일별 일정 형식을 확인해 주세요.');
+    }
+    const time = typeof entry.time === 'string' ? entry.time.trim() : '';
+    const content = typeof entry.content === 'string' ? entry.content.trim() : '';
+    if ((time && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) || content.length > 100) {
+      throw new HttpsError('invalid-argument', '방송 시간 또는 내용이 올바르지 않습니다.');
+    }
+    return { time, content, offline: entry.offline === true };
+  });
+}
+
 function isValidCalendarDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
@@ -4794,6 +4820,76 @@ exports.streamerFanPageScheduleDelete = onCall({ maxInstances: 20 }, async (requ
     .transaction((current) => current ? null : undefined);
   if (!result.committed) throw new HttpsError('not-found', '팬페이지 일정을 찾을 수 없습니다.');
   return { deleted: true, eventId };
+});
+
+exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  const weekStart = typeof data.weekStart === 'string' ? data.weekStart : '';
+  if (!streamerId || !isValidWeeklyScheduleWeekStart(weekStart)) {
+    throw new HttpsError('invalid-argument', '스트리머와 월요일 날짜를 확인해 주세요.');
+  }
+  const target = await findVerifiedBySoopId(streamerId);
+  if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+  const scheduleRef = fanPageWeeklySchedulesRef(target.streamer.id, weekStart);
+
+  if (data.action === 'get') {
+    const record = (await scheduleRef.get()).val() || {};
+    let entries = Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false }));
+    try {
+      entries = normalizeWeeklyScheduleEntries(record.entries);
+    } catch (_) {
+      // 이전/손상 데이터가 공개 방송표 전체의 로딩을 막지 않도록 빈 주간표로 표시한다.
+    }
+    let avatar = null;
+    const avatarImageId = typeof record.avatarImageId === 'string' ? record.avatarImageId : '';
+    if (avatarImageId && /^[A-Za-z0-9_-]{8,100}$/.test(avatarImageId)) {
+      const galleryStreamerIds = await findGalleryStreamerIds(target);
+      const image = (await sharedDb.ref(`gallery/imagesPublic/${avatarImageId}`).get()).val();
+      if (image && galleryStreamerIds.includes(String(image.streamerId || '')) && isGalleryPublicUrl(image.thumbUrl)) {
+        avatar = { id: avatarImageId, thumbUrl: image.thumbUrl, imageUrl: isGalleryPublicUrl(image.imageUrl) ? image.imageUrl : image.thumbUrl };
+      }
+    }
+    return {
+      weekStart,
+      entries,
+      avatarImageId: avatar ? avatar.id : '',
+      avatar,
+      updatedAt: Number(record.updatedAt) || 0,
+    };
+  }
+
+  if (data.action !== 'save') throw new HttpsError('invalid-argument', '요청 종류를 확인해 주세요.');
+  const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+  if (!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)) {
+    throw new HttpsError('permission-denied', '해당 팬페이지의 인증 스트리머와 관리자만 주간 일정을 저장할 수 있습니다.');
+  }
+  const entries = normalizeWeeklyScheduleEntries(data.entries);
+  const avatarImageId = typeof data.avatarImageId === 'string' ? data.avatarImageId.trim() : '';
+  if (avatarImageId) {
+    if (!/^[A-Za-z0-9_-]{8,100}$/.test(avatarImageId)) throw new HttpsError('invalid-argument', '갤러리 이미지를 확인해 주세요.');
+    const galleryStreamerIds = await findGalleryStreamerIds(target);
+    const image = (await sharedDb.ref(`gallery/imagesPublic/${avatarImageId}`).get()).val();
+    if (!image || !galleryStreamerIds.includes(String(image.streamerId || '')) || !isGalleryPublicUrl(image.thumbUrl)) {
+      throw new HttpsError('permission-denied', '해당 스트리머의 공개 갤러리 이미지만 사용할 수 있습니다.');
+    }
+  }
+  const expectedUpdatedAt = Math.max(0, Number(data.expectedUpdatedAt) || 0);
+  const updatedAt = Date.now();
+  let conflict = false;
+  const result = await scheduleRef.transaction((existing) => {
+    if ((Number(existing && existing.updatedAt) || 0) > expectedUpdatedAt) {
+      conflict = true;
+      return;
+    }
+    return { weekStart, entries, avatarImageId, updatedAt };
+  });
+  if (!result.committed) {
+    if (conflict) throw new HttpsError('aborted', '다른 화면에서 이 주의 일정이 바뀌었습니다. 최신 내용을 불러와 다시 저장해 주세요.');
+    throw new HttpsError('aborted', '저장 중 충돌이 발생했습니다. 최신 내용을 불러와 다시 시도해 주세요.');
+  }
+  return { weekStart, entries, avatarImageId, updatedAt };
 });
 
 exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {
