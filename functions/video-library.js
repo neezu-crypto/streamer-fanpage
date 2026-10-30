@@ -49,12 +49,29 @@ function normalizeVideoLibraryItem(id, value, source = {}) {
 }
 
 function compareVideoLibraryItems(left, right) {
-  return right.sortAt - left.sortAt || right.id.localeCompare(left.id);
+  return right.sortAt - left.sortAt || (right.id < left.id ? -1 : right.id > left.id ? 1 : 0);
 }
 
 function isBeforeVideoLibraryCursor(item, cursor) {
   if (!cursor) return true;
-  return item.sortAt < cursor.sortAt || (item.sortAt === cursor.sortAt && item.id.localeCompare(cursor.id) < 0);
+  return item.sortAt < cursor.sortAt || (item.sortAt === cursor.sortAt && item.id < cursor.id);
+}
+
+function videoLibrarySortKey(sortAt, id) {
+  const timestamp = Math.max(0, Math.floor(Number(sortAt) || 0));
+  const itemId = String(id || '');
+  if (!VIDEO_LIBRARY_ITEM_ID_PATTERN.test(itemId)) return '';
+  return `${String(timestamp).padStart(16, '0')}_${itemId}`;
+}
+
+function parseVideoLibrarySortKey(key, value = {}) {
+  const normalizedKey = String(key || '');
+  const separator = normalizedKey.indexOf('_');
+  if (separator < 1) return null;
+  const id = String(value.itemId || normalizedKey.slice(separator + 1));
+  const sortAt = Math.max(0, Number(value.sortAt) || Number(normalizedKey.slice(0, separator)) || 0);
+  if (!VIDEO_LIBRARY_ITEM_ID_PATTERN.test(id)) return null;
+  return { id, sortAt };
 }
 
 function paginateVideoLibraryEntries(sources, cursor, limit = 24) {
@@ -92,5 +109,7 @@ module.exports = {
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
+  parseVideoLibrarySortKey,
   paginateVideoLibraryEntries,
+  videoLibrarySortKey,
 };

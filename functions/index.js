@@ -64,7 +64,9 @@ const {
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
+  parseVideoLibrarySortKey,
   paginateVideoLibraryEntries,
+  videoLibrarySortKey,
 } = require('./video-library');
 
 initializeApp();
@@ -3876,18 +3878,15 @@ function videoLibraryIndexSortAt(item) {
 }
 
 async function readVideoLibraryIndexPage(indexRef, cursor, limit) {
-  let query = indexRef.orderByChild('sortAt');
-  if (cursor) query = query.endAt(cursor.sortAt, cursor.id);
+  let query = indexRef.orderByKey();
+  if (cursor) query = query.endAt(videoLibrarySortKey(cursor.sortAt, cursor.id));
   const snapshot = await query.limitToLast(limit + 2).get();
   const rows = [];
   snapshot.forEach((child) => {
-    if (child.key) rows.push({
-      id: child.key,
-      sortAt: Math.max(0, Number(child.child('sortAt').val()) || 0),
-      value: child.val(),
-    });
+    const parsed = parseVideoLibrarySortKey(child.key, child.val() || {});
+    if (parsed) rows.push({ ...parsed, value: child.val() });
   });
-  return rows;
+  return rows.reverse();
 }
 
 function normalizePage(streamer, value) {
@@ -6199,8 +6198,9 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     const saved = await manualRef.transaction((current) => current ? undefined : record);
     if (!saved.committed) throw new HttpsError('already-exists', '이미 직접 등록된 영상이에요.');
     const updates = {};
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${itemId}`] = { sortAt: record.sortAt };
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${itemId}`] = { sortAt: record.sortAt };
+    const sortKey = videoLibrarySortKey(record.sortAt, itemId);
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${sortKey}`] = { itemId, sortAt: record.sortAt };
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${sortKey}`] = { itemId, sortAt: record.sortAt };
     await root.update(updates);
     return { saved: true, itemId };
   }
@@ -6223,8 +6223,9 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     if (!result.committed) throw new HttpsError('not-found', '직접 등록한 영상을 찾을 수 없습니다.');
     if (oldCategoryId !== categoryId) {
       const updates = {};
-      updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${oldCategoryId}/${id}`] = null;
-      updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${id}`] = { sortAt: result.snapshot.val().sortAt };
+      const sortKey = videoLibrarySortKey(result.snapshot.val().sortAt, id);
+      updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${oldCategoryId}/${sortKey}`] = null;
+      updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${sortKey}`] = { itemId: id, sortAt: result.snapshot.val().sortAt };
       await root.update(updates);
     }
     return { saved: true };
@@ -6238,9 +6239,10 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     const entry = snapshot.val();
     if (!entry) throw new HttpsError('not-found', '직접 등록한 영상을 찾을 수 없습니다.');
     const updates = {};
+    const sortKey = videoLibrarySortKey(entry.sortAt, id);
     updates[`${VIDEO_LIBRARY_ROOT}/manualVideos/${id}`] = null;
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${id}`] = null;
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${entry.categoryId}/${id}`] = null;
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${sortKey}`] = null;
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${entry.categoryId}/${sortKey}`] = null;
     await root.update(updates);
     return { deleted: true };
   }
@@ -6385,7 +6387,7 @@ exports.streamerFanPageVideoLibrarySyncWorker = onTaskDispatched({
     const acceptedItems = isIncremental
       ? (await Promise.all(candidates.map(async (item) => {
         const existing = await videoLibraryImportVideosRef(channelId, String(channel.activeSyncId))
-          .child(`youtube_${item.id}`).get();
+          .child(videoLibrarySortKey(item.sortAt, `youtube_${item.id}`)).get();
         return existing.exists() ? null : item;
       }))).filter(Boolean)
       : candidates;
@@ -6397,7 +6399,9 @@ exports.streamerFanPageVideoLibrarySyncWorker = onTaskDispatched({
     acceptedItems.forEach((item) => {
       const itemId = `youtube_${item.id}`;
       latestPublishedAt = Math.max(latestPublishedAt, item.sortAt);
-      videoUpdates[`${VIDEO_LIBRARY_ROOT}/imports/${channelId}/${generationId}/videos/${itemId}`] = {
+      const sortKey = videoLibrarySortKey(item.sortAt, itemId);
+      videoUpdates[`${VIDEO_LIBRARY_ROOT}/imports/${channelId}/${generationId}/videos/${sortKey}`] = {
+        itemId,
         platform: 'youtube', videoId: item.id, title: item.title, thumbnailUrl: item.thumbnailUrl,
         publishedAt: item.publishedAt, sortAt: item.sortAt, importedAt: Date.now(),
       };
