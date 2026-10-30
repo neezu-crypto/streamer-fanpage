@@ -828,6 +828,7 @@
 .weekly-schedule-avatar-hit-area{position:absolute;left:5.62%;top:18.7%;z-index:3;width:23.33%;height:60.04%;padding:0;border:0;border-radius:.7cqw;background:transparent;cursor:pointer}
 .weekly-schedule-avatar-hit-area:hover,.weekly-schedule-avatar-hit-area:focus-visible{outline:.24cqw solid #e89ab3;outline-offset:-.24cqw}
 .weekly-schedule-image-tools{position:absolute;left:5.62%;top:18.7%;z-index:5;width:23.33%;height:60.04%;min-height:0;overflow:auto;gap:.65cqw;padding:.8cqw;border:1px solid #e7b7c8;border-radius:.7cqw;background:#fffafcf2;box-shadow:0 .4cqw 1.2cqw #6e3e532b}
+.weekly-schedule-meta[hidden],.weekly-schedule-image-tools[hidden],.weekly-schedule-modal-title-row[hidden]{display:none!important}
 .weekly-schedule-image-heading{display:grid;gap:.2cqw}.weekly-schedule-image-heading strong{font-size:1.15cqw}.weekly-schedule-image-heading small,.weekly-schedule-selected-image{font-size:.82cqw;line-height:1.35}
 .weekly-schedule-image-actions{display:grid;grid-template-columns:1fr;gap:.4cqw}
 .weekly-schedule-image-actions .button,.weekly-schedule-gallery-picker>.button,.weekly-schedule-upload-panel>.button{min-height:2.5cqw;padding:0 .6cqw;font-size:.82cqw}
