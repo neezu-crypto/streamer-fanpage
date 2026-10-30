@@ -8531,7 +8531,7 @@ function openYouTubePlayer(video) {
   playerUrl.searchParams.set('origin', location.origin);
   iframe.src = playerUrl.toString();
   iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
-  iframe.referrerPolicy = 'no-referrer';
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
   frame.replaceChildren(iframe);
   const generation = ++youtubePlayerGeneration;
   $('youtubePlayerVolume').value = String(youtubeVolumeLevel);
