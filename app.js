@@ -8378,6 +8378,9 @@ function renderWeeklyScheduleDialog(page) {
   categoryLabel.append(category);
   const fileLabel = document.createElement('label'); fileLabel.className = 'profile-editor-field'; fileLabel.textContent = '이미지 파일';
   const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
+  // 파일 선택기 취소도 cancel 이벤트를 발생시킨다. 이 이벤트가 모달의 Esc 취소 처리로
+  // 전달되는 브라우저에서도 부모 편집 모달이 닫히지 않도록 입력 요소에서 차단한다.
+  fileInput.addEventListener('cancel', (event) => event.stopPropagation());
   fileLabel.append(fileInput); uploadFields.append(categoryLabel, fileLabel);
   const uploadNote = document.createElement('small'); uploadNote.className = 'weekly-schedule-upload-note';
   uploadNote.textContent = '갤러리와 같은 jpg/png/webp/gif 형식, 최대 15MB입니다. 썸네일도 함께 생성돼요.';
@@ -8818,7 +8821,19 @@ function renderWeeklyScheduleDialog(page) {
   const closeAndSave = async () => { if (await saveCurrentWeek()) dialog.close(); };
   close.addEventListener('click', closeAndSave);
   cancel.addEventListener('click', closeAndSave);
-  dialog.addEventListener('cancel', (event) => { event.preventDefault(); void closeAndSave(); });
+  dialog.addEventListener('cancel', (event) => {
+    // 자식 갤러리 모달이나 파일 선택기에서 올라온 취소는 편집 모달 취소로 처리하지 않는다.
+    if (event.target !== dialog) return;
+    event.preventDefault(); void closeAndSave();
+  });
+  imageTools.addEventListener('cancel', (event) => event.stopPropagation());
+  imageTools.addEventListener('close', () => {
+    if (dialog.open && avatarHitArea.isConnected) avatarHitArea.focus({ preventScroll: true });
+  });
+  dialog.addEventListener('close', () => {
+    if (imageTools.open) imageTools.close();
+    state.weekStart = weekInput.value || state.weekStart;
+  });
   download.addEventListener('click', () => {
     if (download.disabled) return;
     download.disabled = true; download.textContent = '이미지 준비 중…';
@@ -8833,7 +8848,6 @@ function renderWeeklyScheduleDialog(page) {
       }).catch((error) => showToast(error.message || 'PNG 저장에 실패했어요.'))
       .finally(() => { void drawPreview(false); download.disabled = false; download.textContent = 'PNG 이미지 저장'; });
   });
-  dialog.addEventListener('close', () => { state.weekStart = weekInput.value || state.weekStart; });
   dialog._syncWeeklyFields = syncWeeklyFields;
   dialog._saveCurrentWeek = saveCurrentWeek;
   dialog._refreshWeeklySchedulePreview = drawPreview;
