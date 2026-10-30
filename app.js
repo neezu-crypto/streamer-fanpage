@@ -1082,24 +1082,30 @@ function renderAdminViewerSubscriptionRequests(requests, truncated = false) {
     row.className = 'admin-viewer-subscription-row';
     const identity = document.createElement('div');
     identity.className = 'admin-viewer-subscription-identity';
+    const soopId = String(request.soopId || request.donorSoopId || '').trim();
+    const isCommentCodeRequest = request.verificationMethod === 'subscriber-comment-code';
     const nickname = document.createElement('strong');
-    nickname.textContent = request.nickname || '닉네임 없음';
-    const donorId = document.createElement('small');
-    donorId.textContent = request.donorSoopId ? '후원 SOOP 아이디 · @' + request.donorSoopId : 'SOOP 아이디 미입력 · 기존 방식 신청';
+    nickname.textContent = request.nickname || (soopId ? '닉네임 미확인' : '닉네임 없음');
+    const soopIdLabel = document.createElement('small');
+    soopIdLabel.textContent = soopId
+      ? `${isCommentCodeRequest ? '구독 인증 SOOP 아이디' : '후원 SOOP 아이디'} · @${soopId}`
+      : isCommentCodeRequest ? '구독 인증 SOOP 아이디 확인 필요' : 'SOOP 아이디 미입력 · 기존 후원 신청';
     const account = document.createElement('small');
     const uid = String(request.requesterUid || '');
     account.textContent = '계정 UID · ' + (uid.length > 8 ? '…' + uid.slice(-8) : uid);
     const donationStatus = document.createElement('small');
-    donationStatus.textContent = request.verificationSource === 'soop-donation-notification'
+    donationStatus.textContent = isCommentCodeRequest
+      ? '구독자 댓글 코드 인증 · SOOP 구독 상태 확인 대기'
+      : request.verificationSource === 'soop-donation-notification'
       ? '과거 SOOP 후원 알림 자동 확인 기록'
       : request.donationCompletedAt
         ? '후원 완료 신호 · ' + new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(request.donationCompletedAt))
-        : request.donorSoopId ? '후원 완료 표시 전 · 관리자 수동 확인 대기' : '후원 정보 없음 · 관리자 수동 확인';
+        : soopId ? '후원 완료 표시 전 · 관리자 수동 확인 대기' : '후원 정보 없음 · 관리자 수동 확인';
     const requestedAt = document.createElement('small');
     requestedAt.textContent = request.requestedAt
       ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(request.requestedAt))
       : '신청 시각 없음';
-    identity.append(nickname, donorId, donationStatus, account, requestedAt);
+    identity.append(nickname, soopIdLabel, donationStatus, account, requestedAt);
 
     const actions = document.createElement('div');
     actions.className = 'admin-viewer-subscription-actions';
@@ -1111,7 +1117,7 @@ function renderAdminViewerSubscriptionRequests(requests, truncated = false) {
     const processingAge = Date.now() - (Number(request.processingAt) || 0);
     const processingActive = request.status === 'processing' && processingAge < 2 * 60 * 1000;
     approve.disabled = processingActive;
-    approve.textContent = processingActive ? '수동 승인 처리 중…' : request.status === 'processing' ? '승인 재개' : '후원 확인 · 30일 승인';
+    approve.textContent = processingActive ? '승인 처리 중…' : request.status === 'processing' ? '승인 재개' : isCommentCodeRequest ? '구독 인증 확인 · 승인' : '후원 확인 · 30일 승인';
     actions.append(approve);
     if (request.status === 'pending') {
       const reject = document.createElement('button');
@@ -1126,7 +1132,7 @@ function renderAdminViewerSubscriptionRequests(requests, truncated = false) {
     container.append(row);
   });
   $('viewerSubscriptionAdminStatus').textContent = rows.length
-    ? `${formatStatCount(rows.length)}건 대기 중${truncated ? ' · 200건까지만 표시' : ''}. 후원 완료 신호와 후원자 SOOP 아이디를 참고해 내역을 확인한 뒤 수동 승인 또는 반려해 주세요.`
+    ? `${formatStatCount(rows.length)}건 대기 중${truncated ? ' · 200건까지만 표시' : ''}. 구독 인증 또는 후원 정보와 SOOP 아이디를 확인한 뒤 처리해 주세요.`
     : '현재 확인 대기 중인 신청이 없습니다.';
 }
 async function loadAdminViewerSubscriptionRequests() {
