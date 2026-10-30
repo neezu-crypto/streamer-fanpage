@@ -6891,16 +6891,29 @@ function videoLibraryStateFor(streamerId) {
       loaded: false, loading: false, saving: false, error: '', categories: [], items: [],
       categoryId: '', cursor: null, hasMore: false, canManage: false, isAdmin: false,
       channels: [], isInitialImporting: false, isSyncing: false, searchQuery: '', editingId: '', editingCategoryId: '', syncTimer: 0,
+      searchMode: false, searchLoading: false, searchTimer: 0, searchRevision: 0,
     };
     videoLibraryStates.set(streamerId, state);
   }
   return state;
 }
 
-function refreshVideoLibrarySection(streamerId) {
+function refreshVideoLibrarySection(streamerId, options = {}) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const section = $('videoLibrarySection');
-  if (section) section.replaceWith(renderVideoLibrarySection(currentPage));
+  if (!section) return;
+  const focusedSearch = options.preserveSearchFocus && section.contains(document.activeElement)
+    && document.activeElement.matches('.video-library-search') ? document.activeElement : null;
+  const selectionStart = focusedSearch ? focusedSearch.selectionStart : null;
+  const selectionEnd = focusedSearch ? focusedSearch.selectionEnd : null;
+  section.replaceWith(renderVideoLibrarySection(currentPage));
+  if (focusedSearch) {
+    const nextSearch = $('videoLibrarySection')?.querySelector('.video-library-search');
+    nextSearch?.focus({ preventScroll: true });
+    if (nextSearch && selectionStart !== null && selectionEnd !== null) {
+      nextSearch.setSelectionRange(selectionStart, selectionEnd);
+    }
+  }
 }
 
 function videoLibraryCategorySelect(categories, selectedId, label) {
@@ -7114,24 +7127,40 @@ function renderVideoLibrarySection(page) {
     section.append(warning);
   }
 
-  if (state.items.length) {
+  if (state.items.length || state.searchQuery) {
     const search = document.createElement('input'); search.type = 'search'; search.className = 'video-library-search';
-    search.placeholder = '불러온 영상에서 검색'; search.setAttribute('aria-label', '불러온 영상 검색');
+    search.placeholder = '채널 전체 영상에서 검색'; search.setAttribute('aria-label', '채널 전체 영상 검색');
     search.value = state.searchQuery;
     search.addEventListener('input', () => {
-      state.searchQuery = search.value;
+      state.searchQuery = search.value.trim() ? search.value : '';
+      state.searchRevision += 1;
+      clearTimeout(state.searchTimer);
+      state.searchMode = !!state.searchQuery.trim();
+      state.searchLoading = false;
+      state.error = '';
+      state.items = [];
+      state.cursor = null;
+      state.hasMore = false;
+      if (!state.searchMode) {
+        state.loaded = false;
+        renderVideoLibraryItems(page, section, state);
+        void loadVideoLibrary(page, { refresh: true });
+        return;
+      }
+      state.loaded = true;
+      const queryLength = Array.from(state.searchQuery.normalize('NFC').trim()).length;
+      state.searchLoading = queryLength >= 2;
       renderVideoLibraryItems(page, section, state);
+      if (state.searchLoading) {
+        const revision = state.searchRevision;
+        state.searchTimer = window.setTimeout(() => requestVideoLibrarySearch(page, revision), 450);
+      }
     });
     section.append(search);
   }
   renderVideoLibraryItems(page, section, state);
 
-  if (state.hasMore) {
-    const more = document.createElement('button'); more.type = 'button'; more.className = 'button video-library-load-more';
-    more.disabled = state.loading; more.textContent = state.loading ? '불러오는 중…' : '더 많은 영상 보기';
-    more.addEventListener('click', () => loadVideoLibrary(page, { append: true }));
-    section.append(more);
-  } else if (state.loaded && !state.items.length) {
+  if (!state.hasMore && state.loaded && !state.items.length && !state.searchMode) {
     const empty = document.createElement('p'); empty.className = 'video-library-state';
     empty.textContent = state.isInitialImporting
       ? '첫 영상을 가져오고 있어요. 잠시 후 목록에 표시됩니다.'
@@ -7152,13 +7181,23 @@ function renderVideoLibrarySection(page) {
 function renderVideoLibraryItems(page, section, state) {
   section.querySelector('.video-library-grid')?.remove();
   section.querySelector('.video-library-empty-filter')?.remove();
-  const query = state.searchQuery.trim().toLocaleLowerCase('ko-KR');
-  const items = state.items.filter((item) => !query
-    || `${item.title || ''} ${item.channelTitle || ''} ${item.platform || ''}`.toLocaleLowerCase('ko-KR').includes(query));
+  section.querySelector('.video-library-load-more')?.remove();
+  const count = section.querySelector('.video-library-count');
+  if (count) count.textContent = `${state.items.length.toLocaleString('ko-KR')}개 표시`;
+  const items = state.items;
   if (!items.length) {
-    if (query) {
+    const queryLength = Array.from(state.searchQuery.normalize('NFC').trim()).length;
+    if (state.searchMode && state.searchLoading) {
+      const pending = document.createElement('p'); pending.className = 'video-library-empty-filter video-library-state';
+      pending.textContent = '채널의 전체 영상에서 검색하고 있어요.';
+      section.append(pending);
+    } else if (state.searchMode && queryLength < 2) {
+      const hint = document.createElement('p'); hint.className = 'video-library-empty-filter video-library-state';
+      hint.textContent = '두 글자 이상 입력하면 채널 전체 영상에서 검색해요.';
+      section.append(hint);
+    } else if (state.searchMode) {
       const empty = document.createElement('p'); empty.className = 'video-library-empty-filter video-library-state';
-      empty.textContent = '검색 결과가 없어요. 더 많은 영상을 불러와 검색해 보세요.';
+      empty.textContent = state.error ? '검색하지 못했어요. 잠시 후 다시 시도해 주세요.' : '채널 전체 영상에서 검색 결과가 없어요.';
       section.append(empty);
     }
     return;
@@ -7221,20 +7260,44 @@ function renderVideoLibraryItems(page, section, state) {
     grid.append(card);
   });
   section.append(grid);
+  if (state.hasMore) {
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'button video-library-load-more';
+    more.disabled = state.loading; more.textContent = state.loading ? '불러오는 중…' : '더 많은 영상 보기';
+    more.addEventListener('click', () => loadVideoLibrary(page, { append: true }));
+    section.append(more);
+  }
+}
+
+function requestVideoLibrarySearch(page, revision) {
+  const state = videoLibraryStateFor(page.streamer.id);
+  if (revision !== state.searchRevision || !state.searchMode) return;
+  if (state.loading) {
+    state.searchTimer = window.setTimeout(() => requestVideoLibrarySearch(page, revision), 150);
+    return;
+  }
+  void loadVideoLibrary(page, { refresh: true, searchRevision: revision });
 }
 
 async function loadVideoLibrary(page, options = {}) {
   const state = videoLibraryStateFor(page.streamer.id);
   if (state.loading || (state.loaded && !options.refresh && !options.append)) return;
   const append = options.append === true;
+  const searchMode = state.searchMode && Array.from(state.searchQuery.normalize('NFC').trim()).length >= 2;
+  const searchRevision = options.searchRevision ?? state.searchRevision;
+  const searchQuery = state.searchQuery;
+  const requestCategoryId = state.categoryId;
   const cursor = append ? state.cursor : null;
   state.loading = true; state.error = '';
-  refreshVideoLibrarySection(page.streamer.id);
+  refreshVideoLibrarySection(page.streamer.id, { preserveSearchFocus: true });
   try {
     const result = (await callVideoLibrary({
-      action: 'list', categoryId: state.categoryId || '', cursor, limit: 24,
+      action: searchMode ? 'search' : 'list',
+      ...(searchMode ? { query: searchQuery } : {}),
+      categoryId: state.categoryId || '', cursor, limit: 24,
     })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    if (searchRevision !== state.searchRevision || requestCategoryId !== state.categoryId
+      || (searchMode && searchQuery !== state.searchQuery)) return;
     state.categories = Array.isArray(result.categories) ? result.categories : [];
     state.canManage = result.canManage === true;
     state.isAdmin = result.isAdmin === true;
@@ -7250,18 +7313,28 @@ async function loadVideoLibrary(page, options = {}) {
     state.cursor = result.nextCursor || null;
     state.hasMore = result.hasMore === true;
     state.loaded = true;
+    if (searchMode) state.searchLoading = false;
   } catch (error) {
-    state.error = error.message || '공통 영상 모음을 불러오지 못했어요.';
+    if (searchRevision === state.searchRevision && requestCategoryId === state.categoryId
+      && (!searchMode || searchQuery === state.searchQuery)) {
+      state.error = error.message || (searchMode ? '전체 영상 검색을 완료하지 못했어요.' : '공통 영상 모음을 불러오지 못했어요.');
+      if (searchMode) state.searchLoading = false;
+    }
   } finally {
     state.loading = false;
     if (currentPage && currentPage.streamer.id === page.streamer.id) {
-      refreshVideoLibrarySection(page.streamer.id);
+      refreshVideoLibrarySection(page.streamer.id, { preserveSearchFocus: true });
       clearTimeout(state.syncTimer);
       const view = $('fanPageView');
       if ((state.isAdmin && state.channels.some((channel) => channel.syncStatus === 'syncing')
-        || state.isInitialImporting)
+        || state.isInitialImporting) && !state.searchMode
         && view?.dataset.fanpageActiveTab === 'video-library') {
         state.syncTimer = window.setTimeout(() => loadVideoLibrary(page, { refresh: true }), 6500);
+      }
+      if (requestCategoryId !== state.categoryId && !state.loading) {
+        window.setTimeout(() => loadVideoLibrary(page), 0);
+      } else if (searchRevision !== state.searchRevision && !state.searchMode && !state.loading) {
+        window.setTimeout(() => loadVideoLibrary(page, { refresh: true }), 0);
       }
     }
   }
@@ -7270,8 +7343,11 @@ async function loadVideoLibrary(page, options = {}) {
 function selectVideoLibraryCategory(page, categoryId) {
   const state = videoLibraryStateFor(page.streamer.id);
   if (state.categoryId === categoryId) return;
+  clearTimeout(state.searchTimer);
+  state.searchRevision += 1;
   state.categoryId = categoryId; state.items = []; state.cursor = null; state.hasMore = false;
-  state.loaded = false; state.searchQuery = ''; state.editingId = ''; state.editingCategoryId = '';
+  state.loaded = false; state.searchQuery = ''; state.searchMode = false; state.searchLoading = false;
+  state.editingId = ''; state.editingCategoryId = '';
   void loadVideoLibrary(page);
 }
 

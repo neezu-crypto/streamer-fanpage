@@ -67,6 +67,8 @@ const {
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
+  normalizeVideoLibrarySearchQuery,
+  matchesVideoLibrarySearch,
   parseVideoLibrarySortKey,
   paginateVideoLibraryEntries,
   shouldActivateVideoLibraryGeneration,
@@ -128,6 +130,8 @@ const FANPAGE_MEMORY_MOMENTS_MAX_ITEMS = 50;
 const FANPAGE_MEMORY_MOMENT_TITLE_MAX_LENGTH = 80;
 const VIDEO_LIBRARY_ROOT = 'streamerFanPageVideoLibrary';
 const VIDEO_LIBRARY_PAGE_SIZE = 24;
+const VIDEO_LIBRARY_SEARCH_MIN_QUERY_LENGTH = 2;
+const VIDEO_LIBRARY_SEARCH_MAX_QUERY_LENGTH = 80;
 const VIDEO_LIBRARY_MAX_CATEGORIES = 40;
 const VIDEO_LIBRARY_MAX_MANUAL_ITEMS = 3000;
 const VIDEO_LIBRARY_MAX_CHANNELS = 100;
@@ -6057,6 +6061,87 @@ async function readVideoLibraryPage(data, isAdmin, canManage) {
   };
 }
 
+async function searchVideoLibraryPage(data, isAdmin, canManage) {
+  const query = normalizeVideoLibrarySearchQuery(data.query);
+  const queryLength = Array.from(query).length;
+  if (queryLength < VIDEO_LIBRARY_SEARCH_MIN_QUERY_LENGTH
+    || queryLength > VIDEO_LIBRARY_SEARCH_MAX_QUERY_LENGTH) {
+    throw new HttpsError('invalid-argument', `검색어를 ${VIDEO_LIBRARY_SEARCH_MIN_QUERY_LENGTH}자 이상 ${VIDEO_LIBRARY_SEARCH_MAX_QUERY_LENGTH}자 이하로 입력해 주세요.`);
+  }
+  const categoryId = data.categoryId ? validateVideoLibraryCategoryId(data.categoryId) : '';
+  const limit = Math.max(1, Math.min(50, Math.floor(Number(data.limit) || VIDEO_LIBRARY_PAGE_SIZE)));
+  const cursor = normalizeVideoLibraryCursor(data.cursor);
+  if (data.cursor && !cursor) throw new HttpsError('invalid-argument', '검색 결과 위치를 확인해 주세요.');
+
+  const [categoriesSnapshot, channelsSnapshot, manualSnapshot] = await Promise.all([
+    videoLibraryRef('categories').get(),
+    videoLibraryRef('channels').get(),
+    videoLibraryRef('manualVideos').get(),
+  ]);
+  const categories = normalizeVideoLibraryCategories(categoriesSnapshot.val());
+  if (categoryId && !categories.some((category) => category.id === categoryId)) {
+    throw new HttpsError('not-found', '선택한 카테고리를 찾을 수 없습니다.');
+  }
+
+  const sources = [];
+  const manualVideos = manualSnapshot.val() && typeof manualSnapshot.val() === 'object'
+    ? Object.entries(manualSnapshot.val()) : [];
+  const manualItems = manualVideos.map(([id, value]) => {
+    if (!value || (categoryId && String(value.categoryId || '') !== categoryId)) return null;
+    const item = normalizeVideoLibraryStoredItem(id, value, { sourceType: 'manual', categoryId: value.categoryId });
+    return item && matchesVideoLibrarySearch(item, query) ? item : null;
+  }).filter(Boolean);
+  sources.push(manualItems);
+
+  const channelEntries = channelsSnapshot.val() && typeof channelsSnapshot.val() === 'object'
+    ? Object.entries(channelsSnapshot.val()) : [];
+  const relevantChannels = channelEntries.flatMap(([channelId, value]) => {
+    const channel = videoLibraryChannelPublic(channelId, value);
+    if (!channel || (categoryId && channel.categoryId !== categoryId)) return [];
+    return [{ channelId, value, channel }];
+  });
+  const relevantChannelValues = relevantChannels.map(({ value }) => value);
+  const isInitialImporting = hasInitialVideoLibraryImport(relevantChannelValues);
+  const isSyncing = hasVideoLibrarySyncInProgress(relevantChannelValues);
+
+  // Read a few channel generations at a time to keep concurrent RTDB snapshots bounded.
+  const channelItems = [];
+  for (let offset = 0; offset < relevantChannels.length; offset += 3) {
+    const batch = relevantChannels.slice(offset, offset + 3);
+    const results = await Promise.all(batch.map(async ({ channelId, value, channel }) => {
+      if (!value.activeSyncId) return [];
+      const snapshot = await videoLibraryImportVideosRef(channelId, value.activeSyncId).get();
+      const items = [];
+      snapshot.forEach((child) => {
+        const raw = child.val();
+        const parsed = parseVideoLibrarySortKey(child.key, raw || {});
+        if (!raw || !parsed) return;
+        const item = normalizeVideoLibraryStoredItem(parsed.id, { ...raw, sortAt: parsed.sortAt }, {
+          sourceType: 'channel', categoryId: channel.categoryId, channelId, channelTitle: channel.channelTitle,
+        });
+        if (item && matchesVideoLibrarySearch(item, query)) items.push(item);
+      });
+      return items;
+    }));
+    channelItems.push(...results.flat());
+  }
+  sources.push(channelItems);
+
+  const page = paginateVideoLibraryEntries(sources, cursor, limit);
+  return {
+    categories,
+    items: page.items,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+    canManage,
+    isAdmin,
+    isInitialImporting,
+    isSyncing,
+    channels: isAdmin ? relevantChannels.map(({ channel }) => channel)
+      .sort((left, right) => left.channelTitle.localeCompare(right.channelTitle, 'ko')) : [],
+  };
+}
+
 async function startVideoLibraryChannelSync(channelId, mode = 'full', options = {}) {
   const channelRef = videoLibraryChannelRef(channelId);
   const syncId = randomUUID();
@@ -6143,6 +6228,7 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     : [null, false];
   const canManage = isAdmin || !!verified;
   if (action === 'list') return readVideoLibraryPage(data, isAdmin, canManage);
+  if (action === 'search') return searchVideoLibraryPage(data, isAdmin, canManage);
   if (!canManage) throw new HttpsError('permission-denied', '인증 스트리머 또는 관리자만 영상 모음을 수정할 수 있습니다.');
 
   const root = videoLibraryRef();
