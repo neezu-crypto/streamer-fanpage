@@ -60,12 +60,17 @@ const {
   VIDEO_LIBRARY_CATEGORY_ID_PATTERN,
   VIDEO_LIBRARY_CHANNEL_ID_PATTERN,
   VIDEO_LIBRARY_ITEM_ID_PATTERN,
+  hasInitialVideoLibraryImport,
+  hasVideoLibrarySyncInProgress,
+  isStaleVideoLibrarySync,
   VIDEO_LIBRARY_TITLE_MAX_LENGTH,
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
   parseVideoLibrarySortKey,
   paginateVideoLibraryEntries,
+  shouldActivateVideoLibraryGeneration,
+  videoLibraryTransactionRecord,
   videoLibrarySortKey,
 } = require('./video-library');
 
@@ -3040,6 +3045,17 @@ function videoLibraryChannelRef(channelId) {
   return videoLibraryRef(`channels/${channelId}`);
 }
 
+async function transactVideoLibraryChannel(channelRef, update) {
+  const snapshot = await channelRef.get();
+  const seed = snapshot.val();
+  let firstAttempt = true;
+  return channelRef.transaction((current) => {
+    const base = videoLibraryTransactionRecord(current, seed, firstAttempt);
+    firstAttempt = false;
+    return base ? update(base) : undefined;
+  });
+}
+
 function videoLibraryImportVideosRef(channelId, syncId) {
   return videoLibraryRef(`imports/${channelId}/${syncId}/videos`);
 }
@@ -5977,6 +5993,12 @@ async function readVideoLibraryPage(data, isAdmin, canManage) {
 
   const channelEntries = channelsSnapshot.val() && typeof channelsSnapshot.val() === 'object'
     ? Object.entries(channelsSnapshot.val()) : [];
+  const isInitialImporting = hasInitialVideoLibraryImport(channelEntries
+    .filter(([, value]) => !categoryId || String(value && value.categoryId || '') === categoryId)
+    .map(([, value]) => value));
+  const isSyncing = hasVideoLibrarySyncInProgress(channelEntries
+    .filter(([, value]) => !categoryId || String(value && value.categoryId || '') === categoryId)
+    .map(([, value]) => value));
   const publicChannels = [];
   const channelSources = await Promise.all(channelEntries.map(async ([channelId, value]) => {
     const channel = videoLibraryChannelPublic(channelId, value);
@@ -6005,18 +6027,29 @@ async function readVideoLibraryPage(data, isAdmin, canManage) {
     nextCursor: page.nextCursor,
     canManage,
     isAdmin,
+    isInitialImporting,
+    isSyncing,
     channels: isAdmin ? publicChannels.sort((left, right) => left.channelTitle.localeCompare(right.channelTitle, 'ko')) : [],
   };
 }
 
-async function startVideoLibraryChannelSync(channelId, mode = 'full') {
+async function startVideoLibraryChannelSync(channelId, mode = 'full', options = {}) {
   const channelRef = videoLibraryChannelRef(channelId);
   const syncId = randomUUID();
   const now = Date.now();
   let started = false;
   let selectedMode = mode;
-  const transaction = await channelRef.transaction((current) => {
-    if (!current || typeof current !== 'object' || current.syncStatus === 'syncing') return undefined;
+  const transaction = await transactVideoLibraryChannel(channelRef, (current) => {
+    const recoverStaleSync = options.recoverStale === true && isStaleVideoLibrarySync(current, now);
+    if (options.recoverStale === true) {
+      console.info(`Video library recovery transaction checked ${channelId}.`, JSON.stringify({
+        status: current.syncStatus || '',
+        ageMs: Math.max(0, now - Math.max(Number(current.syncStartedAt) || 0, Number(current.updatedAt) || 0)),
+        stale: recoverStaleSync,
+      }));
+    }
+    if (current.syncStatus === 'syncing' && !recoverStaleSync) return undefined;
+    if (recoverStaleSync) selectedMode = 'full';
     if (selectedMode === 'incremental' && !current.activeSyncId) selectedMode = 'full';
     started = true;
     return {
@@ -6034,16 +6067,24 @@ async function startVideoLibraryChannelSync(channelId, mode = 'full') {
       updatedAt: now,
     };
   });
-  if (!transaction.committed || !started) return false;
+  if (!transaction.committed || !started) {
+    if (options.recoverStale === true) {
+      console.info(`Video library recovery transaction did not restart ${channelId}.`, JSON.stringify({
+        committed: transaction.committed,
+        started,
+      }));
+    }
+    return false;
+  }
   try {
     await enqueueVideoLibrarySync(channelId, syncId, '');
-    await channelRef.transaction((current) => {
-      if (!current || current.syncId !== syncId || current.nextPageToken !== '') return undefined;
+    await transactVideoLibraryChannel(channelRef, (current) => {
+      if (current.syncId !== syncId || current.nextPageToken !== '') return undefined;
       return { ...current, dispatchPending: false };
     });
     return true;
   } catch (error) {
-    await channelRef.transaction((current) => current && current.syncId === syncId
+    await transactVideoLibraryChannel(channelRef, (current) => current.syncId === syncId
       ? { ...current, syncStatus: 'error', syncError: '동기화 작업을 시작하지 못했어요. 다시 시도해 주세요.', dispatchPending: false }
       : undefined);
     throw new HttpsError('unavailable', 'YouTube 채널 동기화 작업을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -6288,11 +6329,12 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
       createdBy: uid,
     };
     const channelRef = videoLibraryChannelRef(channel.channelId);
+    if ((await channelRef.get()).exists()) throw new HttpsError('already-exists', '이미 등록된 YouTube 채널이에요.');
     const reservation = await channelRef.transaction((current) => current ? undefined : record);
     if (!reservation.committed) throw new HttpsError('already-exists', '이미 등록된 YouTube 채널이에요.');
     try {
       await enqueueVideoLibrarySync(channel.channelId, syncId, '');
-      await channelRef.transaction((current) => current && current.syncId === syncId && current.nextPageToken === ''
+      await transactVideoLibraryChannel(channelRef, (current) => current.syncId === syncId && current.nextPageToken === ''
         ? { ...current, dispatchPending: false } : undefined);
     } catch (error) {
       await channelRef.update({ syncStatus: 'error', syncError: '동기화 작업을 시작하지 못했어요. 다시 시도해 주세요.', dispatchPending: false });
@@ -6309,7 +6351,7 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
       throw new HttpsError('invalid-argument', '채널과 카테고리를 확인해 주세요.');
     }
     const ref = videoLibraryChannelRef(channelId);
-    const result = await ref.transaction((current) => current ? { ...current, categoryId, updatedAt: now, updatedBy: uid } : undefined);
+    const result = await transactVideoLibraryChannel(ref, (current) => ({ ...current, categoryId, updatedAt: now, updatedBy: uid }));
     if (!result.committed) throw new HttpsError('not-found', 'YouTube 채널을 찾을 수 없습니다.');
     return { saved: true };
   }
@@ -6355,15 +6397,26 @@ exports.streamerFanPageVideoLibrarySyncWorker = onTaskDispatched({
   const channelId = String(data.channelId || '');
   const syncId = String(data.syncId || '');
   const pageToken = String(data.pageToken || '');
-  if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(channelId) || !/^[0-9a-f-]{36}$/i.test(syncId)) return;
+  if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(channelId) || !/^[0-9a-f-]{36}$/i.test(syncId)) {
+    console.warn('Video library sync task skipped: invalid task identifiers.');
+    return;
+  }
   const channelRef = videoLibraryChannelRef(channelId);
   const channelSnapshot = await channelRef.get();
   const channel = channelSnapshot.val();
-  if (!channel || channel.syncId !== syncId || channel.syncStatus !== 'syncing') return;
+  if (!channel) {
+    console.info(`Video library sync task skipped: channel record is missing (${channelId}).`);
+    return;
+  }
+  if (channel.syncId !== syncId || channel.syncStatus !== 'syncing') {
+    console.info(`Video library sync task skipped: task is no longer current (${channelId}, status ${channel.syncStatus || 'missing'}).`);
+    return;
+  }
   if (String(channel.nextPageToken || '') !== pageToken) {
+    console.info(`Video library sync task received an outdated page token (${channelId}, pending ${channel.dispatchPending === true}).`);
     if (channel.dispatchPending) {
       await enqueueVideoLibrarySync(channelId, syncId, String(channel.nextPageToken || ''));
-      await channelRef.transaction((current) => current && current.syncId === syncId
+      await transactVideoLibraryChannel(channelRef, (current) => current.syncId === syncId
         && String(current.nextPageToken || '') === String(channel.nextPageToken || '')
         ? { ...current, dispatchPending: false } : undefined);
     }
@@ -6395,10 +6448,10 @@ exports.streamerFanPageVideoLibrarySyncWorker = onTaskDispatched({
     const finished = !nextPageToken;
     const generationId = isIncremental ? String(channel.activeSyncId) : syncId;
     const videoUpdates = {};
-    let latestPublishedAt = Math.max(0, Number(channel.latestPublishedAt) || 0);
+    let pageLatestPublishedAt = 0;
     acceptedItems.forEach((item) => {
       const itemId = `youtube_${item.id}`;
-      latestPublishedAt = Math.max(latestPublishedAt, item.sortAt);
+      pageLatestPublishedAt = Math.max(pageLatestPublishedAt, item.sortAt);
       const sortKey = videoLibrarySortKey(item.sortAt, itemId);
       videoUpdates[`${VIDEO_LIBRARY_ROOT}/imports/${channelId}/${generationId}/videos/${sortKey}`] = {
         itemId,
@@ -6406,27 +6459,31 @@ exports.streamerFanPageVideoLibrarySyncWorker = onTaskDispatched({
         publishedAt: item.publishedAt, sortAt: item.sortAt, importedAt: Date.now(),
       };
     });
-    const importedCount = Math.max(0, Number(channel.importedCount) || 0) + acceptedItems.length;
     if (Object.keys(videoUpdates).length) await db.ref().update(videoUpdates);
     const syncAt = Date.now();
-    const channelResult = await channelRef.transaction((current) => {
-      if (!current || current.syncId !== syncId || current.syncStatus !== 'syncing') return undefined;
+    const channelResult = await transactVideoLibraryChannel(channelRef, (current) => {
+      if (current.syncId !== syncId || current.syncStatus !== 'syncing') return undefined;
       const updated = {
         ...current,
         nextPageToken,
         dispatchPending: !!nextPageToken,
         totalCount: Math.max(Number(current.totalCount) || 0, page.totalCount),
-        importedCount,
-        latestPublishedAt,
+        importedCount: Math.max(0, Number(current.importedCount) || 0) + acceptedItems.length,
+        latestPublishedAt: Math.max(0, Number(current.latestPublishedAt) || 0, pageLatestPublishedAt),
         syncFailureCount: 0,
         syncStatus: finished ? 'ready' : 'syncing',
         syncError: '',
         updatedAt: syncAt,
       };
+      if (shouldActivateVideoLibraryGeneration({
+        syncMode: current.syncMode,
+        finished,
+        activeSyncId: current.activeSyncId,
+        syncId,
+      })) updated.activeSyncId = syncId;
       if (finished) {
         updated.lastSyncAt = syncAt;
         if (!isIncremental) {
-          updated.activeSyncId = syncId;
           updated.lastFullSyncAt = syncAt;
         } else {
           updated.lastIncrementalSyncAt = syncAt;
@@ -6436,9 +6493,19 @@ exports.streamerFanPageVideoLibrarySyncWorker = onTaskDispatched({
       return updated;
     });
     if (!channelResult.committed) return;
+    console.info('Video library sync page committed.', JSON.stringify({
+      channelId,
+      syncMode: isIncremental ? 'incremental' : 'full',
+      pageItems: acceptedItems.length,
+      importedCount: Number(channelResult.snapshot.val().importedCount) || 0,
+      firstPagePublished: !isIncremental && channel.activeSyncId !== syncId
+        && channelResult.snapshot.val().activeSyncId === syncId,
+      finished,
+      hasNextPage: !!nextPageToken,
+    }));
     if (!finished) {
       await enqueueVideoLibrarySync(channelId, syncId, nextPageToken);
-      await channelRef.transaction((current) => current && current.syncId === syncId
+      await transactVideoLibraryChannel(channelRef, (current) => current.syncId === syncId
         && String(current.nextPageToken || '') === nextPageToken
         ? { ...current, dispatchPending: false } : undefined);
     } else if (!isIncremental) {
@@ -6451,8 +6518,8 @@ exports.streamerFanPageVideoLibrarySyncWorker = onTaskDispatched({
   } catch (error) {
     console.error(`Video library channel sync failed for ${channelId}:`, error.message || error);
     let exhausted = false;
-    await channelRef.transaction((current) => {
-      if (!current || current.syncId !== syncId) return undefined;
+    await transactVideoLibraryChannel(channelRef, (current) => {
+      if (current.syncId !== syncId) return undefined;
       const failureCount = Math.max(0, Number(current.syncFailureCount) || 0) + 1;
       exhausted = failureCount >= 10;
       return {
@@ -6481,6 +6548,25 @@ exports.streamerFanPageVideoLibraryCleanupWorker = onTaskDispatched({
   if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(String(channelId)) || !/^[0-9a-f-]{36}$/i.test(String(syncId))) return;
   const hasMore = await removeVideoLibraryGenerationBatch(String(channelId), String(syncId));
   if (hasMore) await enqueueVideoLibraryCleanup(String(channelId), String(syncId));
+});
+
+exports.streamerFanPageVideoLibrarySyncRecovery = onSchedule({
+  schedule: 'every 5 minutes', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
+}, async () => {
+  const snapshot = await videoLibraryRef('channels').get();
+  const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
+  const now = Date.now();
+  const staleChannels = Object.entries(channels).filter(([, channel]) => isStaleVideoLibrarySync(channel, now));
+  console.info(`Video library sync recovery scanned ${Object.keys(channels).length} channels; ${staleChannels.length} stalled.`);
+  await Promise.all(staleChannels.map(async ([channelId]) => {
+    try {
+      const recovered = await startVideoLibraryChannelSync(channelId, 'full', { recoverStale: true });
+      if (recovered) console.warn(`Restarted stalled video library sync for ${channelId}.`);
+      else console.info(`Skipped recovery because ${channelId} is no longer stalled.`);
+    } catch (error) {
+      console.error(`Could not recover stalled video library sync for ${channelId}:`, error.message || error);
+    }
+  }));
 });
 
 exports.streamerFanPageVideoLibraryIncrementalSync = onSchedule({

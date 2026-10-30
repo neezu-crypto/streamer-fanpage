@@ -4421,7 +4421,9 @@ function renderFanPage(page, options = {}) {
     if (tabKey === 'content') loadFanPageContent(page);
     if (tabKey === 'video-library') {
       const videoLibraryState = videoLibraryStateFor(page.streamer.id);
-      if (!videoLibraryState.loaded || videoLibraryState.error) void loadVideoLibrary(page);
+      if (!videoLibraryState.loaded || videoLibraryState.error || videoLibraryState.isSyncing) {
+        void loadVideoLibrary(page, { refresh: videoLibraryState.loaded && videoLibraryState.isSyncing });
+      }
     }
     if (tabKey === 'rolling-paper') {
       const rollingPaperState = rollingPaperStateFor(page.streamer.id);
@@ -6888,7 +6890,7 @@ function videoLibraryStateFor(streamerId) {
     state = {
       loaded: false, loading: false, saving: false, error: '', categories: [], items: [],
       categoryId: '', cursor: null, hasMore: false, canManage: false, isAdmin: false,
-      channels: [], searchQuery: '', editingId: '', syncTimer: 0,
+      channels: [], isInitialImporting: false, isSyncing: false, searchQuery: '', editingId: '', syncTimer: 0,
     };
     videoLibraryStates.set(streamerId, state);
   }
@@ -7097,9 +7099,18 @@ function renderVideoLibrarySection(page) {
     section.append(more);
   } else if (state.loaded && !state.items.length) {
     const empty = document.createElement('p'); empty.className = 'video-library-state';
-    empty.textContent = state.canManage && !state.categories.length
-      ? '먼저 하위 카테고리를 추가해 주세요.' : '아직 등록된 영상이 없어요.';
+    empty.textContent = state.isInitialImporting
+      ? '첫 영상을 가져오고 있어요. 잠시 후 목록에 표시됩니다.'
+      : state.isSyncing
+        ? '채널 영상을 가져오고 있어요. 새로고침하면 추가된 영상을 확인할 수 있습니다.'
+        : state.canManage && !state.categories.length
+          ? '먼저 하위 카테고리를 추가해 주세요.' : '아직 등록된 영상이 없어요.';
     section.append(empty);
+  }
+  if (state.isSyncing && state.items.length) {
+    const progress = document.createElement('p'); progress.className = 'video-library-state';
+    progress.textContent = '채널의 나머지 영상도 계속 가져오고 있어요. 새로고침하면 추가된 영상을 확인할 수 있습니다.';
+    section.append(progress);
   }
   return section;
 }
@@ -7193,6 +7204,8 @@ async function loadVideoLibrary(page, options = {}) {
     state.categories = Array.isArray(result.categories) ? result.categories : [];
     state.canManage = result.canManage === true;
     state.isAdmin = result.isAdmin === true;
+    state.isInitialImporting = result.isInitialImporting === true;
+    state.isSyncing = result.isSyncing === true;
     state.channels = Array.isArray(result.channels) ? result.channels : [];
     const incoming = Array.isArray(result.items) ? result.items : [];
     if (append) {
@@ -7211,7 +7224,8 @@ async function loadVideoLibrary(page, options = {}) {
       refreshVideoLibrarySection(page.streamer.id);
       clearTimeout(state.syncTimer);
       const view = $('fanPageView');
-      if (state.isAdmin && state.channels.some((channel) => channel.syncStatus === 'syncing')
+      if ((state.isAdmin && state.channels.some((channel) => channel.syncStatus === 'syncing')
+        || state.isInitialImporting)
         && view?.dataset.fanpageActiveTab === 'video-library') {
         state.syncTimer = window.setTimeout(() => loadVideoLibrary(page, { refresh: true }), 6500);
       }
