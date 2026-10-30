@@ -4284,7 +4284,7 @@ function renderFanPage(page, options = {}) {
     { key: 'home', label: '홈', eyebrow: 'YOUR HOME', title: '방송과 최신 소식', description: '방송 상태와 일정, 최근 다시보기를 모아 보여드려요.' },
     { key: 'activity', label: '팬 활동', eyebrow: 'FAN ACTIVITY', title: '팬들과 함께하는 공간', description: '팬 참여와 소통, 함께 만든 추억을 둘러보세요.' },
     { key: 'content', label: '콘텐츠', eyebrow: 'STREAMER CONTENTS', title: '다시보기와 활동 기록', description: '영상, 대회 이력, 플레이한 게임을 모아봤어요.' },
-    { key: 'video-library', label: '영상 모음', eyebrow: 'VIDEO COLLECTION', title: '영상 모음', description: '스트리머와 관리자가 함께 모은 방송 추천 영상을 둘러보세요.' },
+    { key: 'video-library', label: '영상 모음', eyebrow: 'VIDEO COLLECTION', title: '영상 모음', description: '스트리머가 라이브에서 자주 시청하는 영상을 모았습니다.' },
     { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 응원 메시지를 남겨 보세요.' },
     { key: 'memories', label: '기억의 순간', eyebrow: 'MEMORY MOMENTS', title: '기억의 순간', description: '100일·200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아봤어요.' },
     { key: 'tamagotchi', label: '다마고치', eyebrow: 'STREAMER TAMAGOTCHI', title: '다마고치', description: '스트리머의 개성을 담은 캐릭터와 원하는 상호작용을 신청해 보세요.' },
@@ -6934,7 +6934,7 @@ function renderVideoLibrarySection(page) {
   headingActions.append(refresh); heading.append(copy, headingActions); section.append(heading);
 
   const description = document.createElement('p'); description.className = 'video-library-description';
-  description.textContent = '스트리머와 관리자가 함께 모은 방송 추천 영상을 둘러보세요.';
+  description.textContent = '스트리머가 라이브에서 자주 시청하는 영상을 모았습니다.';
   section.append(description);
 
   if (state.canManage) {
