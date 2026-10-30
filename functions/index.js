@@ -6570,7 +6570,7 @@ exports.streamerFanPageVideoLibrarySyncRecovery = onSchedule({
 });
 
 exports.streamerFanPageVideoLibraryIncrementalSync = onSchedule({
-  schedule: 'every 6 hours', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
+  schedule: 'every 72 hours', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
 }, async () => {
   const snapshot = await videoLibraryRef('channels').get();
   const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
