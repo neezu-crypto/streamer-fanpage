@@ -5078,7 +5078,8 @@ exports.streamerFanPageViewerStatsExportUsage = onRequest({
   region: 'us-central1',
   memory: '256MiB',
   maxInstances: 1,
-  invoker: 'private',
+  // Keep the private endpoint available to the GitHub Actions exporter after every deploy.
+  invoker: ['fanpage-static-exporter@soop-stock-market.iam.gserviceaccount.com'],
 }, async (request, response) => {
   if (request.method !== 'POST') {
     return response.set('Allow', 'POST').status(405).json({ error: 'POST 요청만 허용합니다.' });
