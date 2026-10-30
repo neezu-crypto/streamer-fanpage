@@ -12,6 +12,7 @@ const { defineSecret } = require('firebase-functions/params');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
+const { planWeFlabUpboImport } = require('./upbo-weflab-import');
 const {
   isPlayedGameId,
   normalizePlayedGameBestRecord,
@@ -3695,6 +3696,48 @@ async function fetchWeFlabRoulette(sourceUrl) {
   return normalizeWeFlabRouletteData({ ...parsed, fetchedAt: Date.now() }, sourceUrl);
 }
 
+async function loadWeFlabRouletteData(streamerId, sourceUrl, forceRefresh = false) {
+  const cacheRef = weflabRouletteCacheRef(streamerId);
+  const cached = normalizeWeFlabRouletteData((await cacheRef.get()).val(), sourceUrl);
+  const cacheAge = cached && cached.fetchedAt ? Math.max(0, Date.now() - cached.fetchedAt) : Infinity;
+  if (cached && !forceRefresh && cacheAge < WEFLAB_ROULETTE_CACHE_TTL_MS) {
+    return { roulette: cached, stale: false, refreshCoolingDown: false };
+  }
+  if (cached && forceRefresh && cacheAge < WEFLAB_ROULETTE_REFRESH_COOLDOWN_MS) {
+    return { roulette: cached, stale: false, refreshCoolingDown: true };
+  }
+
+  const requestKey = `${streamerId}:${sourceUrl}`;
+  const inProgress = weflabRouletteFetchInProgress.get(requestKey);
+  if (inProgress) return await inProgress;
+
+  const task = (async () => {
+    try {
+      const fresh = await fetchWeFlabRoulette(sourceUrl);
+      try {
+        await cacheRef.set({ ...fresh, sourceUrl });
+      } catch (cacheError) {
+        console.warn(`Could not cache WeFlab roulette data for ${streamerId}:`, cacheError);
+      }
+      return { roulette: fresh, stale: false, refreshCoolingDown: false };
+    } catch (error) {
+      if (cached && cached.itemCount > 0) {
+        console.warn(`Serving stale WeFlab roulette cache for ${streamerId}:`, error);
+        return { roulette: cached, stale: true, refreshCoolingDown: false };
+      }
+      if (error instanceof HttpsError) throw error;
+      console.error(`WeFlab roulette fetch failed for ${streamerId}:`, error);
+      throw new HttpsError('unavailable', '위플랩 룰렛 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+    }
+  })();
+  weflabRouletteFetchInProgress.set(requestKey, task);
+  try {
+    return await task;
+  } finally {
+    if (weflabRouletteFetchInProgress.get(requestKey) === task) weflabRouletteFetchInProgress.delete(requestKey);
+  }
+}
+
 function youtubeCacheRef(streamerId) {
   return db.ref(`streamerFanPageYouTubeCache/${streamerId}`);
 }
@@ -4266,47 +4309,8 @@ exports.streamerFanPageRoulette = onCall({ maxInstances: 20 }, async (request) =
       stale: false,
     };
   }
-
-  const cacheRef = weflabRouletteCacheRef(target.streamer.id);
-  const cached = normalizeWeFlabRouletteData((await cacheRef.get()).val(), sourceUrl);
-  const cacheAge = cached && cached.fetchedAt ? Math.max(0, Date.now() - cached.fetchedAt) : Infinity;
   const forceRefresh = request.data && request.data.forceRefresh === true;
-  if (cached && !forceRefresh && cacheAge < WEFLAB_ROULETTE_CACHE_TTL_MS) {
-    return { roulette: cached, stale: false, refreshCoolingDown: false };
-  }
-  if (cached && forceRefresh && cacheAge < WEFLAB_ROULETTE_REFRESH_COOLDOWN_MS) {
-    return { roulette: cached, stale: false, refreshCoolingDown: true };
-  }
-
-  const requestKey = `${target.streamer.id}:${sourceUrl}`;
-  const inProgress = weflabRouletteFetchInProgress.get(requestKey);
-  if (inProgress) return await inProgress;
-
-  const task = (async () => {
-    try {
-      const fresh = await fetchWeFlabRoulette(sourceUrl);
-      try {
-        await cacheRef.set({ ...fresh, sourceUrl });
-      } catch (cacheError) {
-        console.warn(`Could not cache WeFlab roulette data for ${target.streamer.id}:`, cacheError);
-      }
-      return { roulette: fresh, stale: false, refreshCoolingDown: false };
-    } catch (error) {
-      if (cached && cached.itemCount > 0) {
-        console.warn(`Serving stale WeFlab roulette cache for ${target.streamer.id}:`, error);
-        return { roulette: cached, stale: true, refreshCoolingDown: false };
-      }
-      if (error instanceof HttpsError) throw error;
-      console.error(`WeFlab roulette fetch failed for ${target.streamer.id}:`, error);
-      throw new HttpsError('unavailable', '위플랩 룰렛 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
-    }
-  })();
-  weflabRouletteFetchInProgress.set(requestKey, task);
-  try {
-    return await task;
-  } finally {
-    if (weflabRouletteFetchInProgress.get(requestKey) === task) weflabRouletteFetchInProgress.delete(requestKey);
-  }
+  return await loadWeFlabRouletteData(target.streamer.id, sourceUrl, forceRefresh);
 });
 
 exports.streamerFanPageYouTubeVideos = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
@@ -5440,8 +5444,52 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
     return { submitted: true, requestIds, count: requestIds.length };
   }
 
-  if (!canManage && ['saveItem', 'saveItems', 'deleteItem', 'approveRequest', 'deleteRequest', 'saveRecord', 'deleteRecord'].includes(action)) {
+  if (!canManage && ['saveItem', 'saveItems', 'deleteItem', 'importRouletteItems', 'approveRequest', 'deleteRequest', 'saveRecord', 'deleteRecord'].includes(action)) {
     throw new HttpsError('permission-denied', '업보 항목과 신청은 해당 스트리머와 관리자만 관리할 수 있습니다.');
+  }
+
+  if (action === 'importRouletteItems') {
+    const configuredUrl = (await pageRef(target.streamer.id).child('profile/rouletteUrl').get()).val();
+    const sourceUrl = parseWeFlabRouletteUrl(configuredUrl);
+    if (!sourceUrl) {
+      throw new HttpsError('failed-precondition', '스트리머 프로필에 위플랩 공개 룰렛 링크를 먼저 등록해 주세요. 룰렛 링크는 한 개만 사용할 수 있습니다.');
+    }
+    const rouletteResult = await loadWeFlabRouletteData(target.streamer.id, sourceUrl);
+    if (rouletteResult.stale) {
+      throw new HttpsError('unavailable', '위플랩 최신 항목을 확인하지 못해 가져오지 않았어요. 잠시 후 다시 시도해 주세요.');
+    }
+    const rouletteItems = rouletteResult.roulette.groups.flatMap((group) => group.items);
+    let importSummary = null;
+    const transaction = await itemsRef.transaction((current) => {
+      const stored = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
+      const plan = planWeFlabUpboImport(rouletteItems, stored, FANPAGE_UPBO_MAX_ITEMS);
+      importSummary = plan;
+      if (!plan.addedNames.length) return undefined;
+      const now = Date.now();
+      const updated = { ...stored };
+      plan.addedNames.forEach((name) => {
+        let id = randomUUID();
+        while (Object.prototype.hasOwnProperty.call(updated, id)) id = randomUUID();
+        updated[id] = { name, description: '', imageUrl: '', active: true, createdAt: now, updatedAt: now };
+      });
+      return updated;
+    });
+    const currentItems = transaction.snapshot.val() || {};
+    const items = Object.entries(currentItems)
+      .map(([id, value]) => normalizeStoredUpboItem(id, value))
+      .filter(Boolean)
+      .sort((a, b) => Number(b.active) - Number(a.active) || a.createdAt - b.createdAt || a.name.localeCompare(b.name, 'ko'))
+      .slice(0, FANPAGE_UPBO_MAX_ITEMS);
+    return {
+      items,
+      addedCount: importSummary ? importSummary.addedNames.length : 0,
+      duplicateCount: importSummary ? importSummary.duplicateCount : 0,
+      invalidNameCount: importSummary ? importSummary.invalidNameCount : 0,
+      limitSkippedCount: importSummary ? importSummary.limitSkippedCount : 0,
+      sourceCount: importSummary ? importSummary.sourceCount : 0,
+      sourceUpdatedAt: rouletteResult.roulette.sourceUpdatedAt || '',
+      canManage,
+    };
   }
 
   if (action === 'saveItems') {
