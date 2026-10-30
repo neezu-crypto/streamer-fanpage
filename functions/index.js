@@ -3709,17 +3709,11 @@ async function fetchYouTubeJson(resource, parameters, apiKey) {
   return payload;
 }
 
-function isKoreanYouTubeLanguage(value) {
-  return /^ko(?:[-_]|$)/i.test(String(value || '').trim());
-}
-
 function koreanLocalizedYouTubeTitle(snippet) {
   if (!snippet || typeof snippet !== 'object') return '';
-  const isKoreanVideo = isKoreanYouTubeLanguage(snippet.defaultLanguage)
-    || isKoreanYouTubeLanguage(snippet.defaultAudioLanguage);
   const localizedTitle = snippet.localized && typeof snippet.localized.title === 'string'
     ? snippet.localized.title.trim() : '';
-  return isKoreanVideo ? localizedTitle.slice(0, 300) : '';
+  return localizedTitle.slice(0, 300);
 }
 
 function normalizeYouTubeVideo(item, options = {}) {
