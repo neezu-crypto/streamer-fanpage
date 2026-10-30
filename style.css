@@ -1368,7 +1368,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 @media(max-width:720px){.registered-section{margin-top:28px}.registered-section-actions{gap:7px}.registered-streamers-toggle{min-height:31px;padding:5px 9px;font-size:9px}}
 
 /* Fanpage content is grouped into four focused views. */
-#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 #fanPageView .fanpage-tab-button{min-width:0;min-height:44px;padding:8px 12px;border:1px solid transparent;border-radius:13px;background:transparent;color:#c7c0cf;font:700 13px var(--font);cursor:pointer;transition:background .16s,border-color .16s,color .16s,box-shadow .16s}
 #fanPageView .fanpage-tab-button:hover{border-color:#ffffff24;background:#ffffff0b;color:var(--text)}
 #fanPageView .fanpage-tab-button[aria-selected=true]{border-color:#ffffff26;background:linear-gradient(180deg,#ffffff18,#ffffff0b);color:var(--text);box-shadow:inset 0 1px 0 #ffffff22}
@@ -1381,14 +1381,83 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 #fanPageView .fanpage-tab-panel-heading>p:last-child{margin:6px 0 0;color:#aaa2b1;font-size:12px;line-height:1.65}
 #fanPageView .fanpage-tab-panel-grid{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:18px}
 #fanPageView .fanpage-tab-panel-grid>*{min-width:0;margin-top:0;scroll-margin-top:82px}
-#fanPageView.fanpage-layout-2 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section){grid-column:1/-1}
+#fanPageView.fanpage-layout-2 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section,.video-library-section){grid-column:1/-1}
 @media(max-width:560px){
   #fanPageView .fanpage-tab-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:14px 0 18px;padding:4px;border-radius:15px}
   #fanPageView .fanpage-tab-button{min-height:42px;padding:7px 3px;border-radius:11px;font-size:clamp(10px,2.8vw,12px);white-space:nowrap}
   #fanPageView .fanpage-tab-panel-heading{margin-bottom:12px}
   #fanPageView .fanpage-tab-panel-heading>p:last-child{font-size:11px}
 }
+@media(min-width:561px) and (max-width:900px){#fanPageView .fanpage-tab-nav{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:900px){#fanPageView .fanpage-tab-nav{padding-right:56px}}
+
+#fanPageView .video-library-section{display:grid;gap:12px;min-width:0}
+#fanPageView .video-library-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#fanPageView .video-library-heading h2{display:inline-block;margin:0 8px 0 0;font:22px/1.25 var(--display)}
+#fanPageView .video-library-heading .eyebrow{margin:0 0 5px;font-size:9px;letter-spacing:.2em}
+#fanPageView .video-library-count{color:var(--muted);font-size:11px}
+#fanPageView .video-library-heading-actions{display:flex;align-items:center;gap:8px}
+#fanPageView .video-library-description{margin:0;color:var(--muted);font-size:12px;line-height:1.6}
+#fanPageView :is(.video-library-category-manager,.video-library-category-form,.video-library-add-form,.video-library-channel-form,.video-library-edit-form){display:flex;align-items:center;gap:8px;min-width:0}
+#fanPageView .video-library-category-form input,#fanPageView .video-library-add-form input,#fanPageView .video-library-add-form select,#fanPageView .video-library-channel-form input,#fanPageView .video-library-channel-form select,#fanPageView .video-library-edit-form input,#fanPageView .video-library-edit-form select,#fanPageView .video-library-search{min-width:0;min-height:40px;padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:#100f16;color:var(--text);font:12px var(--font)}
+#fanPageView .video-library-category-form input{flex:1}
+#fanPageView .video-library-add-form input,#fanPageView .video-library-channel-form input{flex:1}
+#fanPageView .video-library-add-form select,#fanPageView .video-library-channel-form select,#fanPageView .video-library-edit-form select{max-width:220px}
+#fanPageView .video-library-categories{display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0}
+#fanPageView .video-library-category-item{display:flex;align-items:center;gap:5px;padding:4px 6px;border:1px solid var(--line);border-radius:999px;background:#ffffff05}
+#fanPageView .video-library-category{min-height:34px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:#ffffff07;color:var(--muted);font:12px var(--font)}
+#fanPageView .video-library-category.is-active{border-color:#f58cac77;background:#f58cac18;color:var(--text)}
+#fanPageView .video-library-category-item>.video-library-category{min-height:28px;padding:4px 9px;border-color:transparent;background:transparent}
+#fanPageView .video-library-category-actions{display:inline-flex;gap:2px}
+#fanPageView .video-library-icon-action{min-width:24px;min-height:24px;padding:2px 4px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:10px var(--font)}
+#fanPageView .video-library-icon-action:hover:not(:disabled){background:#f58cac17;color:var(--text)}
+#fanPageView .video-library-icon-action:disabled{opacity:.35;cursor:default}
+#fanPageView .video-library-search{width:min(360px,100%);background:#17151e}
+#fanPageView .video-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;min-width:0}
+#fanPageView .video-library-card{min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:15px;background:#ffffff06}
+#fanPageView .video-library-play{display:block;width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left}
+#fanPageView .video-library-thumbnail-frame{position:relative;display:grid;place-items:center;aspect-ratio:16/9;overflow:hidden;background:#24212d}
+#fanPageView .video-library-thumbnail-frame img{display:block;width:100%;height:100%;object-fit:cover}
+#fanPageView .video-library-thumbnail-frame.is-missing{background:linear-gradient(135deg,#262330,#181720)}
+#fanPageView .video-library-play-icon{position:absolute;display:grid;place-items:center;width:42px;height:30px;border-radius:10px;background:#ed1c24dd;color:white;font-size:15px;opacity:.95}
+#fanPageView .video-library-card-body{display:grid;gap:5px;padding:11px 12px 12px;min-width:0}
+#fanPageView .video-library-source{overflow:hidden;color:var(--pink);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+#fanPageView .video-library-card h3{display:-webkit-box;overflow:hidden;margin:0;color:var(--text);font:14px/1.45 var(--font);-webkit-box-orient:vertical;-webkit-line-clamp:2}
+#fanPageView .video-library-card-body small{color:var(--muted);font-size:10px}
+#fanPageView .video-library-card-actions{display:flex;gap:6px;padding:0 10px 10px}
+#fanPageView .video-library-card-actions .button{min-height:32px;padding:6px 10px;font-size:10px}
+#fanPageView .video-library-edit-form{display:grid;grid-template-columns:minmax(0,1fr);padding:0 10px 10px}
+#fanPageView .video-library-edit-form select{width:100%;max-width:none}
+#fanPageView .video-library-load-more{justify-self:center;min-width:170px}
+#fanPageView .video-library-state{margin:0;padding:22px 14px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);font-size:12px;text-align:center}
+#fanPageView .video-library-state.is-error,#fanPageView .video-library-inline-error{color:#ffadb5}
+#fanPageView .video-library-state.is-error{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+#fanPageView .video-library-inline-error{margin:0;font-size:11px}
+#fanPageView .video-library-admin-tools{padding:10px 12px;border:1px solid var(--line);border-radius:13px;background:#ffffff04}
+#fanPageView .video-library-admin-tools summary{color:var(--muted);font-size:11px;cursor:pointer}
+#fanPageView .video-library-channel-form{margin-top:10px;flex-wrap:wrap}
+#fanPageView .video-library-channel-list{display:grid;gap:8px;margin-top:10px}
+#fanPageView .video-library-channel-card{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px 10px;padding:10px;border:1px solid var(--line);border-radius:11px;background:#ffffff04}
+#fanPageView .video-library-channel-card>a{min-width:0;overflow:hidden;color:var(--text);font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+#fanPageView .video-library-channel-card progress{grid-column:1/-1;width:100%;height:7px;accent-color:var(--pink)}
+#fanPageView .video-library-channel-card small{grid-column:1/-1;color:var(--muted);font-size:10px}
+#fanPageView .video-library-channel-card select{grid-column:1/-1;min-height:34px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;background:#100f16;color:var(--text);font:11px var(--font)}
+#fanPageView .video-library-channel-card .button{min-height:32px;padding:6px 9px;font-size:10px}
+@media(max-width:560px){
+  #fanPageView .video-library-heading{align-items:flex-start}
+  #fanPageView .video-library-heading h2{font-size:20px}
+  #fanPageView .video-library-category-form,#fanPageView .video-library-add-form,#fanPageView .video-library-channel-form{display:grid;grid-template-columns:minmax(0,1fr)}
+  #fanPageView .video-library-add-form select,#fanPageView .video-library-channel-form select{max-width:none;width:100%}
+  #fanPageView .video-library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  #fanPageView .video-library-card{border-radius:12px}
+  #fanPageView .video-library-card-body{padding:8px}
+  #fanPageView .video-library-card h3{font-size:12px}
+  #fanPageView .video-library-card-actions{padding:0 8px 8px}
+  #fanPageView .video-library-card-actions .button{flex:1;min-width:0;padding:6px 5px}
+  #fanPageView .video-library-channel-card{grid-template-columns:minmax(0,1fr) auto}
+  #fanPageView .video-library-channel-card .video-library-channel-delete{grid-column:1/-1}
+  #fanPageView .video-library-channel-card progress,#fanPageView .video-library-channel-card small,#fanPageView .video-library-channel-card select{grid-column:1/-1}
+}
 
 /* Streamer-specific Tamagotchi design applications */
 #fanPageView .tamagotchi-section{grid-column:1/-1;display:grid;gap:9px}
