@@ -8225,13 +8225,14 @@ function renderWeeklyScheduleDialog(page) {
   const header = document.createElement('div'); header.className = 'profile-editor-heading';
   const headingCopy = document.createElement('div');
   const title = document.createElement('h2'); title.id = 'weeklyScheduleGraphicTitle'; title.textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
+  title.className = 'weekly-schedule-sr-title';
   const intro = document.createElement('p'); intro.className = 'weekly-schedule-intro';
   intro.textContent = '갤러리 사진과 요일별 방송 내용을 넣고 공유용 이미지를 저장하세요.';
   const modalTitleRow = document.createElement('div'); modalTitleRow.className = 'weekly-schedule-modal-title-row';
   const previousWeek = document.createElement('button'); previousWeek.type = 'button'; previousWeek.className = 'weekly-schedule-arrow'; previousWeek.setAttribute('aria-label', '이전 주 일정'); previousWeek.textContent = '‹';
   const nextWeek = document.createElement('button'); nextWeek.type = 'button'; nextWeek.className = 'weekly-schedule-arrow'; nextWeek.setAttribute('aria-label', '다음 주 일정'); nextWeek.textContent = '›';
-  modalTitleRow.append(previousWeek, title, nextWeek);
-  headingCopy.append(modalTitleRow, intro);
+  modalTitleRow.append(previousWeek, title, nextWeek); modalTitleRow.hidden = true;
+  headingCopy.append(modalTitleRow, title, intro);
   const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
   close.setAttribute('aria-label', '방송표 편집 닫기'); close.textContent = '×';
   header.append(headingCopy, close);
@@ -8256,18 +8257,19 @@ function renderWeeklyScheduleDialog(page) {
   const linkedEventsHeading = document.createElement('strong'); linkedEventsHeading.textContent = '자동 연동 일정';
   const linkedEventsList = document.createElement('div'); linkedEventsList.className = 'weekly-schedule-linked-list';
   linkedEventsPanel.append(linkedEventsHeading, linkedEventsList);
+  linkedEventsPanel.hidden = true;
 
-  const imageTools = document.createElement('div'); imageTools.className = 'weekly-schedule-image-tools';
+  const imageTools = document.createElement('div'); imageTools.className = 'weekly-schedule-image-tools'; imageTools.hidden = true;
   const imageHeading = document.createElement('div'); imageHeading.className = 'weekly-schedule-image-heading';
-  const imageLabel = document.createElement('strong'); imageLabel.textContent = '왼쪽 아바타 이미지';
-  const imageNote = document.createElement('small'); imageNote.textContent = '갤러리에서 선택하거나 이 화면에서 갤러리에 등록할 수 있어요.';
+  const imageLabel = document.createElement('strong'); imageLabel.textContent = '갤러리 이미지';
+  const imageNote = document.createElement('small'); imageNote.textContent = '이미지를 선택하면 방송표에 바로 적용돼요.';
   imageHeading.append(imageLabel, imageNote);
   const imageActions = document.createElement('div'); imageActions.className = 'weekly-schedule-image-actions';
   const chooseImage = document.createElement('button'); chooseImage.type = 'button'; chooseImage.className = 'button'; chooseImage.textContent = '갤러리에서 선택';
-  const uploadImage = document.createElement('button'); uploadImage.type = 'button'; uploadImage.className = 'button'; uploadImage.textContent = '갤러리에 이미지 등록';
-  const clearImage = document.createElement('button'); clearImage.type = 'button'; clearImage.className = 'button weekly-schedule-clear-image'; clearImage.textContent = '이미지 제거';
+  const uploadImage = document.createElement('button'); uploadImage.type = 'button'; uploadImage.className = 'button'; uploadImage.textContent = '새 이미지 등록';
+  const clearImage = document.createElement('button'); clearImage.type = 'button'; clearImage.className = 'button weekly-schedule-clear-image'; clearImage.textContent = '선택 이미지 제거';
   imageActions.append(chooseImage, uploadImage, clearImage);
-  const selectedImageNote = document.createElement('p'); selectedImageNote.className = 'weekly-schedule-selected-image'; selectedImageNote.textContent = '아직 사진을 선택하지 않았어요.';
+  const selectedImageNote = document.createElement('p'); selectedImageNote.className = 'weekly-schedule-selected-image'; selectedImageNote.textContent = '왼쪽 사진 영역을 눌러 선택해 주세요.';
 
   const galleryPanel = document.createElement('div'); galleryPanel.className = 'weekly-schedule-gallery-picker'; galleryPanel.hidden = true;
   const galleryStatus = document.createElement('p'); galleryStatus.className = 'weekly-schedule-gallery-status'; galleryStatus.setAttribute('role', 'status');
@@ -8302,29 +8304,48 @@ function renderWeeklyScheduleDialog(page) {
   const dayInputs = [];
   weekdays.forEach((weekday, index) => {
     const dayCard = document.createElement('section'); dayCard.className = 'weekly-schedule-day-edit';
-    const dayLabel = document.createElement('strong'); dayLabel.className = 'weekly-schedule-day-label'; dayLabel.textContent = `${weekday}요일`;
+    const rectangles = index < 4
+      ? { x: 585 + index * 262, y: 171, w: 242, h: 323 }
+      : { x: 588 + (index - 4) * 347, y: 525, w: 317, h: 331 };
+    dayCard.style.left = `${rectangles.x / 1672 * 100}%`;
+    dayCard.style.top = `${rectangles.y / 941 * 100}%`;
+    dayCard.style.width = `${rectangles.w / 1672 * 100}%`;
+    dayCard.style.height = `${rectangles.h / 941 * 100}%`;
     const offlineLabel = document.createElement('label'); offlineLabel.className = 'weekly-schedule-offline-label';
     const offline = document.createElement('input'); offline.type = 'checkbox'; offline.name = `offline-${index}`;
     offlineLabel.append(offline, document.createTextNode('휴방'));
-    const timeLabel = document.createElement('label'); timeLabel.className = 'profile-editor-field'; timeLabel.textContent = '방송 시작 시간';
-    const time = document.createElement('input'); time.type = 'text'; time.inputMode = 'numeric'; time.placeholder = '7 또는 19:30'; time.maxLength = 5; time.name = `time-${index}`; timeLabel.append(time);
-    const textLabel = document.createElement('label'); textLabel.className = 'profile-editor-field'; textLabel.textContent = '방송 내용';
-    const text = document.createElement('input'); text.type = 'text'; text.name = `text-${index}`; text.maxLength = 60;
-    text.placeholder = '예: 저녁 합방 · 발로란트'; text.maxLength = 100; textLabel.append(text);
-    offline.addEventListener('change', () => { time.disabled = offline.checked; text.disabled = offline.checked; markWeeklyDirty(); });
-    time.addEventListener('input', markWeeklyDirty); text.addEventListener('input', markWeeklyDirty);
-    dayCard.append(dayLabel, offlineLabel, timeLabel, textLabel); dayGrid.append(dayCard);
-    dayInputs.push({ offline, time, text });
+    const timeLabel = document.createElement('label'); timeLabel.className = 'weekly-schedule-stage-time-field';
+    const time = document.createElement('input'); time.type = 'text'; time.inputMode = 'numeric'; time.placeholder = '시작 시간'; time.maxLength = 5; time.name = `time-${index}`; time.setAttribute('aria-label', `${weekday}요일 방송 시작 시간`); timeLabel.append(time);
+    const textLabel = document.createElement('label'); textLabel.className = 'weekly-schedule-stage-content-field';
+    const text = document.createElement('div'); text.className = 'weekly-schedule-stage-content-input'; text.contentEditable = 'true'; text.setAttribute('role', 'textbox');
+    text.setAttribute('aria-multiline', 'true'); text.setAttribute('aria-label', `${weekday}요일 방송 콘텐츠`); text.dataset.placeholder = '방송 콘텐츠'; text.spellcheck = false; textLabel.append(text);
+    const linkedDisplay = document.createElement('div'); linkedDisplay.className = 'weekly-schedule-stage-linked'; linkedDisplay.setAttribute('aria-label', `${weekday}요일 자동 연동 일정`);
+    offline.addEventListener('change', () => { time.disabled = offline.checked; text.contentEditable = offline.checked ? 'false' : 'true'; markWeeklyDirty(); });
+    time.addEventListener('input', markWeeklyDirty);
+    time.addEventListener('blur', () => {
+      const normalized = normalizeGraphicTime(time.value);
+      if (normalized) time.value = normalized;
+      markWeeklyDirty();
+    });
+    text.addEventListener('input', () => {
+      if (text.innerText.length > 100) text.innerText = text.innerText.slice(0, 100);
+      markWeeklyDirty();
+    });
+    dayCard.append(offlineLabel, timeLabel, textLabel, linkedDisplay); dayGrid.append(dayCard);
+    dayInputs.push({ offline, time, text, linkedDisplay });
   });
 
   const previewHeading = document.createElement('div'); previewHeading.className = 'weekly-schedule-preview-heading';
   const previewTitle = document.createElement('h3'); previewTitle.textContent = '미리보기';
   const previewNote = document.createElement('small'); previewNote.textContent = '템플릿 이미지는 새로 제작한 팬페이지 전용 배경입니다.';
   previewHeading.append(previewTitle, previewNote);
-  const previewFrame = document.createElement('div'); previewFrame.className = 'weekly-schedule-preview-frame';
+  const previewFrame = document.createElement('div'); previewFrame.className = 'weekly-schedule-preview-frame weekly-schedule-template-stage';
   const previewCanvas = document.createElement('canvas'); previewCanvas.className = 'weekly-schedule-preview-canvas';
   previewCanvas.width = 1672; previewCanvas.height = 941; previewCanvas.setAttribute('aria-label', '주간 방송표 이미지 미리보기');
-  previewFrame.append(previewCanvas);
+  const avatarHitArea = document.createElement('button'); avatarHitArea.type = 'button'; avatarHitArea.className = 'weekly-schedule-avatar-hit-area';
+  avatarHitArea.setAttribute('aria-label', '템플릿 이미지 칸에서 갤러리 사진 선택 또는 등록');
+  previousWeek.classList.add('weekly-schedule-stage-previous'); nextWeek.classList.add('weekly-schedule-stage-next');
+  previewFrame.append(previewCanvas, previousWeek, nextWeek, dayGrid, avatarHitArea, imageTools);
 
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
   const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요. 기존 연동 일정은 수정되지 않습니다.';
@@ -8333,7 +8354,8 @@ function renderWeeklyScheduleDialog(page) {
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '닫기';
   const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
   footerActions.append(cancel, download); footer.append(saveHint, saveStatus, footerActions);
-  form.append(meta, weekTools, linkedEventsPanel, imageTools, dayHeading, dayGrid, previewHeading, previewFrame, footer);
+  dayHeading.hidden = true; previewHeading.hidden = true;
+  form.append(meta, weekTools, previewFrame, linkedEventsPanel, footer);
   card.append(header, form); dialog.append(card);
 
   const templateImage = new Image();
@@ -8377,7 +8399,7 @@ function renderWeeklyScheduleDialog(page) {
     ctx.save(); ctx.beginPath(); ctx.rect(x, y, width, height); ctx.clip();
     ctx.drawImage(image, sx, sy, sw, sh, x, y, width, height); ctx.restore();
   }
-  function drawGraphicDay(day, index, rect) {
+  function drawGraphicDay(day, index, rect, includeEditableValues = true) {
     const { x, y, w, h } = rect;
     const input = dayInputs[index];
     const isOffline = input.offline.checked;
@@ -8385,18 +8407,20 @@ function renderWeeklyScheduleDialog(page) {
     ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const linkedEvents = state.linkedEvents[index] || [];
     const linkedHoliday = linkedEvents.some((event) => event.typeName === '휴방');
-    const time = isOffline || linkedHoliday ? '휴방' : (normalizeGraphicTime(input.time.value) || linkedEvents.find((event) => event.time)?.time || '');
+    const time = includeEditableValues
+      ? (isOffline || linkedHoliday ? '휴방' : (normalizeGraphicTime(input.time.value) || linkedEvents.find((event) => event.time)?.time || ''))
+      : '';
     ctx.fillStyle = '#b94e70'; ctx.font = '800 29px Pretendard, "Noto Sans KR", sans-serif';
     if (time) ctx.fillText(time, x + w / 2, y + 42, w - 28);
     const lines = [];
-    if (input.text.value.trim() && !isOffline) lines.push(input.text.value.trim());
-    linkedEvents.forEach((event) => {
+    if (includeEditableValues && input.text.innerText.trim() && !isOffline) lines.push(input.text.innerText.trim());
+    if (includeEditableValues) linkedEvents.forEach((event) => {
       const linked = `${event.time && event.time !== time ? `${event.time} ` : ''}${event.title || event.typeName || '연동 일정'}`.trim();
       if (linked) lines.push(linked);
     });
-    if (isOffline && !lines.length) lines.push('방송 일정이 없습니다');
+    if (includeEditableValues && isOffline && !lines.length) lines.push('방송 일정이 없습니다');
     ctx.fillStyle = '#dd7897'; ctx.font = `700 ${w < 260 ? 24 : 27}px Pretendard, "Noto Sans KR", sans-serif`;
-    const shown = lines.slice(0, 4); const lineHeight = w < 260 ? 34 : 38;
+    const shown = lines.flatMap((line) => wrapGraphicText(line, w - 34, 3)).slice(0, 4); const lineHeight = w < 260 ? 34 : 38;
     const startY = y + h / 2 + 16 - ((shown.length - 1) * lineHeight) / 2;
     shown.forEach((line, lineIndex) => {
       let text = line; while (ctx.measureText(text).width > w - 34 && text.length > 3) text = `${text.slice(0, -2)}…`;
@@ -8406,7 +8430,7 @@ function renderWeeklyScheduleDialog(page) {
     ctx.fillText(`${dayName}요일`, x + w / 2, y + h - 28);
     ctx.restore();
   }
-  async function drawPreview() {
+  async function drawPreview(includeEditableValues = false) {
     const request = ++drawRequest;
     if (!ctx) return;
     if (!templateImage.complete || !templateImage.naturalWidth) {
@@ -8437,9 +8461,9 @@ function renderWeeklyScheduleDialog(page) {
     ctx.restore();
     const topCards = Array.from({ length: 4 }, (_, index) => ({ x: 585 + index * 262, y: 171, w: 242, h: 323 }));
     const bottomCards = Array.from({ length: 3 }, (_, index) => ({ x: 588 + index * 347, y: 525, w: 317, h: 331 }));
-    [...topCards, ...bottomCards].forEach((rect, index) => drawGraphicDay(dayInputs[index], index, rect));
-    selectedImageNote.textContent = selected ? `선택됨 · ${selected.categoryLabel || '갤러리 이미지'}` : '아직 사진을 선택하지 않았어요.';
-    clearImage.disabled = !selected;
+    [...topCards, ...bottomCards].forEach((rect, index) => drawGraphicDay(dayInputs[index], index, rect, includeEditableValues));
+    selectedImageNote.textContent = selected ? `적용 중 · ${selected.categoryLabel || '갤러리 이미지'}` : '사진을 고르지 않으면 이 칸은 비워 둡니다.';
+    clearImage.disabled = !selected; clearImage.hidden = !selected;
   }
 
   async function loadScheduleGallery(append = false) {
@@ -8480,7 +8504,7 @@ function renderWeeklyScheduleDialog(page) {
       state.localObjectUrl = '';
       state.selectedImage = { ...item, image };
       state.avatarImageId = item.id;
-      state.galleryOpen = false; galleryPanel.hidden = true; uploadPanel.hidden = true;
+      state.galleryOpen = false; galleryPanel.hidden = true; uploadPanel.hidden = true; imageTools.hidden = true;
       if (persist) markWeeklyDirty(); else drawPreview();
     } catch (error) {
       galleryStatus.textContent = error.message || '이미지를 선택하지 못했어요.';
@@ -8537,7 +8561,7 @@ function renderWeeklyScheduleDialog(page) {
       state.avatarImageId = registered.imageId;
       state.galleryItems = [{ ...state.selectedImage, thumbUrl: registered.thumbUrl }, ...state.galleryItems.filter((item) => item.id !== registered.imageId)];
       state.galleryLoaded = true; state.galleryOpen = false; state.uploadOpen = false;
-      galleryPanel.hidden = true; uploadPanel.hidden = true; fileInput.value = '';
+      galleryPanel.hidden = true; uploadPanel.hidden = true; imageTools.hidden = true; fileInput.value = '';
       uploadStatus.textContent = '갤러리 등록을 마치고 방송표에 적용했어요.';
       markWeeklyDirty(); showToast('갤러리에 이미지를 등록하고 방송표에 넣었어요.');
     } catch (error) {
@@ -8556,8 +8580,13 @@ function renderWeeklyScheduleDialog(page) {
       const entry = state.entries[index] || {};
       input.offline.checked = entry.offline === true;
       input.time.value = entry.time || '';
-      input.text.value = entry.content || '';
-      input.time.disabled = input.offline.checked; input.text.disabled = input.offline.checked;
+      input.text.innerText = entry.content || '';
+      input.time.disabled = input.offline.checked; input.text.contentEditable = input.offline.checked ? 'false' : 'true';
+      const events = (state.linkedEvents[index] || []).map((event) => `${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '일정'}`.trim()).filter(Boolean);
+      input.linkedDisplay.replaceChildren();
+      events.slice(0, 3).forEach((eventText) => {
+        const line = document.createElement('span'); line.textContent = eventText; input.linkedDisplay.append(line);
+      });
     });
     linkedEventsList.replaceChildren();
     let linkedCount = 0;
@@ -8576,14 +8605,16 @@ function renderWeeklyScheduleDialog(page) {
     if (state.avatarImageId && state.savedAvatar && (!state.selectedImage || state.selectedImage.id !== state.avatarImageId)) {
       void selectScheduleGalleryImage({ id: state.avatarImageId, thumbUrl: state.savedAvatar.thumbUrl, imageUrl: state.savedAvatar.imageUrl, categoryLabel: '저장된 갤러리 이미지' }, false);
     }
-    drawPreview();
+    imageTools.hidden = true;
+    avatarHitArea.hidden = false;
+    drawPreview(false);
   }
 
   function collectWeeklyEntries() {
     return dayInputs.map(({ offline, time, text }) => {
       const normalized = offline.checked ? '' : normalizeGraphicTime(time.value);
       if (normalized === null) throw new Error('시간은 0~23 또는 7:30 형식으로 입력해 주세요.');
-      return { time: normalized || '', content: offline.checked ? '' : text.value.trim().slice(0, 100), offline: offline.checked };
+      return { time: normalized || '', content: offline.checked ? '' : text.innerText.trim().slice(0, 100), offline: offline.checked };
     });
   }
 
@@ -8648,13 +8679,22 @@ function renderWeeklyScheduleDialog(page) {
     else if (state.galleryOpen) renderScheduleGalleryItems();
     if (state.galleryOpen) { state.uploadOpen = false; uploadPanel.hidden = true; }
   });
+  avatarHitArea.addEventListener('click', () => {
+    imageTools.hidden = !imageTools.hidden;
+    if (!imageTools.hidden) {
+      state.galleryOpen = false; state.uploadOpen = false;
+      galleryPanel.hidden = true; uploadPanel.hidden = true;
+      if (state.selectedImage || state.savedAvatar) clearImage.hidden = false;
+    }
+  });
   uploadImage.addEventListener('click', () => {
     state.uploadOpen = !state.uploadOpen; uploadPanel.hidden = !state.uploadOpen;
     if (state.uploadOpen) { state.galleryOpen = false; galleryPanel.hidden = true; }
   });
   clearImage.addEventListener('click', () => {
     if (state.localObjectUrl) URL.revokeObjectURL(state.localObjectUrl);
-    state.localObjectUrl = ''; state.selectedImage = null; state.avatarImageId = ''; state.savedAvatar = null; markWeeklyDirty();
+    state.localObjectUrl = ''; state.selectedImage = null; state.avatarImageId = ''; state.savedAvatar = null;
+    imageTools.hidden = true; markWeeklyDirty();
   });
   galleryMore.addEventListener('click', () => loadScheduleGallery(true));
   uploadSubmit.addEventListener('click', uploadScheduleGalleryImage);
@@ -8667,7 +8707,7 @@ function renderWeeklyScheduleDialog(page) {
   download.addEventListener('click', () => {
     if (download.disabled) return;
     download.disabled = true; download.textContent = '이미지 준비 중…';
-    saveCurrentWeek().then((saved) => { if (!saved) throw new Error('저장 오류를 먼저 해결해 주세요.'); return drawPreview(); })
+    saveCurrentWeek().then((saved) => { if (!saved) throw new Error('저장 오류를 먼저 해결해 주세요.'); return drawPreview(true); })
       .then(() => new Promise((resolve, reject) => previewCanvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('PNG 이미지를 만들지 못했어요.')), 'image/png')))
       .then((blob) => {
         const url = URL.createObjectURL(blob); const link = document.createElement('a');
@@ -8676,7 +8716,7 @@ function renderWeeklyScheduleDialog(page) {
         document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
         showToast('주간 방송표 PNG를 저장했어요.');
       }).catch((error) => showToast(error.message || 'PNG 저장에 실패했어요.'))
-      .finally(() => { download.disabled = false; download.textContent = 'PNG 이미지 저장'; });
+      .finally(() => { void drawPreview(false); download.disabled = false; download.textContent = 'PNG 이미지 저장'; });
   });
   dialog.addEventListener('close', () => { state.weekStart = weekInput.value || state.weekStart; });
   dialog._syncWeeklyFields = syncWeeklyFields;
