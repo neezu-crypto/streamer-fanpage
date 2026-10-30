@@ -56,6 +56,16 @@ const {
   isAdminStatsSnapshotStale,
   validateAdminStatsSnapshot,
 } = require('./admin-stats-snapshot');
+const {
+  VIDEO_LIBRARY_CATEGORY_ID_PATTERN,
+  VIDEO_LIBRARY_CHANNEL_ID_PATTERN,
+  VIDEO_LIBRARY_ITEM_ID_PATTERN,
+  VIDEO_LIBRARY_TITLE_MAX_LENGTH,
+  normalizeVideoLibraryCategory,
+  normalizeVideoLibraryCursor,
+  normalizeVideoLibraryItem,
+  paginateVideoLibraryEntries,
+} = require('./video-library');
 
 initializeApp();
 const db = getDatabase();
@@ -109,6 +119,14 @@ const FANPAGE_PLAYED_GAMES_MAX_ITEMS = 100;
 const FANPAGE_PLAYED_GAME_VODS_MAX_ITEMS = 20;
 const FANPAGE_MEMORY_MOMENTS_MAX_ITEMS = 50;
 const FANPAGE_MEMORY_MOMENT_TITLE_MAX_LENGTH = 80;
+const VIDEO_LIBRARY_ROOT = 'streamerFanPageVideoLibrary';
+const VIDEO_LIBRARY_PAGE_SIZE = 24;
+const VIDEO_LIBRARY_MAX_CATEGORIES = 40;
+const VIDEO_LIBRARY_MAX_MANUAL_ITEMS = 3000;
+const VIDEO_LIBRARY_MAX_CHANNELS = 100;
+const VIDEO_LIBRARY_CHANNEL_PAGE_SIZE = 50;
+const VIDEO_LIBRARY_SYNC_BATCH_SIZE = 50;
+const VIDEO_LIBRARY_CATEGORY_NAME_MAX_LENGTH = 32;
 const FANPAGE_TAMAGOTCHI_MAX_APPLICATIONS_PER_STREAMER = 20;
 const FANPAGE_TAMAGOTCHI_INTERACTIONS = new Set(['pet', 'feed', 'play', 'talk', 'live', 'idle', 'sound']);
 const FANPAGE_ROLLING_PAPER_MAX_ITEMS = 300;
@@ -3004,6 +3022,26 @@ function songbookRef(streamerId) {
   return db.ref(`streamerFanPageSongbooks/${streamerId}`);
 }
 
+function videoLibraryRef(path = '') {
+  return db.ref(path ? `${VIDEO_LIBRARY_ROOT}/${path}` : VIDEO_LIBRARY_ROOT);
+}
+
+function videoLibraryIndexRef(categoryId = '') {
+  return videoLibraryRef(categoryId ? `indexes/categories/${categoryId}` : 'indexes/all');
+}
+
+function videoLibraryManualVideoRef(itemId) {
+  return videoLibraryRef(`manualVideos/${itemId}`);
+}
+
+function videoLibraryChannelRef(channelId) {
+  return videoLibraryRef(`channels/${channelId}`);
+}
+
+function videoLibraryImportVideosRef(channelId, syncId) {
+  return videoLibraryRef(`imports/${channelId}/${syncId}/videos`);
+}
+
 function normalizeSongbookEntries(value) {
   const entries = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return Object.entries(entries)
@@ -3735,6 +3773,121 @@ async function fetchYouTubeUploads(channelUrl, apiKey) {
     items,
     fetchedAt: Date.now(),
   };
+}
+
+async function resolveVideoLibraryYouTubeChannel(channelUrl, apiKey) {
+  const parsed = parseYouTubeChannelUrl(channelUrl);
+  if (!parsed) throw new HttpsError('invalid-argument', 'YouTube 채널 링크를 확인해 주세요.');
+  const channelFilter = parsed.type === 'handle'
+    ? { forHandle: parsed.value }
+    : parsed.type === 'username' ? { forUsername: parsed.value } : { id: parsed.value };
+  const response = await fetchYouTubeJson('channels', {
+    part: 'snippet,contentDetails,statistics',
+    ...channelFilter,
+  }, apiKey);
+  const channel = Array.isArray(response.items) ? response.items[0] : null;
+  const channelId = String(channel && channel.id || '');
+  const uploadsPlaylistId = String(channel && channel.contentDetails
+    && channel.contentDetails.relatedPlaylists && channel.contentDetails.relatedPlaylists.uploads || '');
+  if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(channelId) || !uploadsPlaylistId) {
+    throw new HttpsError('not-found', 'YouTube 채널을 찾을 수 없어요. 링크를 확인해 주세요.');
+  }
+  const thumbnails = channel.snippet && channel.snippet.thumbnails || {};
+  const thumbnail = thumbnails.high || thumbnails.medium || thumbnails.default;
+  const thumbnailUrl = cleanHttpsImageUrl(thumbnail && thumbnail.url || '');
+  return {
+    channelId,
+    channelUrl: `https://www.youtube.com/channel/${channelId}`,
+    uploadsPlaylistId,
+    channelTitle: String(channel.snippet && channel.snippet.title || '').trim().slice(0, 100),
+    thumbnailUrl,
+    totalCount: Math.max(0, Math.floor(Number(channel.statistics && channel.statistics.videoCount) || 0)),
+  };
+}
+
+async function fetchVideoLibraryYouTubePage(uploadsPlaylistId, apiKey, pageToken = '') {
+  const response = await fetchYouTubeJson('playlistItems', {
+    part: 'snippet,contentDetails',
+    playlistId: uploadsPlaylistId,
+    maxResults: VIDEO_LIBRARY_CHANNEL_PAGE_SIZE,
+    pageToken,
+  }, apiKey);
+  const items = Array.isArray(response.items) ? response.items.map(normalizeYouTubeVideo).filter(Boolean) : [];
+  return {
+    items,
+    nextPageToken: typeof response.nextPageToken === 'string' ? response.nextPageToken : '',
+    totalCount: Math.max(items.length, Math.floor(Number(response.pageInfo && response.pageInfo.totalResults) || 0)),
+  };
+}
+
+function videoLibraryChannelPublic(channelId, value) {
+  if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(String(channelId || '')) || !value || typeof value !== 'object') return null;
+  const categoryId = VIDEO_LIBRARY_CATEGORY_ID_PATTERN.test(String(value.categoryId || '')) ? value.categoryId : '';
+  return {
+    id: channelId,
+    channelTitle: String(value.channelTitle || '').slice(0, 100),
+    channelUrl: `https://www.youtube.com/channel/${channelId}`,
+    thumbnailUrl: cleanHttpsImageUrl(value.thumbnailUrl || ''),
+    categoryId,
+    videoCount: Math.max(0, Math.floor(Number(value.totalCount) || 0)),
+    importedCount: Math.max(0, Math.floor(Number(value.importedCount) || 0)),
+    syncStatus: ['syncing', 'ready', 'error'].includes(value.syncStatus) ? value.syncStatus : 'queued',
+    syncMode: value.syncMode === 'incremental' ? 'incremental' : 'full',
+    syncError: typeof value.syncError === 'string' ? value.syncError.slice(0, 180) : '',
+    lastSyncAt: Math.max(0, Number(value.lastSyncAt) || 0),
+    lastFullSyncAt: Math.max(0, Number(value.lastFullSyncAt) || 0),
+  };
+}
+
+async function enqueueVideoLibrarySync(channelId, syncId, pageToken = '') {
+  await adminFunctions.taskQueue('streamerFanPageVideoLibrarySyncWorker')
+    .enqueue({ channelId, syncId, pageToken }, { dispatchDeadlineSeconds: 120 });
+}
+
+async function enqueueVideoLibraryCleanup(channelId, syncId) {
+  await adminFunctions.taskQueue('streamerFanPageVideoLibraryCleanupWorker')
+    .enqueue({ channelId, syncId }, { dispatchDeadlineSeconds: 120 });
+}
+
+function normalizeVideoLibraryTitle(value) {
+  if (typeof value !== 'string' || /[\x00-\x1F\x7F]/.test(value)) return '';
+  const normalized = value.normalize('NFC').trim().replace(/\s+/g, ' ');
+  return normalized.length <= 500 ? normalized : '';
+}
+
+function validateVideoLibraryCategoryId(value) {
+  const categoryId = String(value || '').trim();
+  if (!VIDEO_LIBRARY_CATEGORY_ID_PATTERN.test(categoryId)) throw new HttpsError('invalid-argument', '카테고리를 선택해 주세요.');
+  return categoryId;
+}
+
+function normalizeVideoLibraryCategories(value) {
+  const categories = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return Object.entries(categories)
+    .map(([id, item]) => normalizeVideoLibraryCategory(id, item))
+    .filter(Boolean)
+    .sort((left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0)
+      || left.createdAt - right.createdAt || left.name.localeCompare(right.name, 'ko'));
+}
+
+function videoLibraryIndexSortAt(item) {
+  const parsed = Date.parse(item.publishedAt || '');
+  return Number.isFinite(parsed) ? parsed : Math.max(0, Number(item.createdAt) || Date.now());
+}
+
+async function readVideoLibraryIndexPage(indexRef, cursor, limit) {
+  let query = indexRef.orderByChild('sortAt');
+  if (cursor) query = query.endAt(cursor.sortAt, cursor.id);
+  const snapshot = await query.limitToLast(limit + 2).get();
+  const rows = [];
+  snapshot.forEach((child) => {
+    if (child.key) rows.push({
+      id: child.key,
+      sortAt: Math.max(0, Number(child.child('sortAt').val()) || 0),
+      value: child.val(),
+    });
+  });
+  return rows;
 }
 
 function normalizePage(streamer, value) {
@@ -5788,6 +5941,567 @@ exports.streamerFanPageSongbook = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxI
   }
 
   throw new HttpsError('invalid-argument', '노래책 요청을 확인해 주세요.');
+});
+
+function normalizeVideoLibraryStoredItem(id, value, source = {}) {
+  const item = normalizeVideoLibraryItem(id, value, source);
+  if (!item) return null;
+  item.thumbnailUrl = cleanHttpsImageUrl(item.thumbnailUrl);
+  item.createdAt = Math.max(0, Number(value.createdAt) || 0);
+  return item;
+}
+
+async function readVideoLibraryPage(data, isAdmin, canManage) {
+  const categoryId = data.categoryId ? validateVideoLibraryCategoryId(data.categoryId) : '';
+  const limit = Math.max(1, Math.min(50, Math.floor(Number(data.limit) || VIDEO_LIBRARY_PAGE_SIZE)));
+  const cursor = normalizeVideoLibraryCursor(data.cursor);
+  if (data.cursor && !cursor) throw new HttpsError('invalid-argument', '영상 목록 위치를 확인해 주세요.');
+  const [categoriesSnapshot, channelsSnapshot] = await Promise.all([
+    videoLibraryRef('categories').get(),
+    videoLibraryRef('channels').get(),
+  ]);
+  const categories = normalizeVideoLibraryCategories(categoriesSnapshot.val());
+  if (categoryId && !categories.some((category) => category.id === categoryId)) {
+    throw new HttpsError('not-found', '선택한 카테고리를 찾을 수 없습니다.');
+  }
+
+  const sources = [];
+  const manualRows = await readVideoLibraryIndexPage(videoLibraryIndexRef(categoryId), cursor, limit);
+  if (manualRows.length) {
+    const manualItems = await Promise.all(manualRows.map(async ({ id }) => {
+      const value = (await videoLibraryManualVideoRef(id).get()).val();
+      if (!value || (categoryId && value.categoryId !== categoryId)) return null;
+      return normalizeVideoLibraryStoredItem(id, value, { sourceType: 'manual', categoryId: value.categoryId });
+    }));
+    sources.push(manualItems.filter(Boolean));
+  }
+
+  const channelEntries = channelsSnapshot.val() && typeof channelsSnapshot.val() === 'object'
+    ? Object.entries(channelsSnapshot.val()) : [];
+  const publicChannels = [];
+  const channelSources = await Promise.all(channelEntries.map(async ([channelId, value]) => {
+    const channel = videoLibraryChannelPublic(channelId, value);
+    if (!channel || (categoryId && channel.categoryId !== categoryId)) return null;
+    if (isAdmin) publicChannels.push(channel);
+    if (!value.activeSyncId) return null;
+    const videoSnapshot = await readVideoLibraryIndexPage(
+      videoLibraryImportVideosRef(channelId, value.activeSyncId), cursor, limit,
+    );
+    const items = videoSnapshot
+      .map(({ id, sortAt, value: raw }) => {
+        return raw ? normalizeVideoLibraryStoredItem(id, { ...raw, sortAt }, {
+          sourceType: 'channel', categoryId: channel.categoryId, channelId, channelTitle: channel.channelTitle,
+        }) : null;
+      })
+      .filter(Boolean);
+    return items;
+  }));
+  sources.push(...channelSources.filter(Boolean));
+
+  const page = paginateVideoLibraryEntries(sources, cursor, limit);
+  return {
+    categories,
+    items: page.items,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+    canManage,
+    isAdmin,
+    channels: isAdmin ? publicChannels.sort((left, right) => left.channelTitle.localeCompare(right.channelTitle, 'ko')) : [],
+  };
+}
+
+async function startVideoLibraryChannelSync(channelId, mode = 'full') {
+  const channelRef = videoLibraryChannelRef(channelId);
+  const syncId = randomUUID();
+  const now = Date.now();
+  let started = false;
+  let selectedMode = mode;
+  const transaction = await channelRef.transaction((current) => {
+    if (!current || typeof current !== 'object' || current.syncStatus === 'syncing') return undefined;
+    if (selectedMode === 'incremental' && !current.activeSyncId) selectedMode = 'full';
+    started = true;
+    return {
+      ...current,
+      syncId,
+      syncMode: selectedMode,
+      syncStatus: 'syncing',
+      syncError: '',
+      nextPageToken: '',
+      dispatchPending: true,
+      syncCutoffAt: selectedMode === 'incremental' ? Math.max(0, Number(current.latestPublishedAt) || 0) : 0,
+      syncFailureCount: 0,
+      importedCount: selectedMode === 'full' ? 0 : Math.max(0, Number(current.importedCount) || 0),
+      syncStartedAt: now,
+      updatedAt: now,
+    };
+  });
+  if (!transaction.committed || !started) return false;
+  try {
+    await enqueueVideoLibrarySync(channelId, syncId, '');
+    await channelRef.transaction((current) => {
+      if (!current || current.syncId !== syncId || current.nextPageToken !== '') return undefined;
+      return { ...current, dispatchPending: false };
+    });
+    return true;
+  } catch (error) {
+    await channelRef.transaction((current) => current && current.syncId === syncId
+      ? { ...current, syncStatus: 'error', syncError: '동기화 작업을 시작하지 못했어요. 다시 시도해 주세요.', dispatchPending: false }
+      : undefined);
+    throw new HttpsError('unavailable', 'YouTube 채널 동기화 작업을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+}
+
+async function removeVideoLibraryGenerationBatch(channelId, syncId) {
+  const videosRef = videoLibraryImportVideosRef(channelId, syncId);
+  const snapshot = await videosRef.orderByKey().limitToFirst(VIDEO_LIBRARY_SYNC_BATCH_SIZE).get();
+  if (!snapshot.exists()) {
+    await videoLibraryRef(`imports/${channelId}/${syncId}`).remove();
+    return false;
+  }
+  const keys = [];
+  snapshot.forEach((child) => { if (child.key) keys.push(child.key); });
+  const updates = {};
+  keys.forEach((key) => { updates[`${VIDEO_LIBRARY_ROOT}/imports/${channelId}/${syncId}/videos/${key}`] = null; });
+  await db.ref().update(updates);
+  if (keys.length < VIDEO_LIBRARY_SYNC_BATCH_SIZE) {
+    await videoLibraryRef(`imports/${channelId}/${syncId}`).remove();
+    return false;
+  }
+  return true;
+}
+
+exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
+  const uid = request.auth && typeof request.auth.uid === 'string' ? request.auth.uid : '';
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  const action = String(data.action || 'list');
+  const [verified, isAdmin] = uid
+    ? await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)])
+    : [null, false];
+  const canManage = isAdmin || !!verified;
+  if (action === 'list') return readVideoLibraryPage(data, isAdmin, canManage);
+  if (!canManage) throw new HttpsError('permission-denied', '인증 스트리머 또는 관리자만 영상 모음을 수정할 수 있습니다.');
+
+  const root = videoLibraryRef();
+  const categoriesRef = videoLibraryRef('categories');
+  const now = Date.now();
+  if (action === 'category-add') {
+    const name = normalizeVideoLibraryTitle(data.name);
+    if (!name || Array.from(name).length > VIDEO_LIBRARY_CATEGORY_NAME_MAX_LENGTH) {
+      throw new HttpsError('invalid-argument', `카테고리 이름은 1자 이상 ${VIDEO_LIBRARY_CATEGORY_NAME_MAX_LENGTH}자 이하로 입력해 주세요.`);
+    }
+    const id = randomUUID();
+    let failure = '';
+    const result = await categoriesRef.transaction((current) => {
+      const entries = current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {};
+      const values = Object.values(entries);
+      if (values.some((item) => item && String(item.name || '').trim().toLocaleLowerCase('ko') === name.toLocaleLowerCase('ko'))) {
+        failure = 'duplicate'; return undefined;
+      }
+      if (Object.keys(entries).length >= VIDEO_LIBRARY_MAX_CATEGORIES) { failure = 'limit'; return undefined; }
+      entries[id] = { name, createdAt: now, updatedAt: now, createdBy: uid };
+      return entries;
+    });
+    if (!result.committed) {
+      throw new HttpsError(failure === 'limit' ? 'resource-exhausted' : 'already-exists',
+        failure === 'limit' ? `카테고리는 ${VIDEO_LIBRARY_MAX_CATEGORIES}개까지 만들 수 있어요.` : '같은 이름의 카테고리가 이미 있어요.');
+    }
+    return { category: normalizeVideoLibraryCategory(id, result.snapshot.val()[id]) };
+  }
+
+  if (action === 'category-rename') {
+    const id = String(data.categoryId || '');
+    const name = normalizeVideoLibraryTitle(data.name);
+    if (!VIDEO_LIBRARY_CATEGORY_ID_PATTERN.test(id) || !name || Array.from(name).length > VIDEO_LIBRARY_CATEGORY_NAME_MAX_LENGTH) {
+      throw new HttpsError('invalid-argument', '카테고리 이름을 확인해 주세요.');
+    }
+    let failure = '';
+    const result = await categoriesRef.transaction((current) => {
+      const entries = current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {};
+      if (!entries[id]) { failure = 'missing'; return undefined; }
+      if (Object.entries(entries).some(([otherId, item]) => otherId !== id
+        && item && String(item.name || '').trim().toLocaleLowerCase('ko') === name.toLocaleLowerCase('ko'))) {
+        failure = 'duplicate'; return undefined;
+      }
+      entries[id] = { ...entries[id], name, updatedAt: now };
+      return entries;
+    });
+    if (!result.committed) throw new HttpsError(failure === 'missing' ? 'not-found' : 'already-exists',
+      failure === 'missing' ? '카테고리를 찾을 수 없습니다.' : '같은 이름의 카테고리가 이미 있어요.');
+    return { saved: true };
+  }
+
+  if (action === 'category-order') {
+    const order = Array.isArray(data.order) ? data.order.map(String) : [];
+    let failure = false;
+    const result = await categoriesRef.transaction((current) => {
+      const entries = current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {};
+      if (order.length !== Object.keys(entries).length || new Set(order).size !== order.length
+        || order.some((id) => !Object.prototype.hasOwnProperty.call(entries, id))) { failure = true; return undefined; }
+      order.forEach((id, index) => { entries[id] = { ...entries[id], sortOrder: index, updatedAt: now }; });
+      return entries;
+    });
+    if (!result.committed) throw new HttpsError(failure ? 'invalid-argument' : 'failed-precondition', '카테고리 순서를 새로고침한 뒤 다시 시도해 주세요.');
+    return { saved: true };
+  }
+
+  if (action === 'category-delete') {
+    const id = String(data.categoryId || '');
+    if (!VIDEO_LIBRARY_CATEGORY_ID_PATTERN.test(id)) throw new HttpsError('invalid-argument', '삭제할 카테고리를 확인해 주세요.');
+    const [categorySnap, indexSnap, channelsSnap] = await Promise.all([
+      categoriesRef.child(id).get(), videoLibraryIndexRef(id).get(), videoLibraryRef('channels').get(),
+    ]);
+    if (!categorySnap.exists()) throw new HttpsError('not-found', '카테고리를 찾을 수 없습니다.');
+    const occupiedChannel = Object.values(channelsSnap.val() || {}).some((channel) => channel && channel.categoryId === id);
+    if (indexSnap.exists() || occupiedChannel) throw new HttpsError('failed-precondition', '영상이나 YouTube 채널이 연결된 카테고리는 비울 때까지 삭제할 수 없습니다.');
+    const updates = {};
+    updates[`${VIDEO_LIBRARY_ROOT}/categories/${id}`] = null;
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${id}`] = null;
+    await root.update(updates);
+    return { deleted: true };
+  }
+
+  if (action === 'video-add') {
+    const categoryId = validateVideoLibraryCategoryId(data.categoryId);
+    if (!(await categoriesRef.child(categoryId).get()).exists()) throw new HttpsError('not-found', '선택한 카테고리를 찾을 수 없습니다.');
+    const video = parseFanPageMemoryVideoUrl(data.url);
+    if (!video) throw new HttpsError('invalid-argument', 'YouTube 또는 SOOP 다시보기 링크를 입력해 주세요.');
+    let title = normalizeVideoLibraryTitle(data.title);
+    let thumbnailUrl = '';
+    let publishedAt = '';
+    if (video.platform === 'youtube') {
+      const response = await fetchYouTubeJson('videos', { part: 'snippet', id: video.videoId }, YOUTUBE_DATA_API_KEY.value());
+      const metadata = Array.isArray(response.items) ? normalizeYouTubeVideo(response.items[0]) : null;
+      if (!metadata) throw new HttpsError('failed-precondition', '공개 YouTube 영상 링크를 확인할 수 없어요.');
+      if (!title) title = metadata.title;
+      thumbnailUrl = metadata.thumbnailUrl || `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`;
+      publishedAt = metadata.publishedAt;
+    } else {
+      const metadata = await fetchSoopVodInfoForComments(video.videoId, 8000);
+      if (!metadata) throw new HttpsError('failed-precondition', '공개 SOOP 다시보기 정보를 불러오지 못했어요.');
+      if (!title) title = normalizeVideoLibraryTitle(metadata.title_name || metadata.title);
+      thumbnailUrl = normalizeFanPageMemoryThumbnailUrl(metadata.thumb || '', video);
+      publishedAt = String(metadata.reg_date || '').slice(0, 32);
+    }
+    if (!title || Array.from(title).length > VIDEO_LIBRARY_TITLE_MAX_LENGTH) {
+      throw new HttpsError('invalid-argument', `영상 제목은 1자 이상 ${VIDEO_LIBRARY_TITLE_MAX_LENGTH}자 이하로 입력해 주세요.`);
+    }
+    const itemId = `${video.platform}_${video.videoId}`;
+    const manualRef = videoLibraryManualVideoRef(itemId);
+    const manualCount = await videoLibraryRef('manualVideos').get();
+    if (manualCount.numChildren() >= VIDEO_LIBRARY_MAX_MANUAL_ITEMS) {
+      throw new HttpsError('resource-exhausted', '개별 등록 영상이 너무 많아요. 정리한 뒤 다시 추가해 주세요.');
+    }
+    const record = {
+      platform: video.platform, videoId: video.videoId, title, thumbnailUrl,
+      publishedAt, sortAt: videoLibraryIndexSortAt({ publishedAt, createdAt: now }),
+      categoryId, url: video.url, createdAt: now, updatedAt: now, createdBy: uid,
+    };
+    const saved = await manualRef.transaction((current) => current ? undefined : record);
+    if (!saved.committed) throw new HttpsError('already-exists', '이미 직접 등록된 영상이에요.');
+    const updates = {};
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${itemId}`] = { sortAt: record.sortAt };
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${itemId}`] = { sortAt: record.sortAt };
+    await root.update(updates);
+    return { saved: true, itemId };
+  }
+
+  if (action === 'video-update') {
+    const id = String(data.id || '');
+    const categoryId = validateVideoLibraryCategoryId(data.categoryId);
+    const title = normalizeVideoLibraryTitle(data.title);
+    if (!VIDEO_LIBRARY_ITEM_ID_PATTERN.test(id) || !title || Array.from(title).length > VIDEO_LIBRARY_TITLE_MAX_LENGTH) {
+      throw new HttpsError('invalid-argument', '영상 제목과 항목을 확인해 주세요.');
+    }
+    if (!(await categoriesRef.child(categoryId).get()).exists()) throw new HttpsError('not-found', '선택한 카테고리를 찾을 수 없습니다.');
+    const manualRef = videoLibraryManualVideoRef(id);
+    let oldCategoryId = '';
+    const result = await manualRef.transaction((current) => {
+      if (!current || typeof current !== 'object') return undefined;
+      oldCategoryId = String(current.categoryId || '');
+      return { ...current, title, categoryId, updatedAt: now, updatedBy: uid };
+    });
+    if (!result.committed) throw new HttpsError('not-found', '직접 등록한 영상을 찾을 수 없습니다.');
+    if (oldCategoryId !== categoryId) {
+      const updates = {};
+      updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${oldCategoryId}/${id}`] = null;
+      updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${id}`] = { sortAt: result.snapshot.val().sortAt };
+      await root.update(updates);
+    }
+    return { saved: true };
+  }
+
+  if (action === 'video-delete') {
+    const id = String(data.id || '');
+    if (!VIDEO_LIBRARY_ITEM_ID_PATTERN.test(id)) throw new HttpsError('invalid-argument', '삭제할 영상을 확인해 주세요.');
+    const entryRef = videoLibraryManualVideoRef(id);
+    const snapshot = await entryRef.get();
+    const entry = snapshot.val();
+    if (!entry) throw new HttpsError('not-found', '직접 등록한 영상을 찾을 수 없습니다.');
+    const updates = {};
+    updates[`${VIDEO_LIBRARY_ROOT}/manualVideos/${id}`] = null;
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${id}`] = null;
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${entry.categoryId}/${id}`] = null;
+    await root.update(updates);
+    return { deleted: true };
+  }
+
+  if (action === 'preview-channel') {
+    if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 YouTube 채널을 등록할 수 있습니다.');
+    return { channel: await resolveVideoLibraryYouTubeChannel(String(data.url || ''), YOUTUBE_DATA_API_KEY.value()) };
+  }
+
+  if (action === 'channel-add') {
+    if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 YouTube 채널을 등록할 수 있습니다.');
+    const categoryId = validateVideoLibraryCategoryId(data.categoryId);
+    if (!(await categoriesRef.child(categoryId).get()).exists()) throw new HttpsError('not-found', '선택한 카테고리를 찾을 수 없습니다.');
+    const channel = await resolveVideoLibraryYouTubeChannel(String(data.url || ''), YOUTUBE_DATA_API_KEY.value());
+    if ((await videoLibraryRef('channels').get()).numChildren() >= VIDEO_LIBRARY_MAX_CHANNELS) {
+      throw new HttpsError('resource-exhausted', `YouTube 채널은 ${VIDEO_LIBRARY_MAX_CHANNELS}개까지 등록할 수 있어요.`);
+    }
+    const syncId = randomUUID();
+    const record = {
+      channelId: channel.channelId,
+      channelTitle: channel.channelTitle,
+      channelUrl: channel.channelUrl,
+      uploadsPlaylistId: channel.uploadsPlaylistId,
+      thumbnailUrl: channel.thumbnailUrl,
+      categoryId,
+      totalCount: channel.totalCount,
+      importedCount: 0,
+      activeSyncId: '',
+      syncId,
+      syncMode: 'full',
+      syncStatus: 'syncing',
+      syncError: '',
+      nextPageToken: '',
+      dispatchPending: true,
+      syncCutoffAt: 0,
+      syncFailureCount: 0,
+      latestPublishedAt: 0,
+      lastSyncAt: 0,
+      lastFullSyncAt: 0,
+      syncStartedAt: now,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: uid,
+    };
+    const channelRef = videoLibraryChannelRef(channel.channelId);
+    const reservation = await channelRef.transaction((current) => current ? undefined : record);
+    if (!reservation.committed) throw new HttpsError('already-exists', '이미 등록된 YouTube 채널이에요.');
+    try {
+      await enqueueVideoLibrarySync(channel.channelId, syncId, '');
+      await channelRef.transaction((current) => current && current.syncId === syncId && current.nextPageToken === ''
+        ? { ...current, dispatchPending: false } : undefined);
+    } catch (error) {
+      await channelRef.update({ syncStatus: 'error', syncError: '동기화 작업을 시작하지 못했어요. 다시 시도해 주세요.', dispatchPending: false });
+      throw new HttpsError('unavailable', '채널은 등록했지만 영상 수집 작업을 시작하지 못했어요. 채널 목록에서 다시 동기화해 주세요.');
+    }
+    return { saved: true, channelId: channel.channelId };
+  }
+
+  if (action === 'channel-set-category') {
+    if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 YouTube 채널을 관리할 수 있습니다.');
+    const channelId = String(data.channelId || '');
+    const categoryId = validateVideoLibraryCategoryId(data.categoryId);
+    if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(channelId) || !(await categoriesRef.child(categoryId).get()).exists()) {
+      throw new HttpsError('invalid-argument', '채널과 카테고리를 확인해 주세요.');
+    }
+    const ref = videoLibraryChannelRef(channelId);
+    const result = await ref.transaction((current) => current ? { ...current, categoryId, updatedAt: now, updatedBy: uid } : undefined);
+    if (!result.committed) throw new HttpsError('not-found', 'YouTube 채널을 찾을 수 없습니다.');
+    return { saved: true };
+  }
+
+  if (action === 'channel-sync') {
+    if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 YouTube 채널을 동기화할 수 있습니다.');
+    const channelId = String(data.channelId || '');
+    if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(channelId)) throw new HttpsError('invalid-argument', '동기화할 채널을 확인해 주세요.');
+    if (!(await startVideoLibraryChannelSync(channelId, 'full'))) throw new HttpsError('failed-precondition', '이미 동기화 중인 채널이에요. 잠시 후 다시 시도해 주세요.');
+    return { queued: true };
+  }
+
+  if (action === 'channel-delete') {
+    if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 YouTube 채널을 삭제할 수 있습니다.');
+    const channelId = String(data.channelId || '');
+    if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(channelId)) throw new HttpsError('invalid-argument', '삭제할 채널을 확인해 주세요.');
+    const [channelSnapshot, generationsSnapshot] = await Promise.all([
+      videoLibraryChannelRef(channelId).get(), videoLibraryRef(`imports/${channelId}`).get(),
+    ]);
+    if (!channelSnapshot.exists()) throw new HttpsError('not-found', 'YouTube 채널을 찾을 수 없습니다.');
+    await videoLibraryChannelRef(channelId).remove();
+    const generationIds = Object.keys(generationsSnapshot.val() || {});
+    await Promise.all(generationIds.map((syncId) => enqueueVideoLibraryCleanup(channelId, syncId).catch((error) => {
+      console.warn(`Could not queue video library cleanup for ${channelId}:`, error.message || error);
+    })));
+    return { deleted: true };
+  }
+
+  throw new HttpsError('invalid-argument', '영상 모음 요청을 확인해 주세요.');
+});
+
+exports.streamerFanPageVideoLibrarySyncWorker = onTaskDispatched({
+  region: 'us-central1',
+  secrets: [YOUTUBE_DATA_API_KEY],
+  memory: '256MiB',
+  timeoutSeconds: 120,
+  maxInstances: 1,
+  concurrency: 1,
+  rateLimits: { maxConcurrentDispatches: 1, maxDispatchesPerSecond: 1 },
+  retryConfig: { maxAttempts: 10, maxRetrySeconds: 600, minBackoffSeconds: 5, maxBackoffSeconds: 60, maxDoublings: 3 },
+}, async (request) => {
+  const data = request.data || {};
+  const channelId = String(data.channelId || '');
+  const syncId = String(data.syncId || '');
+  const pageToken = String(data.pageToken || '');
+  if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(channelId) || !/^[0-9a-f-]{36}$/i.test(syncId)) return;
+  const channelRef = videoLibraryChannelRef(channelId);
+  const channelSnapshot = await channelRef.get();
+  const channel = channelSnapshot.val();
+  if (!channel || channel.syncId !== syncId || channel.syncStatus !== 'syncing') return;
+  if (String(channel.nextPageToken || '') !== pageToken) {
+    if (channel.dispatchPending) {
+      await enqueueVideoLibrarySync(channelId, syncId, String(channel.nextPageToken || ''));
+      await channelRef.transaction((current) => current && current.syncId === syncId
+        && String(current.nextPageToken || '') === String(channel.nextPageToken || '')
+        ? { ...current, dispatchPending: false } : undefined);
+    }
+    return;
+  }
+
+  try {
+    const page = await fetchVideoLibraryYouTubePage(channel.uploadsPlaylistId, YOUTUBE_DATA_API_KEY.value(), pageToken);
+    const isIncremental = channel.syncMode === 'incremental' && !!channel.activeSyncId;
+    const cutoffAt = isIncremental ? Math.max(0, Number(channel.syncCutoffAt) || 0) : 0;
+    let encounteredExisting = false;
+    const candidates = [];
+    for (const item of page.items) {
+      const publishedAtMs = Date.parse(item.publishedAt || '');
+      if (isIncremental && (!Number.isFinite(publishedAtMs) || publishedAtMs < cutoffAt)) {
+        encounteredExisting = true;
+        continue;
+      }
+      candidates.push({ ...item, sortAt: Number.isFinite(publishedAtMs) ? publishedAtMs : Date.now() });
+    }
+    const acceptedItems = isIncremental
+      ? (await Promise.all(candidates.map(async (item) => {
+        const existing = await videoLibraryImportVideosRef(channelId, String(channel.activeSyncId))
+          .child(`youtube_${item.id}`).get();
+        return existing.exists() ? null : item;
+      }))).filter(Boolean)
+      : candidates;
+    const nextPageToken = isIncremental && encounteredExisting ? '' : page.nextPageToken;
+    const finished = !nextPageToken;
+    const generationId = isIncremental ? String(channel.activeSyncId) : syncId;
+    const videoUpdates = {};
+    let latestPublishedAt = Math.max(0, Number(channel.latestPublishedAt) || 0);
+    acceptedItems.forEach((item) => {
+      const itemId = `youtube_${item.id}`;
+      latestPublishedAt = Math.max(latestPublishedAt, item.sortAt);
+      videoUpdates[`${VIDEO_LIBRARY_ROOT}/imports/${channelId}/${generationId}/videos/${itemId}`] = {
+        platform: 'youtube', videoId: item.id, title: item.title, thumbnailUrl: item.thumbnailUrl,
+        publishedAt: item.publishedAt, sortAt: item.sortAt, importedAt: Date.now(),
+      };
+    });
+    const importedCount = Math.max(0, Number(channel.importedCount) || 0) + acceptedItems.length;
+    if (Object.keys(videoUpdates).length) await db.ref().update(videoUpdates);
+    const syncAt = Date.now();
+    const channelResult = await channelRef.transaction((current) => {
+      if (!current || current.syncId !== syncId || current.syncStatus !== 'syncing') return undefined;
+      const updated = {
+        ...current,
+        nextPageToken,
+        dispatchPending: !!nextPageToken,
+        totalCount: Math.max(Number(current.totalCount) || 0, page.totalCount),
+        importedCount,
+        latestPublishedAt,
+        syncFailureCount: 0,
+        syncStatus: finished ? 'ready' : 'syncing',
+        syncError: '',
+        updatedAt: syncAt,
+      };
+      if (finished) {
+        updated.lastSyncAt = syncAt;
+        if (!isIncremental) {
+          updated.activeSyncId = syncId;
+          updated.lastFullSyncAt = syncAt;
+        } else {
+          updated.lastIncrementalSyncAt = syncAt;
+        }
+        updated.dispatchPending = false;
+      }
+      return updated;
+    });
+    if (!channelResult.committed) return;
+    if (!finished) {
+      await enqueueVideoLibrarySync(channelId, syncId, nextPageToken);
+      await channelRef.transaction((current) => current && current.syncId === syncId
+        && String(current.nextPageToken || '') === nextPageToken
+        ? { ...current, dispatchPending: false } : undefined);
+    } else if (!isIncremental) {
+      const generations = await videoLibraryRef(`imports/${channelId}`).get();
+      const oldIds = Object.keys(generations.val() || {}).filter((id) => id !== syncId);
+      await Promise.all(oldIds.map((id) => enqueueVideoLibraryCleanup(channelId, id).catch((error) => {
+        console.warn(`Could not queue old video library generation cleanup for ${channelId}:`, error.message || error);
+      })));
+    }
+  } catch (error) {
+    console.error(`Video library channel sync failed for ${channelId}:`, error.message || error);
+    let exhausted = false;
+    await channelRef.transaction((current) => {
+      if (!current || current.syncId !== syncId) return undefined;
+      const failureCount = Math.max(0, Number(current.syncFailureCount) || 0) + 1;
+      exhausted = failureCount >= 10;
+      return {
+        ...current,
+        syncFailureCount: failureCount,
+        ...(exhausted ? {
+          syncStatus: 'error',
+          syncError: 'YouTube 영상을 불러오지 못했어요. 관리자에게 다시 동기화를 요청해 주세요.',
+          dispatchPending: false,
+        } : {}),
+      };
+    });
+    if (exhausted) {
+      return;
+    }
+    throw error;
+  }
+});
+
+exports.streamerFanPageVideoLibraryCleanupWorker = onTaskDispatched({
+  region: 'us-central1', memory: '256MiB', timeoutSeconds: 120, maxInstances: 1, concurrency: 1,
+  rateLimits: { maxConcurrentDispatches: 1, maxDispatchesPerSecond: 1 },
+  retryConfig: { maxAttempts: 10, maxRetrySeconds: 600, minBackoffSeconds: 5, maxBackoffSeconds: 60, maxDoublings: 3 },
+}, async (request) => {
+  const { channelId = '', syncId = '' } = request.data || {};
+  if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(String(channelId)) || !/^[0-9a-f-]{36}$/i.test(String(syncId))) return;
+  const hasMore = await removeVideoLibraryGenerationBatch(String(channelId), String(syncId));
+  if (hasMore) await enqueueVideoLibraryCleanup(String(channelId), String(syncId));
+});
+
+exports.streamerFanPageVideoLibraryIncrementalSync = onSchedule({
+  schedule: 'every 6 hours', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
+}, async () => {
+  const snapshot = await videoLibraryRef('channels').get();
+  const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
+  await Promise.all(Object.entries(channels).map(async ([channelId, channel]) => {
+    if (!channel || channel.syncStatus === 'syncing') return;
+    try { await startVideoLibraryChannelSync(channelId, 'incremental'); }
+    catch (error) { console.warn(`Could not enqueue incremental video library sync for ${channelId}:`, error.message || error); }
+  }));
+});
+
+exports.streamerFanPageVideoLibraryFullSync = onSchedule({
+  schedule: 'every sunday 03:00', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
+}, async () => {
+  const snapshot = await videoLibraryRef('channels').get();
+  const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
+  const dueBefore = Date.now() - 6 * 24 * 60 * 60 * 1000;
+  await Promise.all(Object.entries(channels).map(async ([channelId, channel]) => {
+    if (!channel || channel.syncStatus === 'syncing' || (Number(channel.lastFullSyncAt) || 0) > dueBefore) return;
+    try { await startVideoLibraryChannelSync(channelId, 'full'); }
+    catch (error) { console.warn(`Could not enqueue full video library sync for ${channelId}:`, error.message || error); }
+  }));
 });
 
 exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request) => {

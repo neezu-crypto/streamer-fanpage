@@ -1356,6 +1356,7 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);gap:20px}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.content-card,.live-section,.messenger-link-section,.fan-character-ogq-pair){min-width:0;margin:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section,.rolling-paper-section,.memory-moments-section){grid-column:1/-1}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>.video-library-section{grid-column:1/-1;min-width:0;margin:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-columns{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);align-items:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column{display:grid;align-content:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column>*{min-width:0;margin:0}
@@ -1382,6 +1383,22 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .affiliate-promo-button:active{transform:translateY(2px);box-shadow:0 1px 0 #83a1e3}
 #fanPageView.fanpage-layout-1 .affiliate-promo-button:focus-visible,#fanPageView.fanpage-layout-1 .affiliate-promo-image-link:focus-visible{outline:3px solid #6484cf;outline-offset:3px}
 #fanPageView.fanpage-layout-1 .affiliate-promo-disclosure{margin:10px 0 0;padding:9px 2px 0;border-top:1px dashed #d8e1f2;color:#81758b;font-size:9px;line-height:1.5;text-align:center}
+#fanPageView.fanpage-layout-1 .video-library-section{border-color:#dce4f5;background:linear-gradient(145deg,#fffefd,#f6f8ff);box-shadow:0 6px 0 #dce5f4,0 12px 26px #66799c0d;color:#51465d}
+#fanPageView.fanpage-layout-1 .video-library-heading .eyebrow{color:var(--kawaii-accent-deep)}
+#fanPageView.fanpage-layout-1 .video-library-count,#fanPageView.fanpage-layout-1 .video-library-description{color:#81758b}
+#fanPageView.fanpage-layout-1 :is(.video-library-category-form input,.video-library-add-form input,.video-library-add-form select,.video-library-channel-form input,.video-library-channel-form select,.video-library-edit-form input,.video-library-edit-form select,.video-library-search,.video-library-channel-card select){border-color:#e3d9e9;background:#fff;color:#51465d}
+#fanPageView.fanpage-layout-1 .video-library-category-item{border-color:#eadfeb;background:#fff}
+#fanPageView.fanpage-layout-1 .video-library-category{border-color:#e5dce9;background:#fff;color:#81758b}
+#fanPageView.fanpage-layout-1 .video-library-category.is-active{border-color:color-mix(in srgb,var(--kawaii-accent-deep),white 38%);background:color-mix(in srgb,var(--kawaii-accent),white 80%);color:#51465d}
+#fanPageView.fanpage-layout-1 .video-library-card{border-color:#e5dce9;background:#fff;box-shadow:0 3px 0 #e7dce8;color:#51465d}
+#fanPageView.fanpage-layout-1 .video-library-card h3{color:#51465d}
+#fanPageView.fanpage-layout-1 .video-library-source{color:var(--kawaii-accent-deep)}
+#fanPageView.fanpage-layout-1 .video-library-card-body small,#fanPageView.fanpage-layout-1 .video-library-channel-card small{color:#81758b}
+#fanPageView.fanpage-layout-1 .video-library-state{border-color:#dce4f5;color:#81758b;background:#fff9fc}
+#fanPageView.fanpage-layout-1 .video-library-admin-tools,#fanPageView.fanpage-layout-1 .video-library-channel-card{border-color:#e5dce9;background:#fff}
+#fanPageView.fanpage-layout-1 .video-library-admin-tools summary,#fanPageView.fanpage-layout-1 .video-library-channel-card>a{color:#51465d}
+#fanPageView.fanpage-layout-1 .video-library-icon-action{color:#81758b}
+#fanPageView.fanpage-layout-1 .video-library-category-form input:focus,#fanPageView.fanpage-layout-1 .video-library-add-form :is(input,select):focus,#fanPageView.fanpage-layout-1 .video-library-channel-form :is(input,select):focus,#fanPageView.fanpage-layout-1 .video-library-edit-form :is(input,select):focus,#fanPageView.fanpage-layout-1 .video-library-search:focus{border-color:color-mix(in srgb,var(--kawaii-accent-deep),white 30%);outline:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--kawaii-accent),transparent 84%)}
 @media(max-width:900px){
   #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1fr);gap:16px}
   #fanPageView.fanpage-layout-1 .fanpage-tab-columns,#fanPageView.fanpage-layout-1 .fanpage-tab-column{display:contents}
@@ -1402,6 +1419,7 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
   #fanPageView.fanpage-layout-1 .fanpage-content-columns .cafe-section{order:4}
   #fanPageView.fanpage-layout-1 .fanpage-tab-panel[data-fanpage-tab-panel=content] .competition-history-section{order:5}
 }
+@media(min-width:561px) and (max-width:900px){#fanPageView.fanpage-layout-1 .fanpage-tab-nav{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:720px){
   #fanPageView.fanpage-layout-1 .fanpage-tab-nav{margin:14px 0 18px}
   #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{gap:14px}
