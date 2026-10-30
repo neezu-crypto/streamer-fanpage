@@ -17,6 +17,14 @@ const SOOP_ID_RE = /^[a-z0-9]{2,20}$/;
 const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const VERIFICATION_CODE_RE = /^[A-F0-9]{10}$/;
 
+let lookupSoopNickname = async () => '';
+let lookupSoopNicknames = async () => new Map();
+
+function configureSoopNicknameLookups(singleLookup, batchLookup) {
+  if (typeof singleLookup === 'function') lookupSoopNickname = singleLookup;
+  if (typeof batchLookup === 'function') lookupSoopNicknames = batchLookup;
+}
+
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
     throw new HttpsError('unauthenticated', '로그인이 필요합니다.');
@@ -199,10 +207,17 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
     }
 
     try {
+      let nickname = '';
+      try {
+        nickname = String(await lookupSoopNickname(soopId) || '').trim().slice(0, 40);
+      } catch (error) {
+        console.warn('Could not resolve SOOP nickname for subscription request:', error.message || error);
+      }
       await db.ref().update({
         [`${REQUESTS_PATH}/${requestId}`]: {
           requesterUid: uid,
           soopId,
+          ...(nickname ? { nickname } : {}),
           verificationMethod: 'subscriber-comment-code',
           verificationCodeHash: verificationCodeHash(requestId, code),
           codeExpiresAt,
@@ -340,9 +355,11 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
       return {
         requestId,
         requesterUid: String(record.requesterUid || ''),
-        nickname: String(record.nickname || '').slice(0, 20),
+        nickname: String(record.nickname || '').slice(0, 40),
         soopId: String(record.soopId || record.donorSoopId || '').slice(0, 20),
+        donorSoopId: String(record.donorSoopId || '').slice(0, 20),
         verificationMethod: String(record.verificationMethod || 'star-donation'),
+        verificationSource: String(record.verificationSource || ''),
         codeExpiresAt: Math.max(0, Number(record.codeExpiresAt) || 0),
         donationCompletedAt: Math.max(0, Number(record.donationCompletedAt) || 0),
         status: record.status,
@@ -351,6 +368,22 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
       };
     }))).filter(Boolean);
     requests.sort((a, b) => a.requestedAt - b.requestedAt);
+    const unresolved = requests.filter((item) => item.soopId && !item.nickname).slice(-20);
+    if (unresolved.length) {
+      try {
+        const nicknames = await lookupSoopNicknames(unresolved.map((item) => item.soopId), 4);
+        const nicknameUpdates = {};
+        for (const item of unresolved) {
+          const nickname = String(nicknames.get(item.soopId.toLowerCase()) || '').trim().slice(0, 40);
+          if (!nickname) continue;
+          item.nickname = nickname;
+          nicknameUpdates[`${REQUESTS_PATH}/${item.requestId}/nickname`] = nickname;
+        }
+        if (Object.keys(nicknameUpdates).length) await db.ref().update(nicknameUpdates);
+      } catch (error) {
+        console.warn('Could not resolve pending SOOP subscription nicknames:', error.message || error);
+      }
+    }
     return { requests, truncated: allIds.length > pendingIds.length };
   }
 
@@ -506,3 +539,5 @@ exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 
     throw error;
   }
 });
+
+exports.configureSoopNicknameLookups = configureSoopNicknameLookups;

@@ -39,6 +39,7 @@ const {
   viewerStatsWakeCandidate,
 } = require('./viewer-stats-policy');
 const {
+  configureSoopNicknameLookups,
   streamerFanPageViewerSubscription,
   streamerFanPageAdminViewerSubscriptionRequests,
 } = require('./viewer-subscriptions');
@@ -810,6 +811,8 @@ async function lookupSoopStreamerNicknames(soopIds, concurrency = 8) {
   }));
   return names;
 }
+
+configureSoopNicknameLookups(lookupSoopStreamerNickname, lookupSoopStreamerNicknames);
 
 async function findVerifiedByUid(uid, ref = (path) => sharedDb.ref(path)) {
   const snap = await ref('streamerVerifications')
