@@ -1386,8 +1386,9 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .video-library-section{border-color:#dce4f5;background:linear-gradient(145deg,#fffefd,#f6f8ff);box-shadow:0 6px 0 #dce5f4,0 12px 26px #66799c0d;color:#51465d}
 #fanPageView.fanpage-layout-1 .video-library-heading .eyebrow{color:var(--kawaii-accent-deep)}
 #fanPageView.fanpage-layout-1 .video-library-count,#fanPageView.fanpage-layout-1 .video-library-description{color:#81758b}
-#fanPageView.fanpage-layout-1 :is(.video-library-category-form input,.video-library-add-form input,.video-library-add-form select,.video-library-channel-form input,.video-library-channel-form select,.video-library-edit-form input,.video-library-edit-form select,.video-library-search,.video-library-channel-card select){border-color:#e3d9e9;background:#fff;color:#51465d}
-#fanPageView.fanpage-layout-1 .video-library-category-item{border-color:#eadfeb;background:#fff}
+#fanPageView.fanpage-layout-1 :is(.video-library-category-form input,.video-library-category-edit-form input,.video-library-add-form input,.video-library-add-form select,.video-library-channel-form input,.video-library-channel-form select,.video-library-edit-form input,.video-library-edit-form select,.video-library-search,.video-library-channel-card select){border-color:#e3d9e9;background:#fff;color:#51465d}
+#fanPageView.fanpage-layout-1 .video-library-category-tools{border-color:#e5dce9;background:#fff9fc}
+#fanPageView.fanpage-layout-1 .video-library-category-delete-note{color:#81758b}
 #fanPageView.fanpage-layout-1 .video-library-category{border-color:#e5dce9;background:#fff;color:#81758b}
 #fanPageView.fanpage-layout-1 .video-library-category.is-active{border-color:color-mix(in srgb,var(--kawaii-accent-deep),white 38%);background:color-mix(in srgb,var(--kawaii-accent),white 80%);color:#51465d}
 #fanPageView.fanpage-layout-1 .video-library-card{border-color:#e5dce9;background:#fff;box-shadow:0 3px 0 #e7dce8;color:#51465d}
@@ -1397,8 +1398,7 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .video-library-state{border-color:#dce4f5;color:#81758b;background:#fff9fc}
 #fanPageView.fanpage-layout-1 .video-library-admin-tools,#fanPageView.fanpage-layout-1 .video-library-channel-card{border-color:#e5dce9;background:#fff}
 #fanPageView.fanpage-layout-1 .video-library-admin-tools summary,#fanPageView.fanpage-layout-1 .video-library-channel-card>a{color:#51465d}
-#fanPageView.fanpage-layout-1 .video-library-icon-action{color:#81758b}
-#fanPageView.fanpage-layout-1 .video-library-category-form input:focus,#fanPageView.fanpage-layout-1 .video-library-add-form :is(input,select):focus,#fanPageView.fanpage-layout-1 .video-library-channel-form :is(input,select):focus,#fanPageView.fanpage-layout-1 .video-library-edit-form :is(input,select):focus,#fanPageView.fanpage-layout-1 .video-library-search:focus{border-color:color-mix(in srgb,var(--kawaii-accent-deep),white 30%);outline:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--kawaii-accent),transparent 84%)}
+#fanPageView.fanpage-layout-1 .video-library-category-form input:focus,#fanPageView.fanpage-layout-1 .video-library-category-edit-form input:focus,#fanPageView.fanpage-layout-1 .video-library-add-form :is(input,select):focus,#fanPageView.fanpage-layout-1 .video-library-channel-form :is(input,select):focus,#fanPageView.fanpage-layout-1 .video-library-edit-form :is(input,select):focus,#fanPageView.fanpage-layout-1 .video-library-search:focus{border-color:color-mix(in srgb,var(--kawaii-accent-deep),white 30%);outline:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--kawaii-accent),transparent 84%)}
 @media(max-width:900px){
   #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1fr);gap:16px}
   #fanPageView.fanpage-layout-1 .fanpage-tab-columns,#fanPageView.fanpage-layout-1 .fanpage-tab-column{display:contents}

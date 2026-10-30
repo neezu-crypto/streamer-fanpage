@@ -1398,20 +1398,23 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 #fanPageView .video-library-count{color:var(--muted);font-size:11px}
 #fanPageView .video-library-heading-actions{display:flex;align-items:center;gap:8px}
 #fanPageView .video-library-description{margin:0;color:var(--muted);font-size:12px;line-height:1.6}
-#fanPageView :is(.video-library-category-manager,.video-library-category-form,.video-library-add-form,.video-library-channel-form,.video-library-edit-form){display:flex;align-items:center;gap:8px;min-width:0}
-#fanPageView .video-library-category-form input,#fanPageView .video-library-add-form input,#fanPageView .video-library-add-form select,#fanPageView .video-library-channel-form input,#fanPageView .video-library-channel-form select,#fanPageView .video-library-edit-form input,#fanPageView .video-library-edit-form select,#fanPageView .video-library-search{min-width:0;min-height:40px;padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:#100f16;color:var(--text);font:12px var(--font)}
+#fanPageView :is(.video-library-category-manager,.video-library-category-form,.video-library-category-edit-form,.video-library-category-edit-actions,.video-library-add-form,.video-library-channel-form,.video-library-edit-form){display:flex;align-items:center;gap:8px;min-width:0}
+#fanPageView .video-library-category-form input,#fanPageView .video-library-category-edit-form input,#fanPageView .video-library-add-form input,#fanPageView .video-library-add-form select,#fanPageView .video-library-channel-form input,#fanPageView .video-library-channel-form select,#fanPageView .video-library-edit-form input,#fanPageView .video-library-edit-form select,#fanPageView .video-library-search{min-width:0;min-height:40px;padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:#100f16;color:var(--text);font:12px var(--font)}
 #fanPageView .video-library-category-form input{flex:1}
+#fanPageView .video-library-category-edit-form input{flex:1}
+#fanPageView .video-library-category-tools{display:grid;justify-items:start;gap:9px;padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:#ffffff04}
+#fanPageView .video-library-category-editor{display:grid;gap:9px;width:100%}
+#fanPageView .video-library-category-edit-toggle{min-height:36px;padding:7px 12px;font-size:11px}
+#fanPageView .video-library-category-delete-note{margin:-3px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+#fanPageView .video-library-category-edit-actions{width:100%;flex-wrap:wrap}
+#fanPageView .video-library-category-edit-actions .button{min-height:36px;padding:7px 12px;font-size:11px}
+#fanPageView .video-library-category-edit-actions .video-library-category-delete{margin-left:auto}
+#fanPageView .video-library-category-edit-form .button{min-height:40px;padding:8px 14px}
 #fanPageView .video-library-add-form input,#fanPageView .video-library-channel-form input{flex:1}
 #fanPageView .video-library-add-form select,#fanPageView .video-library-channel-form select,#fanPageView .video-library-edit-form select{max-width:220px}
 #fanPageView .video-library-categories{display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0}
-#fanPageView .video-library-category-item{display:flex;align-items:center;gap:5px;padding:4px 6px;border:1px solid var(--line);border-radius:999px;background:#ffffff05}
 #fanPageView .video-library-category{min-height:34px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:#ffffff07;color:var(--muted);font:12px var(--font)}
 #fanPageView .video-library-category.is-active{border-color:#f58cac77;background:#f58cac18;color:var(--text)}
-#fanPageView .video-library-category-item>.video-library-category{min-height:28px;padding:4px 9px;border-color:transparent;background:transparent}
-#fanPageView .video-library-category-actions{display:inline-flex;gap:2px}
-#fanPageView .video-library-icon-action{min-width:24px;min-height:24px;padding:2px 4px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:10px var(--font)}
-#fanPageView .video-library-icon-action:hover:not(:disabled){background:#f58cac17;color:var(--text)}
-#fanPageView .video-library-icon-action:disabled{opacity:.35;cursor:default}
 #fanPageView .video-library-search{width:min(360px,100%);background:#17151e}
 #fanPageView .video-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;min-width:0}
 #fanPageView .video-library-card{min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:15px;background:#ffffff06}
@@ -1446,7 +1449,11 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 @media(max-width:560px){
   #fanPageView .video-library-heading{align-items:flex-start}
   #fanPageView .video-library-heading h2{font-size:20px}
-  #fanPageView .video-library-category-form,#fanPageView .video-library-add-form,#fanPageView .video-library-channel-form{display:grid;grid-template-columns:minmax(0,1fr)}
+  #fanPageView .video-library-category-form,#fanPageView .video-library-category-edit-form,#fanPageView .video-library-add-form,#fanPageView .video-library-channel-form{display:grid;grid-template-columns:minmax(0,1fr)}
+  #fanPageView .video-library-category-edit-form .button{width:100%}
+  #fanPageView .video-library-category-edit-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  #fanPageView .video-library-category-edit-actions .button{width:100%;min-width:0}
+  #fanPageView .video-library-category-edit-actions .video-library-category-delete{grid-column:1/-1;margin-left:0}
   #fanPageView .video-library-add-form select,#fanPageView .video-library-channel-form select{max-width:none;width:100%}
   #fanPageView .video-library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   #fanPageView .video-library-card{border-radius:12px}
