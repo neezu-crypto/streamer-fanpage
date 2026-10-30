@@ -7920,13 +7920,18 @@ async function loadWeeklySchedulePageData(page, weekStart, board) {
     }));
     state.linkedEvents = dates.map((date) => eventMap.get(date) || []);
     state.loading = false; state.dirty = false; state.saveStatus = '';
-    if (board?.isConnected) {
-      board.querySelector('.weekly-schedule-title').textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
+    const sourceBoard = board?._weeklyScheduleSourceBoard || (board?.classList.contains('weekly-schedule-board') ? board : null);
+    const visibleBoards = new Set([sourceBoard, board, sourceBoard?._weeklyScheduleViewDialog].filter((item) => item?.isConnected));
+    visibleBoards.forEach((targetBoard) => {
+      const boardTitle = targetBoard.querySelector('.weekly-schedule-title');
+      const boardRange = targetBoard.querySelector('.weekly-schedule-date-range');
+      const boardStatus = targetBoard.querySelector('.weekly-schedule-status');
+      if (boardTitle) boardTitle.textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
       const end = parseLocalDateKey(state.weekStart); end.setDate(end.getDate() + 6);
-      board.querySelector('.weekly-schedule-date-range').textContent = `${formatWeeklyScheduleDate(start)} – ${formatWeeklyScheduleDate(end)}`;
-      board.querySelector('.weekly-schedule-status').textContent = calendarErrors.length ? 'SOOP 일정을 불러오지 못해 저장된 방송표만 표시하고 있어요.' : '';
-      board._drawWeeklyBoard?.();
-    }
+      if (boardRange) boardRange.textContent = `${formatWeeklyScheduleDate(start)} – ${formatWeeklyScheduleDate(end)}`;
+      if (boardStatus) boardStatus.textContent = calendarErrors.length ? 'SOOP 일정을 불러오지 못해 저장된 방송표만 표시하고 있어요.' : '';
+      targetBoard._drawWeeklyBoard?.();
+    });
     const dialog = $('weeklyScheduleGraphicDialog');
     if (dialog?.open && dialog._syncWeeklyFields) dialog._syncWeeklyFields();
   } catch (error) {
@@ -7974,16 +7979,16 @@ function renderCalendarSection(page) {
         template.src = new URL('./assets/weekly-schedule-template.png?v=20261031-weekly-board-v2', import.meta.url).href;
       });
     }
-    void templatePromise.then(() => {
+    return templatePromise.then(() => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (template?.naturalWidth) ctx.drawImage(template, 0, 0, canvas.width, canvas.height);
       const weekStart = parseLocalDateKey(state.weekStart); const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
       ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#a74464';
-      let titleSize = 43; const headerText = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
+      let titleSize = 50; const headerText = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
       ctx.font = `800 ${titleSize}px Pretendard, "Noto Sans KR", sans-serif`;
       while (ctx.measureText(headerText).width > 680 && titleSize > 25) { titleSize -= 1; ctx.font = `800 ${titleSize}px Pretendard, "Noto Sans KR", sans-serif`; }
       ctx.fillText(headerText, 1114, 94, 690);
-      ctx.fillStyle = '#fff8fa'; ctx.font = '600 25px Pretendard, "Noto Sans KR", sans-serif';
+      ctx.fillStyle = '#fff8fa'; ctx.font = '700 30px Pretendard, "Noto Sans KR", sans-serif';
       ctx.fillText(`${formatWeeklyScheduleDate(weekStart)} – ${formatWeeklyScheduleDate(weekEnd)}`, 285, 850, 430);
       const days = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
       const topCards = Array.from({ length: 4 }, (_, index) => ({ x: 585 + index * 262, y: 171, w: 242, h: 323 }));
@@ -7997,16 +8002,16 @@ function renderCalendarSection(page) {
         const linkedHoliday = linked.some((event) => event.typeName === '휴방');
         const firstLine = entry.offline || linkedHoliday ? '휴방' : (normalizeGraphicTime(entry.time) || linked.find((event) => event.time)?.time || '');
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#b94e70'; ctx.font = '800 29px Pretendard, "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#a63d61'; ctx.font = '800 40px Pretendard, "Noto Sans KR", sans-serif';
         if (firstLine) ctx.fillText(firstLine, x + w / 2, y + 42, w - 28);
-        ctx.fillStyle = '#dd7897'; ctx.font = `700 ${w < 260 ? 23 : 26}px Pretendard, "Noto Sans KR", sans-serif`;
-        const maxWidth = w - 34; const lineHeight = 34; const shown = lines.slice(0, 4);
+        ctx.fillStyle = '#c65378'; ctx.font = `750 ${w < 260 ? 30 : 33}px Pretendard, "Noto Sans KR", sans-serif`;
+        const maxWidth = w - 30; const lineHeight = 39; const shown = lines.slice(0, 4);
         const centerY = y + h / 2 + 15; const startY = centerY - ((shown.length - 1) * lineHeight) / 2;
         shown.forEach((line, lineIndex) => {
           let text = line; while (ctx.measureText(text).width > maxWidth && text.length > 3) text = `${text.slice(0, -2)}…`;
           ctx.fillText(text, x + w / 2, startY + lineIndex * lineHeight);
         });
-        ctx.fillStyle = '#b94e70'; ctx.font = '800 24px Pretendard, "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#a63d61'; ctx.font = '800 30px Pretendard, "Noto Sans KR", sans-serif';
         ctx.fillText(days[index], x + w / 2, y + h - 28);
       });
       ctx.restore();
@@ -8031,40 +8036,108 @@ function renderCalendarSection(page) {
     });
   }
   section._drawWeeklyBoard = drawBoard;
-  if (canManage) {
-    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'weekly-schedule-board-edit';
-    const openEditor = () => { if (!mobileScheduleMedia.matches) openWeeklyScheduleDialog(page); };
-    edit.textContent = '방송표 편집'; edit.addEventListener('click', openEditor);
-    imageFrame.addEventListener('click', openEditor); imageFrame.tabIndex = 0; imageFrame.setAttribute('role', 'button');
-    imageFrame.setAttribute('aria-label', '주간 방송표 편집');
-    imageFrame.addEventListener('keydown', (event) => {
-      if (!mobileScheduleMedia.matches && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openEditor(); }
-    });
+  const edit = canManage ? document.createElement('button') : null;
+  if (edit) {
+    edit.type = 'button'; edit.className = 'weekly-schedule-board-edit'; edit.textContent = '방송표 편집';
+    edit.addEventListener('click', (event) => { event.stopPropagation(); if (!mobileScheduleMedia.matches) openWeeklyScheduleDialog(page); });
     imageFrame.append(edit);
-    const syncEditAvailability = () => {
-      const enabled = !mobileScheduleMedia.matches;
-      edit.hidden = !enabled;
-      if (enabled) {
-        imageFrame.tabIndex = 0; imageFrame.setAttribute('role', 'button');
-        imageFrame.setAttribute('aria-label', '주간 방송표 편집');
-      } else {
-        imageFrame.removeAttribute('tabindex'); imageFrame.removeAttribute('role'); imageFrame.removeAttribute('aria-label');
-      }
-    };
-    syncEditAvailability();
-    if (typeof mobileScheduleMedia.addEventListener === 'function') mobileScheduleMedia.addEventListener('change', syncEditAvailability);
-    else mobileScheduleMedia.addListener(syncEditAvailability);
-    section._cleanupWeeklyScheduleViewport = () => {
-      if (typeof mobileScheduleMedia.removeEventListener === 'function') mobileScheduleMedia.removeEventListener('change', syncEditAvailability);
-      else mobileScheduleMedia.removeListener(syncEditAvailability);
-    };
   }
+  const openSchedule = () => {
+    if (canManage && !mobileScheduleMedia.matches) openWeeklyScheduleDialog(page);
+    else openWeeklyScheduleViewDialog(page, section);
+  };
+  imageFrame.addEventListener('click', openSchedule);
+  imageFrame.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openSchedule(); }
+  });
+  const syncScheduleActivation = () => {
+    imageFrame.tabIndex = 0; imageFrame.setAttribute('role', 'button');
+    imageFrame.setAttribute('aria-label', canManage && !mobileScheduleMedia.matches ? '주간 방송표 편집' : '주간 방송표 크게 보기');
+    if (edit) edit.hidden = mobileScheduleMedia.matches;
+  };
+  syncScheduleActivation();
+  if (typeof mobileScheduleMedia.addEventListener === 'function') mobileScheduleMedia.addEventListener('change', syncScheduleActivation);
+  else mobileScheduleMedia.addListener(syncScheduleActivation);
+  section._cleanupWeeklyScheduleViewport = () => {
+    if (typeof mobileScheduleMedia.removeEventListener === 'function') mobileScheduleMedia.removeEventListener('change', syncScheduleActivation);
+    else mobileScheduleMedia.removeListener(syncScheduleActivation);
+  };
   previous.addEventListener('click', () => { const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() - 7); void loadWeeklySchedulePageData(page, localDateKey(date), section); });
   next.addEventListener('click', () => { const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + 7); void loadWeeklySchedulePageData(page, localDateKey(date), section); });
   section.append(heading, imageFrame);
   drawBoard();
   void loadWeeklySchedulePageData(page, state.weekStart, section);
   return section;
+}
+
+function renderWeeklyScheduleViewDialog(page, board) {
+  const state = weeklyScheduleGraphicStateFor(page.streamer.id);
+  const dialog = document.createElement('dialog'); dialog.className = 'account-dialog weekly-schedule-view-dialog';
+  dialog.setAttribute('aria-label', '주간 방송표');
+  const card = document.createElement('section'); card.className = 'account-dialog-card weekly-schedule-view-card';
+  const header = document.createElement('header'); header.className = 'weekly-schedule-view-heading';
+  const titleRow = document.createElement('div'); titleRow.className = 'weekly-schedule-board-title-row';
+  const previous = document.createElement('button'); previous.type = 'button'; previous.className = 'weekly-schedule-arrow'; previous.setAttribute('aria-label', '이전 주 일정'); previous.textContent = '‹';
+  const title = document.createElement('h2'); title.className = 'weekly-schedule-title';
+  const next = document.createElement('button'); next.type = 'button'; next.className = 'weekly-schedule-arrow'; next.setAttribute('aria-label', '다음 주 일정'); next.textContent = '›';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close'; close.setAttribute('aria-label', '주간 방송표 닫기'); close.textContent = '×';
+  titleRow.append(previous, title, next); header.append(titleRow, close);
+  const dateRange = document.createElement('p'); dateRange.className = 'weekly-schedule-date-range';
+  const readingHint = document.createElement('p'); readingHint.className = 'weekly-schedule-view-hint'; readingHint.textContent = '주간 일정은 누구나 열람할 수 있어요.';
+  const status = document.createElement('p'); status.className = 'weekly-schedule-status'; status.setAttribute('role', 'status');
+  const frame = document.createElement('div'); frame.className = 'weekly-schedule-view-frame';
+  const canvas = document.createElement('canvas'); canvas.width = 1672; canvas.height = 941; canvas.className = 'weekly-schedule-view-canvas'; canvas.setAttribute('aria-label', '주간 방송표 미리보기');
+  const avatar = document.createElement('img'); avatar.className = 'weekly-schedule-board-avatar'; avatar.alt = `${page.streamer.nickname} 갤러리 이미지`; avatar.hidden = true;
+  frame.append(canvas, avatar);
+  const detailsHeading = document.createElement('h3'); detailsHeading.className = 'weekly-schedule-view-details-title'; detailsHeading.textContent = '요일별 일정';
+  const details = document.createElement('div'); details.className = 'weekly-schedule-view-details';
+  card.append(header, dateRange, readingHint, status, frame, detailsHeading, details); dialog.append(card);
+  const ctx = canvas.getContext('2d');
+  const weekdays = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+  async function drawView() {
+    await board?._drawWeeklyBoard?.();
+    const sourceCanvas = board?.querySelector('.weekly-schedule-board-canvas');
+    if (ctx && sourceCanvas) ctx.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height);
+    const sourceAvatar = board?.querySelector('.weekly-schedule-board-avatar');
+    avatar.hidden = !sourceAvatar || sourceAvatar.hidden;
+    if (!avatar.hidden && sourceAvatar.src !== avatar.src) avatar.src = sourceAvatar.src;
+    title.textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
+    const start = parseLocalDateKey(state.weekStart); const end = new Date(start); end.setDate(end.getDate() + 6);
+    dateRange.textContent = `${formatWeeklyScheduleDate(start)} – ${formatWeeklyScheduleDate(end)}`;
+    details.replaceChildren();
+    weekdays.forEach((weekday, index) => {
+      const date = new Date(start); date.setDate(date.getDate() + index);
+      const entry = state.entries[index] || {}; const linked = state.linkedEvents[index] || [];
+      const item = document.createElement('article'); item.className = 'weekly-schedule-view-day';
+      const label = document.createElement('h4'); label.textContent = `${date.getMonth() + 1}월 ${date.getDate()}일 ${weekday}`;
+      const lines = [];
+      if (entry.offline) lines.push('휴방');
+      else if (entry.time || entry.content) lines.push(`${entry.time || '시간 미정'}${entry.content ? ` · ${entry.content}` : ''}`);
+      linked.forEach((event) => lines.push(`${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '방송 일정'}`.trim()));
+      const text = document.createElement('p'); text.textContent = lines.length ? lines.join(' / ') : '등록된 일정 없음';
+      item.append(label, text); details.append(item);
+    });
+  }
+  const moveWeek = (offset) => {
+    const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + offset * 7);
+    void loadWeeklySchedulePageData(page, localDateKey(date), dialog);
+  };
+  previous.addEventListener('click', () => moveWeek(-1)); next.addEventListener('click', () => moveWeek(1));
+  close.addEventListener('click', () => dialog.close());
+  dialog._drawWeeklyBoard = drawView;
+  dialog._weeklyScheduleSourceBoard = board;
+  dialog.addEventListener('close', () => dialog.remove());
+  return dialog;
+}
+
+function openWeeklyScheduleViewDialog(page, board) {
+  if (!board?._weeklyScheduleViewDialog?.isConnected) {
+    const dialog = renderWeeklyScheduleViewDialog(page, board);
+    board._weeklyScheduleViewDialog = dialog; board.append(dialog);
+  }
+  const dialog = board._weeklyScheduleViewDialog;
+  dialog._drawWeeklyBoard?.();
+  showFanPageModal(dialog);
 }
 
 function openFanPageScheduleDialog(selectedDate) {
@@ -8259,7 +8332,9 @@ function renderWeeklyScheduleDialog(page) {
   linkedEventsPanel.append(linkedEventsHeading, linkedEventsList);
   linkedEventsPanel.hidden = true;
 
-  const imageTools = document.createElement('div'); imageTools.className = 'weekly-schedule-image-tools'; imageTools.hidden = true;
+  const imageTools = document.createElement('dialog'); imageTools.className = 'account-dialog weekly-schedule-image-tools';
+  imageTools.setAttribute('aria-label', '갤러리 이미지 선택 및 등록');
+  const imageCard = document.createElement('div'); imageCard.className = 'account-dialog-card weekly-schedule-gallery-card';
   const imageHeading = document.createElement('div'); imageHeading.className = 'weekly-schedule-image-heading';
   const imageLabel = document.createElement('strong'); imageLabel.textContent = '갤러리 이미지';
   const imageNote = document.createElement('small'); imageNote.textContent = '이미지를 선택하면 방송표에 바로 적용돼요.';
@@ -8294,7 +8369,8 @@ function renderWeeklyScheduleDialog(page) {
   const uploadStatus = document.createElement('p'); uploadStatus.className = 'weekly-schedule-upload-status'; uploadStatus.setAttribute('role', 'status');
   const uploadSubmit = document.createElement('button'); uploadSubmit.type = 'button'; uploadSubmit.className = 'button button-primary'; uploadSubmit.textContent = '갤러리에 등록하고 선택';
   uploadPanel.append(uploadFields, uploadNote, uploadStatus, uploadSubmit);
-  imageTools.append(imageHeading, imageActions, selectedImageNote, galleryPanel, uploadPanel);
+  imageCard.append(imageHeading, imageActions, selectedImageNote, galleryPanel, uploadPanel);
+  imageTools.append(imageCard);
 
   const dayHeading = document.createElement('div'); dayHeading.className = 'weekly-schedule-days-heading';
   const daysTitle = document.createElement('h3'); daysTitle.textContent = '요일별 일정';
@@ -8346,7 +8422,7 @@ function renderWeeklyScheduleDialog(page) {
   const avatarHitArea = document.createElement('button'); avatarHitArea.type = 'button'; avatarHitArea.className = 'weekly-schedule-avatar-hit-area';
   avatarHitArea.setAttribute('aria-label', '템플릿 이미지 칸에서 갤러리 사진 선택 또는 등록');
   previousWeek.classList.add('weekly-schedule-stage-previous'); nextWeek.classList.add('weekly-schedule-stage-next');
-  previewFrame.append(previewCanvas, previousWeek, nextWeek, dayGrid, avatarHitArea, imageTools);
+  previewFrame.append(previewCanvas, previousWeek, nextWeek, dayGrid, avatarHitArea);
 
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
   const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요. 기존 연동 일정은 수정되지 않습니다.';
@@ -8357,7 +8433,7 @@ function renderWeeklyScheduleDialog(page) {
   footerActions.append(cancel, download); footer.append(saveHint, saveStatus, footerActions);
   dayHeading.hidden = true; previewHeading.hidden = true;
   form.append(meta, weekTools, previewFrame, linkedEventsPanel, footer);
-  card.append(header, form); dialog.append(card);
+  card.append(header, form); dialog.append(card, imageTools);
 
   const templateImage = new Image();
   const templateImageUrl = new URL('./assets/weekly-schedule-template.png?v=20261031-weekly-board-v2', import.meta.url).href;
@@ -8505,7 +8581,8 @@ function renderWeeklyScheduleDialog(page) {
       state.localObjectUrl = '';
       state.selectedImage = { ...item, image };
       state.avatarImageId = item.id;
-      state.galleryOpen = false; galleryPanel.hidden = true; uploadPanel.hidden = true; imageTools.hidden = true;
+      state.galleryOpen = false; galleryPanel.hidden = true; uploadPanel.hidden = true;
+      if (imageTools.open) imageTools.close();
       if (persist) markWeeklyDirty(); else drawPreview();
     } catch (error) {
       galleryStatus.textContent = error.message || '이미지를 선택하지 못했어요.';
@@ -8562,7 +8639,7 @@ function renderWeeklyScheduleDialog(page) {
       state.avatarImageId = registered.imageId;
       state.galleryItems = [{ ...state.selectedImage, thumbUrl: registered.thumbUrl }, ...state.galleryItems.filter((item) => item.id !== registered.imageId)];
       state.galleryLoaded = true; state.galleryOpen = false; state.uploadOpen = false;
-      galleryPanel.hidden = true; uploadPanel.hidden = true; imageTools.hidden = true; fileInput.value = '';
+      galleryPanel.hidden = true; uploadPanel.hidden = true; if (imageTools.open) imageTools.close(); fileInput.value = '';
       uploadStatus.textContent = '갤러리 등록을 마치고 방송표에 적용했어요.';
       markWeeklyDirty(); showToast('갤러리에 이미지를 등록하고 방송표에 넣었어요.');
     } catch (error) {
@@ -8606,7 +8683,6 @@ function renderWeeklyScheduleDialog(page) {
     if (state.avatarImageId && state.savedAvatar && (!state.selectedImage || state.selectedImage.id !== state.avatarImageId)) {
       void selectScheduleGalleryImage({ id: state.avatarImageId, thumbUrl: state.savedAvatar.thumbUrl, imageUrl: state.savedAvatar.imageUrl, categoryLabel: '저장된 갤러리 이미지' }, false);
     }
-    imageTools.hidden = true;
     avatarHitArea.hidden = false;
     drawPreview(false);
   }
@@ -8681,14 +8757,12 @@ function renderWeeklyScheduleDialog(page) {
     if (state.galleryOpen) { state.uploadOpen = false; uploadPanel.hidden = true; }
   });
   avatarHitArea.addEventListener('click', () => {
-    imageTools.hidden = !imageTools.hidden;
-    if (!imageTools.hidden) {
-      state.galleryOpen = false; state.uploadOpen = false;
-      galleryPanel.hidden = true; uploadPanel.hidden = true;
-      clearImage.hidden = !(state.selectedImage || state.savedAvatar);
-    }
+    state.galleryOpen = false; state.uploadOpen = false;
+    galleryPanel.hidden = true; uploadPanel.hidden = true;
+    clearImage.hidden = !(state.selectedImage || state.savedAvatar);
+    showFanPageModal(imageTools);
   });
-  closeImageTools.addEventListener('click', () => { imageTools.hidden = true; });
+  closeImageTools.addEventListener('click', () => { imageTools.close(); });
   uploadImage.addEventListener('click', () => {
     state.uploadOpen = !state.uploadOpen; uploadPanel.hidden = !state.uploadOpen;
     if (state.uploadOpen) { state.galleryOpen = false; galleryPanel.hidden = true; }
@@ -8696,7 +8770,7 @@ function renderWeeklyScheduleDialog(page) {
   clearImage.addEventListener('click', () => {
     if (state.localObjectUrl) URL.revokeObjectURL(state.localObjectUrl);
     state.localObjectUrl = ''; state.selectedImage = null; state.avatarImageId = ''; state.savedAvatar = null;
-    imageTools.hidden = true; markWeeklyDirty();
+    if (imageTools.open) imageTools.close(); markWeeklyDirty();
   });
   galleryMore.addEventListener('click', () => loadScheduleGallery(true));
   uploadSubmit.addEventListener('click', uploadScheduleGalleryImage);
