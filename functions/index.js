@@ -3709,7 +3709,20 @@ async function fetchYouTubeJson(resource, parameters, apiKey) {
   return payload;
 }
 
-function normalizeYouTubeVideo(item) {
+function isKoreanYouTubeLanguage(value) {
+  return /^ko(?:[-_]|$)/i.test(String(value || '').trim());
+}
+
+function koreanLocalizedYouTubeTitle(snippet) {
+  if (!snippet || typeof snippet !== 'object') return '';
+  const isKoreanVideo = isKoreanYouTubeLanguage(snippet.defaultLanguage)
+    || isKoreanYouTubeLanguage(snippet.defaultAudioLanguage);
+  const localizedTitle = snippet.localized && typeof snippet.localized.title === 'string'
+    ? snippet.localized.title.trim() : '';
+  return isKoreanVideo ? localizedTitle.slice(0, 300) : '';
+}
+
+function normalizeYouTubeVideo(item, options = {}) {
   if (!item || typeof item !== 'object') return null;
   const snippet = item && item.snippet && typeof item.snippet === 'object' ? item.snippet : {};
   const contentDetails = item && item.contentDetails && typeof item.contentDetails === 'object' ? item.contentDetails : {};
@@ -3729,10 +3742,11 @@ function normalizeYouTubeVideo(item) {
       // 썸네일 주소가 예상과 다르면 이미지만 생략한다.
     }
   }
+  const koreanTitle = options.preferKoreanLocalizedTitle === true ? koreanLocalizedYouTubeTitle(snippet) : '';
   return {
     id: videoId,
-    title: typeof snippet.title === 'string' ? snippet.title.trim().slice(0, 300)
-      : typeof item.title === 'string' ? item.title.trim().slice(0, 300) : '제목 없음',
+    title: koreanTitle || (typeof snippet.title === 'string' ? snippet.title.trim().slice(0, 300)
+      : typeof item.title === 'string' ? item.title.trim().slice(0, 300) : '제목 없음'),
     publishedAt: typeof snippet.publishedAt === 'string' ? snippet.publishedAt.slice(0, 32)
       : typeof item.publishedAt === 'string' ? item.publishedAt.slice(0, 32) : '',
     thumbnailUrl,
@@ -3830,7 +3844,23 @@ async function fetchVideoLibraryYouTubePage(uploadsPlaylistId, apiKey, pageToken
     maxResults: VIDEO_LIBRARY_CHANNEL_PAGE_SIZE,
     pageToken,
   }, apiKey);
-  const items = Array.isArray(response.items) ? response.items.map(normalizeYouTubeVideo).filter(Boolean) : [];
+  let items = Array.isArray(response.items) ? response.items.map(normalizeYouTubeVideo).filter(Boolean) : [];
+  const videoIds = [...new Set(items.map((item) => item.id).filter((id) => /^[A-Za-z0-9_-]{11}$/.test(id)))];
+  if (videoIds.length) {
+    try {
+      const videosResponse = await fetchYouTubeJson('videos', {
+        part: 'snippet', id: videoIds.join(','), hl: 'ko',
+      }, apiKey);
+      const koreanTitles = new Map((Array.isArray(videosResponse.items) ? videosResponse.items : [])
+        .map((video) => [String(video && video.id || ''), koreanLocalizedYouTubeTitle(video && video.snippet)]));
+      items = items.map((item) => {
+        const title = koreanTitles.get(item.id);
+        return title ? { ...item, title } : item;
+      });
+    } catch (error) {
+      console.warn('Could not load Korean YouTube titles for video library; using playlist titles:', error.message || error);
+    }
+  }
   return {
     items,
     nextPageToken: typeof response.nextPageToken === 'string' ? response.nextPageToken : '',
@@ -6209,8 +6239,9 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     let thumbnailUrl = '';
     let publishedAt = '';
     if (video.platform === 'youtube') {
-      const response = await fetchYouTubeJson('videos', { part: 'snippet', id: video.videoId }, YOUTUBE_DATA_API_KEY.value());
-      const metadata = Array.isArray(response.items) ? normalizeYouTubeVideo(response.items[0]) : null;
+      const response = await fetchYouTubeJson('videos', { part: 'snippet', id: video.videoId, hl: 'ko' }, YOUTUBE_DATA_API_KEY.value());
+      const metadata = Array.isArray(response.items)
+        ? normalizeYouTubeVideo(response.items[0], { preferKoreanLocalizedTitle: true }) : null;
       if (!metadata) throw new HttpsError('failed-precondition', '공개 YouTube 영상 링크를 확인할 수 없어요.');
       if (!title) title = metadata.title;
       thumbnailUrl = metadata.thumbnailUrl || `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`;
