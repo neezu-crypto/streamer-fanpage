@@ -4,7 +4,7 @@ const { applicationDefault } = require('firebase-admin/app');
 const { buildAdminStatsSnapshotFromProjection, makeDateKeys } = require('./admin-stats-snapshot');
 
 const PROJECT_ID = 'soop-stock-market';
-const DATABASE_URL = 'https://soop-stock-market-default-rtdb.firebaseio.com';
+const DATABASE_URL = 'https://streamer-fanpage-rtdb.firebaseio.com';
 const DEFAULT_BUCKET = 'soop-stock-market-fanpage-admin-stats';
 const OBJECT_NAME = 'admin-stats/v1/latest.json';
 const REQUEST_TIMEOUT_MS = 60 * 1000;

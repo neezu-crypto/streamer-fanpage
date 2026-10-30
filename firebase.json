@@ -1,4 +1,10 @@
 {
+  "database": [
+    {
+      "target": "fanpage",
+      "rules": "database.fanpage.rules.json"
+    }
+  ],
   "functions": [
     {
       "source": "functions",

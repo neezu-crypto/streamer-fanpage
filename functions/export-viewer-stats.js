@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const PROJECT_ID = 'soop-stock-market';
-const DATABASE_URL = 'https://soop-stock-market-default-rtdb.firebaseio.com';
+const DATABASE_URL = 'https://streamer-fanpage-rtdb.firebaseio.com';
 const SOURCE_PATH = 'streamerFanPageViewerStatsCache';
 const CACHE_SCHEMA_VERSION = 1;
 const STATIC_SCHEMA_VERSION = 1;

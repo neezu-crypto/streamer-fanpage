@@ -1,6 +1,6 @@
 'use strict';
 
-const { getDatabase } = require('firebase-admin/database');
+const { getDatabase, getDatabaseWithUrl } = require('firebase-admin/database');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 
 const ADS_PATH = 'streamerFanPageSponsorAds';
@@ -16,6 +16,9 @@ const REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const REQUEST_COOLDOWN_MS = 60 * 1000;
 const SOOP_ID_RE = /^[a-z0-9]{2,20}$/;
 const FORBIDDEN_TEXT_RE = /[<>\x00-\x1F\x7F]/;
+const FANPAGE_DATABASE_URL = 'https://streamer-fanpage-rtdb.firebaseio.com';
+const fanpageDb = () => getDatabaseWithUrl(FANPAGE_DATABASE_URL);
+const sharedDb = () => getDatabase();
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {
@@ -24,8 +27,8 @@ function requireAuth(request) {
   return request.auth.uid;
 }
 
-async function isAdmin(uid, db) {
-  const snapshot = await db.ref(`adminCenter/adminUids/${uid}`).get();
+async function isAdmin(uid) {
+  const snapshot = await sharedDb().ref(`adminCenter/adminUids/${uid}`).get();
   return snapshot.val() === true;
 }
 
@@ -81,7 +84,7 @@ async function expirePendingRequest(db, requestId, record) {
 
 exports.streamerFanPageSponsorAds = onCall({ maxInstances: 20, enforceAppCheck: true }, async (request) => {
   const uid = requireAuth(request);
-  const db = getDatabase();
+  const db = fanpageDb();
   const data = request.data || {};
   const action = String(data.action || 'list');
 
@@ -126,7 +129,7 @@ exports.streamerFanPageSponsorAds = onCall({ maxInstances: 20, enforceAppCheck: 
         startsAt: Math.max(0, Number(ad.startsAt) || 0),
         expiresAt: Math.max(0, Number(ad.expiresAt) || 0),
       }));
-    return { ads, pendingByRail, isAdmin: await isAdmin(uid, db), maxAdsPerRail: MAX_ADS_PER_RAIL };
+    return { ads, pendingByRail, isAdmin: await isAdmin(uid), maxAdsPerRail: MAX_ADS_PER_RAIL };
   }
 
   if (action === 'submit') {
@@ -352,8 +355,8 @@ function soopIdFromRecord(record) {
 
 exports.streamerFanPageAdminSponsorAds = onCall({ maxInstances: 10, enforceAppCheck: true }, async (request) => {
   const adminUid = requireAuth(request);
-  const db = getDatabase();
-  if (!await isAdmin(adminUid, db)) throw new HttpsError('permission-denied', '관리자만 홍보 신청을 관리할 수 있습니다.');
+  const db = fanpageDb();
+  if (!await isAdmin(adminUid)) throw new HttpsError('permission-denied', '관리자만 홍보 신청을 관리할 수 있습니다.');
   const data = request.data || {};
   const action = String(data.action || 'list');
 

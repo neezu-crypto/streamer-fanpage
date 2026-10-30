@@ -9,7 +9,8 @@ const {
   validateAdminStatsSnapshot,
 } = require('./admin-stats-snapshot');
 
-const DATABASE_URL = 'https://soop-stock-market-default-rtdb.firebaseio.com';
+const SHARED_DATABASE_URL = 'https://soop-stock-market-default-rtdb.firebaseio.com';
+const FANPAGE_DATABASE_URL = 'https://streamer-fanpage-rtdb.firebaseio.com';
 const ROOT = 'streamerFanPageAdminMetrics/v1';
 const REQUEST_TIMEOUT_MS = 60 * 1000;
 
@@ -22,9 +23,9 @@ function googleAccessToken() {
   return token;
 }
 
-async function readPaths(accessToken, paths) {
+async function readPaths(accessToken, paths, databaseUrl) {
   const entries = await Promise.all(Object.entries(paths).map(async ([key, path]) => {
-    const response = await fetch(new URL(encodeURI(`${path}.json`), `${DATABASE_URL}/`), {
+    const response = await fetch(new URL(encodeURI(`${path}.json`), `${databaseUrl}/`), {
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -36,13 +37,18 @@ async function readPaths(accessToken, paths) {
 }
 
 async function readSources(accessToken) {
-  return readPaths(accessToken, {
-    verified: 'streamerVerifications',
-    fanPageStats: 'streamerFanPageStats',
-    viewerStatsLimits: 'streamerFanPageViewerStatsLimits',
-    streamerNames: 'streamerNames',
-    viewerStatsQueue: 'streamerFanPageViewerStatsQueue',
-  });
+  const [shared, fanpage] = await Promise.all([
+    readPaths(accessToken, {
+      verified: 'streamerVerifications',
+      streamerNames: 'streamerNames',
+    }, SHARED_DATABASE_URL),
+    readPaths(accessToken, {
+      fanPageStats: 'streamerFanPageStats',
+      viewerStatsLimits: 'streamerFanPageViewerStatsLimits',
+      viewerStatsQueue: 'streamerFanPageViewerStatsQueue',
+    }, FANPAGE_DATABASE_URL),
+  ]);
+  return { ...shared, ...fanpage };
 }
 
 async function readLiveProjection(accessToken) {
@@ -52,7 +58,7 @@ async function readLiveProjection(accessToken) {
     fanPageStats: `${ROOT}/fanpage/statsLive`,
     viewerStatsDaily: `${ROOT}/viewerStats/dailyLive`,
     queueNow: `${ROOT}/viewerStats/queueLive`,
-  });
+  }, FANPAGE_DATABASE_URL);
   return live;
 }
 
@@ -100,7 +106,7 @@ async function seedProjection(accessToken = googleAccessToken(), { now = Date.no
     [`${ROOT}/viewerStats/dailyBaseline`]: seed.viewerStats.baseline,
     [`${ROOT}/viewerStats/queueBaseline`]: seed.viewerStats.queueBaseline,
   };
-  const updateResponse = await fetch(`${DATABASE_URL}/.json`, {
+  const updateResponse = await fetch(`${FANPAGE_DATABASE_URL}/.json`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${accessToken}`,

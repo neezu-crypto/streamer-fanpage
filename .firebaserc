@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "soop-stock-market"
+  },
+  "targets": {
+    "soop-stock-market": {
+      "database": {
+        "fanpage": [
+          "streamer-fanpage-rtdb"
+        ]
+      }
+    }
+  }
+}
