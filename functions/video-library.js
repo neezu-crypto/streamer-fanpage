@@ -134,6 +134,22 @@ function normalizeVideoLibraryCursor(value) {
   return Number.isFinite(sortAt) && sortAt >= 0 && VIDEO_LIBRARY_ITEM_ID_PATTERN.test(id) ? { sortAt, id } : null;
 }
 
+function normalizeVideoLibrarySearchQuery(value) {
+  if (typeof value !== 'string') return '';
+  return value.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ko-KR');
+}
+
+function matchesVideoLibrarySearch(item, query) {
+  const normalizedQuery = normalizeVideoLibrarySearchQuery(query);
+  if (!normalizedQuery || !item || typeof item !== 'object') return false;
+  const searchable = [item.title, item.channelTitle, item.platform, item.videoId]
+    .filter((value) => typeof value === 'string')
+    .join(' ')
+    .normalize('NFC')
+    .toLocaleLowerCase('ko-KR');
+  return searchable.includes(normalizedQuery);
+}
+
 module.exports = {
   VIDEO_LIBRARY_CATEGORY_ID_PATTERN,
   VIDEO_LIBRARY_CHANNEL_ID_PATTERN,
@@ -147,6 +163,8 @@ module.exports = {
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
+  normalizeVideoLibrarySearchQuery,
+  matchesVideoLibrarySearch,
   parseVideoLibrarySortKey,
   paginateVideoLibraryEntries,
   shouldActivateVideoLibraryGeneration,

@@ -6,6 +6,8 @@ const {
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
+  normalizeVideoLibrarySearchQuery,
+  matchesVideoLibrarySearch,
   parseVideoLibrarySortKey,
   paginateVideoLibraryEntries,
   hasInitialVideoLibraryImport,
@@ -62,6 +64,16 @@ test('video library pagination sorts newest first, deduplicates sources, and adv
   const second = paginateVideoLibraryEntries([manual, channel], first.nextCursor, 2);
   assert.deepEqual(second.items.map((item) => item.id), ['youtube_lmnopqrstuv']);
   assert.equal(second.hasMore, false);
+});
+
+test('video library search matches complete titles and channel names case-insensitively', () => {
+  const item = { title: '먼작귀 치이카와 낙서 N 보석십자수', channelTitle: '온이유 채널', platform: 'youtube', videoId: 'abcdefghijk' };
+  assert.equal(normalizeVideoLibrarySearchQuery('  치이카와   낙서 '), '치이카와 낙서');
+  assert.equal(matchesVideoLibrarySearch(item, '치이카와 낙서'), true);
+  assert.equal(matchesVideoLibrarySearch(item, '온이유'), true);
+  assert.equal(matchesVideoLibrarySearch(item, 'YOUTUBE'), true);
+  assert.equal(matchesVideoLibrarySearch(item, '없는 영상'), false);
+  assert.equal(matchesVideoLibrarySearch(item, ''), false);
 });
 
 test('video library cursors reject malformed positions', () => {
