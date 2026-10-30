@@ -43,6 +43,9 @@ const callCommentProfileSave = authenticatedCallable('streamerFanPageCommentProf
 const callVodRefresh = authenticatedCallable('streamerFanPageVodRefresh', { timeout: 3600000 });
 const callCalendar = authenticatedCallable('streamerFanPageCalendar');
 const callLiveStatus = authenticatedCallable('streamerFanPageLiveStatus');
+const callGalleryUploadTarget = authenticatedCallable('streamerFanPageGallery');
+const callGalleryUploadPrepare = authenticatedCallable('requestImageUpload');
+const callGalleryImageRegister = authenticatedCallable('registerImage');
 const callGallery = authenticatedCallable('streamerFanPageGallery');
 const callScheduleAdd = authenticatedCallable('streamerFanPageScheduleAdd');
 const callScheduleDelete = authenticatedCallable('streamerFanPageScheduleDelete');
@@ -371,6 +374,7 @@ const vodPageLoadsInProgress = new Set();
 let vodCommentState = null;
 let vodCommentRequestId = 0;
 const calendarStates = new Map();
+const weeklyScheduleGraphicStates = new Map();
 const liveStatusStates = new Map();
 const youtubeStates = new Map();
 const cafeStates = new Map();
@@ -4497,7 +4501,7 @@ function renderFanPage(page, options = {}) {
     document.body.classList.add('fanpage-bottom-banner-active');
     view.append(bottomBanner);
   }
-  if (page.isOwner) view.append(renderFanPageScheduleDialog(page));
+  if (page.isOwner) view.append(renderFanPageScheduleDialog(page), renderWeeklyScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
   fanPageQuickNavCleanup = createFanPageQuickRemote(view);
@@ -7843,6 +7847,7 @@ function renderGallerySection(page) {
 
 function renderCalendarSection(page) {
   const streamerId = page.streamer.id;
+  const canBuildGraphic = page.isOwner;
   const state = calendarStateFor(streamerId);
   const section = document.createElement('section');
   section.className = 'calendar-section content-card';
@@ -7853,7 +7858,7 @@ function renderCalendarSection(page) {
   const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'STREAMER SCHEDULE';
   const title = document.createElement('h2'); title.textContent = '방송 일정';
   copy.append(eyebrow, title);
-  if (page.isOwner) {
+  if (canBuildGraphic) {
     const ownerHint = document.createElement('p'); ownerHint.className = 'calendar-owner-hint';
     ownerHint.textContent = '날짜를 더블 클릭해 해당 날짜에 일정을 추가할 수 있어요.';
     copy.append(ownerHint);
@@ -7889,11 +7894,14 @@ function renderCalendarSection(page) {
     state.days = []; state.fetchedAt = null; state.stale = false;
     refreshCalendarSection(streamerId); loadCalendar(streamerId);
   });
-  if (page.isOwner) {
+  if (canBuildGraphic) {
     const addSchedule = document.createElement('button'); addSchedule.type = 'button';
     addSchedule.className = 'button button-primary calendar-add-button'; addSchedule.textContent = '＋ 일정 추가';
     addSchedule.addEventListener('click', () => openFanPageScheduleDialog(state.selectedDate));
-    controls.append(mode, navigation, today, addSchedule);
+    const makeScheduleGraphic = document.createElement('button'); makeScheduleGraphic.type = 'button';
+    makeScheduleGraphic.className = 'button calendar-graphic-button'; makeScheduleGraphic.textContent = '주간 방송표 만들기';
+    makeScheduleGraphic.addEventListener('click', () => openWeeklyScheduleDialog(page));
+    controls.append(mode, navigation, today, addSchedule, makeScheduleGraphic);
   } else controls.append(mode, navigation, today);
   const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'calendar-refresh-button';
   refresh.disabled = state.loading; refresh.setAttribute('aria-label', '일정 새로고침'); refresh.textContent = state.loading ? '불러오는 중…' : '↻ 새로고침';
@@ -8135,6 +8143,429 @@ function renderFanPageScheduleDialog(page) {
   });
   dialog.append(form);
   return dialog;
+}
+
+function weeklyScheduleGraphicStateFor(streamerId) {
+  if (!weeklyScheduleGraphicStates.has(streamerId)) {
+    const monday = new Date();
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    weeklyScheduleGraphicStates.set(streamerId, {
+      weekStart: localDateKey(monday),
+      selectedImage: null,
+      localObjectUrl: '',
+      galleryItems: [],
+      galleryLoaded: false,
+      galleryNextOffset: 0,
+      galleryHasMore: false,
+      galleryLoading: false,
+      galleryOpen: false,
+      uploadOpen: false,
+      uploadBusy: false,
+    });
+  }
+  return weeklyScheduleGraphicStates.get(streamerId);
+}
+
+function renderWeeklyScheduleDialog(page) {
+  const state = weeklyScheduleGraphicStateFor(page.streamer.id);
+  const dialog = document.createElement('dialog');
+  dialog.id = 'weeklyScheduleGraphicDialog'; dialog.className = 'account-dialog weekly-schedule-dialog';
+  const card = document.createElement('div'); card.className = 'account-dialog-card weekly-schedule-card';
+  const header = document.createElement('div'); header.className = 'profile-editor-heading';
+  const headingCopy = document.createElement('div');
+  const title = document.createElement('h2'); title.id = 'weeklyScheduleGraphicTitle'; title.textContent = '주간 방송표 만들기';
+  const intro = document.createElement('p'); intro.className = 'weekly-schedule-intro';
+  intro.textContent = '갤러리 사진과 요일별 방송 내용을 넣고 공유용 이미지를 저장하세요.';
+  headingCopy.append(title, intro);
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
+  close.setAttribute('aria-label', '방송표 편집 닫기'); close.textContent = '×'; close.addEventListener('click', () => dialog.close());
+  header.append(headingCopy, close);
+
+  const form = document.createElement('form'); form.className = 'weekly-schedule-form';
+  form.addEventListener('submit', (event) => event.preventDefault());
+  const meta = document.createElement('div'); meta.className = 'weekly-schedule-meta';
+  const titleField = document.createElement('label'); titleField.className = 'profile-editor-field'; titleField.textContent = '방송표 제목';
+  const graphicTitle = document.createElement('input'); graphicTitle.name = 'graphicTitle'; graphicTitle.type = 'text'; graphicTitle.maxLength = 40;
+  graphicTitle.value = `${page.streamer.nickname} 주간 방송 일정`; graphicTitle.required = true;
+  titleField.append(graphicTitle);
+  const weekField = document.createElement('label'); weekField.className = 'profile-editor-field'; weekField.textContent = '월요일 날짜';
+  const weekInput = document.createElement('input'); weekInput.name = 'weekStart'; weekInput.type = 'date'; weekInput.required = true; weekInput.value = state.weekStart;
+  weekField.append(weekInput);
+  meta.append(titleField, weekField);
+
+  const weekTools = document.createElement('div'); weekTools.className = 'weekly-schedule-tools';
+  const previousWeek = document.createElement('button'); previousWeek.type = 'button'; previousWeek.className = 'button'; previousWeek.textContent = '← 이전 주';
+  const nextWeek = document.createElement('button'); nextWeek.type = 'button'; nextWeek.className = 'button'; nextWeek.textContent = '다음 주 →';
+  const importCurrent = document.createElement('button'); importCurrent.type = 'button'; importCurrent.className = 'button weekly-schedule-import'; importCurrent.textContent = '캘린더 일정 가져오기';
+  const copyPrevious = document.createElement('button'); copyPrevious.type = 'button'; copyPrevious.className = 'button weekly-schedule-import'; copyPrevious.textContent = '지난주 일정 복사';
+  const importStatus = document.createElement('small'); importStatus.className = 'weekly-schedule-import-status'; importStatus.setAttribute('role', 'status');
+  weekTools.append(previousWeek, nextWeek, importCurrent, copyPrevious, importStatus);
+
+  const imageTools = document.createElement('div'); imageTools.className = 'weekly-schedule-image-tools';
+  const imageHeading = document.createElement('div'); imageHeading.className = 'weekly-schedule-image-heading';
+  const imageLabel = document.createElement('strong'); imageLabel.textContent = '왼쪽 아바타 이미지';
+  const imageNote = document.createElement('small'); imageNote.textContent = '갤러리에서 선택하거나 이 화면에서 갤러리에 등록할 수 있어요.';
+  imageHeading.append(imageLabel, imageNote);
+  const imageActions = document.createElement('div'); imageActions.className = 'weekly-schedule-image-actions';
+  const chooseImage = document.createElement('button'); chooseImage.type = 'button'; chooseImage.className = 'button'; chooseImage.textContent = '갤러리에서 선택';
+  const uploadImage = document.createElement('button'); uploadImage.type = 'button'; uploadImage.className = 'button'; uploadImage.textContent = '갤러리에 이미지 등록';
+  const clearImage = document.createElement('button'); clearImage.type = 'button'; clearImage.className = 'button weekly-schedule-clear-image'; clearImage.textContent = '이미지 제거';
+  imageActions.append(chooseImage, uploadImage, clearImage);
+  const selectedImageNote = document.createElement('p'); selectedImageNote.className = 'weekly-schedule-selected-image'; selectedImageNote.textContent = '아직 사진을 선택하지 않았어요.';
+
+  const galleryPanel = document.createElement('div'); galleryPanel.className = 'weekly-schedule-gallery-picker'; galleryPanel.hidden = true;
+  const galleryStatus = document.createElement('p'); galleryStatus.className = 'weekly-schedule-gallery-status'; galleryStatus.setAttribute('role', 'status');
+  const galleryGrid = document.createElement('div'); galleryGrid.className = 'weekly-schedule-gallery-grid';
+  const galleryMore = document.createElement('button'); galleryMore.type = 'button'; galleryMore.className = 'button'; galleryMore.textContent = '갤러리 이미지 더 보기';
+  galleryPanel.append(galleryStatus, galleryGrid, galleryMore);
+
+  const uploadPanel = document.createElement('div'); uploadPanel.className = 'weekly-schedule-upload-panel'; uploadPanel.hidden = true;
+  const uploadFields = document.createElement('div'); uploadFields.className = 'weekly-schedule-upload-fields';
+  const categoryLabel = document.createElement('label'); categoryLabel.className = 'profile-editor-field'; categoryLabel.textContent = '갤러리 분류';
+  const category = document.createElement('select'); category.name = 'galleryCategory';
+  [['screenshot', '스크린샷'], ['ai-art', 'AI 일러스트'], ['fan-art', '팬아트'], ['meme', '밈'], ['etc', '기타']].forEach(([value, label]) => {
+    const option = document.createElement('option'); option.value = value; option.textContent = label; category.append(option);
+  });
+  categoryLabel.append(category);
+  const fileLabel = document.createElement('label'); fileLabel.className = 'profile-editor-field'; fileLabel.textContent = '이미지 파일';
+  const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
+  fileLabel.append(fileInput); uploadFields.append(categoryLabel, fileLabel);
+  const uploadNote = document.createElement('small'); uploadNote.className = 'weekly-schedule-upload-note';
+  uploadNote.textContent = '갤러리와 같은 jpg/png/webp/gif 형식, 최대 15MB입니다. 썸네일도 함께 생성돼요.';
+  const uploadStatus = document.createElement('p'); uploadStatus.className = 'weekly-schedule-upload-status'; uploadStatus.setAttribute('role', 'status');
+  const uploadSubmit = document.createElement('button'); uploadSubmit.type = 'button'; uploadSubmit.className = 'button button-primary'; uploadSubmit.textContent = '갤러리에 등록하고 선택';
+  uploadPanel.append(uploadFields, uploadNote, uploadStatus, uploadSubmit);
+  imageTools.append(imageHeading, imageActions, selectedImageNote, galleryPanel, uploadPanel);
+
+  const dayHeading = document.createElement('div'); dayHeading.className = 'weekly-schedule-days-heading';
+  const daysTitle = document.createElement('h3'); daysTitle.textContent = '요일별 일정';
+  const daysHint = document.createElement('small'); daysHint.textContent = '시간은 선택 입력이며, 휴방을 켜면 OFFLINE으로 표시돼요.';
+  dayHeading.append(daysTitle, daysHint);
+  const dayGrid = document.createElement('div'); dayGrid.className = 'weekly-schedule-day-edit-grid';
+  const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+  const dayInputs = [];
+  weekdays.forEach((weekday, index) => {
+    const dayCard = document.createElement('section'); dayCard.className = 'weekly-schedule-day-edit';
+    const dayLabel = document.createElement('strong'); dayLabel.className = 'weekly-schedule-day-label'; dayLabel.textContent = `${weekday}요일`;
+    const offlineLabel = document.createElement('label'); offlineLabel.className = 'weekly-schedule-offline-label';
+    const offline = document.createElement('input'); offline.type = 'checkbox'; offline.name = `offline-${index}`;
+    offlineLabel.append(offline, document.createTextNode('휴방'));
+    const timeLabel = document.createElement('label'); timeLabel.className = 'profile-editor-field'; timeLabel.textContent = '시간';
+    const time = document.createElement('input'); time.type = 'time'; time.name = `time-${index}`; timeLabel.append(time);
+    const textLabel = document.createElement('label'); textLabel.className = 'profile-editor-field'; textLabel.textContent = '방송 내용';
+    const text = document.createElement('input'); text.type = 'text'; text.name = `text-${index}`; text.maxLength = 60;
+    text.placeholder = '예: 저녁 합방 · 발로란트'; textLabel.append(text);
+    offline.addEventListener('change', () => { time.disabled = offline.checked; text.disabled = offline.checked; drawPreview(); });
+    time.addEventListener('input', drawPreview); text.addEventListener('input', drawPreview);
+    dayCard.append(dayLabel, offlineLabel, timeLabel, textLabel); dayGrid.append(dayCard);
+    dayInputs.push({ offline, time, text });
+  });
+
+  const previewHeading = document.createElement('div'); previewHeading.className = 'weekly-schedule-preview-heading';
+  const previewTitle = document.createElement('h3'); previewTitle.textContent = '미리보기';
+  const previewNote = document.createElement('small'); previewNote.textContent = '템플릿 이미지는 새로 제작한 팬페이지 전용 배경입니다.';
+  previewHeading.append(previewTitle, previewNote);
+  const previewFrame = document.createElement('div'); previewFrame.className = 'weekly-schedule-preview-frame';
+  const previewCanvas = document.createElement('canvas'); previewCanvas.className = 'weekly-schedule-preview-canvas';
+  previewCanvas.width = 1672; previewCanvas.height = 941; previewCanvas.setAttribute('aria-label', '주간 방송표 이미지 미리보기');
+  previewFrame.append(previewCanvas);
+
+  const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
+  const saveHint = document.createElement('small'); saveHint.textContent = '이미지는 PNG로 내려받을 수 있습니다. 입력한 요일별 내용은 현재 브라우저 편집 상태로만 유지됩니다.';
+  const footerActions = document.createElement('div'); footerActions.className = 'profile-editor-footer-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '닫기'; cancel.addEventListener('click', () => dialog.close());
+  const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
+  footerActions.append(cancel, download); footer.append(saveHint, footerActions);
+  form.append(meta, weekTools, imageTools, dayHeading, dayGrid, previewHeading, previewFrame, footer);
+  card.append(header, form); dialog.append(card);
+
+  const templateImage = new Image();
+  const templateImageUrl = new URL('./assets/weekly-schedule-template.png?v=20261031-weekly-schedule', import.meta.url).href;
+  let templateLoadPromise = null;
+  let drawRequest = 0;
+  const ctx = previewCanvas.getContext('2d');
+  function formatGraphicDate(date) {
+    return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+  }
+  function dateAtWeekday(offset) {
+    const start = parseLocalDateKey(weekInput.value || state.weekStart);
+    start.setDate(start.getDate() + offset);
+    return start;
+  }
+  function wrapGraphicText(text, maxWidth, maxLines) {
+    const lines = [];
+    String(text || '').split(/\s+/).filter(Boolean).forEach((word) => {
+      const candidate = lines.length ? `${lines[lines.length - 1]} ${word}` : word;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        if (lines.length) lines[lines.length - 1] = candidate; else lines.push(candidate);
+        return;
+      }
+      if (lines.length >= maxLines) return;
+      if (ctx.measureText(word).width <= maxWidth) { lines.push(word); return; }
+      let partial = '';
+      for (const char of word) {
+        if (ctx.measureText(partial + char).width > maxWidth && partial) {
+          if (lines.length < maxLines) lines.push(partial);
+          partial = char;
+        } else partial += char;
+      }
+      if (partial && lines.length < maxLines) lines.push(partial);
+    });
+    return lines.slice(0, maxLines);
+  }
+  function drawImageCover(image, x, y, width, height) {
+    const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+    const sw = width / scale; const sh = height / scale;
+    const sx = (image.naturalWidth - sw) / 2; const sy = (image.naturalHeight - sh) / 2;
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, width, height); ctx.clip();
+    ctx.drawImage(image, sx, sy, sw, sh, x, y, width, height); ctx.restore();
+  }
+  function drawGraphicDay(day, index, rect) {
+    const { x, y, w, h } = rect;
+    const date = dateAtWeekday(index);
+    const input = dayInputs[index];
+    const isOffline = input.offline.checked;
+    const dayName = weekdays[index];
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#b94e70'; ctx.font = '700 28px Pretendard, "Noto Sans KR", sans-serif';
+    ctx.fillText(`${dayName}요일`, x + w / 2, y + 38);
+    ctx.fillStyle = '#9c7d86'; ctx.font = '500 17px Pretendard, "Noto Sans KR", sans-serif';
+    ctx.fillText(formatGraphicDate(date), x + w / 2, y + 68);
+    const timeText = isOffline ? '방송 없음' : (input.time.value ? `${input.time.value} 방송` : '시간 미정');
+    ctx.font = '700 18px Pretendard, "Noto Sans KR", sans-serif';
+    const pillWidth = Math.min(w - 28, Math.max(116, ctx.measureText(timeText).width + 30));
+    ctx.fillStyle = '#f9d6e0'; ctx.beginPath(); ctx.roundRect(x + (w - pillWidth) / 2, y + 88, pillWidth, 40, 20); ctx.fill();
+    ctx.fillStyle = '#a64d69'; ctx.fillText(timeText, x + w / 2, y + 108);
+    if (isOffline) {
+      ctx.fillStyle = '#ed8daf'; ctx.font = '800 34px Pretendard, "Noto Sans KR", sans-serif';
+      ctx.fillText('OFFLINE', x + w / 2, y + h / 2 + 28);
+    } else {
+      const description = input.text.value.trim() || '자유 일정';
+      ctx.fillStyle = '#dd7897'; ctx.font = `700 ${w < 260 ? 26 : 29}px Pretendard, "Noto Sans KR", sans-serif`;
+      const lines = wrapGraphicText(description, w - 34, 4);
+      const lineHeight = w < 260 ? 37 : 40;
+      const startY = y + h / 2 + 5 - ((lines.length - 1) * lineHeight) / 2;
+      lines.forEach((line, lineIndex) => ctx.fillText(line, x + w / 2, startY + lineIndex * lineHeight));
+    }
+    ctx.restore();
+  }
+  async function drawPreview() {
+    const request = ++drawRequest;
+    if (!ctx) return;
+    if (!templateImage.complete || !templateImage.naturalWidth) {
+      if (!templateLoadPromise) templateLoadPromise = new Promise((resolve) => {
+        templateImage.onload = resolve; templateImage.onerror = resolve; templateImage.src = templateImageUrl;
+      });
+      await templateLoadPromise;
+    }
+    if (request !== drawRequest) return;
+    ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    if (templateImage.naturalWidth) ctx.drawImage(templateImage, 0, 0, previewCanvas.width, previewCanvas.height);
+    const selected = state.selectedImage;
+    const avatar = selected?.image;
+    if (avatar?.complete && avatar.naturalWidth) drawImageCover(avatar, 94, 176, 390, 565);
+    else {
+      ctx.save(); ctx.fillStyle = '#9c8390'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '600 20px Pretendard, "Noto Sans KR", sans-serif'; ctx.fillText('갤러리에서 아바타를 선택하세요', 289, 456); ctx.restore();
+    }
+    const graphicTitle = titleField.querySelector('input').value.trim() || '주간 방송 일정';
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#a74464';
+    let titleSize = 44; ctx.font = `800 ${titleSize}px Pretendard, "Noto Sans KR", sans-serif`;
+    while (ctx.measureText(graphicTitle).width > 700 && titleSize > 25) { titleSize -= 1; ctx.font = `800 ${titleSize}px Pretendard, "Noto Sans KR", sans-serif`; }
+    ctx.fillText(graphicTitle, 1114, 92, 720);
+    const weekStart = parseLocalDateKey(weekInput.value || state.weekStart); const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
+    ctx.fillStyle = '#fff8fa'; ctx.font = '600 25px Pretendard, "Noto Sans KR", sans-serif';
+    ctx.fillText(`${formatGraphicDate(weekStart)}  –  ${formatGraphicDate(weekEnd)}`, 285, 850, 430);
+    ctx.restore();
+    const topCards = Array.from({ length: 4 }, (_, index) => ({ x: 585 + index * 262, y: 171, w: 242, h: 323 }));
+    const bottomCards = Array.from({ length: 3 }, (_, index) => ({ x: 588 + index * 347, y: 525, w: 317, h: 331 }));
+    [...topCards, ...bottomCards].forEach((rect, index) => drawGraphicDay(dayInputs[index], index, rect));
+    selectedImageNote.textContent = selected ? `선택됨 · ${selected.categoryLabel || '갤러리 이미지'}` : '아직 사진을 선택하지 않았어요.';
+    clearImage.disabled = !selected;
+  }
+
+  async function loadScheduleGallery(append = false) {
+    if (state.galleryLoading) return;
+    state.galleryLoading = true; galleryStatus.textContent = '공개 갤러리를 불러오고 있어요.'; galleryGrid.replaceChildren(); galleryMore.hidden = true;
+    try {
+      const offset = append ? state.galleryNextOffset : 0;
+      const result = (await callGalleryUploadTarget({ streamerId: page.streamer.id, view: 'rolling-paper-picker', offset })).data;
+      const items = Array.isArray(result.items) ? result.items.filter((item) => item?.id && item.thumbUrl) : [];
+      state.galleryItems = append ? [...state.galleryItems, ...items] : items;
+      state.galleryNextOffset = Number(result.nextOffset) || state.galleryItems.length;
+      state.galleryHasMore = result.hasMore === true; state.galleryLoaded = true;
+      renderScheduleGalleryItems();
+    } catch (error) {
+      galleryStatus.textContent = error.message || '갤러리 이미지를 불러오지 못했어요.';
+    } finally { state.galleryLoading = false; galleryMore.disabled = false; }
+  }
+  function renderScheduleGalleryItems() {
+    galleryGrid.replaceChildren();
+    galleryStatus.textContent = state.galleryItems.length ? '' : '선택할 수 있는 공개 갤러리 이미지가 없어요.';
+    state.galleryItems.forEach((item) => {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'weekly-schedule-gallery-image';
+      button.setAttribute('aria-label', `${item.categoryLabel || '갤러리'} 이미지 선택`);
+      const image = document.createElement('img'); image.src = item.thumbUrl; image.alt = ''; image.loading = 'lazy';
+      button.append(image); button.addEventListener('click', () => selectScheduleGalleryImage(item)); galleryGrid.append(button);
+    });
+    galleryMore.hidden = !state.galleryHasMore;
+    galleryMore.disabled = state.galleryLoading;
+  }
+  async function selectScheduleGalleryImage(item) {
+    galleryStatus.textContent = '이미지를 준비하고 있어요.';
+    galleryGrid.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+    try {
+      const result = (await callGalleryUploadTarget({ streamerId: page.streamer.id, view: 'schedule-image-data', imageId: item.id })).data;
+      const image = new Image(); image.src = result.dataUrl;
+      await image.decode();
+      if (state.localObjectUrl) URL.revokeObjectURL(state.localObjectUrl);
+      state.localObjectUrl = '';
+      state.selectedImage = { ...item, image };
+      state.galleryOpen = false; galleryPanel.hidden = true; uploadPanel.hidden = true;
+      drawPreview();
+    } catch (error) {
+      galleryStatus.textContent = error.message || '이미지를 선택하지 못했어요.';
+    } finally { galleryGrid.querySelectorAll('button').forEach((button) => { button.disabled = false; }); }
+  }
+  async function makeGalleryThumbnail(file) {
+    return new Promise((resolve, reject) => {
+      const image = new Image(); const objectUrl = URL.createObjectURL(file);
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const width = image.naturalWidth; const height = image.naturalHeight;
+        const scale = Math.min(1, 480 / Math.max(width, height));
+        const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(width * scale)); canvas.height = Math.max(1, Math.round(height * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => blob ? resolve({ blob, width, height }) : reject(new Error('썸네일 생성에 실패했어요.')), 'image/jpeg', 0.82);
+      };
+      image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('이미지를 읽을 수 없어요.')); };
+      image.src = objectUrl;
+    });
+  }
+  async function uploadScheduleGalleryImage() {
+    const file = fileInput.files?.[0];
+    const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    if (!file) { uploadStatus.textContent = '이미지 파일을 선택해 주세요.'; return; }
+    if (!allowed.has(file.type)) { uploadStatus.textContent = 'jpg/png/webp/gif 이미지만 등록할 수 있어요.'; return; }
+    if (file.size <= 0 || file.size > 15 * 1024 * 1024) { uploadStatus.textContent = '이미지 용량은 15MB 이하여야 해요.'; return; }
+    if (state.uploadBusy) return;
+    state.uploadBusy = true; uploadSubmit.disabled = true; uploadSubmit.textContent = '등록 중…';
+    let uploadedToR2 = false;
+    try {
+      uploadStatus.textContent = '갤러리 형식의 썸네일을 만드는 중…';
+      const thumb = await makeGalleryThumbnail(file);
+      uploadStatus.textContent = '갤러리 저장 공간을 준비하는 중…';
+      const target = (await callGalleryUploadTarget({ streamerId: page.streamer.id, view: 'upload-target' })).data;
+      const prepared = (await callGalleryUploadPrepare({ contentType: file.type, fileSize: file.size, thumbFileSize: thumb.blob.size })).data;
+      uploadStatus.textContent = '이미지와 썸네일을 갤러리에 올리는 중…';
+      const imagePut = await fetch(prepared.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+      if (!imagePut.ok) throw new Error(`원본 업로드에 실패했어요 (${imagePut.status}).`);
+      uploadedToR2 = true;
+      const thumbPut = await fetch(prepared.thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumb.blob });
+      if (!thumbPut.ok) throw new Error(`썸네일 업로드에 실패했어요 (${thumbPut.status}).`);
+      uploadStatus.textContent = '갤러리에 이미지를 등록하는 중…';
+      const registered = (await callGalleryImageRegister({
+        imageId: prepared.imageId, key: prepared.key, thumbKey: prepared.thumbKey,
+        streamerId: target.streamerId, streamerName: target.streamerName, category: category.value,
+        width: thumb.width, height: thumb.height,
+      })).data;
+      const source = URL.createObjectURL(file);
+      const image = new Image(); image.src = source; await image.decode();
+      if (state.localObjectUrl) URL.revokeObjectURL(state.localObjectUrl);
+      state.localObjectUrl = source;
+      const categoryLabel = category.options[category.selectedIndex]?.textContent || '갤러리 이미지';
+      state.selectedImage = { id: registered.imageId, imageUrl: registered.imageUrl, thumbUrl: registered.thumbUrl, category: category.value, categoryLabel, image };
+      state.galleryItems = [{ ...state.selectedImage, thumbUrl: registered.thumbUrl }, ...state.galleryItems.filter((item) => item.id !== registered.imageId)];
+      state.galleryLoaded = true; state.galleryOpen = false; state.uploadOpen = false;
+      galleryPanel.hidden = true; uploadPanel.hidden = true; fileInput.value = '';
+      uploadStatus.textContent = '갤러리 등록을 마치고 방송표에 적용했어요.';
+      drawPreview(); showToast('갤러리에 이미지를 등록하고 방송표에 넣었어요.');
+    } catch (error) {
+      uploadStatus.textContent = uploadedToR2
+        ? `${error.message || '등록하지 못했어요.'} 파일 업로드 후 갤러리 등록 단계에서 실패했을 수 있어요.`
+        : (error.message || '갤러리에 이미지를 등록하지 못했어요.');
+    } finally {
+      state.uploadBusy = false; uploadSubmit.disabled = false; uploadSubmit.textContent = '갤러리에 등록하고 선택';
+    }
+  }
+  async function loadCalendarWeek(weekStartValue, previous = false) {
+    const weekStart = parseLocalDateKey(weekStartValue); if (previous) weekStart.setDate(weekStart.getDate() - 7);
+    const dates = Array.from({ length: 7 }, (_, index) => { const date = new Date(weekStart); date.setDate(date.getDate() + index); return localDateKey(date); });
+    const months = [...new Set(dates.map((dateKey) => { const date = parseLocalDateKey(dateKey); return `${date.getFullYear()}-${date.getMonth() + 1}`; }))];
+    const results = await Promise.all(months.map((monthKey) => {
+      const [year, month] = monthKey.split('-').map(Number);
+      return callCalendar({ streamerId: page.streamer.id, view: 'month', year, month, day: 1 });
+    }));
+    const eventsByDate = new Map();
+    results.forEach((result) => (result.data.days || []).forEach((day) => {
+      if (dates.includes(day.date)) eventsByDate.set(day.date, day.events || []);
+    }));
+    dates.forEach((dateKey, index) => {
+      const events = (eventsByDate.get(dateKey) || []).filter((event) => event.title || event.typeName);
+      dayInputs[index].offline.checked = events.length > 0 && events.every((event) => event.typeName === '휴방');
+      dayInputs[index].time.value = dayInputs[index].offline.checked ? '' : (events.find((event) => event.time)?.time || '');
+      dayInputs[index].text.value = dayInputs[index].offline.checked ? '' : events.map((event) => event.title || event.typeName).join(' · ').slice(0, 60);
+      dayInputs[index].time.disabled = dayInputs[index].offline.checked; dayInputs[index].text.disabled = dayInputs[index].offline.checked;
+    });
+    drawPreview();
+  }
+
+  chooseImage.addEventListener('click', () => {
+    state.galleryOpen = !state.galleryOpen; galleryPanel.hidden = !state.galleryOpen;
+    if (state.galleryOpen && !state.galleryLoaded) void loadScheduleGallery();
+    else if (state.galleryOpen) renderScheduleGalleryItems();
+    if (state.galleryOpen) { state.uploadOpen = false; uploadPanel.hidden = true; }
+  });
+  uploadImage.addEventListener('click', () => {
+    state.uploadOpen = !state.uploadOpen; uploadPanel.hidden = !state.uploadOpen;
+    if (state.uploadOpen) { state.galleryOpen = false; galleryPanel.hidden = true; }
+  });
+  clearImage.addEventListener('click', () => {
+    if (state.localObjectUrl) URL.revokeObjectURL(state.localObjectUrl);
+    state.localObjectUrl = ''; state.selectedImage = null; drawPreview();
+  });
+  galleryMore.addEventListener('click', () => loadScheduleGallery(true));
+  uploadSubmit.addEventListener('click', uploadScheduleGalleryImage);
+  graphicTitle.addEventListener('input', drawPreview);
+  weekInput.addEventListener('input', () => { state.weekStart = weekInput.value; drawPreview(); });
+  previousWeek.addEventListener('click', () => { const date = parseLocalDateKey(weekInput.value); date.setDate(date.getDate() - 7); weekInput.value = localDateKey(date); state.weekStart = weekInput.value; drawPreview(); });
+  nextWeek.addEventListener('click', () => { const date = parseLocalDateKey(weekInput.value); date.setDate(date.getDate() + 7); weekInput.value = localDateKey(date); state.weekStart = weekInput.value; drawPreview(); });
+  importCurrent.addEventListener('click', async () => {
+    if (!weekInput.value) return;
+    importCurrent.disabled = true; importStatus.textContent = '현재 주 일정을 불러오고 있어요.';
+    try { await loadCalendarWeek(weekInput.value); importStatus.textContent = '캘린더 일정을 방송표에 넣었어요.'; }
+    catch (error) { importStatus.textContent = error.message || '캘린더 일정을 가져오지 못했어요.'; }
+    finally { importCurrent.disabled = false; }
+  });
+  copyPrevious.addEventListener('click', async () => {
+    if (!weekInput.value) return;
+    copyPrevious.disabled = true; importStatus.textContent = '지난주 일정을 복사하고 있어요.';
+    try { await loadCalendarWeek(weekInput.value, true); importStatus.textContent = '지난주 일정을 현재 방송표에 복사했어요.'; }
+    catch (error) { importStatus.textContent = error.message || '지난주 일정을 복사하지 못했어요.'; }
+    finally { copyPrevious.disabled = false; }
+  });
+  download.addEventListener('click', () => {
+    if (download.disabled) return;
+    download.disabled = true; download.textContent = '이미지 준비 중…';
+    drawPreview().then(() => new Promise((resolve, reject) => previewCanvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('PNG 이미지를 만들지 못했어요.')), 'image/png')))
+      .then((blob) => {
+        const url = URL.createObjectURL(blob); const link = document.createElement('a');
+        const safeTitle = (graphicTitle.value.trim() || '주간 방송표').replace(/[\\/:*?"<>|]+/g, '-');
+        link.href = url; link.download = `${safeTitle}-${weekInput.value || localDateKey(new Date())}.png`;
+        document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast('주간 방송표 PNG를 저장했어요.');
+      }).catch((error) => showToast(error.message || 'PNG 저장에 실패했어요.'))
+      .finally(() => { download.disabled = false; download.textContent = 'PNG 이미지 저장'; });
+  });
+  dialog.addEventListener('close', () => { state.weekStart = weekInput.value || state.weekStart; });
+  dialog._refreshWeeklySchedulePreview = drawPreview;
+  return dialog;
+}
+
+function openWeeklyScheduleDialog(page) {
+  const dialog = $('weeklyScheduleGraphicDialog');
+  if (dialog) { showFanPageModal(dialog); dialog._refreshWeeklySchedulePreview?.(); }
 }
 
 function refreshCalendarSection(streamerId) {

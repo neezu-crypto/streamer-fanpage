@@ -4612,13 +4612,44 @@ exports.streamerFanPageLiveStatus = onCall({ maxInstances: 20 }, async (request)
 });
 
 exports.streamerFanPageGallery = onCall({ maxInstances: 20 }, async (request) => {
-  requireAuth(request);
+  const uid = requireAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
   const target = await findVerifiedBySoopId(streamerId);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
   if (data.view === 'rolling-paper-picker') {
     return readStreamerGalleryPicker(target, data.offset);
+  }
+  if (data.view === 'upload-target' || data.view === 'schedule-image-data') {
+    const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+    if (!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)) {
+      throw new HttpsError('permission-denied', '해당 팬페이지의 인증 스트리머만 방송표 이미지를 등록하거나 사용할 수 있습니다.');
+    }
+    const galleryStreamerIds = await findGalleryStreamerIds(target);
+    if (data.view === 'upload-target') {
+      if (galleryStreamerIds.length !== 1) {
+        throw new HttpsError('failed-precondition', '이 스트리머의 갤러리 계정을 하나로 확인할 수 없습니다. 갤러리 계정 연결을 확인해 주세요.');
+      }
+      return { streamerId: galleryStreamerIds[0], streamerName: target.streamer.nickname };
+    }
+
+    const imageId = typeof data.imageId === 'string' ? data.imageId.trim() : '';
+    if (!/^[A-Za-z0-9_-]{8,100}$/.test(imageId)) throw new HttpsError('invalid-argument', '갤러리 이미지를 확인해 주세요.');
+    const imageSnapshot = await sharedDb.ref(`gallery/imagesPublic/${imageId}`).get();
+    const image = imageSnapshot.val();
+    if (!image || !galleryStreamerIds.includes(String(image.streamerId || '')) || !isGalleryPublicUrl(image.thumbUrl)) {
+      throw new HttpsError('permission-denied', '이 스트리머의 공개 갤러리 이미지가 아닙니다.');
+    }
+    const response = await fetch(image.thumbUrl, { signal: AbortSignal.timeout(12000) });
+    if (!response.ok) throw new HttpsError('unavailable', '갤러리 이미지를 불러오지 못했습니다.');
+    const contentType = String(response.headers.get('content-type') || '').split(';')[0].toLowerCase();
+    const contentLength = Number(response.headers.get('content-length')) || 0;
+    if (!/^image\/(?:jpeg|png|webp|gif)$/.test(contentType) || contentLength > 3 * 1024 * 1024) {
+      throw new HttpsError('failed-precondition', '방송표에 사용할 수 없는 이미지 형식입니다.');
+    }
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > 3 * 1024 * 1024) throw new HttpsError('resource-exhausted', '이미지 크기가 너무 큽니다.');
+    return { imageId, dataUrl: `data:${contentType};base64,${bytes.toString('base64')}` };
   }
   return await readStreamerGallery(target);
 });
