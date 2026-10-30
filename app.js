@@ -1772,11 +1772,28 @@ function renderUpboItemManager(page, state) {
   const title = document.createElement('h4'); title.textContent = '신청 가능한 항목';
   const count = document.createElement('span'); count.className = 'upbo-viewer-total'; count.textContent = `${state.items.length} / 100`;
   headingCopy.append(title, count);
+  const actions = document.createElement('div'); actions.className = 'upbo-manager-actions';
   const addItem = upboButton('+ 항목 추가', 'button-primary upbo-small-button upbo-add-item-inline', () => openUpboItemEditor(page));
   addItem.disabled = state.saving || state.items.length >= MAX_UPBO_ITEMS;
-  heading.append(headingCopy, addItem); panel.append(heading);
+  const hasRouletteLink = !!String(page.profile && page.profile.rouletteUrl || '').trim();
+  const importItems = upboButton(
+    state.saving ? '불러오는 중…' : '위플랩 항목 가져오기',
+    'upbo-small-button upbo-import-roulette-items',
+    () => importUpboRouletteItems(page),
+  );
+  importItems.disabled = state.saving || !hasRouletteLink || state.items.length >= MAX_UPBO_ITEMS;
+  importItems.title = !hasRouletteLink
+    ? '프로필 설정에 위플랩 공개 룰렛 링크를 먼저 등록해 주세요.'
+    : state.items.length >= MAX_UPBO_ITEMS ? '신청 항목은 최대 100개까지 등록할 수 있어요.' : '';
+  actions.append(importItems, addItem);
+  heading.append(headingCopy, actions); panel.append(heading);
+  const importNote = document.createElement('p'); importNote.className = 'upbo-import-note';
+  importNote.textContent = hasRouletteLink
+    ? '프로필에 등록된 위플랩 공개 링크 한 개에서 항목 이름만 가져와요. 확률과 종류는 이름에 포함하지 않고, 중복 항목은 건너뜁니다.'
+    : '자동으로 가져오려면 프로필 설정의 룰렛 확률에 위플랩 공개 링크 한 개를 등록해 주세요.';
+  panel.append(importNote);
   if (!state.items.length) {
-    const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 항목이 없어요. 항목 추가 버튼으로 등록해 주세요.';
+    const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 항목이 없어요. 위플랩 항목 가져오기 또는 항목 추가 버튼으로 등록해 주세요.';
     panel.append(empty); return panel;
   }
   const list = document.createElement('div'); list.className = 'upbo-item-list';
@@ -1981,6 +1998,35 @@ async function loadUpboBoard(streamerId, pageType = 'initial') {
 
 function loadMoreUpboRecords(streamerId) { return loadUpboBoard(streamerId, 'records'); }
 function loadMoreUpboPending(streamerId) { return loadUpboBoard(streamerId, 'pending'); }
+
+async function importUpboRouletteItems(page) {
+  const state = upboStateFor(page.streamer.id);
+  if (!state.canManage || state.saving) return;
+  if (!String(page.profile && page.profile.rouletteUrl || '').trim()) {
+    showToast('프로필 설정에 위플랩 공개 룰렛 링크를 먼저 등록해 주세요.');
+    return;
+  }
+  if (state.items.length >= MAX_UPBO_ITEMS) {
+    showToast('신청 항목은 최대 100개까지 등록할 수 있어요.');
+    return;
+  }
+  state.saving = true;
+  refreshUpboSection(page.streamer.id);
+  try {
+    const result = (await callUpbo({ action: 'importRouletteItems', streamerId: page.streamer.id })).data;
+    state.items = Array.isArray(result.items) ? result.items : state.items;
+    const details = [`${Number(result.addedCount) || 0}개 추가`];
+    if (result.duplicateCount) details.push(`중복 ${result.duplicateCount}개 제외`);
+    if (result.invalidNameCount) details.push(`이름 확인 필요 ${result.invalidNameCount}개 제외`);
+    if (result.limitSkippedCount) details.push(`최대 항목 수로 ${result.limitSkippedCount}개 미추가`);
+    showToast(`위플랩 룰렛 항목을 가져왔어요. ${details.join(' · ')}`);
+  } catch (error) {
+    showToast(error.message || '위플랩 룰렛 항목을 가져오지 못했어요.');
+  } finally {
+    state.saving = false;
+    refreshUpboSection(page.streamer.id);
+  }
+}
 
 function openUpboItemEditor(page, existingItem = null) {
   const state = upboStateFor(page.streamer.id);
