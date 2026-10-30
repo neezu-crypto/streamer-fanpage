@@ -6,7 +6,9 @@ const {
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
+  parseVideoLibrarySortKey,
   paginateVideoLibraryEntries,
+  videoLibrarySortKey,
 } = require('../video-library');
 
 const categoryId = '123e4567-e89b-42d3-a456-426614174000';
@@ -59,4 +61,16 @@ test('video library cursors reject malformed positions', () => {
   assert.deepEqual(normalizeVideoLibraryCursor({ sortAt: 123, id: 'soop_123' }), { sortAt: 123, id: 'soop_123' });
   assert.equal(normalizeVideoLibraryCursor({ sortAt: -1, id: 'soop_123' }), null);
   assert.equal(normalizeVideoLibraryCursor({ sortAt: 123, id: 'bad' }), null);
+});
+
+test('composite video index keys preserve newest-first order and round-trip the cursor', () => {
+  const older = videoLibrarySortKey(99, 'soop_100');
+  const newer = videoLibrarySortKey(100, 'youtube_abcdefghijk');
+  assert.ok(newer > older);
+  assert.deepEqual(parseVideoLibrarySortKey(newer, { itemId: 'youtube_abcdefghijk', sortAt: 100 }), {
+    id: 'youtube_abcdefghijk', sortAt: 100,
+  });
+  assert.deepEqual(parseVideoLibrarySortKey(older), { id: 'soop_100', sortAt: 99 });
+  assert.equal(videoLibrarySortKey(100, 'invalid-id'), '');
+  assert.equal(parseVideoLibrarySortKey('invalid-key'), null);
 });
