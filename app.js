@@ -6982,7 +6982,8 @@ function renderVideoLibrarySection(page) {
     toggle.textContent = isEditingCategory ? '편집 닫기' : '카테고리 편집';
     toggle.setAttribute('aria-expanded', String(isEditingCategory));
     toggle.setAttribute('aria-controls', editorContent.id);
-    toggle.setAttribute('aria-label', `${selectedCategory.name} 카테고리 편집`);
+    toggle.setAttribute('aria-label', isEditingCategory
+      ? `${selectedCategory.name} 카테고리 편집 닫기` : `${selectedCategory.name} 카테고리 편집 열기`);
     toggle.addEventListener('click', () => {
       state.editingCategoryId = isEditingCategory ? '' : selectedCategory.id;
       refreshVideoLibrarySection(page.streamer.id);
