@@ -8268,7 +8268,8 @@ function renderWeeklyScheduleDialog(page) {
   const chooseImage = document.createElement('button'); chooseImage.type = 'button'; chooseImage.className = 'button'; chooseImage.textContent = '갤러리에서 선택';
   const uploadImage = document.createElement('button'); uploadImage.type = 'button'; uploadImage.className = 'button'; uploadImage.textContent = '새 이미지 등록';
   const clearImage = document.createElement('button'); clearImage.type = 'button'; clearImage.className = 'button weekly-schedule-clear-image'; clearImage.textContent = '선택 이미지 제거';
-  imageActions.append(chooseImage, uploadImage, clearImage);
+  const closeImageTools = document.createElement('button'); closeImageTools.type = 'button'; closeImageTools.className = 'button'; closeImageTools.textContent = '닫기';
+  imageActions.append(chooseImage, uploadImage, clearImage, closeImageTools);
   const selectedImageNote = document.createElement('p'); selectedImageNote.className = 'weekly-schedule-selected-image'; selectedImageNote.textContent = '왼쪽 사진 영역을 눌러 선택해 주세요.';
 
   const galleryPanel = document.createElement('div'); galleryPanel.className = 'weekly-schedule-gallery-picker'; galleryPanel.hidden = true;
@@ -8684,9 +8685,10 @@ function renderWeeklyScheduleDialog(page) {
     if (!imageTools.hidden) {
       state.galleryOpen = false; state.uploadOpen = false;
       galleryPanel.hidden = true; uploadPanel.hidden = true;
-      if (state.selectedImage || state.savedAvatar) clearImage.hidden = false;
+      clearImage.hidden = !(state.selectedImage || state.savedAvatar);
     }
   });
+  closeImageTools.addEventListener('click', () => { imageTools.hidden = true; });
   uploadImage.addEventListener('click', () => {
     state.uploadOpen = !state.uploadOpen; uploadPanel.hidden = !state.uploadOpen;
     if (state.uploadOpen) { state.galleryOpen = false; galleryPanel.hidden = true; }
