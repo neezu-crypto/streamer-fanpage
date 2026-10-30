@@ -6753,9 +6753,17 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
     if (value && !['rank', 'record'].includes(type)) throw new HttpsError('invalid-argument', '기록 종류를 선택해 주세요.');
     const gameRef = rootRef.child(appId);
     if (!(await gameRef.get()).exists()) throw new HttpsError('not-found', '기록을 수정할 게임을 찾을 수 없습니다.');
-    const transaction = await gameRef.transaction((current) => {
-      if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
-      return updatePlayedGameBestRecord(current, value ? { type, value } : null);
+    const transaction = await rootRef.transaction((current) => {
+      // Admin SDK transactions may first call the updater with an uncached null.
+      // Returning undefined here aborts before RTDB can retry with the server value.
+      if (current === null) return null;
+      const games = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
+      const game = games[appId];
+      if (!game || typeof game !== 'object' || Array.isArray(game)) return undefined;
+      return {
+        ...games,
+        [appId]: updatePlayedGameBestRecord(game, value ? { type, value } : null),
+      };
     });
     if (!transaction.committed) {
       if (!(await gameRef.get()).exists()) throw new HttpsError('not-found', '기록을 수정할 게임을 찾을 수 없습니다.');
