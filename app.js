@@ -7866,6 +7866,14 @@ function formatWeeklyScheduleDate(date) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 }
 
+async function ensureWeeklyScheduleFonts() {
+  if (!document.fonts?.load) return;
+  await Promise.all([
+    document.fonts.load('800 50px Jua'),
+    document.fonts.load('700 32px "Gowun Dodum"'),
+  ]);
+}
+
 function normalizeGraphicTime(value) {
   const text = String(value || '').trim();
   if (!text) return '';
@@ -7910,6 +7918,7 @@ async function loadWeeklySchedulePageData(page, weekStart, board) {
     state.entries = Array.isArray(saved.data.entries) && saved.data.entries.length === 7
       ? saved.data.entries.map((entry) => ({ time: String(entry.time || ''), content: String(entry.content || ''), offline: entry.offline === true }))
       : Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false }));
+    state.footerText = typeof saved.data.footerText === 'string' ? saved.data.footerText.slice(0, 48) : '';
     state.avatarImageId = savedAvatarId;
     state.updatedAt = Number(saved.data.updatedAt) || 0;
     state.savedAvatar = saved.data.avatar || null;
@@ -7967,8 +7976,9 @@ function renderCalendarSection(page) {
   const imageFrame = document.createElement('div'); imageFrame.className = 'weekly-schedule-board-frame';
   const canvas = document.createElement('canvas'); canvas.width = 1672; canvas.height = 941; canvas.className = 'weekly-schedule-board-canvas';
   const avatar = document.createElement('img'); avatar.className = 'weekly-schedule-board-avatar'; avatar.alt = `${page.streamer.nickname} 갤러리 이미지`; avatar.hidden = true;
+  const dateCaption = document.createElement('p'); dateCaption.className = 'weekly-schedule-date-caption';
   const mobileList = document.createElement('div'); mobileList.className = 'weekly-schedule-mobile-list';
-  imageFrame.append(canvas, avatar, mobileList);
+  imageFrame.append(canvas, avatar, dateCaption, mobileList);
   let template = null; let templatePromise = null;
   const ctx = canvas.getContext('2d');
   function drawBoard() {
@@ -7979,17 +7989,21 @@ function renderCalendarSection(page) {
         template.src = new URL('./assets/weekly-schedule-template.png?v=20261031-weekly-board-v2', import.meta.url).href;
       });
     }
-    return templatePromise.then(() => {
+    return templatePromise.then(async () => {
+      await ensureWeeklyScheduleFonts();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (template?.naturalWidth) ctx.drawImage(template, 0, 0, canvas.width, canvas.height);
       const weekStart = parseLocalDateKey(state.weekStart); const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
       ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#a74464';
       let titleSize = 50; const headerText = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
-      ctx.font = `800 ${titleSize}px Pretendard, "Noto Sans KR", sans-serif`;
-      while (ctx.measureText(headerText).width > 680 && titleSize > 25) { titleSize -= 1; ctx.font = `800 ${titleSize}px Pretendard, "Noto Sans KR", sans-serif`; }
+      ctx.font = `800 ${titleSize}px Jua, "Gowun Dodum", sans-serif`;
+      while (ctx.measureText(headerText).width > 680 && titleSize > 25) { titleSize -= 1; ctx.font = `800 ${titleSize}px Jua, "Gowun Dodum", sans-serif`; }
       ctx.fillText(headerText, 1114, 94, 690);
-      ctx.fillStyle = '#fff8fa'; ctx.font = '700 30px Pretendard, "Noto Sans KR", sans-serif';
-      ctx.fillText(`${formatWeeklyScheduleDate(weekStart)} – ${formatWeeklyScheduleDate(weekEnd)}`, 285, 850, 430);
+      const defaultFooterText = `${formatWeeklyScheduleDate(weekStart)} – ${formatWeeklyScheduleDate(weekEnd)}`;
+      dateCaption.textContent = state.footerText || defaultFooterText;
+      ctx.fillStyle = '#9b365c'; ctx.font = '800 31px Jua, "Gowun Dodum", sans-serif';
+      ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
+      ctx.fillText(state.footerText || defaultFooterText, 285, 850, 450); ctx.shadowBlur = 0;
       const days = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
       const topCards = Array.from({ length: 4 }, (_, index) => ({ x: 585 + index * 262, y: 171, w: 242, h: 323 }));
       const bottomCards = Array.from({ length: 3 }, (_, index) => ({ x: 588 + index * 347, y: 525, w: 317, h: 331 }));
@@ -8002,16 +8016,16 @@ function renderCalendarSection(page) {
         const linkedHoliday = linked.some((event) => event.typeName === '휴방');
         const firstLine = entry.offline || linkedHoliday ? '휴방' : (normalizeGraphicTime(entry.time) || linked.find((event) => event.time)?.time || '');
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#a63d61'; ctx.font = '800 40px Pretendard, "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#a63d61'; ctx.font = '800 40px Jua, "Gowun Dodum", sans-serif';
         if (firstLine) ctx.fillText(firstLine, x + w / 2, y + 42, w - 28);
-        ctx.fillStyle = '#c65378'; ctx.font = `750 ${w < 260 ? 30 : 33}px Pretendard, "Noto Sans KR", sans-serif`;
+        ctx.fillStyle = '#a94d6b'; ctx.font = `700 ${w < 260 ? 30 : 33}px Gowun Dodum, sans-serif`;
         const maxWidth = w - 30; const lineHeight = 39; const shown = lines.slice(0, 4);
         const centerY = y + h / 2 + 15; const startY = centerY - ((shown.length - 1) * lineHeight) / 2;
         shown.forEach((line, lineIndex) => {
           let text = line; while (ctx.measureText(text).width > maxWidth && text.length > 3) text = `${text.slice(0, -2)}…`;
           ctx.fillText(text, x + w / 2, startY + lineIndex * lineHeight);
         });
-        ctx.fillStyle = '#a63d61'; ctx.font = '800 30px Pretendard, "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#a63d61'; ctx.font = '800 30px Jua, "Gowun Dodum", sans-serif';
         ctx.fillText(days[index], x + w / 2, y + h - 28);
       });
       ctx.restore();
@@ -8265,6 +8279,7 @@ function weeklyScheduleGraphicStateFor(streamerId) {
     monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
     weeklyScheduleGraphicStates.set(streamerId, {
       weekStart: localDateKey(monday),
+      footerText: '',
       selectedImage: null,
       avatarImageId: '',
       entries: Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false })),
@@ -8421,8 +8436,11 @@ function renderWeeklyScheduleDialog(page) {
   previewCanvas.width = 1672; previewCanvas.height = 941; previewCanvas.setAttribute('aria-label', '주간 방송표 이미지 미리보기');
   const avatarHitArea = document.createElement('button'); avatarHitArea.type = 'button'; avatarHitArea.className = 'weekly-schedule-avatar-hit-area';
   avatarHitArea.setAttribute('aria-label', '템플릿 이미지 칸에서 갤러리 사진 선택 또는 등록');
+  const footerTextInput = document.createElement('input'); footerTextInput.type = 'text'; footerTextInput.className = 'weekly-schedule-footer-text';
+  footerTextInput.maxLength = 48; footerTextInput.setAttribute('aria-label', '하단 리본 날짜 또는 문구');
+  footerTextInput.title = '날짜 범위 또는 원하는 문구를 입력할 수 있어요.';
   previousWeek.classList.add('weekly-schedule-stage-previous'); nextWeek.classList.add('weekly-schedule-stage-next');
-  previewFrame.append(previewCanvas, previousWeek, nextWeek, dayGrid, avatarHitArea);
+  previewFrame.append(previewCanvas, previousWeek, nextWeek, dayGrid, avatarHitArea, footerTextInput);
 
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
   const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요. 기존 연동 일정은 수정되지 않습니다.';
@@ -8487,7 +8505,7 @@ function renderWeeklyScheduleDialog(page) {
     const time = includeEditableValues
       ? (isOffline || linkedHoliday ? '휴방' : (normalizeGraphicTime(input.time.value) || linkedEvents.find((event) => event.time)?.time || ''))
       : '';
-    ctx.fillStyle = '#b94e70'; ctx.font = '800 29px Pretendard, "Noto Sans KR", sans-serif';
+    ctx.fillStyle = '#a63d61'; ctx.font = '800 40px Jua, "Gowun Dodum", sans-serif';
     if (time) ctx.fillText(time, x + w / 2, y + 42, w - 28);
     const lines = [];
     if (includeEditableValues && input.text.innerText.trim() && !isOffline) lines.push(input.text.innerText.trim());
@@ -8496,14 +8514,14 @@ function renderWeeklyScheduleDialog(page) {
       if (linked) lines.push(linked);
     });
     if (includeEditableValues && isOffline && !lines.length) lines.push('방송 일정이 없습니다');
-    ctx.fillStyle = '#dd7897'; ctx.font = `700 ${w < 260 ? 24 : 27}px Pretendard, "Noto Sans KR", sans-serif`;
+    ctx.fillStyle = '#a94d6b'; ctx.font = `700 ${w < 260 ? 30 : 33}px Gowun Dodum, sans-serif`;
     const shown = lines.flatMap((line) => wrapGraphicText(line, w - 34, 3)).slice(0, 4); const lineHeight = w < 260 ? 34 : 38;
     const startY = y + h / 2 + 16 - ((shown.length - 1) * lineHeight) / 2;
     shown.forEach((line, lineIndex) => {
       let text = line; while (ctx.measureText(text).width > w - 34 && text.length > 3) text = `${text.slice(0, -2)}…`;
       ctx.fillText(text, x + w / 2, startY + lineIndex * lineHeight);
     });
-    ctx.fillStyle = '#b94e70'; ctx.font = '800 24px Pretendard, "Noto Sans KR", sans-serif';
+    ctx.fillStyle = '#a63d61'; ctx.font = '800 30px Jua, "Gowun Dodum", sans-serif';
     ctx.fillText(`${dayName}요일`, x + w / 2, y + h - 28);
     ctx.restore();
   }
@@ -8516,6 +8534,7 @@ function renderWeeklyScheduleDialog(page) {
       });
       await templateLoadPromise;
     }
+    await ensureWeeklyScheduleFonts();
     if (request !== drawRequest) return;
     ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
     if (templateImage.naturalWidth) ctx.drawImage(templateImage, 0, 0, previewCanvas.width, previewCanvas.height);
@@ -8524,17 +8543,22 @@ function renderWeeklyScheduleDialog(page) {
     if (avatar?.complete && avatar.naturalWidth) drawImageCover(avatar, 94, 176, 390, 565);
     else {
       ctx.save(); ctx.fillStyle = '#9c8390'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = '600 20px Pretendard, "Noto Sans KR", sans-serif'; ctx.fillText('갤러리에서 아바타를 선택하세요', 289, 456); ctx.restore();
+      ctx.font = '700 26px Gowun Dodum, sans-serif'; ctx.fillText('갤러리에서 아바타를 선택하세요', 289, 456); ctx.restore();
     }
     const graphicTitle = weeklyScheduleWeekTitle(page.streamer.nickname, weekInput.value || state.weekStart);
     title.textContent = graphicTitle; titleField.querySelector('input').value = graphicTitle;
     ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#a74464';
-    let titleSize = 44; ctx.font = `800 ${titleSize}px Pretendard, "Noto Sans KR", sans-serif`;
-    while (ctx.measureText(graphicTitle).width > 700 && titleSize > 25) { titleSize -= 1; ctx.font = `800 ${titleSize}px Pretendard, "Noto Sans KR", sans-serif`; }
+    let titleSize = 50; ctx.font = `800 ${titleSize}px Jua, "Gowun Dodum", sans-serif`;
+    while (ctx.measureText(graphicTitle).width > 700 && titleSize > 25) { titleSize -= 1; ctx.font = `800 ${titleSize}px Jua, "Gowun Dodum", sans-serif`; }
     ctx.fillText(graphicTitle, 1114, 92, 720);
     const weekStart = parseLocalDateKey(weekInput.value || state.weekStart); const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
-    ctx.fillStyle = '#fff8fa'; ctx.font = '600 25px Pretendard, "Noto Sans KR", sans-serif';
-    ctx.fillText(`${formatGraphicDate(weekStart)}  –  ${formatGraphicDate(weekEnd)}`, 285, 850, 430);
+    const defaultFooterText = `${formatGraphicDate(weekStart)} – ${formatGraphicDate(weekEnd)}`;
+    if (!footerTextInput.matches(':focus')) footerTextInput.value = state.footerText || defaultFooterText;
+    ctx.fillStyle = '#9b365c'; ctx.font = '800 32px Jua, "Gowun Dodum", sans-serif';
+    if (!footerTextInput.matches(':focus')) {
+      ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
+      ctx.fillText(state.footerText || defaultFooterText, 285, 850, 450); ctx.shadowBlur = 0;
+    }
     ctx.restore();
     const topCards = Array.from({ length: 4 }, (_, index) => ({ x: 585 + index * 262, y: 171, w: 242, h: 323 }));
     const bottomCards = Array.from({ length: 3 }, (_, index) => ({ x: 588 + index * 347, y: 525, w: 317, h: 331 }));
@@ -8654,6 +8678,8 @@ function renderWeeklyScheduleDialog(page) {
     weekInput.value = state.weekStart;
     graphicTitle.value = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
     title.textContent = graphicTitle.value;
+    const footerStart = parseLocalDateKey(state.weekStart); const footerEnd = new Date(footerStart); footerEnd.setDate(footerEnd.getDate() + 6);
+    footerTextInput.value = state.footerText || `${formatGraphicDate(footerStart)} – ${formatGraphicDate(footerEnd)}`;
     dayInputs.forEach((input, index) => {
       const entry = state.entries[index] || {};
       input.offline.checked = entry.offline === true;
@@ -8712,7 +8738,7 @@ function renderWeeklyScheduleDialog(page) {
         try {
           const response = await callWeeklySchedule({
             action: 'save', streamerId: page.streamer.id, weekStart: state.weekStart,
-            entries, avatarImageId: state.avatarImageId || '', expectedUpdatedAt: state.updatedAt,
+            entries, avatarImageId: state.avatarImageId || '', footerText: state.footerText || '', expectedUpdatedAt: state.updatedAt,
           });
           state.updatedAt = Number(response.data.updatedAt) || Date.now();
           state.entries = entries;
@@ -8740,6 +8766,19 @@ function renderWeeklyScheduleDialog(page) {
     window.clearTimeout(state.saveTimer);
     state.saveTimer = window.setTimeout(() => { void saveCurrentWeek(); }, 700);
   }
+
+  footerTextInput.addEventListener('input', () => {
+    state.footerText = footerTextInput.value.trim().slice(0, footerTextInput.maxLength);
+    markWeeklyDirty();
+  });
+  footerTextInput.addEventListener('blur', () => {
+    if (!footerTextInput.value.trim()) {
+      state.footerText = '';
+      const start = parseLocalDateKey(state.weekStart); const end = new Date(start); end.setDate(end.getDate() + 6);
+      footerTextInput.value = `${formatGraphicDate(start)} – ${formatGraphicDate(end)}`;
+    }
+    drawPreview(false);
+  });
 
   async function moveEditorWeek(offset) {
     if (!(await saveCurrentWeek())) return;
