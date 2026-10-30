@@ -1,7 +1,7 @@
 'use strict';
 
 const { initializeApp } = require('firebase-admin/app');
-const { getDatabase, ServerValue } = require('firebase-admin/database');
+const { getDatabase, getDatabaseWithUrl, ServerValue } = require('firebase-admin/database');
 const { getFunctions: getAdminFunctions } = require('firebase-admin/functions');
 const { getStorage } = require('firebase-admin/storage');
 const { HttpsError, onCall, onRequest } = require('firebase-functions/v2/https');
@@ -76,8 +76,10 @@ const {
   videoLibrarySortKey,
 } = require('./video-library');
 
-initializeApp();
-const db = getDatabase();
+const app = initializeApp();
+const sharedDb = getDatabase();
+const FANPAGE_DATABASE_URL = 'https://streamer-fanpage-rtdb.firebaseio.com';
+const db = getDatabaseWithUrl(FANPAGE_DATABASE_URL, app);
 const adminFunctions = getAdminFunctions();
 const cloudStorage = getStorage();
 exports.streamerFanPageViewerSubscription = streamerFanPageViewerSubscription;
@@ -286,8 +288,21 @@ function trackedViewerStatsRefObject(reference) {
   return proxy;
 }
 
+const VIEWER_STATS_SHARED_ROOTS = new Set([
+  'adminCenter',
+  'users',
+  'streamerVerifications',
+  'streamerNames',
+  'streamerFanPageViewerSubscriptions',
+  'verifiedStreamerVisits',
+  'verifiedStreamerVisitDedup',
+]);
+
 function viewerStatsRef(path) {
-  return trackedViewerStatsRefObject(db.ref(path));
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  const root = normalizedPath.split('/')[0];
+  const database = VIEWER_STATS_SHARED_ROOTS.has(root) ? sharedDb : db;
+  return trackedViewerStatsRefObject(database.ref(path));
 }
 
 async function recordViewerStatsTelemetry(telemetry) {
@@ -669,7 +684,7 @@ async function hasProtectedAccount(request, uid = requireAuth(request)) {
   if (signInProvider && signInProvider !== 'anonymous') return true;
 
   const [kakaoLinked, verified, admin] = await Promise.all([
-    db.ref(`users/${uid}/kakaoLinked`).get(),
+    sharedDb.ref(`users/${uid}/kakaoLinked`).get(),
     findVerifiedByUid(uid),
     isAdminUid(uid),
   ]);
@@ -796,7 +811,7 @@ async function lookupSoopStreamerNicknames(soopIds, concurrency = 8) {
   return names;
 }
 
-async function findVerifiedByUid(uid, ref = (path) => db.ref(path)) {
+async function findVerifiedByUid(uid, ref = (path) => sharedDb.ref(path)) {
   const snap = await ref('streamerVerifications')
     .orderByChild('uid').equalTo(uid).limitToFirst(1).get();
   if (!snap.exists()) return null;
@@ -813,7 +828,7 @@ async function isAdminUid(uid) {
 async function findVerifiedBySoopId(soopId) {
   const normalized = String(soopId || '').trim().toLowerCase();
   if (!SOOP_ID_PATTERN.test(normalized)) return null;
-  const snap = await db.ref('streamerVerifications')
+  const snap = await sharedDb.ref('streamerVerifications')
     .orderByChild('soopId').equalTo(normalized).limitToFirst(1).get();
   if (!snap.exists()) return null;
   const [key, record] = Object.entries(snap.val())[0];
@@ -840,7 +855,7 @@ function fanPageStatsDateKey(timestamp = Date.now()) {
 }
 
 async function cleanupVerifiedStreamerVisitDedup(todayKey) {
-  await pruneVerifiedStreamerVisitDedup(db, ['streamerFanPage', 'viewerStats'], todayKey);
+  await pruneVerifiedStreamerVisitDedup(sharedDb, ['streamerFanPage', 'viewerStats'], todayKey);
 }
 
 function metricCount(value) {
@@ -999,7 +1014,7 @@ async function recordFanPageView(uid, streamerId) {
 }
 
 async function recordVerifiedStreamerFanPageVisit(verified) {
-  return recordVerifiedStreamerVisit(db, verified, 'streamerFanPage', fanPageStatsDateKey());
+  return recordVerifiedStreamerVisit(sharedDb, verified, 'streamerFanPage', fanPageStatsDateKey());
 }
 
 function pageRef(streamerId) {
@@ -1279,14 +1294,14 @@ function isGalleryPublicUrl(value) {
 async function findGalleryStreamerIds(target) {
   const verifiedUid = target.record && typeof target.record.uid === 'string' ? target.record.uid : '';
   if (verifiedUid) {
-    const linkedSnap = await db.ref(`gallery/streamerAccountLinks/${verifiedUid}`).get();
+    const linkedSnap = await sharedDb.ref(`gallery/streamerAccountLinks/${verifiedUid}`).get();
     const linkedId = linkedSnap.val() && linkedSnap.val().streamerId;
     if (isSafeGalleryStreamerId(linkedId)) return [linkedId];
   }
 
   // 갤러리 계정 연결이 아직 없는 스트리머는 갤러리 업로드가 사용하는
   // streamerNames를 기준으로 찾고, `[크루명]` 표기는 제거한 뒤 유일하게 일치할 때만 연결한다.
-  const namesSnap = await db.ref('streamerNames').get();
+  const namesSnap = await sharedDb.ref('streamerNames').get();
   const expectedName = normalizeGalleryStreamerName(target.streamer.nickname);
   if (!expectedName) return [];
   const names = namesSnap.val() || {};
@@ -1311,7 +1326,7 @@ async function readStreamerGallery(target) {
 
   // Gallery는 streamerId 인덱스로 이미 관련 이미지들을 조회한다. 팬페이지도 같은
   // 공개 미러(imagesPublic)를 사용하고, UID가 포함된 내부 images 노드는 읽지 않는다.
-  const snapshots = await Promise.all(galleryStreamerIds.map((galleryStreamerId) => db.ref('gallery/imagesPublic')
+  const snapshots = await Promise.all(galleryStreamerIds.map((galleryStreamerId) => sharedDb.ref('gallery/imagesPublic')
     .orderByChild('streamerId').equalTo(galleryStreamerId).get()));
   const uniqueImages = new Map();
   snapshots.forEach((snapshot) => {
@@ -1334,7 +1349,7 @@ async function readStreamerGallery(target) {
       .forEach((item) => previewById.set(item.id, item));
   });
   const previewItems = [...previewById.values()].sort((a, b) => b.createdAt - a.createdAt);
-  const stats = await Promise.all(previewItems.map((item) => db.ref(`gallery/imageStats/${item.id}`).get()));
+  const stats = await Promise.all(previewItems.map((item) => sharedDb.ref(`gallery/imageStats/${item.id}`).get()));
   const items = previewItems.map((item, index) => {
     const value = stats[index].val() || {};
     return {
@@ -1358,7 +1373,7 @@ async function readStreamerGalleryPicker(target, requestedOffset = 0) {
   if (!cached || Date.now() - cached.fetchedAt >= FANPAGE_GALLERY_CACHE_TTL_MS) {
     const galleryStreamerIds = await findGalleryStreamerIds(target);
     if (!galleryStreamerIds.length) return { linked: false, totalCount: 0, items: [], offset: 0, hasMore: false };
-    const snapshots = await Promise.all(galleryStreamerIds.map((galleryStreamerId) => db.ref('gallery/imagesPublic')
+    const snapshots = await Promise.all(galleryStreamerIds.map((galleryStreamerId) => sharedDb.ref('gallery/imagesPublic')
       .orderByChild('streamerId').equalTo(galleryStreamerId).get()));
     const uniqueImages = new Map();
     snapshots.forEach((snapshot) => {
@@ -4074,7 +4089,8 @@ async function resolveFanpageCommentProfile(uid) {
     ['gallery', `gallery/profiles/${uid}`],
   ];
   for (const [source, path] of paths) {
-    const snapshot = await db.ref(path).get();
+    const database = source === 'streamerFanPageCommentProfiles' ? db : sharedDb;
+    const snapshot = await database.ref(path).get();
     const profile = normalizeFanpageCommentProfile(snapshot.val());
     if (profile) return { ...profile, source };
   }
@@ -4217,7 +4233,7 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
   const [pageSnap, vods, stockNamesSnap, fanpageEmotesSnap] = await Promise.all([
     pageRef(target.streamer.id).get(),
     readVodPage(target.streamer.id),
-    db.ref('streamerNames').get(),
+    sharedDb.ref('streamerNames').get(),
     db.ref(`streamerFanPageEmotes/${target.streamer.id}`).get(),
   ]);
   const stock = findStockForStreamer(target.streamer, stockNamesSnap.val());
@@ -7296,7 +7312,7 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
     let galleryImage = null;
     if (hasGalleryImage) {
       const [imageSnapshot, galleryStreamerIds] = await Promise.all([
-        db.ref('gallery/imagesPublic').child(imageId).get(),
+        sharedDb.ref('gallery/imagesPublic').child(imageId).get(),
         findGalleryStreamerIds(target),
       ]);
       const publicImage = imageSnapshot.val();

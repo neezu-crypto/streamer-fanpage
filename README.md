@@ -1,13 +1,15 @@
 # 스트리머 팬페이지
 
-스트리머 게임시리즈의 인증 스트리머 팬페이지입니다. GitHub Pages로 정적 화면을 배포하고, Firebase Cloud Functions를 통해 공유 RTDB의 스트리머 인증 정보를 확인하고 페이지 데이터를 관리합니다.
+스트리머 게임시리즈의 인증 스트리머 팬페이지입니다. GitHub Pages로 정적 화면을 배포하고, Firebase Cloud Functions를 통해 공유 RTDB의 스트리머 인증 정보를 확인하고 전용 RTDB의 페이지 데이터를 관리합니다.
 
 - 정적 사이트: `https://neezu-crypto.github.io/streamer-fanpage/`
 - Firebase 프로젝트: `soop-stock-market`
+- 팬페이지·고점체크 RTDB: `streamer-fanpage-rtdb` (`us-central1`, 서버 전용)
+- 공유 RTDB: `soop-stock-market-default-rtdb` (인증·관리자 권한·고점체크 구독 데이터)
 - Functions codebase: `fanpage`
 - Functions 배포 시 변경한 함수만 codebase와 함께 지정합니다. 관리자 통계 기능은 `firebase deploy --only functions:fanpage:streamerFanPageBootstrap,functions:fanpage:streamerFanPageAdminStats --project soop-stock-market`으로 배포합니다. 다시보기 시청 통계와 구독 게이트는 `firebase deploy --only functions:fanpage:streamerFanPageViewerStats,functions:fanpage:streamerFanPageViewerSubscription,functions:fanpage:streamerFanPageAdminViewerSubscriptionRequests --project soop-stock-market`으로 배포합니다.
 
-팬페이지, 최근 방문, 수동 갱신한 SOOP 다시보기 목록과 집계는 서버 전용 RTDB 경로에 저장하며 브라우저는 RTDB를 직접 읽거나 쓰지 않습니다. 최근 방문은 UID별 최대 8개로 보관하고 `streamerFanPageRecent` callable은 로그인한 본인의 목록만 반환합니다. 팬페이지 일별 조회·순방문은 집계값으로 저장하며, 관리자 callable도 방문자별 식별 정보는 반환하지 않습니다. `streamerFanPageAdminStats`는 `adminCenter/adminUids/{uid}`를 서버에서 확인하고 관리자에게 집계만 반환합니다. 고점체크 작업 결과는 요청 UID 해시와 대조해 본인만 조회할 수 있습니다. 다시보기 목록은 24개씩 서버 callable로 페이지를 읽고, 전체 갱신은 임시 세대에 분할 저장한 뒤 검증을 마치면 활성 세대를 바꿉니다. 갱신은 인증 스트리머 본인 또는 관리자만 실행할 수 있습니다. 각 항목은 SOOP 임베드 모달로 열고, 재생이 지원되지 않으면 SOOP 원본 링크를 제공합니다.
+팬페이지 콘텐츠·최근 방문·다시보기·관리자 집계와 고점체크 분석 결과·캐시·대기열·사용량은 전용 RTDB에 저장합니다. 공유 RTDB에는 Firebase 사용자/스트리머 인증, 관리자 권한, 고점체크 구독·신청처럼 다른 서비스와 공유하는 데이터만 둡니다. 전용 RTDB의 브라우저 읽기·쓰기는 차단하고 데이터 접근은 서버 callable로 처리합니다. 최근 방문은 UID별 최대 8개로 보관하고 `streamerFanPageRecent` callable은 로그인한 본인의 목록만 반환합니다. 팬페이지 일별 조회·순방문은 집계값으로 저장하며, 관리자 callable도 방문자별 식별 정보는 반환하지 않습니다. `streamerFanPageAdminStats`는 공유 RTDB의 `adminCenter/adminUids/{uid}`를 서버에서 확인하고 관리자에게 집계만 반환합니다. 고점체크 작업 결과는 요청 UID 해시와 대조해 본인만 조회할 수 있습니다. 다시보기 목록은 24개씩 서버 callable로 페이지를 읽고, 전체 갱신은 임시 세대에 분할 저장한 뒤 검증을 마치면 활성 세대를 바꿉니다. 갱신은 인증 스트리머 본인 또는 관리자만 실행할 수 있습니다. 각 항목은 SOOP 임베드 모달로 열고, 재생이 지원되지 않으면 SOOP 원본 링크를 제공합니다.
 
 인증 스트리머가 팬페이지에 접속하면 서버가 인증을 확인해 하루 한 번 관리자 접속 알림을 보냅니다. 새 이벤트에는 공개 닉네임·SOOP 아이디·접속 시각만 기록하고, Firebase UID는 넣지 않습니다. Discord 알림도 공개 닉네임·SOOP 아이디·접속 시각만 전달합니다. 일반 이용자는 이벤트 경로를 읽을 수 없습니다. 과거 이벤트에 UID가 포함되어 있을 수 있으며 같은 관리자 전용 접근 제한을 적용합니다.
 
