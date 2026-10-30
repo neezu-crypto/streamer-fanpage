@@ -6890,7 +6890,7 @@ function videoLibraryStateFor(streamerId) {
     state = {
       loaded: false, loading: false, saving: false, error: '', categories: [], items: [],
       categoryId: '', cursor: null, hasMore: false, canManage: false, isAdmin: false,
-      channels: [], isInitialImporting: false, isSyncing: false, searchQuery: '', editingId: '', syncTimer: 0,
+      channels: [], isInitialImporting: false, isSyncing: false, searchQuery: '', editingId: '', editingCategoryId: '', syncTimer: 0,
     };
     videoLibraryStates.set(streamerId, state);
   }
@@ -6963,40 +6963,73 @@ function renderVideoLibrarySection(page) {
   allCategory.textContent = '전체'; allCategory.setAttribute('aria-pressed', String(!state.categoryId));
   allCategory.addEventListener('click', () => selectVideoLibraryCategory(page, ''));
   categoryBar.append(allCategory);
-  state.categories.forEach((category, index) => {
-    const item = document.createElement('div'); item.className = 'video-library-category-item';
+  state.categories.forEach((category) => {
     const select = document.createElement('button'); select.type = 'button';
     select.className = `video-library-category${state.categoryId === category.id ? ' is-active' : ''}`;
     select.textContent = category.name; select.setAttribute('aria-pressed', String(state.categoryId === category.id));
     select.addEventListener('click', () => selectVideoLibraryCategory(page, category.id));
-    item.append(select);
-    if (state.canManage) {
-      const actions = document.createElement('span'); actions.className = 'video-library-category-actions';
-      const rename = document.createElement('button'); rename.type = 'button'; rename.className = 'video-library-icon-action';
-      rename.textContent = '이름'; rename.setAttribute('aria-label', `${category.name} 이름 변경`);
-      rename.addEventListener('click', () => {
-        const name = prompt('카테고리 이름을 입력해 주세요.', category.name);
-        if (name === null || !name.trim()) return;
-        runVideoLibraryMutation(page, 'category-rename', { categoryId: category.id, name: name.trim() }, '카테고리 이름을 바꿨어요.');
-      });
-      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'video-library-icon-action';
-      remove.textContent = '삭제'; remove.setAttribute('aria-label', `${category.name} 삭제`);
-      remove.addEventListener('click', () => {
-        if (!confirm(`“${category.name}” 카테고리를 삭제할까요? 비어 있는 카테고리만 삭제할 수 있어요.`)) return;
-        runVideoLibraryMutation(page, 'category-delete', { categoryId: category.id }, '카테고리를 삭제했어요.');
-      });
-      const up = document.createElement('button'); up.type = 'button'; up.className = 'video-library-icon-action';
-      up.textContent = '↑'; up.disabled = index === 0; up.setAttribute('aria-label', `${category.name} 위로 이동`);
-      up.addEventListener('click', () => reorderVideoLibraryCategory(page, index, index - 1));
-      const down = document.createElement('button'); down.type = 'button'; down.className = 'video-library-icon-action';
-      down.textContent = '↓'; down.disabled = index === state.categories.length - 1;
-      down.setAttribute('aria-label', `${category.name} 아래로 이동`);
-      down.addEventListener('click', () => reorderVideoLibraryCategory(page, index, index + 1));
-      actions.append(rename, remove, up, down); item.append(actions);
-    }
-    categoryBar.append(item);
+    categoryBar.append(select);
   });
   section.append(categoryBar);
+
+  const selectedCategory = state.categories.find((category) => category.id === state.categoryId);
+  if (state.canManage && selectedCategory) {
+    const categoryTools = document.createElement('div'); categoryTools.className = 'video-library-category-tools';
+    const editorContent = document.createElement('div'); editorContent.className = 'video-library-category-editor';
+    editorContent.id = 'videoLibraryCategoryEditor';
+    const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'button video-library-category-edit-toggle';
+    const isEditingCategory = state.editingCategoryId === selectedCategory.id;
+    toggle.textContent = isEditingCategory ? '편집 닫기' : '카테고리 편집';
+    toggle.setAttribute('aria-expanded', String(isEditingCategory));
+    toggle.setAttribute('aria-controls', editorContent.id);
+    toggle.setAttribute('aria-label', `${selectedCategory.name} 카테고리 편집`);
+    toggle.addEventListener('click', () => {
+      state.editingCategoryId = isEditingCategory ? '' : selectedCategory.id;
+      refreshVideoLibrarySection(page.streamer.id);
+    });
+    categoryTools.append(toggle);
+
+    if (isEditingCategory) {
+      const editForm = document.createElement('form'); editForm.className = 'video-library-category-edit-form';
+      const nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.required = true;
+      nameInput.maxLength = 32; nameInput.value = selectedCategory.name;
+      nameInput.setAttribute('aria-label', '카테고리 이름');
+      const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary';
+      save.disabled = state.saving; save.textContent = state.saving ? '저장 중…' : '이름 저장';
+      editForm.append(nameInput, save);
+      editForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const name = nameInput.value.trim();
+        if (!name || state.saving) return;
+        runVideoLibraryMutation(page, 'category-rename', { categoryId: selectedCategory.id, name }, '카테고리 이름을 바꿨어요.');
+      });
+      const deleteNote = document.createElement('p'); deleteNote.className = 'video-library-category-delete-note';
+      deleteNote.textContent = '영상이나 YouTube 채널이 연결된 카테고리는 삭제할 수 없어요.';
+      editorContent.append(editForm, deleteNote);
+
+      const actions = document.createElement('div'); actions.className = 'video-library-category-edit-actions';
+      const index = state.categories.findIndex((category) => category.id === selectedCategory.id);
+      const up = document.createElement('button'); up.type = 'button'; up.className = 'button';
+      up.textContent = '↑ 위로'; up.disabled = state.saving || index <= 0;
+      up.addEventListener('click', () => reorderVideoLibraryCategory(page, index, index - 1));
+      const down = document.createElement('button'); down.type = 'button'; down.className = 'button';
+      down.textContent = '↓ 아래로'; down.disabled = state.saving || index < 0 || index >= state.categories.length - 1;
+      down.addEventListener('click', () => reorderVideoLibraryCategory(page, index, index + 1));
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button video-library-category-delete';
+      const categoryHasContent = !state.loaded || state.items.length > 0 || state.hasMore
+        || state.channels.some((channel) => channel.categoryId === selectedCategory.id);
+      remove.disabled = state.saving || categoryHasContent; remove.textContent = '카테고리 삭제';
+      remove.title = categoryHasContent ? '영상과 연결된 채널이 없는 카테고리만 삭제할 수 있어요.' : '';
+      remove.addEventListener('click', () => {
+        if (!confirm(`“${selectedCategory.name}” 카테고리를 삭제할까요? 영상과 연결된 YouTube 채널이 없는 카테고리만 삭제할 수 있어요.`)) return;
+        runVideoLibraryMutation(page, 'category-delete', { categoryId: selectedCategory.id }, '카테고리를 삭제했어요.');
+      });
+      actions.append(up, down, remove);
+      editorContent.append(actions);
+    }
+    categoryTools.append(toggle, editorContent);
+    section.append(categoryTools);
+  }
 
   if (state.canManage && state.categories.length) {
     const addForm = document.createElement('form'); addForm.className = 'video-library-add-form';
@@ -7237,7 +7270,7 @@ function selectVideoLibraryCategory(page, categoryId) {
   const state = videoLibraryStateFor(page.streamer.id);
   if (state.categoryId === categoryId) return;
   state.categoryId = categoryId; state.items = []; state.cursor = null; state.hasMore = false;
-  state.loaded = false; state.searchQuery = ''; state.editingId = '';
+  state.loaded = false; state.searchQuery = ''; state.editingId = ''; state.editingCategoryId = '';
   void loadVideoLibrary(page);
 }
 
@@ -7250,7 +7283,7 @@ async function runVideoLibraryMutation(page, action, payload, successMessage) {
     await callVideoLibrary({ action, ...payload });
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
     if (action === 'category-delete' && state.categoryId === payload.categoryId) state.categoryId = '';
-    state.loaded = false; state.editingId = '';
+    state.loaded = false; state.editingId = ''; state.editingCategoryId = '';
     showToast(successMessage);
   } catch (error) {
     showToast(error.message || '영상 모음 변경을 저장하지 못했어요.');
