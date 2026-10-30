@@ -4160,6 +4160,7 @@ function renderFanPage(page, options = {}) {
     stockPriceUnsubscribe();
     stockPriceUnsubscribe = null;
   }
+  $('calendarSection')?._cleanupWeeklyScheduleViewport?.();
   stockPriceSparklineRequest += 1;
   currentPage = page;
   publishFanpageEmoteContext(page);
@@ -7941,7 +7942,8 @@ async function loadWeeklySchedulePageData(page, weekStart, board) {
 
 function renderCalendarSection(page) {
   const state = weeklyScheduleGraphicStateFor(page.streamer.id);
-  const canEdit = (page.isOwner || isAdminUser) && !window.matchMedia('(max-width: 720px)').matches;
+  const canManage = page.isOwner || isAdminUser;
+  const mobileScheduleMedia = window.matchMedia('(max-width: 720px)');
   const section = document.createElement('section');
   section.className = 'weekly-schedule-board content-card'; section.id = 'calendarSection';
   const heading = document.createElement('header'); heading.className = 'weekly-schedule-board-heading';
@@ -8029,14 +8031,33 @@ function renderCalendarSection(page) {
     });
   }
   section._drawWeeklyBoard = drawBoard;
-  if (canEdit) {
+  if (canManage) {
     const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'weekly-schedule-board-edit';
-    const openEditor = () => { if (!window.matchMedia('(max-width: 720px)').matches) openWeeklyScheduleDialog(page); };
+    const openEditor = () => { if (!mobileScheduleMedia.matches) openWeeklyScheduleDialog(page); };
     edit.textContent = '방송표 편집'; edit.addEventListener('click', openEditor);
     imageFrame.addEventListener('click', openEditor); imageFrame.tabIndex = 0; imageFrame.setAttribute('role', 'button');
     imageFrame.setAttribute('aria-label', '주간 방송표 편집');
-    imageFrame.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openEditor(); } });
+    imageFrame.addEventListener('keydown', (event) => {
+      if (!mobileScheduleMedia.matches && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openEditor(); }
+    });
     imageFrame.append(edit);
+    const syncEditAvailability = () => {
+      const enabled = !mobileScheduleMedia.matches;
+      edit.hidden = !enabled;
+      if (enabled) {
+        imageFrame.tabIndex = 0; imageFrame.setAttribute('role', 'button');
+        imageFrame.setAttribute('aria-label', '주간 방송표 편집');
+      } else {
+        imageFrame.removeAttribute('tabindex'); imageFrame.removeAttribute('role'); imageFrame.removeAttribute('aria-label');
+      }
+    };
+    syncEditAvailability();
+    if (typeof mobileScheduleMedia.addEventListener === 'function') mobileScheduleMedia.addEventListener('change', syncEditAvailability);
+    else mobileScheduleMedia.addListener(syncEditAvailability);
+    section._cleanupWeeklyScheduleViewport = () => {
+      if (typeof mobileScheduleMedia.removeEventListener === 'function') mobileScheduleMedia.removeEventListener('change', syncEditAvailability);
+      else mobileScheduleMedia.removeListener(syncEditAvailability);
+    };
   }
   previous.addEventListener('click', () => { const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() - 7); void loadWeeklySchedulePageData(page, localDateKey(date), section); });
   next.addEventListener('click', () => { const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + 7); void loadWeeklySchedulePageData(page, localDateKey(date), section); });
@@ -8673,7 +8694,10 @@ function openWeeklyScheduleDialog(page) {
 function refreshCalendarSection(streamerId) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const section = $('calendarSection');
-  if (section) section.replaceWith(renderCalendarSection(currentPage));
+  if (section) {
+    section._cleanupWeeklyScheduleViewport?.();
+    section.replaceWith(renderCalendarSection(currentPage));
+  }
 }
 
 function shiftCalendar(streamerId, amount) {
