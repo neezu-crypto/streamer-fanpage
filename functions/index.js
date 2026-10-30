@@ -4854,6 +4854,7 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
     return {
       weekStart,
       entries,
+      footerText: typeof record.footerText === 'string' ? record.footerText.slice(0, 48) : '',
       avatarImageId: avatar ? avatar.id : '',
       avatar,
       updatedAt: Number(record.updatedAt) || 0,
@@ -4866,6 +4867,9 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
     throw new HttpsError('permission-denied', '해당 팬페이지의 인증 스트리머와 관리자만 주간 일정을 저장할 수 있습니다.');
   }
   const entries = normalizeWeeklyScheduleEntries(data.entries);
+  const footerText = typeof data.footerText === 'string'
+    ? data.footerText.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 48)
+    : '';
   const avatarImageId = typeof data.avatarImageId === 'string' ? data.avatarImageId.trim() : '';
   if (avatarImageId) {
     if (!/^[A-Za-z0-9_-]{8,100}$/.test(avatarImageId)) throw new HttpsError('invalid-argument', '갤러리 이미지를 확인해 주세요.');
@@ -4883,13 +4887,13 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
       conflict = true;
       return;
     }
-    return { weekStart, entries, avatarImageId, updatedAt };
+    return { weekStart, entries, footerText, avatarImageId, updatedAt };
   });
   if (!result.committed) {
     if (conflict) throw new HttpsError('aborted', '다른 화면에서 이 주의 일정이 바뀌었습니다. 최신 내용을 불러와 다시 저장해 주세요.');
     throw new HttpsError('aborted', '저장 중 충돌이 발생했습니다. 최신 내용을 불러와 다시 시도해 주세요.');
   }
-  return { weekStart, entries, avatarImageId, updatedAt };
+  return { weekStart, entries, footerText, avatarImageId, updatedAt };
 });
 
 exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {

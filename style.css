@@ -780,7 +780,7 @@
 .weekly-schedule-board-heading{display:grid;justify-items:center;gap:3px;text-align:center}
 .weekly-schedule-board-heading>.eyebrow{margin:0;color:#bc7890;font-size:9px;letter-spacing:.2em}
 .weekly-schedule-board-title-row,.weekly-schedule-modal-title-row{display:flex;align-items:center;justify-content:center;gap:14px;width:100%}
-.weekly-schedule-title{margin:0;color:#514352;font-size:25px;text-align:center}
+.weekly-schedule-title{margin:0;color:#514352;font:800 25px var(--display);text-align:center}
 .weekly-schedule-arrow{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border:1px solid #f1b3c8;border-radius:50%;background:linear-gradient(#fff,#fff5f8);color:#a54c6b;font-size:25px;line-height:1;box-shadow:0 3px 0 #ead5e2;cursor:pointer}
 .weekly-schedule-arrow:hover{background:#fde5ed}
 .weekly-schedule-date-range,.weekly-schedule-status{margin:0;color:#968796;font-size:11px}
@@ -792,6 +792,7 @@
 .weekly-schedule-board-edit{position:absolute;right:12px;bottom:12px;min-height:34px;padding:0 14px;border:1px solid #e8a7bd;border-radius:18px;background:#fff;color:#8f4662;font:inherit;font-size:11px;box-shadow:0 3px 0 #ead5e2;opacity:0;transition:opacity .15s ease;cursor:pointer}
 .weekly-schedule-board-frame:hover .weekly-schedule-board-edit,.weekly-schedule-board-frame:focus-within .weekly-schedule-board-edit{opacity:1}
 .weekly-schedule-mobile-list{display:none}
+.weekly-schedule-date-caption{display:block;width:fit-content;max-width:calc(100% - 20px);margin:10px auto 2px;padding:10px 20px;border:1px solid #e9b4c6;border-radius:999px;background:linear-gradient(145deg,#fffafd,#ffeaf1);color:#87304f;text-align:center;font:700 clamp(15px,1.25vw,18px)/1.4 var(--display);overflow-wrap:anywhere;box-shadow:0 3px 0 #ead5e2}
 .weekly-schedule-modal-title-row .weekly-schedule-title{font-size:22px}
 .weekly-schedule-modal-title-row .weekly-schedule-arrow{width:32px;height:32px;flex-basis:32px;font-size:21px}
 .weekly-schedule-linked-note{margin:0;color:#9b93a2;font-size:10px;line-height:1.5}
@@ -806,7 +807,9 @@
 .weekly-schedule-template-stage{position:relative;overflow:hidden;aspect-ratio:1672/941;container-type:inline-size;background:#fff8fa}
 .weekly-schedule-sr-title{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 .weekly-schedule-template-stage .weekly-schedule-preview-canvas{display:block;width:100%;height:100%}
-.weekly-schedule-stage-previous,.weekly-schedule-stage-next{position:absolute;top:5.4%;z-index:4;width:2.7%;height:7%;min-width:25px;min-height:25px;padding:0;border-radius:50%;font-size:1.55cqw!important;opacity:.94}
+.weekly-schedule-stage-previous,.weekly-schedule-stage-next{position:absolute;top:7%;z-index:4;width:3.1%;height:5.5%;min-width:36px;min-height:36px;padding:0;border:2px solid #fff;border-radius:50%;background:linear-gradient(145deg,#fffafd,#f9dbe5);color:#a54265;box-shadow:0 3px 0 #df9ab0,inset 0 1px 0 #fff;font:800 1.35cqw/1 'Jua','Gowun Dodum',sans-serif!important;opacity:.98;transition:transform .16s ease,filter .16s ease}
+.weekly-schedule-stage-previous:hover,.weekly-schedule-stage-next:hover{filter:saturate(1.12);transform:translateY(-2px)}
+.weekly-schedule-stage-previous:active,.weekly-schedule-stage-next:active{transform:translateY(1px);box-shadow:0 1px 0 #df9ab0,inset 0 1px 0 #fff}
 .weekly-schedule-stage-previous{left:41.7%}.weekly-schedule-stage-next{left:89.1%}
 .weekly-schedule-day-edit-grid{position:absolute;inset:0;display:block;pointer-events:none}
 .weekly-schedule-day-edit{position:absolute;display:block;overflow:hidden;padding:0;border:0;background:transparent;pointer-events:none}
@@ -826,6 +829,9 @@
 .weekly-schedule-stage-linked span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .weekly-schedule-avatar-hit-area{position:absolute;left:5.62%;top:18.7%;z-index:3;width:23.33%;height:60.04%;padding:0;border:0;border-radius:.7cqw;background:transparent;cursor:pointer}
 .weekly-schedule-avatar-hit-area:hover,.weekly-schedule-avatar-hit-area:focus-visible{outline:.24cqw solid #e89ab3;outline-offset:-.24cqw}
+.weekly-schedule-footer-text{position:absolute;left:3.6%;top:86.6%;z-index:5;width:26.9%;height:7.4%;padding:0 .35cqw;border:1px solid transparent;border-radius:.5cqw;outline:0;background:transparent;color:transparent;caret-color:#9b365c;text-align:center;font:800 clamp(14px,1.8cqw,30px)/1 'Jua','Gowun Dodum',sans-serif;cursor:text}
+.weekly-schedule-footer-text:hover{border-color:#eab1c4aa;background:#fff8fa55}
+.weekly-schedule-footer-text:focus{border-color:#da8ca8;background:#fffaf3e8;color:#8f2e50;box-shadow:0 0 0 .2cqw #da8ca833}
 .weekly-schedule-meta[hidden],.weekly-schedule-modal-title-row[hidden]{display:none!important}
 .weekly-schedule-image-heading{display:grid;gap:.2cqw}.weekly-schedule-image-heading strong{font-size:1.15cqw}.weekly-schedule-image-heading small,.weekly-schedule-selected-image{font-size:.82cqw;line-height:1.35}
 .weekly-schedule-image-actions{display:grid;grid-template-columns:1fr;gap:.4cqw}
@@ -838,6 +844,7 @@
 .weekly-schedule-upload-panel .profile-editor-field{gap:.25cqw;font-size:.76cqw}
 .weekly-schedule-upload-panel .profile-editor-field input,.weekly-schedule-upload-panel .profile-editor-field select{min-height:2.2cqw;padding:.35cqw;font-size:.8cqw}
 @media(max-width:720px){.weekly-schedule-board{padding:14px;gap:9px}.weekly-schedule-title{font-size:18px}.weekly-schedule-board-title-row{gap:7px}.weekly-schedule-arrow{width:32px;height:32px;flex-basis:32px;font-size:21px}.weekly-schedule-board-edit{display:none}.weekly-schedule-mobile-list{display:grid;gap:7px;padding:10px;background:#fffafd}.weekly-schedule-mobile-day{display:grid;grid-template-columns:100px minmax(0,1fr);align-items:start;gap:8px;padding:8px 4px;border-bottom:1px solid #f0e5ec}.weekly-schedule-mobile-day strong{color:#a34e6c;font-size:11px}.weekly-schedule-mobile-day p{margin:0;color:#635665;font-size:11px;line-height:1.55;overflow-wrap:anywhere}.weekly-schedule-linked-row{grid-template-columns:52px 70px minmax(0,1fr);gap:5px}.weekly-schedule-modal-title-row{gap:6px}.weekly-schedule-modal-title-row .weekly-schedule-title{font-size:16px}}
+@media(max-width:720px){.weekly-schedule-date-caption{font-size:15px;padding:9px 15px}}
 @media(max-width:390px){.weekly-schedule-mobile-day{grid-template-columns:82px minmax(0,1fr)}.weekly-schedule-title{font-size:16px}.weekly-schedule-board{padding:10px}}
 
 .live-section{margin-top:18px;padding:20px;border:1px solid #ffffff15;border-radius:16px;background:linear-gradient(130deg,#201c28,#17151e)}
@@ -866,7 +873,7 @@
 .weekly-schedule-view-details-title{margin:4px 0 0;color:#51465d;font-size:19px}
 .weekly-schedule-view-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .weekly-schedule-view-day{min-width:0;padding:14px 16px;border:1px solid #eadbe5;border-radius:13px;background:#fffafd}
-.weekly-schedule-view-day h4{margin:0 0 6px;color:#a34e6c;font-size:15px;line-height:1.5}
+.weekly-schedule-view-day h4{margin:0 0 6px;color:#a34e6c;font:700 15px/1.5 var(--display)}
 .weekly-schedule-view-day p{margin:0;color:#51465d;font-size:16px;line-height:1.65;overflow-wrap:anywhere;white-space:pre-wrap}
 dialog.account-dialog.weekly-schedule-image-tools{position:fixed;inset:0;width:min(980px,calc(100% - 28px));max-width:calc(100vw - 28px);max-height:calc(100dvh - 28px);height:fit-content;margin:auto;padding:0;overflow:visible;border:1px solid #e7b7c8;border-radius:20px;background:#fffafd;color:#51465d;box-shadow:0 24px 80px #4b314533}
 dialog.account-dialog.weekly-schedule-image-tools:not([open]){display:none}
