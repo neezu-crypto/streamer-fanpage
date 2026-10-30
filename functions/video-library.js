@@ -4,6 +4,7 @@ const VIDEO_LIBRARY_CATEGORY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}
 const VIDEO_LIBRARY_CHANNEL_ID_PATTERN = /^UC[A-Za-z0-9_-]{20,30}$/i;
 const VIDEO_LIBRARY_ITEM_ID_PATTERN = /^(?:youtube_[A-Za-z0-9_-]{11}|soop_\d{1,20})$/;
 const VIDEO_LIBRARY_TITLE_MAX_LENGTH = 120;
+const VIDEO_LIBRARY_SYNC_STALE_MS = 3 * 60 * 1000;
 
 function normalizeVideoLibraryCategory(id, value) {
   if (!VIDEO_LIBRARY_CATEGORY_ID_PATTERN.test(String(id || '')) || !value || typeof value !== 'object') return null;
@@ -74,6 +75,38 @@ function parseVideoLibrarySortKey(key, value = {}) {
   return { id, sortAt };
 }
 
+function isInitialVideoLibraryImport(channel) {
+  return !!channel && typeof channel === 'object'
+    && channel.syncStatus === 'syncing' && !String(channel.activeSyncId || '');
+}
+
+function hasInitialVideoLibraryImport(channels) {
+  const entries = Array.isArray(channels) ? channels : Object.values(channels || {});
+  return entries.some(isInitialVideoLibraryImport);
+}
+
+function hasVideoLibrarySyncInProgress(channels) {
+  const entries = Array.isArray(channels) ? channels : Object.values(channels || {});
+  return entries.some((channel) => !!channel && typeof channel === 'object' && channel.syncStatus === 'syncing');
+}
+
+function shouldActivateVideoLibraryGeneration({ syncMode, finished, activeSyncId, syncId }) {
+  const activeId = String(activeSyncId || '');
+  const currentId = String(syncId || '');
+  return syncMode !== 'incremental' && (finished === true || !activeId || (!!currentId && activeId === currentId));
+}
+
+function videoLibraryTransactionRecord(current, seed, allowSeed) {
+  if (current && typeof current === 'object') return current;
+  return allowSeed && seed && typeof seed === 'object' ? seed : null;
+}
+
+function isStaleVideoLibrarySync(channel, now = Date.now()) {
+  if (!channel || typeof channel !== 'object' || channel.syncStatus !== 'syncing') return false;
+  const lastProgressAt = Math.max(Number(channel.syncStartedAt) || 0, Number(channel.updatedAt) || 0);
+  return lastProgressAt > 0 && now - lastProgressAt >= VIDEO_LIBRARY_SYNC_STALE_MS;
+}
+
 function paginateVideoLibraryEntries(sources, cursor, limit = 24) {
   const deduplicated = new Map();
   for (const item of sources.flat()) {
@@ -106,10 +139,17 @@ module.exports = {
   VIDEO_LIBRARY_CHANNEL_ID_PATTERN,
   VIDEO_LIBRARY_ITEM_ID_PATTERN,
   VIDEO_LIBRARY_TITLE_MAX_LENGTH,
+  VIDEO_LIBRARY_SYNC_STALE_MS,
+  hasInitialVideoLibraryImport,
+  hasVideoLibrarySyncInProgress,
+  isInitialVideoLibraryImport,
+  isStaleVideoLibrarySync,
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
   parseVideoLibrarySortKey,
   paginateVideoLibraryEntries,
+  shouldActivateVideoLibraryGeneration,
+  videoLibraryTransactionRecord,
   videoLibrarySortKey,
 };

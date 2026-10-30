@@ -8,6 +8,13 @@ const {
   normalizeVideoLibraryItem,
   parseVideoLibrarySortKey,
   paginateVideoLibraryEntries,
+  hasInitialVideoLibraryImport,
+  hasVideoLibrarySyncInProgress,
+  isInitialVideoLibraryImport,
+  isStaleVideoLibrarySync,
+  shouldActivateVideoLibraryGeneration,
+  VIDEO_LIBRARY_SYNC_STALE_MS,
+  videoLibraryTransactionRecord,
   videoLibrarySortKey,
 } = require('../video-library');
 
@@ -73,4 +80,43 @@ test('composite video index keys preserve newest-first order and round-trip the 
   assert.deepEqual(parseVideoLibrarySortKey(older), { id: 'soop_100', sortAt: 99 });
   assert.equal(videoLibrarySortKey(100, 'invalid-id'), '');
   assert.equal(parseVideoLibrarySortKey('invalid-key'), null);
+});
+
+test('a new channel publishes its first full-sync page while a replacement waits for completion', () => {
+  assert.equal(shouldActivateVideoLibraryGeneration({ syncMode: 'full', finished: false, activeSyncId: '' }), true);
+  assert.equal(shouldActivateVideoLibraryGeneration({ syncMode: 'full', finished: false, activeSyncId: 'old-generation' }), false);
+  assert.equal(shouldActivateVideoLibraryGeneration({ syncMode: 'full', finished: true, activeSyncId: 'old-generation' }), true);
+  assert.equal(shouldActivateVideoLibraryGeneration({ syncMode: 'full', finished: false, activeSyncId: 'current-generation', syncId: 'current-generation' }), true);
+  assert.equal(shouldActivateVideoLibraryGeneration({ syncMode: 'incremental', finished: false, activeSyncId: 'active-generation' }), false);
+});
+
+test('initial imports are detectable for public loading feedback and stop after first publication', () => {
+  const initial = { syncStatus: 'syncing', activeSyncId: '' };
+  assert.equal(isInitialVideoLibraryImport(initial), true);
+  assert.equal(hasInitialVideoLibraryImport({ channelA: initial, channelB: { syncStatus: 'ready' } }), true);
+  assert.equal(hasInitialVideoLibraryImport([{ syncStatus: 'ready', activeSyncId: 'generation' }]), false);
+  assert.equal(isInitialVideoLibraryImport({ syncStatus: 'syncing', activeSyncId: 'generation' }), false);
+});
+
+test('sync-in-progress state remains visible after the first batch is published', () => {
+  assert.equal(hasVideoLibrarySyncInProgress({ channelA: { syncStatus: 'syncing', activeSyncId: 'generation' } }), true);
+  assert.equal(hasVideoLibrarySyncInProgress([{ syncStatus: 'ready' }]), false);
+});
+
+test('stalled sync detection waits three minutes and ignores completed imports', () => {
+  const now = 1_800_000_000_000;
+  const stalled = { syncStatus: 'syncing', syncStartedAt: now - VIDEO_LIBRARY_SYNC_STALE_MS - 1 };
+  const recent = { syncStatus: 'syncing', syncStartedAt: now - VIDEO_LIBRARY_SYNC_STALE_MS + 1 };
+  assert.equal(isStaleVideoLibrarySync(stalled, now), true);
+  assert.equal(isStaleVideoLibrarySync(recent, now), false);
+  assert.equal(isStaleVideoLibrarySync({ ...stalled, syncStatus: 'ready' }, now), false);
+});
+
+test('channel transactions can use a fresh server read when their local starting value is empty', () => {
+  const seed = { syncId: 'current-sync', syncStatus: 'syncing' };
+  assert.equal(videoLibraryTransactionRecord(null, seed, true), seed);
+  const serverCurrent = { syncId: 'newer-sync', syncStatus: 'ready' };
+  assert.equal(videoLibraryTransactionRecord(serverCurrent, seed, false), serverCurrent);
+  assert.equal(videoLibraryTransactionRecord(null, seed, false), null);
+  assert.equal(videoLibraryTransactionRecord(null, null, true), null);
 });
