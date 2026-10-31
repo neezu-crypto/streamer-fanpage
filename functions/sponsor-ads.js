@@ -271,6 +271,10 @@ exports.streamerFanPageSponsorAds = onCall({ maxInstances: 20, enforceAppCheck: 
         throw new HttpsError('failed-precondition', '후원 완료를 등록할 수 있는 대기 신청이 없습니다. 신청 상태를 새로고침해 주세요.');
       }
       const claimRef = db.ref(`${CLAIMS_PATH}/${requestId}`);
+      const held = [];
+      try {
+      held.push(await holdFreshRealtimeSnapshot(claimRef));
+      held.push(await holdFreshRealtimeSnapshot(requestRef));
       const requestSoopId = soopIdFromRecord(existing);
       const markClaimDonationComplete = () => claimRef.transaction((current) => {
         if (!current || current.status !== 'pending' || current.soopId !== requestSoopId) return;
@@ -331,6 +335,9 @@ exports.streamerFanPageSponsorAds = onCall({ maxInstances: 20, enforceAppCheck: 
         throw new HttpsError('failed-precondition', '후원 완료를 등록할 수 있는 대기 신청이 없습니다.');
       }
       return { status: 'pending', donationCompletedAt: Number(saved.donationCompletedAt) || now };
+      } finally {
+        held.forEach((item) => item.release());
+      }
     }
 
     if (Number(existing.donationCompletedAt) > 0) {
