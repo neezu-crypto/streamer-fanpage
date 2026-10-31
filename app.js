@@ -7869,22 +7869,26 @@ function formatWeeklyScheduleDate(date) {
 function drawWeeklyScheduleTitle(ctx, value) {
   const title = String(value || '');
   let fontSize = 50;
+  const centerY = 105;
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#a74464';
   ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`;
   while (ctx.measureText(title).width > 680 && fontSize > 25) {
     fontSize -= 1;
     ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`;
   }
-  ctx.fillText(title, 1114, 94, 690);
+  const metrics = ctx.measureText(title);
+  const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.75;
+  const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2;
+  ctx.fillText(title, 1114, centerY + (ascent - descent) / 2, 690);
   return fontSize;
 }
 
 function drawWeeklyScheduleFooterText(ctx, value, centerX, centerY, maxWidth) {
   const fullText = String(value || '');
-  let fontSize = 44;
-  const minimumFontSize = 28;
+  let fontSize = 38;
+  const minimumFontSize = 24;
   const setFont = () => { ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`; };
   setFont();
   while (ctx.measureText(fullText).width > maxWidth && fontSize > minimumFontSize) {
@@ -7938,11 +7942,46 @@ function normalizeGraphicTime(value) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+function updateWeeklyScheduleTargets(page, state, board, statusMessage = '') {
+  const sourceBoard = board?._weeklyScheduleSourceBoard || (board?.classList.contains('weekly-schedule-board') ? board : null);
+  const visibleBoards = new Set([sourceBoard, board, sourceBoard?._weeklyScheduleViewDialog].filter((item) => item?.isConnected));
+  const start = parseLocalDateKey(state.weekStart);
+  const end = new Date(start); end.setDate(end.getDate() + 6);
+  visibleBoards.forEach((targetBoard) => {
+    const boardTitle = targetBoard.querySelector('.weekly-schedule-title');
+    const boardRange = targetBoard.querySelector('.weekly-schedule-date-range');
+    const boardStatus = targetBoard.querySelector('.weekly-schedule-status');
+    if (boardTitle) boardTitle.textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
+    if (boardRange) boardRange.textContent = `${formatWeeklyScheduleDate(start)} – ${formatWeeklyScheduleDate(end)}`;
+    if (boardStatus) boardStatus.textContent = statusMessage;
+    void targetBoard._drawWeeklyBoard?.();
+  });
+  const editor = $('weeklyScheduleGraphicDialog');
+  if (editor?.open) {
+    editor._syncWeeklyFields?.();
+    editor._refreshWeeklySchedulePreview?.();
+  }
+}
+
 async function loadWeeklySchedulePageData(page, weekStart, board) {
   const state = weeklyScheduleGraphicStateFor(page.streamer.id);
   const requestId = ++state.loadRequestId;
-  state.weekStart = weekStartFromDate(weekStart);
-  if (board?.isConnected) board.querySelector('.weekly-schedule-status').textContent = '일정을 불러오는 중이에요.';
+  const requestedWeekStart = weekStartFromDate(weekStart);
+  const weekChanged = state.weekStart !== requestedWeekStart;
+  if (weekChanged) {
+    state.entries = Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false }));
+    state.linkedEvents = Array.from({ length: 7 }, () => []);
+    state.footerText = '';
+    state.avatarImageId = '';
+    state.savedAvatar = null;
+    state.selectedImage = null;
+    if (state.localObjectUrl) URL.revokeObjectURL(state.localObjectUrl);
+    state.localObjectUrl = '';
+    state.updatedAt = 0;
+  }
+  state.weekStart = requestedWeekStart;
+  state.loading = true;
+  updateWeeklyScheduleTargets(page, state, board, '일정을 불러오는 중이에요.');
   const start = parseLocalDateKey(state.weekStart); const dates = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(start); date.setDate(date.getDate() + index); return localDateKey(date);
   });
@@ -7969,6 +8008,7 @@ async function loadWeeklySchedulePageData(page, weekStart, board) {
     state.footerText = typeof saved.data.footerText === 'string' ? saved.data.footerText.slice(0, 48) : '';
     state.avatarImageId = savedAvatarId;
     state.updatedAt = Number(saved.data.updatedAt) || 0;
+    state.weekUpdatedAtByStart[state.weekStart] = state.updatedAt;
     state.savedAvatar = saved.data.avatar || null;
     const eventMap = new Map(dates.map((date) => [date, []]));
     const calendarErrors = calendarResults.map((result) => result.data.loadError).filter(Boolean);
@@ -7977,20 +8017,7 @@ async function loadWeeklySchedulePageData(page, weekStart, board) {
     }));
     state.linkedEvents = dates.map((date) => eventMap.get(date) || []);
     state.loading = false; state.dirty = false; state.saveStatus = '';
-    const sourceBoard = board?._weeklyScheduleSourceBoard || (board?.classList.contains('weekly-schedule-board') ? board : null);
-    const visibleBoards = new Set([sourceBoard, board, sourceBoard?._weeklyScheduleViewDialog].filter((item) => item?.isConnected));
-    visibleBoards.forEach((targetBoard) => {
-      const boardTitle = targetBoard.querySelector('.weekly-schedule-title');
-      const boardRange = targetBoard.querySelector('.weekly-schedule-date-range');
-      const boardStatus = targetBoard.querySelector('.weekly-schedule-status');
-      if (boardTitle) boardTitle.textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
-      const end = parseLocalDateKey(state.weekStart); end.setDate(end.getDate() + 6);
-      if (boardRange) boardRange.textContent = `${formatWeeklyScheduleDate(start)} – ${formatWeeklyScheduleDate(end)}`;
-      if (boardStatus) boardStatus.textContent = calendarErrors.length ? 'SOOP 일정을 불러오지 못해 저장된 방송표만 표시하고 있어요.' : '';
-      targetBoard._drawWeeklyBoard?.();
-    });
-    const dialog = $('weeklyScheduleGraphicDialog');
-    if (dialog?.open && dialog._syncWeeklyFields) dialog._syncWeeklyFields();
+    updateWeeklyScheduleTargets(page, state, board, calendarErrors.length ? 'SOOP 일정을 불러오지 못해 저장된 방송표만 표시하고 있어요.' : '');
   } catch (error) {
     if (requestId !== state.loadRequestId) return;
     state.loading = false;
@@ -7998,7 +8025,7 @@ async function loadWeeklySchedulePageData(page, weekStart, board) {
     const message = /\binternal\b|\bnot[- ]found\b|unknown error/i.test(rawMessage)
       ? '주간 방송표를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
       : rawMessage || '일정을 불러오지 못했어요.';
-    if (board?.isConnected) board.querySelector('.weekly-schedule-status').textContent = message;
+    updateWeeklyScheduleTargets(page, state, board, message);
   }
 }
 
@@ -8342,6 +8369,7 @@ function weeklyScheduleGraphicStateFor(streamerId) {
       entries: Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false })),
       linkedEvents: Array.from({ length: 7 }, () => []),
       updatedAt: 0,
+      weekUpdatedAtByStart: {},
       loading: false,
       loadRequestId: 0,
       saveTimer: 0,
@@ -8798,21 +8826,32 @@ function renderWeeklyScheduleDialog(page) {
         try { entries = collectWeeklyEntries(); }
         catch (error) { state.saveStatus = error.message; saveStatus.textContent = error.message; return false; }
         const revision = state.localRevision || 0;
+        const savingWeekStart = state.weekStart;
+        const savingAvatarImageId = state.avatarImageId || '';
+        const savingFooterText = state.footerText || '';
+        const expectedUpdatedAt = state.updatedAt;
         state.saveStatus = '저장 중…'; saveStatus.textContent = state.saveStatus;
         try {
           const response = await callWeeklySchedule({
-            action: 'save', streamerId: page.streamer.id, weekStart: state.weekStart,
-            entries, avatarImageId: state.avatarImageId || '', footerText: state.footerText || '', expectedUpdatedAt: state.updatedAt,
+            action: 'save', streamerId: page.streamer.id, weekStart: savingWeekStart,
+            entries, avatarImageId: savingAvatarImageId, footerText: savingFooterText, expectedUpdatedAt,
           });
-          state.updatedAt = Number(response.data.updatedAt) || Date.now();
-          state.entries = entries;
-          if ((state.localRevision || 0) === revision) state.dirty = false;
-          state.saveStatus = state.dirty ? '변경사항을 저장하고 있어요.' : '저장 완료';
-          saveStatus.textContent = state.saveStatus;
-          $('calendarSection')?._drawWeeklyBoard?.();
+          state.weekUpdatedAtByStart[savingWeekStart] = Number(response.data.updatedAt) || Date.now();
+          if (state.weekStart === savingWeekStart) {
+            state.updatedAt = state.weekUpdatedAtByStart[savingWeekStart];
+            state.entries = entries;
+            if ((state.localRevision || 0) === revision) state.dirty = false;
+          }
+          if (state.weekStart === savingWeekStart) {
+            state.saveStatus = state.dirty ? '변경사항을 저장하고 있어요.' : '저장 완료';
+            saveStatus.textContent = state.saveStatus;
+          }
+          if (state.weekStart === savingWeekStart) $('calendarSection')?._drawWeeklyBoard?.();
         } catch (error) {
-          state.saveStatus = error.message || '저장하지 못했어요. 다시 시도해 주세요.';
-          saveStatus.textContent = state.saveStatus;
+          if (state.weekStart === savingWeekStart) {
+            state.saveStatus = error.message || '저장하지 못했어요. 다시 시도해 주세요.';
+            saveStatus.textContent = state.saveStatus;
+          }
           return false;
         }
       }
@@ -8845,12 +8884,98 @@ function renderWeeklyScheduleDialog(page) {
   });
 
   async function moveEditorWeek(offset) {
-    if (!(await saveCurrentWeek())) return;
+    if (state.weekNavigationBusy) return;
+    let entries;
+    try { entries = collectWeeklyEntries(); }
+    catch (error) { state.saveStatus = error.message; saveStatus.textContent = error.message; return; }
+    const setNavigationBusy = (busy) => {
+      previousWeek.disabled = busy; nextWeek.disabled = busy;
+      footerTextInput.disabled = busy; avatarHitArea.disabled = busy;
+      chooseImage.disabled = busy; uploadImage.disabled = busy;
+      clearImage.disabled = busy || !(state.selectedImage || state.savedAvatar);
+      dayInputs.forEach(({ offline, time, text }) => {
+        offline.disabled = busy;
+        time.disabled = busy || offline.checked;
+        text.contentEditable = busy || offline.checked ? 'false' : 'true';
+      });
+    };
+    window.clearTimeout(state.saveTimer);
+    const previous = {
+      weekStart: state.weekStart,
+      entries: entries.map((entry) => ({ ...entry })),
+      linkedEvents: state.linkedEvents.map((events) => [...events]),
+      footerText: state.footerText,
+      avatarImageId: state.avatarImageId,
+      savedAvatar: state.savedAvatar,
+      selectedImage: state.selectedImage,
+      updatedAt: state.updatedAt,
+      dirty: state.dirty,
+      localRevision: state.localRevision || 0,
+      loading: state.loading,
+      saveStatus: state.saveStatus,
+      localObjectUrl: state.localObjectUrl,
+      entriesToSave: entries,
+      pendingSave: state.savePromise,
+    };
     const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + offset * 7);
     const nextWeekStart = localDateKey(date);
-    state.selectedImage = null; state.savedAvatar = null;
-    await loadWeeklySchedulePageData(page, nextWeekStart, $('calendarSection'));
+
+    // 화면의 주차와 날짜부터 바꾸고, 저장·불러오기는 그 뒤에 진행한다.
+    state.weekNavigationBusy = true;
+    setNavigationBusy(true);
+    state.weekStart = nextWeekStart;
+    state.entries = Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false }));
+    state.linkedEvents = Array.from({ length: 7 }, () => []);
+    state.footerText = '';
+    state.avatarImageId = '';
+    state.savedAvatar = null;
+    state.selectedImage = null;
+    state.updatedAt = state.weekUpdatedAtByStart[nextWeekStart] || 0;
+    state.dirty = false;
+    state.localRevision = previous.localRevision + 1;
+    state.loading = true;
+    state.saveStatus = '주간 일정을 불러오는 중…';
     syncWeeklyFields();
+    updateWeeklyScheduleTargets(page, state, $('calendarSection'), '주간 일정을 불러오는 중이에요.');
+
+    try {
+      if (previous.pendingSave) await previous.pendingSave;
+      if (previous.dirty) {
+        const expectedUpdatedAt = state.weekUpdatedAtByStart[previous.weekStart] ?? previous.updatedAt;
+        const response = await callWeeklySchedule({
+          action: 'save', streamerId: page.streamer.id, weekStart: previous.weekStart,
+          entries: previous.entriesToSave, avatarImageId: previous.avatarImageId || '',
+          footerText: previous.footerText || '', expectedUpdatedAt,
+        });
+        state.weekUpdatedAtByStart[previous.weekStart] = Number(response.data.updatedAt) || Date.now();
+      }
+      if (state.localObjectUrl === previous.localObjectUrl && state.localObjectUrl) {
+        URL.revokeObjectURL(state.localObjectUrl);
+        state.localObjectUrl = '';
+      }
+      await loadWeeklySchedulePageData(page, nextWeekStart, $('calendarSection'));
+      syncWeeklyFields();
+    } catch (error) {
+      // 저장에 실패하면 편집 내용을 복원해 재시도할 수 있게 한다.
+      state.weekStart = previous.weekStart;
+      state.entries = previous.entries;
+      state.linkedEvents = previous.linkedEvents;
+      state.footerText = previous.footerText;
+      state.avatarImageId = previous.avatarImageId;
+      state.savedAvatar = previous.savedAvatar;
+      state.selectedImage = previous.selectedImage;
+      state.updatedAt = state.weekUpdatedAtByStart[previous.weekStart] ?? previous.updatedAt;
+      state.dirty = previous.dirty;
+      state.localRevision = previous.localRevision;
+      state.loading = previous.loading;
+      state.localObjectUrl = previous.localObjectUrl;
+      state.saveStatus = error.message || '이전 주 일정을 저장하지 못했어요.';
+      syncWeeklyFields();
+      updateWeeklyScheduleTargets(page, state, $('calendarSection'), state.saveStatus);
+    } finally {
+      state.weekNavigationBusy = false;
+      setNavigationBusy(false);
+    }
   }
 
   chooseImage.addEventListener('click', () => {
