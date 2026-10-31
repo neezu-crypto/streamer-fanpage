@@ -1649,6 +1649,33 @@ dialog[open]{overscroll-behavior:contain}
 #fanPageView .video-library-state.is-error,#fanPageView .video-library-inline-error{color:#ffadb5}
 #fanPageView .video-library-state.is-error{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
 #fanPageView .video-library-inline-error{margin:0;font-size:11px}
+#fanPageView dialog.video-library-add-dialog{width:min(500px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:min(720px,calc(100dvh - 32px));padding:0;overflow-x:hidden;overflow-y:auto;border:1px solid var(--line);border-radius:20px;background:#211e2a;color:var(--text);box-shadow:0 26px 90px #0009}
+#fanPageView dialog.video-library-add-dialog::backdrop{background:#08070de0;backdrop-filter:blur(7px)}
+#fanPageView .video-library-add-dialog-card{display:grid;gap:16px;padding:24px}
+#fanPageView .video-library-add-dialog-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+#fanPageView .video-library-add-dialog-heading .eyebrow{margin:0 0 5px;color:var(--pink);font-size:9px;letter-spacing:.2em}
+#fanPageView .video-library-add-dialog-heading h2{margin:0;font:23px/1.3 var(--display)}
+#fanPageView .video-library-add-dialog-description{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+#fanPageView .video-library-add-dialog-close{flex:0 0 auto;width:38px;min-width:38px;height:38px;min-height:38px;padding:0;border-radius:50%;font-size:22px;line-height:1}
+#fanPageView .video-library-add-dialog-back{justify-self:start;min-height:36px;padding:7px 12px;font-size:11px}
+#fanPageView .video-library-add-options{display:grid;gap:9px}
+#fanPageView .video-library-add-option{display:grid;grid-template-columns:42px minmax(0,1fr) 20px;align-items:center;gap:12px;width:100%;min-height:72px;padding:12px;border:1px solid var(--line);border-radius:15px;background:#ffffff08;color:var(--text);text-align:left;cursor:pointer;transition:border-color .16s,background .16s,transform .16s,box-shadow .16s}
+#fanPageView .video-library-add-option:hover:not(:disabled){transform:translateY(-1px);border-color:var(--pink);background:#f58cac12;box-shadow:0 5px 16px #0002}
+#fanPageView .video-library-add-option:focus-visible{outline:3px solid var(--pink);outline-offset:2px}
+#fanPageView .video-library-add-option:disabled{opacity:.52;cursor:not-allowed}
+#fanPageView .video-library-add-option-icon{display:grid;width:40px;height:40px;place-items:center;border:1px solid #f58cac55;border-radius:13px;background:#f58cac18;color:var(--pink);font-size:18px;font-weight:800}
+#fanPageView .video-library-add-option-copy{display:grid;gap:4px;min-width:0}
+#fanPageView .video-library-add-option-copy strong{font-size:14px}
+#fanPageView .video-library-add-option-copy small{color:var(--muted);font-size:11px;line-height:1.5}
+#fanPageView .video-library-add-option-arrow{color:var(--pink);font-size:23px;line-height:1}
+#fanPageView .video-library-add-dialog-form{display:grid;gap:13px}
+#fanPageView .video-library-add-dialog-field{display:grid;gap:7px;color:var(--text);font-size:12px;font-weight:700}
+#fanPageView .video-library-add-dialog-form :is(input,select){box-sizing:border-box;width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#100f16;color:var(--text);font:13px var(--font)}
+#fanPageView .video-library-add-dialog-form :is(input,select):focus{border-color:var(--pink);outline:0;box-shadow:0 0 0 3px #f58cac24}
+#fanPageView .video-library-add-dialog-form .button{min-height:44px;justify-self:end;min-width:145px}
+#fanPageView .video-library-add-dialog-hint{margin:0;color:var(--muted);font-size:11px;line-height:1.6}
+#fanPageView .video-library-add-dialog-status{margin:0;padding:10px 12px;border:1px solid #67c79755;border-radius:11px;background:#67c79712;color:#9ee3bd;font-size:12px;line-height:1.5}
+#fanPageView .video-library-add-dialog-status.is-error{border-color:#ff879755;background:#ff879712;color:#ffadb5}
 #fanPageView .video-library-admin-tools{padding:10px 12px;border:1px solid var(--line);border-radius:13px;background:#ffffff04}
 #fanPageView .video-library-admin-tools summary{color:var(--muted);font-size:11px;cursor:pointer}
 #fanPageView .video-library-channel-form{margin-top:10px;flex-wrap:wrap}
@@ -1677,6 +1704,12 @@ dialog[open]{overscroll-behavior:contain}
   #fanPageView .video-library-channel-card{grid-template-columns:minmax(0,1fr) auto}
   #fanPageView .video-library-channel-card .video-library-channel-delete{grid-column:1/-1}
   #fanPageView .video-library-channel-card progress,#fanPageView .video-library-channel-card small,#fanPageView .video-library-channel-card select{grid-column:1/-1}
+  #fanPageView dialog.video-library-add-dialog{width:calc(100vw - 20px);max-width:calc(100vw - 20px);max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));border-radius:18px}
+  #fanPageView .video-library-add-dialog-card{gap:14px;padding:19px}
+  #fanPageView .video-library-add-dialog-heading h2{font-size:21px}
+  #fanPageView .video-library-add-option{grid-template-columns:38px minmax(0,1fr) 18px;gap:10px;min-height:68px;padding:10px}
+  #fanPageView .video-library-add-option-icon{width:36px;height:36px}
+  #fanPageView .video-library-add-dialog-form .button{width:100%;justify-self:stretch}
 }
 
 /* Streamer-specific Tamagotchi design applications */

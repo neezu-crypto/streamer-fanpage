@@ -1384,6 +1384,18 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .affiliate-promo-button:focus-visible,#fanPageView.fanpage-layout-1 .affiliate-promo-image-link:focus-visible{outline:3px solid #6484cf;outline-offset:3px}
 #fanPageView.fanpage-layout-1 .affiliate-promo-disclosure{margin:10px 0 0;padding:9px 2px 0;border-top:1px dashed #d8e1f2;color:#81758b;font-size:9px;line-height:1.5;text-align:center}
 #fanPageView.fanpage-layout-1 .video-library-section{border-color:#dce4f5;background:linear-gradient(145deg,#fffefd,#f6f8ff);box-shadow:0 6px 0 #dce5f4,0 12px 26px #66799c0d;color:#51465d}
+#fanPageView.fanpage-layout-1 .video-library-add-open{min-height:42px;padding:9px 15px}
+#fanPageView.fanpage-layout-1 .video-library-add-dialog-card{background:transparent}
+#fanPageView.fanpage-layout-1 .video-library-add-dialog-heading .eyebrow{color:var(--kawaii-accent-deep)}
+#fanPageView.fanpage-layout-1 .video-library-add-dialog-description,#fanPageView.fanpage-layout-1 .video-library-add-option-copy small,#fanPageView.fanpage-layout-1 .video-library-add-dialog-hint{color:#81758b}
+#fanPageView.fanpage-layout-1 .video-library-add-option{border-color:#e5dce9;background:linear-gradient(145deg,#fff,#fff9fc);color:#51465d;box-shadow:0 3px 0 #e7dce8}
+#fanPageView.fanpage-layout-1 .video-library-add-option:hover:not(:disabled){border-color:#d86f98;background:linear-gradient(145deg,#fff5f9,#fff);box-shadow:0 4px 0 #e6cbd8,0 8px 18px #75608010}
+#fanPageView.fanpage-layout-1 .video-library-add-option-icon{border-color:#efb3ca;background:#fff1f6;color:#c94f7a}
+#fanPageView.fanpage-layout-1 .video-library-add-option-arrow{color:#c94f7a}
+#fanPageView.fanpage-layout-1 .video-library-add-dialog-status{border-color:#8dd3ad;background:#effaf3;color:#276b45!important}
+#fanPageView.fanpage-layout-1 .video-library-add-dialog-status.is-error{border-color:#f1a3ad;background:#fff1f2;color:#a43f4b!important}
+#fanPageView.fanpage-layout-1 .video-library-add-dialog-heading .video-library-add-dialog-close{color:#51465d}
+#fanPageView.fanpage-layout-1 .video-library-add-dialog-back{color:#51465d}
 #fanPageView.fanpage-layout-1 .video-library-heading .eyebrow{color:var(--kawaii-accent-deep)}
 #fanPageView.fanpage-layout-1 .video-library-count,#fanPageView.fanpage-layout-1 .video-library-description{color:#81758b}
 #fanPageView.fanpage-layout-1 :is(.video-library-category-form input,.video-library-category-edit-form input,.video-library-add-form input,.video-library-add-form select,.video-library-channel-form input,.video-library-channel-form select,.video-library-edit-form input,.video-library-edit-form select,.video-library-search,.video-library-channel-card select){border-color:#e3d9e9;background:#fff;color:#51465d}

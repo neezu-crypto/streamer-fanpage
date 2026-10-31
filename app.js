@@ -174,7 +174,7 @@ function showFanPageModal(dialog) {
   const isTouchLayout = window.matchMedia('(hover: none), (pointer: coarse)').matches;
   if (isTouchLayout) {
     const initialFocus = dialog.querySelector(
-      '.profile-settings-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
+      '.profile-settings-close, .video-library-add-dialog-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
     ) || dialog;
     if (initialFocus === dialog) dialog.tabIndex = -1;
     initialFocus.setAttribute('autofocus', '');
@@ -182,7 +182,7 @@ function showFanPageModal(dialog) {
   dialog.showModal();
   if (isTouchLayout) {
     const initialFocus = dialog.querySelector(
-      '.profile-settings-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
+      '.profile-settings-close, .video-library-add-dialog-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
     ) || dialog;
     initialFocus.focus({ preventScroll: true });
   }
@@ -4444,6 +4444,7 @@ function renderFanPage(page, options = {}) {
   ]);
   function selectFanPageTab(tabKey, moveFocus = false) {
     if (!tabPanels.has(tabKey)) return;
+    if (tabKey !== 'video-library') view.querySelector('dialog.video-library-add-dialog[open]')?.close();
     const previousTabKey = view.dataset.fanpageActiveTab;
     if (tabKey === 'rolling-paper' && previousTabKey !== 'rolling-paper') {
       const rollingPaperState = rollingPaperStateFor(page.streamer.id);
@@ -6985,6 +6986,168 @@ function videoLibraryCategorySelect(categories, selectedId, label) {
   return select;
 }
 
+function openVideoLibraryAddDialog(page) {
+  const state = videoLibraryStateFor(page.streamer.id);
+  const dialog = document.createElement('dialog');
+  dialog.className = 'account-dialog video-library-add-dialog';
+  dialog.setAttribute('aria-labelledby', 'videoLibraryAddTitle');
+  const card = document.createElement('div'); card.className = 'account-dialog-card video-library-add-dialog-card';
+  dialog.append(card);
+  let mode = 'choose';
+  let feedback = '';
+  let feedbackKind = 'success';
+
+  const render = () => {
+    card.replaceChildren();
+    const header = document.createElement('div'); header.className = 'video-library-add-dialog-heading';
+    const headingCopy = document.createElement('div');
+    const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'FAVORITES';
+    const title = document.createElement('h2'); title.id = 'videoLibraryAddTitle'; title.textContent = '즐겨찾기 추가';
+    const description = document.createElement('p'); description.className = 'video-library-add-dialog-description';
+    description.textContent = mode === 'choose' ? '무엇을 추가할까요?' : ({
+      category: '새 하위 카테고리를 만들어요.',
+      video: 'YouTube 또는 SOOP 다시보기 링크를 등록해요.',
+      channel: 'YouTube 채널의 공개 영상을 모두 가져와요.',
+    }[mode] || '즐겨찾기에 항목을 추가해요.');
+    headingCopy.append(eyebrow, title, description);
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'button video-library-add-dialog-close';
+    close.setAttribute('aria-label', '추가 창 닫기'); close.textContent = '×';
+    close.addEventListener('click', () => dialog.close());
+    header.append(headingCopy, close); card.append(header);
+
+    if (mode !== 'choose') {
+      const back = document.createElement('button'); back.type = 'button'; back.className = 'button video-library-add-dialog-back';
+      back.textContent = '← 추가 종류 선택'; back.disabled = state.saving;
+      back.addEventListener('click', () => { mode = 'choose'; feedback = ''; render(); });
+      card.append(back);
+    }
+
+    if (feedback) {
+      const status = document.createElement('p'); status.className = `video-library-add-dialog-status${feedbackKind === 'error' ? ' is-error' : ''}`;
+      status.setAttribute('role', feedbackKind === 'error' ? 'alert' : 'status'); status.textContent = feedback;
+      card.append(status);
+    }
+
+    if (mode === 'choose') {
+      const options = document.createElement('div'); options.className = 'video-library-add-options';
+      const addOption = (key, icon, label, note, disabled = false) => {
+        const button = document.createElement('button'); button.type = 'button';
+        button.className = 'video-library-add-option'; button.disabled = disabled || state.saving;
+        const symbol = document.createElement('span'); symbol.className = 'video-library-add-option-icon'; symbol.setAttribute('aria-hidden', 'true'); symbol.textContent = icon;
+        const copy = document.createElement('span'); copy.className = 'video-library-add-option-copy';
+        const name = document.createElement('strong'); name.textContent = label;
+        const detail = document.createElement('small'); detail.textContent = note;
+        copy.append(name, detail); const arrow = document.createElement('span'); arrow.className = 'video-library-add-option-arrow'; arrow.setAttribute('aria-hidden', 'true'); arrow.textContent = '›';
+        button.append(symbol, copy, arrow);
+        if (!button.disabled) button.addEventListener('click', () => { mode = key; feedback = ''; render(); });
+        options.append(button);
+      };
+      addOption('category', '▦', '카테고리', '영상을 주제별로 나눌 새 카테고리');
+      addOption('video', '▶', '영상', state.categories.length ? 'YouTube 또는 SOOP 다시보기 링크' : '먼저 카테고리를 추가해 주세요.', !state.categories.length);
+      if (state.isAdmin) addOption('channel', '▣', 'YouTube 채널', state.categories.length ? '채널의 전체 공개 영상 가져오기' : '먼저 카테고리를 추가해 주세요.', !state.categories.length);
+      card.append(options);
+      if (!state.categories.length) {
+        const hint = document.createElement('p'); hint.className = 'video-library-add-dialog-hint';
+        hint.textContent = '카테고리를 만든 뒤 이 창에서 영상이나 채널을 이어서 추가할 수 있어요.'; card.append(hint);
+      }
+    } else if (mode === 'category') {
+      const form = document.createElement('form'); form.className = 'video-library-add-dialog-form';
+      const label = document.createElement('label'); label.className = 'video-library-add-dialog-field';
+      label.textContent = '카테고리 이름';
+      const input = document.createElement('input'); input.type = 'text'; input.name = 'name'; input.required = true; input.maxLength = 32;
+      input.placeholder = '예: 리그 오브 레전드'; input.setAttribute('aria-label', '새 하위 카테고리 이름');
+      label.append(input);
+      const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
+      submit.disabled = state.saving; submit.textContent = state.saving ? '추가 중…' : '카테고리 추가';
+      form.append(label, submit);
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const name = input.value.trim();
+        if (!name || state.saving || !form.reportValidity()) return;
+        void submitVideoLibraryAdd(page, dialog, 'category-add', { name }, '카테고리를 추가했어요. 영상이나 채널도 이어서 등록할 수 있어요.', 'choose');
+      });
+      card.append(form);
+      if (!state.saving) input.focus({ preventScroll: true });
+    } else if (mode === 'video') {
+      const form = document.createElement('form'); form.className = 'video-library-add-dialog-form';
+      const categoryLabel = document.createElement('label'); categoryLabel.className = 'video-library-add-dialog-field'; categoryLabel.textContent = '카테고리';
+      const category = videoLibraryCategorySelect(state.categories, state.categoryId || state.categories[0]?.id || '', '추가할 영상 카테고리');
+      categoryLabel.append(category);
+      const urlLabel = document.createElement('label'); urlLabel.className = 'video-library-add-dialog-field'; urlLabel.textContent = '영상 링크';
+      const url = document.createElement('input'); url.type = 'url'; url.required = true; url.maxLength = 500;
+      url.placeholder = 'YouTube 또는 SOOP 다시보기 링크'; url.setAttribute('aria-label', '등록할 영상 링크'); urlLabel.append(url);
+      const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
+      submit.disabled = state.saving; submit.textContent = state.saving ? '등록 중…' : '영상 추가';
+      form.append(categoryLabel, urlLabel, submit);
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!form.reportValidity() || state.saving) return;
+        void submitVideoLibraryAdd(page, dialog, 'video-add', { categoryId: category.value, url: url.value.trim() }, '영상을 추가했어요. 이 창에서 계속 등록할 수 있어요.', 'video');
+      });
+      card.append(form);
+      if (!state.saving) url.focus({ preventScroll: true });
+    } else if (mode === 'channel' && state.isAdmin) {
+      const form = document.createElement('form'); form.className = 'video-library-add-dialog-form';
+      const categoryLabel = document.createElement('label'); categoryLabel.className = 'video-library-add-dialog-field'; categoryLabel.textContent = '추가할 카테고리';
+      const category = videoLibraryCategorySelect(state.categories, state.categoryId || state.categories[0]?.id || '', '가져올 영상 카테고리'); categoryLabel.append(category);
+      const urlLabel = document.createElement('label'); urlLabel.className = 'video-library-add-dialog-field'; urlLabel.textContent = 'YouTube 채널 링크';
+      const url = document.createElement('input'); url.type = 'url'; url.required = true; url.maxLength = 500;
+      url.placeholder = 'YouTube 채널 또는 @핸들 링크'; url.setAttribute('aria-label', 'YouTube 채널 주소'); urlLabel.append(url);
+      const note = document.createElement('p'); note.className = 'video-library-add-dialog-hint'; note.textContent = '등록 후 공개 영상 전체를 백그라운드에서 가져옵니다.';
+      const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
+      submit.disabled = state.saving; submit.textContent = state.saving ? '채널 확인 중…' : '채널 추가';
+      form.append(categoryLabel, urlLabel, note, submit);
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!form.reportValidity() || state.saving) return;
+        void submitVideoLibraryAdd(page, dialog, 'channel-add', { categoryId: category.value, url: url.value.trim() }, '채널을 추가했어요. 전체 영상 가져오기를 시작했어요.', 'channel');
+      });
+      card.append(form);
+      if (!state.saving) url.focus({ preventScroll: true });
+    }
+  };
+
+  dialog._renderVideoLibraryAddDialog = render;
+  dialog._setVideoLibraryAddMode = (value) => { mode = value; };
+  dialog._setVideoLibraryAddFeedback = (message, kind = 'success') => { feedback = message; feedbackKind = kind; };
+  render();
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  const view = $('fanPageView');
+  (view || document.body).append(dialog);
+  showFanPageModal(dialog);
+}
+
+async function submitVideoLibraryAdd(page, dialog, action, payload, successMessage, nextMode) {
+  const state = videoLibraryStateFor(page.streamer.id);
+  if (state.saving) return;
+  state.saving = true;
+  dialog._setVideoLibraryAddMode?.(nextMode);
+  dialog._setVideoLibraryAddFeedback?.('');
+  dialog._renderVideoLibraryAddDialog?.();
+  try {
+    const result = (await callVideoLibrary({ action, ...payload })).data;
+    if (!currentPage || currentPage.streamer.id !== page.streamer.id) { dialog.close(); return; }
+    if (action === 'category-add' && result?.category?.id) {
+      state.categoryId = result.category.id;
+      state.categories = [...state.categories.filter((category) => category.id !== result.category.id), result.category]
+        .sort((left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0)
+          || Number(left.createdAt || 0) - Number(right.createdAt || 0)
+          || left.name.localeCompare(right.name, 'ko'));
+    }
+    state.loaded = false; state.error = '';
+    await loadVideoLibrary(page, { refresh: true });
+    if (!dialog.open) return;
+    dialog._setVideoLibraryAddMode?.(nextMode);
+    dialog._setVideoLibraryAddFeedback?.(successMessage, 'success');
+  } catch (error) {
+    dialog._setVideoLibraryAddMode?.(nextMode);
+    dialog._setVideoLibraryAddFeedback?.(error.message || '추가하지 못했어요. 입력한 내용을 확인해 주세요.', 'error');
+  } finally {
+    state.saving = false;
+    if (dialog.open && typeof dialog._renderVideoLibraryAddDialog === 'function') dialog._renderVideoLibraryAddDialog();
+  }
+}
+
 function renderVideoLibrarySection(page) {
   const state = videoLibraryStateFor(page.streamer.id);
   const section = document.createElement('section');
@@ -6999,6 +7162,12 @@ function renderVideoLibrarySection(page) {
   count.textContent = `${state.items.length.toLocaleString('ko-KR')}개 표시`;
   copy.append(eyebrow, title, count);
   const headingActions = document.createElement('div'); headingActions.className = 'video-library-heading-actions';
+  if (state.canManage) {
+    const add = document.createElement('button'); add.type = 'button'; add.className = 'button button-primary video-library-add-open';
+    add.textContent = '＋ 추가하기'; add.disabled = state.saving || state.loading;
+    add.addEventListener('click', () => openVideoLibraryAddDialog(page));
+    headingActions.append(add);
+  }
   const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'button video-library-refresh';
   refresh.disabled = state.loading || state.saving;
   refresh.textContent = state.loading ? '불러오는 중…' : '↻ 새로고침';
@@ -7008,23 +7177,6 @@ function renderVideoLibrarySection(page) {
   const description = document.createElement('p'); description.className = 'video-library-description';
   description.textContent = '스트리머가 라이브에서 자주 시청하는 영상을 모았습니다.';
   section.append(description);
-
-  if (state.canManage) {
-    const categoryManager = document.createElement('div'); categoryManager.className = 'video-library-category-manager';
-    const categoryForm = document.createElement('form'); categoryForm.className = 'video-library-category-form';
-    const categoryInput = document.createElement('input'); categoryInput.type = 'text'; categoryInput.maxLength = 32;
-    categoryInput.placeholder = '새 하위 카테고리'; categoryInput.setAttribute('aria-label', '새 영상 카테고리 이름');
-    const addCategory = document.createElement('button'); addCategory.type = 'submit'; addCategory.className = 'button button-primary';
-    addCategory.disabled = state.saving; addCategory.textContent = '＋ 카테고리';
-    categoryForm.append(categoryInput, addCategory);
-    categoryForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (!categoryInput.value.trim() || state.saving) return;
-      runVideoLibraryMutation(page, 'category-add', { name: categoryInput.value.trim() }, '카테고리를 추가했어요.');
-    });
-    categoryManager.append(categoryForm);
-    section.append(categoryManager);
-  }
 
   const categoryBar = document.createElement('div'); categoryBar.className = 'video-library-categories';
   categoryBar.setAttribute('aria-label', '영상 카테고리');
@@ -7102,39 +7254,10 @@ function renderVideoLibrarySection(page) {
     section.append(categoryTools);
   }
 
-  if (state.canManage && state.categories.length) {
-    const addForm = document.createElement('form'); addForm.className = 'video-library-add-form';
-    const category = videoLibraryCategorySelect(state.categories, state.categoryId || state.categories[0].id, '추가할 영상 카테고리');
-    const url = document.createElement('input'); url.type = 'url'; url.required = true; url.maxLength = 500;
-    url.placeholder = 'YouTube 또는 SOOP 다시보기 링크'; url.setAttribute('aria-label', '등록할 영상 링크');
-    const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary';
-    add.disabled = state.saving; add.textContent = state.saving ? '등록 중…' : '＋ 영상 추가';
-    addForm.append(category, url, add);
-    addForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (!addForm.reportValidity() || state.saving) return;
-      runVideoLibraryMutation(page, 'video-add', { categoryId: category.value, url: url.value.trim() }, '영상을 추가했어요.');
-    });
-    section.append(addForm);
-  }
-
-  if (state.isAdmin && state.categories.length) {
+  if (state.isAdmin && state.channels.length) {
     const admin = document.createElement('details'); admin.className = 'video-library-admin-tools';
-    const summary = document.createElement('summary'); summary.textContent = '관리자 · YouTube 채널 전체 영상 가져오기';
+    const summary = document.createElement('summary'); summary.textContent = '관리자 · 등록 채널 관리';
     admin.append(summary);
-    const form = document.createElement('form'); form.className = 'video-library-channel-form';
-    const url = document.createElement('input'); url.type = 'url'; url.required = true; url.maxLength = 500;
-    url.placeholder = 'YouTube 채널 또는 @핸들 링크'; url.setAttribute('aria-label', 'YouTube 채널 주소');
-    const category = videoLibraryCategorySelect(state.categories, state.categoryId || state.categories[0].id, '가져올 영상 카테고리');
-    const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary';
-    add.disabled = state.saving; add.textContent = state.saving ? '등록 중…' : '채널 추가';
-    form.append(url, category, add);
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (!form.reportValidity() || state.saving) return;
-      runVideoLibraryMutation(page, 'channel-add', { url: url.value.trim(), categoryId: category.value }, '채널을 등록했어요. 영상 가져오기가 백그라운드에서 시작됩니다.');
-    });
-    admin.append(form);
     if (state.channels.length) {
       const channelList = document.createElement('div'); channelList.className = 'video-library-channel-list';
       state.channels.forEach((channel) => {
