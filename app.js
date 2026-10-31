@@ -7963,7 +7963,7 @@ function updateWeeklyScheduleTargets(page, state, board, statusMessage = '') {
   }
 }
 
-async function loadWeeklySchedulePageData(page, weekStart, board) {
+async function loadWeeklySchedulePageData(page, weekStart, board, options = {}) {
   const state = weeklyScheduleGraphicStateFor(page.streamer.id);
   const requestId = ++state.loadRequestId;
   const requestedWeekStart = weekStartFromDate(weekStart);
@@ -7974,6 +7974,8 @@ async function loadWeeklySchedulePageData(page, weekStart, board) {
     state.footerText = '';
     state.avatarImageId = '';
     state.savedAvatar = null;
+    state.carriedForwardFrom = '';
+    state.avatarUnavailable = false;
     state.selectedImage = null;
     if (state.localObjectUrl) URL.revokeObjectURL(state.localObjectUrl);
     state.localObjectUrl = '';
@@ -7988,7 +7990,10 @@ async function loadWeeklySchedulePageData(page, weekStart, board) {
   const months = [...new Set(dates.map((dateKey) => { const date = parseLocalDateKey(dateKey); return `${date.getFullYear()}-${date.getMonth() + 1}`; }))];
   try {
     const [saved, calendarResults] = await Promise.all([
-      callWeeklySchedule({ action: 'get', streamerId: page.streamer.id, weekStart: state.weekStart }),
+      callWeeklySchedule({
+        action: 'get', streamerId: page.streamer.id, weekStart: state.weekStart,
+        carryForward: options.carryForward === true,
+      }),
       Promise.all(months.map((monthKey) => {
         const [year, month] = monthKey.split('-').map(Number);
         return callCalendar({ streamerId: page.streamer.id, view: 'month', year, month, day: 1 })
@@ -8010,14 +8015,21 @@ async function loadWeeklySchedulePageData(page, weekStart, board) {
     state.updatedAt = Number(saved.data.updatedAt) || 0;
     state.weekUpdatedAtByStart[state.weekStart] = state.updatedAt;
     state.savedAvatar = saved.data.avatar || null;
+    state.carriedForwardFrom = typeof saved.data.carriedForwardFrom === 'string' ? saved.data.carriedForwardFrom : '';
+    state.avatarUnavailable = saved.data.avatarUnavailable === true;
     const eventMap = new Map(dates.map((date) => [date, []]));
     const calendarErrors = calendarResults.map((result) => result.data.loadError).filter(Boolean);
     calendarResults.forEach((result) => (result.data.days || []).forEach((day) => {
       if (eventMap.has(day.date)) eventMap.set(day.date, day.events || []);
     }));
     state.linkedEvents = dates.map((date) => eventMap.get(date) || []);
-    state.loading = false; state.dirty = false; state.saveStatus = '';
-    updateWeeklyScheduleTargets(page, state, board, calendarErrors.length ? 'SOOP 일정을 불러오지 못해 저장된 방송표만 표시하고 있어요.' : '');
+    state.loading = false; state.dirty = false;
+    state.saveStatus = state.avatarUnavailable ? '아바타 이미지를 불러오지 못했어요. 갤러리에서 다시 선택해 주세요.' : '';
+    const statusMessages = [];
+    if (state.carriedForwardFrom) statusMessages.push('이전 방송표의 내용을 가져왔어요.');
+    if (state.avatarUnavailable) statusMessages.push('아바타 이미지는 갤러리에서 다시 선택해 주세요.');
+    if (calendarErrors.length) statusMessages.push('SOOP 일정을 불러오지 못해 저장된 방송표만 표시하고 있어요.');
+    updateWeeklyScheduleTargets(page, state, board, statusMessages.join(' '));
   } catch (error) {
     if (requestId !== state.loadRequestId) return;
     state.loading = false;
@@ -8158,7 +8170,7 @@ function renderCalendarSection(page) {
   next.addEventListener('click', (event) => {
     event.stopPropagation();
     const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + 7);
-    void loadWeeklySchedulePageData(page, localDateKey(date), section);
+    void loadWeeklySchedulePageData(page, localDateKey(date), section, { carryForward: true });
   });
   section.append(heading, imageFrame);
   drawBoard();
@@ -8217,7 +8229,7 @@ function renderWeeklyScheduleViewDialog(page, board) {
   }
   const moveWeek = (offset) => {
     const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + offset * 7);
-    void loadWeeklySchedulePageData(page, localDateKey(date), dialog);
+    void loadWeeklySchedulePageData(page, localDateKey(date), dialog, { carryForward: offset > 0 });
   };
   previous.addEventListener('click', (event) => { event.stopPropagation(); moveWeek(-1); });
   next.addEventListener('click', (event) => { event.stopPropagation(); moveWeek(1); });
@@ -8370,6 +8382,8 @@ function weeklyScheduleGraphicStateFor(streamerId) {
       linkedEvents: Array.from({ length: 7 }, () => []),
       updatedAt: 0,
       weekUpdatedAtByStart: {},
+      carriedForwardFrom: '',
+      avatarUnavailable: false,
       loading: false,
       loadRequestId: 0,
       saveTimer: 0,
@@ -8908,6 +8922,8 @@ function renderWeeklyScheduleDialog(page) {
       avatarImageId: state.avatarImageId,
       savedAvatar: state.savedAvatar,
       selectedImage: state.selectedImage,
+      carriedForwardFrom: state.carriedForwardFrom || '',
+      avatarUnavailable: state.avatarUnavailable === true,
       updatedAt: state.updatedAt,
       dirty: state.dirty,
       localRevision: state.localRevision || 0,
@@ -8930,6 +8946,8 @@ function renderWeeklyScheduleDialog(page) {
     state.avatarImageId = '';
     state.savedAvatar = null;
     state.selectedImage = null;
+    state.carriedForwardFrom = '';
+    state.avatarUnavailable = false;
     state.updatedAt = state.weekUpdatedAtByStart[nextWeekStart] || 0;
     state.dirty = false;
     state.localRevision = previous.localRevision + 1;
@@ -8953,8 +8971,21 @@ function renderWeeklyScheduleDialog(page) {
         URL.revokeObjectURL(state.localObjectUrl);
         state.localObjectUrl = '';
       }
-      await loadWeeklySchedulePageData(page, nextWeekStart, $('calendarSection'));
+      await loadWeeklySchedulePageData(page, nextWeekStart, $('calendarSection'), { carryForward: offset > 0 });
       syncWeeklyFields();
+      if (offset > 0 && state.carriedForwardFrom) {
+        state.dirty = true;
+        state.localRevision = (state.localRevision || 0) + 1;
+        const carriedForwardFrom = state.carriedForwardFrom;
+        const saved = await saveCurrentWeek();
+        if (saved && state.weekStart === nextWeekStart) {
+          state.saveStatus = state.avatarUnavailable
+            ? `이전 방송표(${carriedForwardFrom})를 가져왔어요. 아바타 이미지는 갤러리에서 다시 선택해 주세요.`
+            : `이전 방송표(${carriedForwardFrom}) 내용을 가져와 저장했어요.`;
+          saveStatus.textContent = state.saveStatus;
+          updateWeeklyScheduleTargets(page, state, $('calendarSection'), state.saveStatus);
+        }
+      }
     } catch (error) {
       // 저장에 실패하면 편집 내용을 복원해 재시도할 수 있게 한다.
       state.weekStart = previous.weekStart;
@@ -8964,6 +8995,8 @@ function renderWeeklyScheduleDialog(page) {
       state.avatarImageId = previous.avatarImageId;
       state.savedAvatar = previous.savedAvatar;
       state.selectedImage = previous.selectedImage;
+      state.carriedForwardFrom = previous.carriedForwardFrom;
+      state.avatarUnavailable = previous.avatarUnavailable;
       state.updatedAt = state.weekUpdatedAtByStart[previous.weekStart] ?? previous.updatedAt;
       state.dirty = previous.dirty;
       state.localRevision = previous.localRevision;
@@ -9049,7 +9082,26 @@ function renderWeeklyScheduleDialog(page) {
 
 function openWeeklyScheduleDialog(page) {
   const dialog = $('weeklyScheduleGraphicDialog');
-  if (dialog) { showFanPageModal(dialog); dialog._syncWeeklyFields?.(); dialog._refreshWeeklySchedulePreview?.(); }
+  if (dialog) {
+    showFanPageModal(dialog);
+    dialog._syncWeeklyFields?.();
+    dialog._refreshWeeklySchedulePreview?.();
+    const state = weeklyScheduleGraphicStateFor(page.streamer.id);
+    if (state.carriedForwardFrom && !state.updatedAt && !state.dirty) {
+      state.dirty = true;
+      state.localRevision = (state.localRevision || 0) + 1;
+      const sourceWeekStart = state.carriedForwardFrom;
+      dialog._saveCurrentWeek?.().then((saved) => {
+        if (!saved || state.carriedForwardFrom !== sourceWeekStart) return;
+        state.saveStatus = state.avatarUnavailable
+          ? `이전 방송표(${sourceWeekStart})를 가져왔어요. 아바타 이미지는 갤러리에서 다시 선택해 주세요.`
+          : `이전 방송표(${sourceWeekStart}) 내용을 가져와 저장했어요.`;
+        const status = dialog.querySelector('.weekly-schedule-save-status');
+        if (status) status.textContent = state.saveStatus;
+        updateWeeklyScheduleTargets(page, state, $('calendarSection'), state.saveStatus);
+      });
+    }
+  }
 }
 
 function refreshCalendarSection(streamerId) {
