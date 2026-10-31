@@ -4842,7 +4842,7 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
       const previousWeek = new Date(`${weekStart}T00:00:00.000Z`);
       previousWeek.setUTCDate(previousWeek.getUTCDate() - 7);
       const previousWeekStart = previousWeek.toISOString().slice(0, 10);
-      const previousSnapshot = await fanPageWeeklySchedulesRef(target.streamer.id)
+      const previousSnapshot = await db.ref(`streamerFanPageWeeklySchedules/${target.streamer.id}`)
         .orderByKey().endAt(previousWeekStart).limitToLast(1).get();
       if (previousSnapshot.exists()) {
         previousSnapshot.forEach((child) => {
