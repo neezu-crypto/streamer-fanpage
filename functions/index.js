@@ -4825,8 +4825,9 @@ exports.streamerFanPageScheduleDelete = onCall({ maxInstances: 20 }, async (requ
 });
 
 exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (request) => {
-  const uid = requireAuth(request);
   const data = request.data || {};
+  const isEmbed = data.action === 'embed';
+  const uid = isEmbed ? null : requireAuth(request);
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
   const weekStart = typeof data.weekStart === 'string' ? data.weekStart : '';
   if (!streamerId || !isValidWeeklyScheduleWeekStart(weekStart)) {
@@ -4836,12 +4837,13 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
   const scheduleRef = fanPageWeeklySchedulesRef(target.streamer.id, weekStart);
 
-  if (data.action === 'get') {
+  if (data.action === 'get' || isEmbed) {
     const [viewerAdmin, viewerSubscription] = await Promise.all([
-      isAdminUid(uid), viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+      uid ? isAdminUid(uid) : false, uid ? viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get() : null,
     ]);
-    const canUseStarlight = viewerAdmin || (Number(viewerSubscription.val()?.expiresAt) || 0) > Date.now();
+    const canUseStarlight = viewerAdmin || (Number(viewerSubscription?.val()?.expiresAt) || 0) > Date.now();
     const targetSnapshot = await scheduleRef.get();
+    if (isEmbed && !targetSnapshot.exists()) throw new HttpsError('not-found', '저장된 주간 일정표가 없습니다.');
     let record = targetSnapshot.val() || {};
     let carriedForwardFrom = '';
     if (!targetSnapshot.exists() && data.carryForward === true) {
@@ -4876,8 +4878,29 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
         // 방송표 내용은 갤러리 이미지 조회가 일시 실패해도 계속 반환한다.
       }
     }
+    let linkedDays = [];
+    if (isEmbed) {
+      const start = new Date(`${weekStart}T00:00:00.000Z`);
+      const end = new Date(start); end.setUTCDate(end.getUTCDate() + 6);
+      const endDate = end.toISOString().slice(0, 10);
+      const months = [...new Set([start, end].map((date) => `${date.getUTCFullYear()}-${date.getUTCMonth() + 1}`))];
+      const soopDays = (await Promise.all(months.map(async (key) => {
+        const [year, month] = key.split('-').map(Number);
+        const cacheRef = calendarCacheRef(target.streamer.id, `month-${year}-${String(month).padStart(2, '0')}`);
+        const cached = (await cacheRef.get()).val();
+        if (Array.isArray(cached?.days) && Date.now() - Number(cached.fetchedAt) < CALENDAR_CACHE_TTL_MS) return cached.days;
+        try {
+          const days = await fetchSoopCalendar(target.streamer.soopId, 'month', year, month, 1);
+          await saveCalendarCache(target.streamer.id, `month-${year}-${String(month).padStart(2, '0')}`, days, Date.now()).catch(() => {});
+          return days;
+        } catch (_) { return Array.isArray(cached?.days) ? cached.days : []; }
+      }))).flat();
+      const events = await readFanPageSchedules(target.streamer.id, weekStart, endDate);
+      linkedDays = mergeCalendarDays(soopDays, events, weekStart, endDate);
+    }
     return {
       weekStart,
+      ...(isEmbed ? { nickname: target.streamer.nickname, linkedDays } : {}),
       entries,
       footerText: carriedForwardFrom ? '' : (typeof record.footerText === 'string' ? record.footerText.slice(0, 48) : ''),
       avatarImageId: avatar ? avatar.id : '',
