@@ -4,10 +4,12 @@
 .viewer-sponsor-rail-title{display:flex;align-items:center;gap:7px;margin:0;padding:0 0 8px;color:#617087;font-size:9px;font-weight:800;letter-spacing:.11em;white-space:nowrap}
 .viewer-sponsor-rail-title:before{width:6px;height:6px;flex:none;border-radius:50%;background:#cf4777;box-shadow:0 0 0 3px #cf47771b;content:""}
 .viewer-sponsor-card{position:relative;display:flex;min-height:116px;flex-direction:column;align-items:center;justify-content:center;gap:8px;overflow:visible;padding:10px 8px;border:1px solid #dfe5ee;border-top:2px solid #486bd6;border-radius:0;background:#fff;color:#17243a;text-align:center;text-decoration:none;box-shadow:none;transition:background .16s,border-color .16s;cursor:pointer}
+.viewer-sponsor-rail>.viewer-sponsor-card:not(.viewer-sponsor-card-open):not(.viewer-sponsor-card-pending){padding-right:0;padding-left:0}
 .viewer-sponsor-card+.viewer-sponsor-card{margin-top:-1px}
 .viewer-sponsor-card:hover,.viewer-sponsor-card:focus-visible{z-index:40;border-color:#486bd6;background:#f9fbff;outline:0}
-.viewer-sponsor-card img{position:relative;width:62px;height:62px;flex:none;border:1px solid #e1e6ef;border-radius:0;background:#edf1f7;object-fit:cover}
-.viewer-sponsor-avatar-fallback{display:grid;width:62px;height:62px;flex:none;place-items:center;border:1px solid #d9e1f1;background:linear-gradient(145deg,#eaf0fc,#fff0f5);color:#486bd6;font-size:20px;font-weight:700}
+.viewer-sponsor-rail>.viewer-sponsor-card img,.viewer-sponsor-rail>.viewer-sponsor-card .viewer-sponsor-avatar-fallback{box-sizing:border-box;width:80%;height:auto;aspect-ratio:1;flex:none}
+.viewer-sponsor-card img{position:relative;border:1px solid #e1e6ef;border-radius:0;background:#edf1f7;object-fit:cover}
+.viewer-sponsor-avatar-fallback{display:grid;place-items:center;border:1px solid #d9e1f1;background:linear-gradient(145deg,#eaf0fc,#fff0f5);color:#486bd6;font-size:20px;font-weight:700}
 .viewer-sponsor-card strong{display:block;max-width:100%;overflow:hidden;color:#26364f;font-size:13px;text-overflow:ellipsis;white-space:nowrap}
 .viewer-sponsor-card-open{border:1px dashed #b9c6d9;border-top:1px dashed #b9c6d9;background:#fbfcfe;color:#65738a;font:inherit}
 .viewer-sponsor-card-open:hover{z-index:auto;border-color:#9eacc1;background:#f6f8fc}
