@@ -7866,6 +7866,54 @@ function formatWeeklyScheduleDate(date) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function drawWeeklyScheduleTitle(ctx, value) {
+  const title = String(value || '');
+  let fontSize = 50;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#a74464';
+  ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`;
+  while (ctx.measureText(title).width > 680 && fontSize > 25) {
+    fontSize -= 1;
+    ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`;
+  }
+  ctx.fillText(title, 1114, 94, 690);
+  return fontSize;
+}
+
+function drawWeeklyScheduleFooterText(ctx, value, centerX, centerY, maxWidth) {
+  const fullText = String(value || '');
+  let fontSize = 44;
+  const minimumFontSize = 28;
+  const setFont = () => { ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`; };
+  setFont();
+  while (ctx.measureText(fullText).width > maxWidth && fontSize > minimumFontSize) {
+    fontSize -= 1;
+    setFont();
+  }
+  let displayText = fullText;
+  const overflow = ctx.measureText(fullText).width > maxWidth;
+  if (overflow) {
+    const characters = Array.from(fullText);
+    while (characters.length && ctx.measureText(`${characters.join('')}…`).width > maxWidth) characters.pop();
+    displayText = characters.length ? `${characters.join('')}…` : '…';
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(displayText, centerX, centerY);
+  return { overflow, fontSize };
+}
+
+function createWeeklyScheduleStageArrow(direction) {
+  const previous = direction === 'previous';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `weekly-schedule-arrow weekly-schedule-stage-${previous ? 'previous' : 'next'}`;
+  button.setAttribute('aria-label', previous ? '이전 주 일정' : '다음 주 일정');
+  button.textContent = previous ? '‹' : '›';
+  return button;
+}
+
 async function ensureWeeklyScheduleFonts() {
   if (!document.fonts?.load) return;
   await Promise.all([
@@ -7962,23 +8010,21 @@ function renderCalendarSection(page) {
   section.className = 'weekly-schedule-board content-card'; section.id = 'calendarSection';
   const heading = document.createElement('header'); heading.className = 'weekly-schedule-board-heading';
   const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'STREAMER SCHEDULE';
-  const titleRow = document.createElement('div'); titleRow.className = 'weekly-schedule-board-title-row';
-  const previous = document.createElement('button'); previous.type = 'button'; previous.className = 'weekly-schedule-arrow'; previous.setAttribute('aria-label', '이전 주 일정'); previous.textContent = '‹';
-  const title = document.createElement('h2'); title.className = 'weekly-schedule-title'; title.textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
-  const next = document.createElement('button'); next.type = 'button'; next.className = 'weekly-schedule-arrow'; next.setAttribute('aria-label', '다음 주 일정'); next.textContent = '›';
-  titleRow.append(previous, title, next);
+  const title = document.createElement('h2'); title.className = 'weekly-schedule-title weekly-schedule-sr-title'; title.textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
   const dateRange = document.createElement('p'); dateRange.className = 'weekly-schedule-date-range';
   const startDate = parseLocalDateKey(state.weekStart); const endDate = new Date(startDate); endDate.setDate(endDate.getDate() + 6);
   dateRange.textContent = `${formatWeeklyScheduleDate(startDate)} – ${formatWeeklyScheduleDate(endDate)}`;
   const status = document.createElement('p'); status.className = 'weekly-schedule-status'; status.setAttribute('role', 'status');
-  heading.append(eyebrow, titleRow, dateRange, status);
+  heading.append(eyebrow, title, dateRange, status);
 
   const imageFrame = document.createElement('div'); imageFrame.className = 'weekly-schedule-board-frame';
   const canvas = document.createElement('canvas'); canvas.width = 1672; canvas.height = 941; canvas.className = 'weekly-schedule-board-canvas';
   const avatar = document.createElement('img'); avatar.className = 'weekly-schedule-board-avatar'; avatar.alt = `${page.streamer.nickname} 갤러리 이미지`; avatar.hidden = true;
+  const previous = createWeeklyScheduleStageArrow('previous');
+  const next = createWeeklyScheduleStageArrow('next');
   const dateCaption = document.createElement('p'); dateCaption.className = 'weekly-schedule-date-caption';
   const mobileList = document.createElement('div'); mobileList.className = 'weekly-schedule-mobile-list';
-  imageFrame.append(canvas, avatar, dateCaption, mobileList);
+  imageFrame.append(canvas, avatar, previous, next, dateCaption, mobileList);
   let template = null; let templatePromise = null;
   const ctx = canvas.getContext('2d');
   function drawBoard() {
@@ -7994,16 +8040,14 @@ function renderCalendarSection(page) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (template?.naturalWidth) ctx.drawImage(template, 0, 0, canvas.width, canvas.height);
       const weekStart = parseLocalDateKey(state.weekStart); const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
-      ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#a74464';
-      let titleSize = 50; const headerText = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
-      ctx.font = `800 ${titleSize}px Jua, "Gowun Dodum", sans-serif`;
-      while (ctx.measureText(headerText).width > 680 && titleSize > 25) { titleSize -= 1; ctx.font = `800 ${titleSize}px Jua, "Gowun Dodum", sans-serif`; }
-      ctx.fillText(headerText, 1114, 94, 690);
+      ctx.save();
+      drawWeeklyScheduleTitle(ctx, weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart));
       const defaultFooterText = `${formatWeeklyScheduleDate(weekStart)} – ${formatWeeklyScheduleDate(weekEnd)}`;
-      dateCaption.textContent = state.footerText || defaultFooterText;
-      ctx.fillStyle = '#9b365c'; ctx.font = '800 31px Jua, "Gowun Dodum", sans-serif';
+      const footerText = state.footerText || defaultFooterText;
+      dateCaption.textContent = footerText;
+      ctx.fillStyle = '#9b365c';
       ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
-      ctx.fillText(state.footerText || defaultFooterText, 285, 850, 450); ctx.shadowBlur = 0;
+      drawWeeklyScheduleFooterText(ctx, footerText, 285, 850, 430); ctx.shadowBlur = 0;
       const days = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
       const topCards = Array.from({ length: 4 }, (_, index) => ({ x: 585 + index * 262, y: 171, w: 242, h: 323 }));
       const bottomCards = Array.from({ length: 3 }, (_, index) => ({ x: 588 + index * 347, y: 525, w: 317, h: 331 }));
@@ -8062,11 +8106,12 @@ function renderCalendarSection(page) {
   };
   imageFrame.addEventListener('click', openSchedule);
   imageFrame.addEventListener('keydown', (event) => {
+    if (event.target !== imageFrame) return;
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openSchedule(); }
   });
   const syncScheduleActivation = () => {
-    imageFrame.tabIndex = 0; imageFrame.setAttribute('role', 'button');
-    imageFrame.setAttribute('aria-label', canManage && !mobileScheduleMedia.matches ? '주간 방송표 편집' : '주간 방송표 크게 보기');
+    imageFrame.tabIndex = 0; imageFrame.setAttribute('role', 'group');
+    imageFrame.setAttribute('aria-label', `주간 방송표. 클릭하거나 Enter를 눌러 ${canManage && !mobileScheduleMedia.matches ? '편집' : '크게 보기'}할 수 있습니다. 양쪽 화살표로 주차를 이동합니다.`);
     if (edit) edit.hidden = mobileScheduleMedia.matches;
   };
   syncScheduleActivation();
@@ -8076,8 +8121,16 @@ function renderCalendarSection(page) {
     if (typeof mobileScheduleMedia.removeEventListener === 'function') mobileScheduleMedia.removeEventListener('change', syncScheduleActivation);
     else mobileScheduleMedia.removeListener(syncScheduleActivation);
   };
-  previous.addEventListener('click', () => { const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() - 7); void loadWeeklySchedulePageData(page, localDateKey(date), section); });
-  next.addEventListener('click', () => { const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + 7); void loadWeeklySchedulePageData(page, localDateKey(date), section); });
+  previous.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() - 7);
+    void loadWeeklySchedulePageData(page, localDateKey(date), section);
+  });
+  next.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + 7);
+    void loadWeeklySchedulePageData(page, localDateKey(date), section);
+  });
   section.append(heading, imageFrame);
   drawBoard();
   void loadWeeklySchedulePageData(page, state.weekStart, section);
@@ -8090,22 +8143,22 @@ function renderWeeklyScheduleViewDialog(page, board) {
   dialog.setAttribute('aria-label', '주간 방송표');
   const card = document.createElement('section'); card.className = 'account-dialog-card weekly-schedule-view-card';
   const header = document.createElement('header'); header.className = 'weekly-schedule-view-heading';
-  const titleRow = document.createElement('div'); titleRow.className = 'weekly-schedule-board-title-row';
-  const previous = document.createElement('button'); previous.type = 'button'; previous.className = 'weekly-schedule-arrow'; previous.setAttribute('aria-label', '이전 주 일정'); previous.textContent = '‹';
-  const title = document.createElement('h2'); title.className = 'weekly-schedule-title';
-  const next = document.createElement('button'); next.type = 'button'; next.className = 'weekly-schedule-arrow'; next.setAttribute('aria-label', '다음 주 일정'); next.textContent = '›';
+  const title = document.createElement('h2'); title.className = 'weekly-schedule-title weekly-schedule-sr-title';
   const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close'; close.setAttribute('aria-label', '주간 방송표 닫기'); close.textContent = '×';
-  titleRow.append(previous, title, next); header.append(titleRow, close);
+  header.append(title, close);
   const dateRange = document.createElement('p'); dateRange.className = 'weekly-schedule-date-range';
   const readingHint = document.createElement('p'); readingHint.className = 'weekly-schedule-view-hint'; readingHint.textContent = '주간 일정은 누구나 열람할 수 있어요.';
   const status = document.createElement('p'); status.className = 'weekly-schedule-status'; status.setAttribute('role', 'status');
   const frame = document.createElement('div'); frame.className = 'weekly-schedule-view-frame';
   const canvas = document.createElement('canvas'); canvas.width = 1672; canvas.height = 941; canvas.className = 'weekly-schedule-view-canvas'; canvas.setAttribute('aria-label', '주간 방송표 미리보기');
   const avatar = document.createElement('img'); avatar.className = 'weekly-schedule-board-avatar'; avatar.alt = `${page.streamer.nickname} 갤러리 이미지`; avatar.hidden = true;
-  frame.append(canvas, avatar);
+  const previous = createWeeklyScheduleStageArrow('previous');
+  const next = createWeeklyScheduleStageArrow('next');
+  frame.append(canvas, avatar, previous, next);
   const detailsHeading = document.createElement('h3'); detailsHeading.className = 'weekly-schedule-view-details-title'; detailsHeading.textContent = '요일별 일정';
+  const footerCaption = document.createElement('p'); footerCaption.className = 'weekly-schedule-view-footer-caption';
   const details = document.createElement('div'); details.className = 'weekly-schedule-view-details';
-  card.append(header, dateRange, readingHint, status, frame, detailsHeading, details); dialog.append(card);
+  card.append(header, dateRange, readingHint, status, frame, footerCaption, detailsHeading, details); dialog.append(card);
   const ctx = canvas.getContext('2d');
   const weekdays = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
   async function drawView() {
@@ -8118,6 +8171,7 @@ function renderWeeklyScheduleViewDialog(page, board) {
     title.textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
     const start = parseLocalDateKey(state.weekStart); const end = new Date(start); end.setDate(end.getDate() + 6);
     dateRange.textContent = `${formatWeeklyScheduleDate(start)} – ${formatWeeklyScheduleDate(end)}`;
+    footerCaption.textContent = state.footerText || dateRange.textContent;
     details.replaceChildren();
     weekdays.forEach((weekday, index) => {
       const date = new Date(start); date.setDate(date.getDate() + index);
@@ -8136,7 +8190,8 @@ function renderWeeklyScheduleViewDialog(page, board) {
     const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + offset * 7);
     void loadWeeklySchedulePageData(page, localDateKey(date), dialog);
   };
-  previous.addEventListener('click', () => moveWeek(-1)); next.addEventListener('click', () => moveWeek(1));
+  previous.addEventListener('click', (event) => { event.stopPropagation(); moveWeek(-1); });
+  next.addEventListener('click', (event) => { event.stopPropagation(); moveWeek(1); });
   close.addEventListener('click', () => dialog.close());
   dialog._drawWeeklyBoard = drawView;
   dialog._weeklyScheduleSourceBoard = board;
@@ -8447,11 +8502,12 @@ function renderWeeklyScheduleDialog(page) {
 
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
   const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요. 기존 연동 일정은 수정되지 않습니다.';
+  const footerTextWarning = document.createElement('small'); footerTextWarning.className = 'weekly-schedule-footer-text-warning'; footerTextWarning.setAttribute('role', 'status'); footerTextWarning.hidden = true;
   const saveStatus = document.createElement('span'); saveStatus.className = 'weekly-schedule-save-status'; saveStatus.setAttribute('role', 'status');
   const footerActions = document.createElement('div'); footerActions.className = 'profile-editor-footer-actions';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '닫기';
   const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
-  footerActions.append(cancel, download); footer.append(saveHint, saveStatus, footerActions);
+  footerActions.append(cancel, download); footer.append(saveHint, footerTextWarning, saveStatus, footerActions);
   dayHeading.hidden = true; previewHeading.hidden = true;
   form.append(meta, weekTools, previewFrame, linkedEventsPanel, footer);
   card.append(header, form); dialog.append(card, imageTools);
@@ -8550,18 +8606,21 @@ function renderWeeklyScheduleDialog(page) {
     }
     const graphicTitle = weeklyScheduleWeekTitle(page.streamer.nickname, weekInput.value || state.weekStart);
     title.textContent = graphicTitle; titleField.querySelector('input').value = graphicTitle;
-    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#a74464';
-    let titleSize = 50; ctx.font = `800 ${titleSize}px Jua, "Gowun Dodum", sans-serif`;
-    while (ctx.measureText(graphicTitle).width > 700 && titleSize > 25) { titleSize -= 1; ctx.font = `800 ${titleSize}px Jua, "Gowun Dodum", sans-serif`; }
-    ctx.fillText(graphicTitle, 1114, 92, 720);
+    ctx.save();
+    drawWeeklyScheduleTitle(ctx, graphicTitle);
     const weekStart = parseLocalDateKey(weekInput.value || state.weekStart); const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
     const defaultFooterText = `${formatGraphicDate(weekStart)} – ${formatGraphicDate(weekEnd)}`;
     if (!footerTextInput.matches(':focus')) footerTextInput.value = state.footerText || defaultFooterText;
-    ctx.fillStyle = '#9b365c'; ctx.font = '800 32px Jua, "Gowun Dodum", sans-serif';
-    if (!footerTextInput.matches(':focus')) {
-      ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
-      ctx.fillText(state.footerText || defaultFooterText, 285, 850, 450); ctx.shadowBlur = 0;
-    }
+    const footerText = state.footerText || defaultFooterText;
+    ctx.fillStyle = '#9b365c';
+    ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
+    const footerFit = drawWeeklyScheduleFooterText(ctx, footerText, 285, 850, 430);
+    footerTextInput.style.fontSize = `calc(${footerFit.fontSize / 16.72}cqw)`;
+    ctx.shadowBlur = 0;
+    footerTextWarning.hidden = !footerFit.overflow;
+    footerTextWarning.textContent = footerFit.overflow
+      ? '문구가 리본에 다 들어가지 않아요. 더 짧게 입력하면 저장 이미지에도 전체가 표시됩니다.'
+      : '';
     ctx.restore();
     const topCards = Array.from({ length: 4 }, (_, index) => ({ x: 585 + index * 262, y: 171, w: 242, h: 323 }));
     const bottomCards = Array.from({ length: 3 }, (_, index) => ({ x: 588 + index * 347, y: 525, w: 317, h: 331 }));
