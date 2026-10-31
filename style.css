@@ -790,8 +790,12 @@
 .weekly-schedule-board-canvas{display:block;width:100%;height:auto}
 .weekly-schedule-board-frame[role=group]{cursor:pointer}
 .weekly-schedule-board-avatar{position:absolute;left:5.62%;top:18.7%;width:23.33%;height:60.04%;border-radius:8px;object-fit:cover}
-.weekly-schedule-board-edit{position:absolute;right:12px;bottom:12px;min-height:34px;padding:0 14px;border:1px solid #e8a7bd;border-radius:18px;background:#fff;color:#8f4662;font:inherit;font-size:11px;box-shadow:0 3px 0 #ead5e2;opacity:0;transition:opacity .15s ease;cursor:pointer}
+.weekly-schedule-board-edit{position:absolute;right:12px;bottom:12px;display:grid;place-items:center;width:42px;height:42px;min-width:42px;min-height:42px;padding:0;border:1px solid #e8a7bd;border-radius:50%;background:linear-gradient(145deg,#fffafd,#ffeaf1);color:#8f4662;box-shadow:0 3px 0 #ead5e2;opacity:0;transition:opacity .15s ease,background .15s ease,transform .15s ease;cursor:pointer}
 .weekly-schedule-board-frame:hover .weekly-schedule-board-edit,.weekly-schedule-board-frame:focus-within .weekly-schedule-board-edit{opacity:1}
+.weekly-schedule-board-edit svg{display:block;width:19px;height:19px}
+.weekly-schedule-board-edit:hover{background:#fde5ed;color:#87304f;transform:translateY(-1px)}
+.weekly-schedule-board-edit:active{transform:translateY(1px);box-shadow:0 1px 0 #ead5e2}
+.weekly-schedule-board-edit:focus-visible{opacity:1;outline:3px solid #a84d6b;outline-offset:3px}
 .weekly-schedule-mobile-list{display:none}
 .weekly-schedule-date-caption{display:block;width:fit-content;max-width:calc(100% - 20px);margin:10px auto 2px;padding:10px 20px;border:1px solid #e9b4c6;border-radius:999px;background:linear-gradient(145deg,#fffafd,#ffeaf1);color:#87304f;text-align:center;font:700 clamp(15px,1.25vw,18px)/1.4 var(--display);overflow-wrap:anywhere;box-shadow:0 3px 0 #ead5e2}
 .weekly-schedule-modal-title-row .weekly-schedule-title{font-size:22px}
@@ -854,7 +858,7 @@
 /* Weekly schedule: readable viewing and a spacious gallery dialog. */
 .weekly-schedule-board-frame[role=group]{cursor:pointer;transition:box-shadow .16s ease,transform .16s ease}
 .weekly-schedule-board-frame[role=group]:hover,.weekly-schedule-board-frame[role=group]:focus-visible{outline:3px solid #df8ca8;outline-offset:3px;box-shadow:0 8px 24px #aa668022}
-.weekly-schedule-board-edit{opacity:1;font-size:13px;min-height:40px;padding-inline:16px}
+.weekly-schedule-board-edit{opacity:1;width:42px;height:42px;min-width:42px;min-height:42px;padding:0}
 .weekly-schedule-title{font-size:27px;line-height:1.35}
 .weekly-schedule-date-range,.weekly-schedule-status{font-size:13px;line-height:1.55}
 .weekly-schedule-mobile-day{grid-template-columns:minmax(112px,.34fr) minmax(0,1fr);gap:12px;padding:12px 8px}

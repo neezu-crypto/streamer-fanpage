@@ -8096,7 +8096,9 @@ function renderCalendarSection(page) {
   section._drawWeeklyBoard = drawBoard;
   const edit = canManage ? document.createElement('button') : null;
   if (edit) {
-    edit.type = 'button'; edit.className = 'weekly-schedule-board-edit'; edit.textContent = '방송표 편집';
+    edit.type = 'button'; edit.className = 'weekly-schedule-board-edit';
+    edit.setAttribute('aria-label', '방송표 편집'); edit.title = '방송표 편집';
+    edit.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
     edit.addEventListener('click', (event) => { event.stopPropagation(); if (!mobileScheduleMedia.matches) openWeeklyScheduleDialog(page); });
     imageFrame.append(edit);
   }
