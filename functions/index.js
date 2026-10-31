@@ -1,5 +1,7 @@
 'use strict';
 
+const { resolveTemplate, mayUseTemplate } = require('./weekly-schedule-template');
+
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase, getDatabaseWithUrl, ServerValue } = require('firebase-admin/database');
 const { getFunctions: getAdminFunctions } = require('firebase-admin/functions');
@@ -4835,6 +4837,10 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
   const scheduleRef = fanPageWeeklySchedulesRef(target.streamer.id, weekStart);
 
   if (data.action === 'get') {
+    const [viewerAdmin, viewerSubscription] = await Promise.all([
+      isAdminUid(uid), viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+    ]);
+    const canUseStarlight = viewerAdmin || (Number(viewerSubscription.val()?.expiresAt) || 0) > Date.now();
     const targetSnapshot = await scheduleRef.get();
     let record = targetSnapshot.val() || {};
     let carriedForwardFrom = '';
@@ -4877,6 +4883,9 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
       avatarImageId: avatar ? avatar.id : '',
       avatar,
       avatarUnavailable: Boolean(requestedAvatarImageId && !avatar),
+      templateId: record.templateId === 'starlight' ? 'starlight' : 'default',
+      animationEnabled: record.animationEnabled !== false,
+      canUseStarlight,
       updatedAt: carriedForwardFrom ? 0 : (Number(record.updatedAt) || 0),
       carriedForwardFrom,
     };
@@ -4886,6 +4895,20 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   if (!isAdmin && (!verified || verified.streamer.id !== target.streamer.id)) {
     throw new HttpsError('permission-denied', '해당 팬페이지의 인증 스트리머와 관리자만 주간 일정을 저장할 수 있습니다.');
+  }
+  const existingRecord = data.templateId == null || typeof data.animationEnabled !== 'boolean'
+    ? ((await scheduleRef.get()).val() || {}) : {};
+  const templateId = resolveTemplate(data.templateId, existingRecord.templateId);
+  const animationEnabled = typeof data.animationEnabled === 'boolean'
+    ? data.animationEnabled : existingRecord.animationEnabled !== false;
+  if (!templateId) {
+    throw new HttpsError('invalid-argument', '방송표 템플릿을 확인해 주세요.');
+  }
+  if (templateId === 'starlight' && !isAdmin) {
+    const subscription = (await viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get()).val() || {};
+    if (!mayUseTemplate(templateId, { expiresAt: subscription.expiresAt })) {
+      throw new HttpsError('permission-denied', '별빛 방송국 템플릿은 통합 구독 중에만 적용하고 수정할 수 있습니다.');
+    }
   }
   const entries = normalizeWeeklyScheduleEntries(data.entries);
   const footerText = typeof data.footerText === 'string'
@@ -4908,13 +4931,13 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
       conflict = true;
       return;
     }
-    return { weekStart, entries, footerText, avatarImageId, updatedAt };
+    return { weekStart, entries, footerText, avatarImageId, templateId, animationEnabled, updatedAt };
   });
   if (!result.committed) {
     if (conflict) throw new HttpsError('aborted', '다른 화면에서 이 주의 일정이 바뀌었습니다. 최신 내용을 불러와 다시 저장해 주세요.');
     throw new HttpsError('aborted', '저장 중 충돌이 발생했습니다. 최신 내용을 불러와 다시 시도해 주세요.');
   }
-  return { weekStart, entries, footerText, avatarImageId, updatedAt };
+  return { weekStart, entries, footerText, avatarImageId, templateId, animationEnabled, updatedAt };
 });
 
 exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {

@@ -7929,13 +7929,13 @@ function wrapWeeklyScheduleCanvasText(ctx, value, maxWidth, maxLines) {
   return lines;
 }
 
-function drawWeeklyScheduleTitle(ctx, value) {
+function drawWeeklyScheduleTitle(ctx, value, starlight = false) {
   const title = String(value || '');
   let fontSize = 50;
   const { centerX, centerY, maxWidth } = WEEKLY_SCHEDULE_LAYOUT.title;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = '#a74464';
+  ctx.fillStyle = starlight ? '#493365' : '#a74464';
   ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`;
   while (ctx.measureText(title).width > maxWidth && fontSize > 25) {
     fontSize -= 1;
@@ -8074,6 +8074,9 @@ async function loadWeeklySchedulePageData(page, weekStart, board, options = {}) 
       ? saved.data.entries.map((entry) => ({ time: String(entry.time || ''), content: String(entry.content || ''), offline: entry.offline === true }))
       : Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false }));
     state.footerText = typeof saved.data.footerText === 'string' ? saved.data.footerText.slice(0, 48) : '';
+    state.templateId = saved.data.templateId === 'starlight' && (!saved.data.carriedForwardFrom || saved.data.canUseStarlight) ? 'starlight' : 'default';
+    state.canUseStarlight = saved.data.canUseStarlight === true;
+    state.animationEnabled = saved.data.animationEnabled !== false;
     state.avatarImageId = savedAvatarId;
     state.updatedAt = Number(saved.data.updatedAt) || 0;
     state.weekUpdatedAtByStart[state.weekStart] = state.updatedAt;
@@ -8130,27 +8133,34 @@ function renderCalendarSection(page) {
   const dateCaption = document.createElement('p'); dateCaption.className = 'weekly-schedule-date-caption';
   const mobileList = document.createElement('div'); mobileList.className = 'weekly-schedule-mobile-list';
   imageFrame.append(canvas, avatar, previous, next, dateCaption, mobileList);
-  let template = null; let templatePromise = null;
+  const templates = new Map();
+  let boardDrawRequest = 0;
   const ctx = canvas.getContext('2d');
   function drawBoard() {
     if (!ctx) return;
-    if (!templatePromise) {
-      templatePromise = new Promise((resolve) => {
-        template = new Image(); template.onload = resolve; template.onerror = resolve;
-        template.src = new URL('./assets/weekly-schedule-template.png?v=20261031-weekly-board-v2', import.meta.url).href;
-      });
+    const drawRequest = ++boardDrawRequest;
+    const templateId = state.templateId === 'starlight' ? 'starlight' : 'default';
+    imageFrame.classList.toggle('weekly-schedule-starlight', templateId === 'starlight' && state.animationEnabled);
+    if (!templates.has(templateId)) {
+      const img = new Image();
+      const ready = new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
+      img.src = new URL(templateId === 'starlight' ? './assets/weekly-schedule-starlight.png' : './assets/weekly-schedule-template.png?v=20261031-weekly-board-v2', import.meta.url).href;
+      templates.set(templateId, { img, ready });
     }
-    return templatePromise.then(async () => {
+    const template = templates.get(templateId);
+    return template.ready.then(async () => {
+      if (templateId !== state.templateId) return;
       await ensureWeeklyScheduleFonts();
+      if (drawRequest !== boardDrawRequest) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (template?.naturalWidth) ctx.drawImage(template, 0, 0, canvas.width, canvas.height);
+      if (template.img.naturalWidth) ctx.drawImage(template.img, 0, 0, canvas.width, canvas.height);
       const weekStart = parseLocalDateKey(state.weekStart); const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
       ctx.save();
-      drawWeeklyScheduleTitle(ctx, weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart));
+      drawWeeklyScheduleTitle(ctx, weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart), state.templateId === 'starlight');
       const defaultFooterText = `${formatWeeklyScheduleDate(weekStart)} – ${formatWeeklyScheduleDate(weekEnd)}`;
       const footerText = state.footerText || defaultFooterText;
       dateCaption.textContent = footerText;
-      ctx.fillStyle = '#9b365c';
+      ctx.fillStyle = state.templateId === 'starlight' ? '#493365' : '#9b365c';
       ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
       const footer = WEEKLY_SCHEDULE_LAYOUT.footer;
       drawWeeklyScheduleFooterText(ctx, footerText, footer.centerX, footer.centerY, footer.maxWidth); ctx.shadowBlur = 0;
@@ -8166,17 +8176,17 @@ function renderCalendarSection(page) {
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         const timeBox = weeklyScheduleRegion(rect, rect.time);
         const contentBox = weeklyScheduleRegion(rect, rect.content);
-        ctx.fillStyle = '#a63d61'; ctx.font = `800 ${w < 260 ? 36 : 38}px Jua, "Gowun Dodum", sans-serif`;
+        ctx.fillStyle = state.templateId === 'starlight' ? '#493365' : '#a63d61'; ctx.font = `800 ${w < 260 ? 36 : 38}px Jua, "Gowun Dodum", sans-serif`;
         if (firstLine) ctx.fillText(firstLine, timeBox.x + timeBox.w / 2, timeBox.y + timeBox.h / 2, timeBox.w);
         const fontSize = w < 260 ? 29 : 31;
-        ctx.fillStyle = '#a94d6b'; ctx.font = `700 ${fontSize}px Gowun Dodum, sans-serif`;
+        ctx.fillStyle = state.templateId === 'starlight' ? '#594578' : '#a94d6b'; ctx.font = `700 ${fontSize}px Gowun Dodum, sans-serif`;
         const lineHeight = w < 260 ? 34 : 36;
         const shown = lines.flatMap((line) => wrapWeeklyScheduleCanvasText(ctx, line, contentBox.w, Math.max(1, Math.floor(contentBox.h / lineHeight)))).slice(0, Math.floor(contentBox.h / lineHeight));
         const centerY = contentBox.y + contentBox.h / 2; const startY = centerY - ((shown.length - 1) * lineHeight) / 2;
         shown.forEach((line, lineIndex) => {
           ctx.fillText(line, contentBox.x + contentBox.w / 2, startY + lineIndex * lineHeight, contentBox.w);
         });
-        ctx.fillStyle = '#a63d61'; ctx.font = '800 30px Jua, "Gowun Dodum", sans-serif';
+        ctx.fillStyle = state.templateId === 'starlight' ? '#493365' : '#a63d61'; ctx.font = '800 30px Jua, "Gowun Dodum", sans-serif';
         ctx.fillText(days[index], x + w / 2, y + h * rect.weekdayY, w - 24);
       });
       ctx.restore();
@@ -8240,7 +8250,22 @@ function renderCalendarSection(page) {
     const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + 7);
     void loadWeeklySchedulePageData(page, localDateKey(date), section, { carryForward: true });
   });
-  section.append(heading, imageFrame);
+  const designPreview = document.createElement('button'); designPreview.type = 'button'; designPreview.className = 'button weekly-template-view'; designPreview.textContent = '별빛 디자인 미리보기';
+  designPreview.addEventListener('click', () => {
+    const previewDialog = document.createElement('dialog'); previewDialog.className = 'account-dialog weekly-template-preview-dialog';
+    const previewCard = document.createElement('div'); previewCard.className = 'account-dialog-card weekly-template-preview-card';
+    const label = document.createElement('h3'); label.textContent = '별빛 방송국 · 구독 전용';
+    const img = document.createElement('img'); img.src = new URL('./assets/weekly-schedule-starlight.png', import.meta.url).href; img.alt = '별빛 방송국 주간 일정표 디자인';
+    const closePreview = document.createElement('button'); closePreview.type = 'button'; closePreview.className = 'button'; closePreview.textContent = '닫기'; closePreview.addEventListener('click', () => previewDialog.close());
+    const visual = document.createElement('div'); visual.className = 'weekly-template-visual weekly-schedule-starlight'; visual.append(img);
+    previewCard.append(label, visual, closePreview); previewDialog.append(previewCard); document.body.append(previewDialog);
+    previewDialog.addEventListener('close', () => previewDialog.remove(), { once: true }); showFanPageModal(previewDialog);
+  });
+  const motionButton = document.createElement('button'); motionButton.type = 'button'; motionButton.className = 'button weekly-template-view';
+  const refreshMotion = () => { const enabled = localStorage.getItem('fanpage.schedule.motion') !== 'off'; document.documentElement.classList.toggle('weekly-motion-off', !enabled); motionButton.textContent = enabled ? '움직임 끄기' : '움직임 켜기'; motionButton.setAttribute('aria-pressed', String(enabled)); };
+  motionButton.addEventListener('click', () => { localStorage.setItem('fanpage.schedule.motion', localStorage.getItem('fanpage.schedule.motion') === 'off' ? 'on' : 'off'); refreshMotion(); }); refreshMotion();
+  section._syncWeeklyMotion = refreshMotion;
+  section.append(heading, imageFrame, designPreview, motionButton);
   drawBoard();
   void loadWeeklySchedulePageData(page, state.weekStart, section);
   return section;
@@ -8275,6 +8300,7 @@ function renderWeeklyScheduleViewDialog(page, board) {
   const weekdays = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
   async function drawView() {
     await board?._drawWeeklyBoard?.();
+    frame.classList.toggle('weekly-schedule-starlight', state.templateId === 'starlight' && state.animationEnabled);
     const sourceCanvas = board?.querySelector('.weekly-schedule-board-canvas');
     if (ctx && sourceCanvas) ctx.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height);
     const sourceAvatar = board?.querySelector('.weekly-schedule-board-avatar');
@@ -8447,6 +8473,9 @@ function weeklyScheduleGraphicStateFor(streamerId) {
     weeklyScheduleGraphicStates.set(streamerId, {
       weekStart: localDateKey(monday),
       footerText: '',
+      templateId: 'default',
+      canUseStarlight: false,
+      animationEnabled: true,
       selectedImage: null,
       avatarImageId: '',
       entries: Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false })),
@@ -8612,6 +8641,24 @@ function renderWeeklyScheduleDialog(page) {
     dayInputs.push({ offline, time, text, linkedDisplay });
   });
 
+  const templateControls = document.createElement('div'); templateControls.className = 'weekly-template-controls';
+  const templateLabel = document.createElement('label'); templateLabel.textContent = '방송표 디자인 ';
+  const templateSelect = document.createElement('select'); templateSelect.setAttribute('aria-label', '방송표 디자인');
+  templateSelect.innerHTML = '<option value="default">기본 템플릿</option><option value="starlight">별빛 방송국 · 구독 전용</option>';
+  const templatePreview = document.createElement('button'); templatePreview.type = 'button'; templatePreview.className = 'button'; templatePreview.textContent = '별빛 템플릿 미리보기';
+  const motionToggle = document.createElement('button'); motionToggle.type = 'button'; motionToggle.className = 'button';
+  const syncMotionToggle = () => { const enabled = state.animationEnabled !== false; motionToggle.textContent = enabled ? '방송표 움직임 끄기' : '방송표 움직임 켜기'; motionToggle.setAttribute('aria-pressed', String(enabled)); motionToggle.disabled = state.templateId !== 'starlight' || !state.canUseStarlight; };
+  motionToggle.addEventListener('click', () => { if (!state.canUseStarlight || state.templateId !== 'starlight') return; state.animationEnabled = !state.animationEnabled; syncMotionToggle(); markWeeklyDirty(); });
+  const templateHint = document.createElement('small'); templateHint.setAttribute('role', 'status');
+  templateLabel.append(templateSelect); templateControls.append(templateLabel, templatePreview, motionToggle, templateHint);
+  const templateDialog = document.createElement('dialog'); templateDialog.className = 'account-dialog weekly-template-preview-dialog';
+  const templateCard = document.createElement('div'); templateCard.className = 'account-dialog-card weekly-template-preview-card';
+  const templateHeading = document.createElement('h3'); templateHeading.textContent = '별빛 방송국 · 구독 전용';
+  const templatePicture = document.createElement('img'); templatePicture.src = new URL('./assets/weekly-schedule-starlight.png', import.meta.url).href; templatePicture.alt = '별빛 방송국 주간 일정표 디자인';
+  const templateClose = document.createElement('button'); templateClose.type = 'button'; templateClose.className = 'button'; templateClose.textContent = '닫기'; templateClose.addEventListener('click', () => templateDialog.close());
+  const templateVisual = document.createElement('div'); templateVisual.className = 'weekly-template-visual weekly-schedule-starlight'; templateVisual.append(templatePicture);
+  templateCard.append(templateHeading, templateVisual, templateClose); templateDialog.append(templateCard);
+  templatePreview.addEventListener('click', () => showFanPageModal(templateDialog));
   const previewHeading = document.createElement('div'); previewHeading.className = 'weekly-schedule-preview-heading';
   const previewTitle = document.createElement('h3'); previewTitle.textContent = '미리보기';
   const previewNote = document.createElement('small'); previewNote.textContent = '템플릿 이미지는 새로 제작한 팬페이지 전용 배경입니다.';
@@ -8638,12 +8685,10 @@ function renderWeeklyScheduleDialog(page) {
   const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
   footerActions.append(download); footer.append(saveHint, footerTextWarning, footerActions);
   dayHeading.hidden = true; previewHeading.hidden = true;
-  form.append(meta, previewFrame, linkedEventsToggle, linkedEventsPanel, footer);
-  card.append(header, form); dialog.append(card, imageTools);
+  form.append(meta, templateControls, previewFrame, linkedEventsToggle, linkedEventsPanel, footer);
+  card.append(header, form); dialog.append(card, imageTools, templateDialog);
 
-  const templateImage = new Image();
-  const templateImageUrl = new URL('./assets/weekly-schedule-template.png?v=20261031-weekly-board-v2', import.meta.url).href;
-  let templateLoadPromise = null;
+  const templateImages = new Map();
   let drawRequest = 0;
   const ctx = previewCanvas.getContext('2d');
   function formatGraphicDate(date) {
@@ -8675,7 +8720,7 @@ function renderWeeklyScheduleDialog(page) {
       : '';
     const timeBox = weeklyScheduleRegion(layout, layout.time);
     const contentBox = weeklyScheduleRegion(layout, layout.content);
-    ctx.fillStyle = '#a63d61'; ctx.font = `800 ${w < 260 ? 36 : 38}px Jua, "Gowun Dodum", sans-serif`;
+    ctx.fillStyle = state.templateId === 'starlight' ? '#493365' : '#a63d61'; ctx.font = `800 ${w < 260 ? 36 : 38}px Jua, "Gowun Dodum", sans-serif`;
     if (time) ctx.fillText(time, timeBox.x + timeBox.w / 2, timeBox.y + timeBox.h / 2, timeBox.w);
     const lines = [];
     if (includeEditableValues && input.text.innerText.trim() && !isOffline) lines.push(input.text.innerText.trim());
@@ -8685,7 +8730,7 @@ function renderWeeklyScheduleDialog(page) {
     });
     if (includeEditableValues && isOffline && !lines.length) lines.push('방송 일정이 없습니다');
     const fontSize = w < 260 ? 29 : 31;
-    ctx.fillStyle = '#a94d6b'; ctx.font = `700 ${fontSize}px Gowun Dodum, sans-serif`;
+    ctx.fillStyle = state.templateId === 'starlight' ? '#594578' : '#a94d6b'; ctx.font = `700 ${fontSize}px Gowun Dodum, sans-serif`;
     const lineHeight = w < 260 ? 34 : 36;
     const maxLines = Math.max(1, Math.floor(contentBox.h / lineHeight));
     const shown = lines.flatMap((line) => wrapWeeklyScheduleCanvasText(ctx, line, contentBox.w, maxLines)).slice(0, maxLines);
@@ -8693,40 +8738,44 @@ function renderWeeklyScheduleDialog(page) {
     shown.forEach((line, lineIndex) => {
       ctx.fillText(line, contentBox.x + contentBox.w / 2, startY + lineIndex * lineHeight, contentBox.w);
     });
-    ctx.fillStyle = '#a63d61'; ctx.font = '800 30px Jua, "Gowun Dodum", sans-serif';
+    ctx.fillStyle = state.templateId === 'starlight' ? '#493365' : '#a63d61'; ctx.font = '800 30px Jua, "Gowun Dodum", sans-serif';
     ctx.fillText(`${dayName}요일`, x + w / 2, y + h * layout.weekdayY, w - 24);
     ctx.restore();
   }
   async function drawPreview(includeEditableValues = false) {
     const request = ++drawRequest;
     if (!ctx) return;
-    if (!templateImage.complete || !templateImage.naturalWidth) {
-      if (!templateLoadPromise) templateLoadPromise = new Promise((resolve) => {
-        templateImage.onload = resolve; templateImage.onerror = resolve; templateImage.src = templateImageUrl;
-      });
-      await templateLoadPromise;
+    const templateId = state.templateId === 'starlight' ? 'starlight' : 'default';
+    previewFrame.classList.toggle('weekly-schedule-starlight', templateId === 'starlight' && state.animationEnabled);
+    if (!templateImages.has(templateId)) {
+      const img = new Image();
+      const ready = new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
+      img.src = new URL(templateId === 'starlight' ? './assets/weekly-schedule-starlight.png' : './assets/weekly-schedule-template.png?v=20261031-weekly-board-v2', import.meta.url).href;
+      templateImages.set(templateId, { img, ready });
     }
+    const template = templateImages.get(templateId);
+    await template.ready;
     await ensureWeeklyScheduleFonts();
     if (request !== drawRequest) return;
     ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-    if (templateImage.naturalWidth) ctx.drawImage(templateImage, 0, 0, previewCanvas.width, previewCanvas.height);
+    if (template.img.naturalWidth) ctx.drawImage(template.img, 0, 0, previewCanvas.width, previewCanvas.height);
     const selected = state.selectedImage;
     const avatar = selected?.image;
     const avatarBounds = WEEKLY_SCHEDULE_LAYOUT.avatar;
     if (avatar?.complete && avatar.naturalWidth) drawImageCover(avatar, avatarBounds.x, avatarBounds.y, avatarBounds.w, avatarBounds.h);
-    else {
+    else if (!includeEditableValues) {
       ctx.save(); ctx.fillStyle = '#9c8390'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = '700 26px Gowun Dodum, sans-serif'; ctx.fillText('갤러리에서 아바타를 선택하세요', avatarBounds.x + avatarBounds.w / 2, avatarBounds.y + avatarBounds.h / 2); ctx.restore();
     }
     const graphicTitle = weeklyScheduleWeekTitle(page.streamer.nickname, weekInput.value || state.weekStart);
     title.textContent = graphicTitle; titleField.querySelector('input').value = graphicTitle;
     ctx.save();
-    drawWeeklyScheduleTitle(ctx, graphicTitle);
+    drawWeeklyScheduleTitle(ctx, graphicTitle, state.templateId === 'starlight');
     const weekStart = parseLocalDateKey(weekInput.value || state.weekStart); const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
     const defaultFooterText = `${formatGraphicDate(weekStart)} – ${formatGraphicDate(weekEnd)}`;
     if (!footerTextInput.matches(':focus')) footerTextInput.value = state.footerText || defaultFooterText;
     const footerText = state.footerText || defaultFooterText;
-    ctx.fillStyle = '#9b365c';
+    ctx.fillStyle = state.templateId === 'starlight' ? '#493365' : '#9b365c';
     ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
     const footerLayout = WEEKLY_SCHEDULE_LAYOUT.footer;
     const footerFit = drawWeeklyScheduleFooterText(ctx, footerTextInput.matches(':focus') ? '' : footerText, footerLayout.centerX, footerLayout.centerY, footerLayout.maxWidth);
@@ -8850,6 +8899,12 @@ function renderWeeklyScheduleDialog(page) {
     }
   }
   function syncWeeklyFields() {
+    const locked = state.templateId === 'starlight' && !state.canUseStarlight;
+    templateSelect.value = state.templateId; syncMotionToggle();
+    templateSelect.options[1].disabled = !state.canUseStarlight && !locked;
+    templateHint.textContent = locked ? '구독이 만료되어 읽기만 가능합니다. 기본 템플릿을 선택하면 수정할 수 있어요.' : (!state.canUseStarlight ? '별빛 방송국은 구독 후 적용할 수 있어요.' : '');
+    footerTextInput.disabled = locked; avatarHitArea.disabled = locked; download.disabled = locked;
+    previewFrame.classList.toggle('weekly-template-locked', locked);
     weekInput.value = state.weekStart;
     graphicTitle.value = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
     title.textContent = graphicTitle.value;
@@ -8860,7 +8915,7 @@ function renderWeeklyScheduleDialog(page) {
       input.offline.checked = entry.offline === true;
       input.time.value = entry.time || '';
       input.text.innerText = entry.content || '';
-      input.time.disabled = input.offline.checked; input.text.contentEditable = input.offline.checked ? 'false' : 'true';
+      input.offline.disabled = locked; input.time.disabled = locked || input.offline.checked; input.text.contentEditable = locked || input.offline.checked ? 'false' : 'true'; input.text.setAttribute('aria-readonly', String(locked || input.offline.checked));
       const events = (state.linkedEvents[index] || []).map((event) => `${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '일정'}`.trim()).filter(Boolean);
       input.linkedDisplay.replaceChildren();
       events.slice(0, 3).forEach((eventText) => {
@@ -8892,6 +8947,11 @@ function renderWeeklyScheduleDialog(page) {
     drawPreview(false);
   }
 
+  templateSelect.addEventListener('change', () => {
+    if (templateSelect.value === 'starlight' && !state.canUseStarlight) { templateSelect.value = state.templateId; return; }
+    try { state.entries = collectWeeklyEntries(); } catch (error) { templateSelect.value = state.templateId; saveStatus.textContent = error.message; return; }
+    state.templateId = templateSelect.value; syncWeeklyFields(); markWeeklyDirty();
+  });
   function collectWeeklyEntries() {
     return dayInputs.map(({ offline, time, text }) => {
       const normalized = offline.checked ? '' : normalizeGraphicTime(time.value);
@@ -8916,12 +8976,14 @@ function renderWeeklyScheduleDialog(page) {
         const savingWeekStart = state.weekStart;
         const savingAvatarImageId = state.avatarImageId || '';
         const savingFooterText = state.footerText || '';
+        const savingTemplateId = state.templateId;
+        const savingAnimationEnabled = state.animationEnabled;
         const expectedUpdatedAt = state.updatedAt;
         state.saveStatus = '저장 중…'; saveStatus.textContent = state.saveStatus;
         try {
           const response = await callWeeklySchedule({
             action: 'save', streamerId: page.streamer.id, weekStart: savingWeekStart,
-            entries, avatarImageId: savingAvatarImageId, footerText: savingFooterText, expectedUpdatedAt,
+            entries, avatarImageId: savingAvatarImageId, footerText: savingFooterText, templateId: savingTemplateId, animationEnabled: savingAnimationEnabled, expectedUpdatedAt,
           });
           state.weekUpdatedAtByStart[savingWeekStart] = Number(response.data.updatedAt) || Date.now();
           if (state.weekStart === savingWeekStart) {
@@ -8977,19 +9039,22 @@ function renderWeeklyScheduleDialog(page) {
     try { entries = collectWeeklyEntries(); }
     catch (error) { state.saveStatus = error.message; saveStatus.textContent = error.message; return; }
     const setNavigationBusy = (busy) => {
+      const locked = state.templateId === 'starlight' && !state.canUseStarlight;
       previousWeek.disabled = busy; nextWeek.disabled = busy;
-      footerTextInput.disabled = busy; avatarHitArea.disabled = busy;
+      footerTextInput.disabled = busy || locked; avatarHitArea.disabled = busy || locked; download.disabled = busy || locked;
       chooseImage.disabled = busy; uploadImage.disabled = busy;
       clearImage.disabled = busy || !(state.selectedImage || state.savedAvatar);
       dayInputs.forEach(({ offline, time, text }) => {
-        offline.disabled = busy;
-        time.disabled = busy || offline.checked;
-        text.contentEditable = busy || offline.checked ? 'false' : 'true';
+        offline.disabled = busy || locked;
+        time.disabled = busy || locked || offline.checked;
+        text.contentEditable = busy || locked || offline.checked ? 'false' : 'true';
       });
     };
     window.clearTimeout(state.saveTimer);
     const previous = {
       weekStart: state.weekStart,
+      templateId: state.templateId,
+      animationEnabled: state.animationEnabled,
       entries: entries.map((entry) => ({ ...entry })),
       linkedEvents: state.linkedEvents.map((events) => [...events]),
       footerText: state.footerText,
@@ -9037,7 +9102,7 @@ function renderWeeklyScheduleDialog(page) {
         const response = await callWeeklySchedule({
           action: 'save', streamerId: page.streamer.id, weekStart: previous.weekStart,
           entries: previous.entriesToSave, avatarImageId: previous.avatarImageId || '',
-          footerText: previous.footerText || '', expectedUpdatedAt,
+          footerText: previous.footerText || '', templateId: previous.templateId, animationEnabled: previous.animationEnabled, expectedUpdatedAt,
         });
         state.weekUpdatedAtByStart[previous.weekStart] = Number(response.data.updatedAt) || Date.now();
       }
@@ -9063,6 +9128,8 @@ function renderWeeklyScheduleDialog(page) {
     } catch (error) {
       // 저장에 실패하면 편집 내용을 복원해 재시도할 수 있게 한다.
       state.weekStart = previous.weekStart;
+      state.templateId = previous.templateId;
+      state.animationEnabled = previous.animationEnabled;
       state.entries = previous.entries;
       state.linkedEvents = previous.linkedEvents;
       state.footerText = previous.footerText;
@@ -9145,7 +9212,7 @@ function renderWeeklyScheduleDialog(page) {
         document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
         showToast('주간 방송표 PNG를 저장했어요.');
       }).catch((error) => showToast(error.message || 'PNG 저장에 실패했어요.'))
-      .finally(() => { void drawPreview(false); download.disabled = false; download.textContent = 'PNG 이미지 저장'; });
+      .finally(() => { void drawPreview(false); download.disabled = state.templateId === 'starlight' && !state.canUseStarlight; download.textContent = 'PNG 이미지 저장'; });
   });
   dialog._syncWeeklyFields = syncWeeklyFields;
   dialog._saveCurrentWeek = saveCurrentWeek;
