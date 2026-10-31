@@ -1246,16 +1246,16 @@ function showFirstAnalysisTutorial(target, loadToken) {
 
 function watchForFirstAnalysisTutorial(loadToken) {
   clearFirstAnalysisTutorial(false);
-  if (isFirstAnalysisTutorialComplete()) return;
-  firstAnalysisTutorialLoadToken = loadToken;
   const heading = $('viewerVodHeading');
   requestAnimationFrame(() => {
-    if (loadToken !== activeLoadToken || isFirstAnalysisTutorialComplete()) return;
+    if (loadToken !== activeLoadToken) return;
     heading?.scrollIntoView({
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
       block: 'start',
     });
   });
+  if (isFirstAnalysisTutorialComplete()) return;
+  firstAnalysisTutorialLoadToken = loadToken;
 
   const grid = $('viewerVodGrid');
   const checkForTarget = () => {
