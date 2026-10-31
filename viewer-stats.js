@@ -205,6 +205,7 @@ const VIEWER_STATS_EXCLUDED_EDGE_SECONDS = 5 * 60;
 const VIEWER_STATS_INSUFFICIENT_WINDOW_CODE = 'insufficient-analysis-window';
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
 const VIEWER_STATS_STATIC_CACHE_SCHEMA_VERSION = 1;
+const VIEWER_FIRST_ANALYSIS_TUTORIAL_KEY = 'streamerFanPage.viewerStats.firstAnalysisTutorial.v1';
 try { window.localStorage.removeItem('streamerFanPage.viewerStats.recentStreamers.v1'); } catch (_) {}
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const VIEWER_PEAK_PERIODS = [
@@ -215,6 +216,11 @@ const VIEWER_PEAK_PERIODS = [
 ];
 let searchRequestId = 0;
 let activeLoadToken = 0;
+let firstAnalysisTutorialObserver = null;
+let firstAnalysisTutorialLoadToken = 0;
+let firstAnalysisTutorialTarget = null;
+let firstAnalysisTutorialCompletedInMemory = false;
+let firstAnalysisTutorialResizeObserver = null;
 let selectedStreamer = null;
 let vodSortMode = 'date-desc';
 let vodSearchKeyword = '';
@@ -1128,12 +1134,167 @@ function readStaticVodStats(streamerId, vodId) {
   return readStaticVodStatsIndex(streamerId).then((statsByVodId) => statsByVodId.get(normalizedVodId) || null);
 }
 
+function isFirstAnalysisTutorialComplete() {
+  if (firstAnalysisTutorialCompletedInMemory) return true;
+  try {
+    firstAnalysisTutorialCompletedInMemory = localStorage.getItem(VIEWER_FIRST_ANALYSIS_TUTORIAL_KEY) === 'done';
+  } catch (_) {}
+  return firstAnalysisTutorialCompletedInMemory;
+}
+
+function positionFirstAnalysisTutorial() {
+  const bubble = $('viewerFirstAnalysisTutorial');
+  const target = firstAnalysisTutorialTarget;
+  if (!bubble || !target || !target.isConnected) return;
+  const rect = target.getBoundingClientRect();
+  const bubbleRect = bubble.getBoundingClientRect();
+  const gap = 14;
+  const placeAbove = rect.top >= bubbleRect.height + gap + 12
+    || window.innerHeight - rect.bottom < bubbleRect.height + gap + 12;
+  const left = Math.max(12, Math.min(
+    rect.left + rect.width / 2 - bubbleRect.width / 2,
+    window.innerWidth - bubbleRect.width - 12,
+  ));
+  const top = placeAbove
+    ? Math.max(10, rect.top - bubbleRect.height - gap)
+    : Math.min(window.innerHeight - bubbleRect.height - 10, rect.bottom + gap);
+  bubble.classList.toggle('is-above', placeAbove);
+  bubble.style.left = left + 'px';
+  bubble.style.top = Math.max(10, top) + 'px';
+  bubble.style.setProperty('--tutorial-arrow-left', Math.max(18, Math.min(
+    rect.left + rect.width / 2 - left,
+    bubbleRect.width - 18,
+  )) + 'px');
+}
+
+function clearFirstAnalysisTutorial(markComplete = false) {
+  if (firstAnalysisTutorialObserver) firstAnalysisTutorialObserver.disconnect();
+  firstAnalysisTutorialObserver = null;
+  firstAnalysisTutorialLoadToken = 0;
+  if (firstAnalysisTutorialResizeObserver) firstAnalysisTutorialResizeObserver.disconnect();
+  firstAnalysisTutorialResizeObserver = null;
+  window.removeEventListener('scroll', positionFirstAnalysisTutorial, true);
+  window.removeEventListener('resize', positionFirstAnalysisTutorial);
+  if (firstAnalysisTutorialTarget) {
+    firstAnalysisTutorialTarget.classList.remove('viewer-tutorial-target');
+    if (firstAnalysisTutorialTarget.getAttribute('aria-describedby') === 'viewerFirstAnalysisTutorial') {
+      firstAnalysisTutorialTarget.removeAttribute('aria-describedby');
+    }
+  }
+  firstAnalysisTutorialTarget = null;
+  const bubble = $('viewerFirstAnalysisTutorial');
+  if (bubble) bubble.remove();
+  if (markComplete) {
+    firstAnalysisTutorialCompletedInMemory = true;
+    try { localStorage.setItem(VIEWER_FIRST_ANALYSIS_TUTORIAL_KEY, 'done'); } catch (_) {}
+  }
+}
+
+function findFirstAnalysisTutorialTarget(loadToken) {
+  if (loadToken !== activeLoadToken || !selectedStreamer || loadToken !== firstAnalysisTutorialLoadToken) return null;
+  const cards = $('viewerVodGrid').querySelectorAll('.viewer-vod-card');
+  for (const card of cards) {
+    if (!card.isConnected || card._loadToken !== loadToken || card.dataset.statsState !== 'idle'
+      || card.dataset.staticHydration === 'pending') continue;
+    const button = card._mainAction;
+    if (!button || button.disabled || button.dataset.playbackUrl
+      || button.textContent.trim() !== '시청자 통계 분석하기') continue;
+    return button;
+  }
+  return null;
+}
+
+function showFirstAnalysisTutorial(target, loadToken) {
+  if (!target || isFirstAnalysisTutorialComplete() || loadToken !== activeLoadToken) return;
+  if (firstAnalysisTutorialObserver) firstAnalysisTutorialObserver.disconnect();
+  firstAnalysisTutorialObserver = null;
+  firstAnalysisTutorialTarget = target;
+  target.classList.add('viewer-tutorial-target');
+  target.setAttribute('aria-describedby', 'viewerFirstAnalysisTutorial');
+
+  const bubble = document.createElement('aside');
+  bubble.id = 'viewerFirstAnalysisTutorial';
+  bubble.className = 'viewer-first-analysis-tutorial';
+  bubble.setAttribute('role', 'note');
+  bubble.setAttribute('aria-live', 'polite');
+  const title = document.createElement('strong');
+  title.textContent = '다시보기 통계 분석';
+  const message = document.createElement('p');
+  message.textContent = '이 버튼을 누르면 선택한 방송의 시청자 그래프를 분석해 최고·최저 시청 순간을 보여줘요.';
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'viewer-first-analysis-tutorial-dismiss';
+  dismiss.textContent = '확인';
+  dismiss.setAttribute('aria-label', '분석 안내 닫기');
+  dismiss.addEventListener('click', () => clearFirstAnalysisTutorial(true));
+  bubble.append(title, message, dismiss);
+  document.body.append(bubble);
+
+  target.scrollIntoView({
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    block: 'center',
+    inline: 'nearest',
+  });
+  window.addEventListener('scroll', positionFirstAnalysisTutorial, true);
+  window.addEventListener('resize', positionFirstAnalysisTutorial);
+  if (typeof ResizeObserver === 'function') {
+    firstAnalysisTutorialResizeObserver = new ResizeObserver(positionFirstAnalysisTutorial);
+    firstAnalysisTutorialResizeObserver.observe(target);
+  }
+  requestAnimationFrame(positionFirstAnalysisTutorial);
+}
+
+function watchForFirstAnalysisTutorial(loadToken) {
+  clearFirstAnalysisTutorial(false);
+  if (isFirstAnalysisTutorialComplete()) return;
+  firstAnalysisTutorialLoadToken = loadToken;
+  const heading = $('viewerVodHeading');
+  requestAnimationFrame(() => {
+    if (loadToken !== activeLoadToken || isFirstAnalysisTutorialComplete()) return;
+    heading?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  });
+
+  const grid = $('viewerVodGrid');
+  const checkForTarget = () => {
+    if (loadToken !== activeLoadToken || isFirstAnalysisTutorialComplete()) {
+      clearFirstAnalysisTutorial(false);
+      return;
+    }
+    const target = findFirstAnalysisTutorialTarget(loadToken);
+    if (target) showFirstAnalysisTutorial(target, loadToken);
+  };
+  firstAnalysisTutorialObserver = new MutationObserver(checkForTarget);
+  firstAnalysisTutorialObserver.observe(grid, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['disabled', 'data-stats-state', 'data-static-hydration'],
+  });
+  checkForTarget();
+}
+
+document.addEventListener('click', (event) => {
+  if (firstAnalysisTutorialTarget && event.target.closest('.viewer-tutorial-target')) {
+    clearFirstAnalysisTutorial(true);
+  }
+}, true);
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && $('viewerFirstAnalysisTutorial')) clearFirstAnalysisTutorial(true);
+});
+
 function hydrateVodCardFromStaticCache(card, streamerId, loadToken) {
+  card.dataset.staticHydration = 'pending';
   readStaticVodStats(streamerId, card._vod.id).then((stats) => {
     if (!stats || !card.isConnected || loadToken !== activeLoadToken
       || !selectedStreamer || selectedStreamer.soopId !== streamerId
       || card.dataset.statsState !== 'idle') return;
     showStatsLinks(card, stats);
+  }).catch(() => {}).finally(() => {
+    card.dataset.staticHydration = 'complete';
   });
 }
 
@@ -2417,6 +2578,7 @@ async function loadVodPage(loadToken, page) {
       $('viewerVodStatus').textContent = keyword
         ? '“' + keyword + '” 검색 결과가 없어요.'
         : '이 방송국에 등록된 다시보기가 없어요.';
+      if (firstAnalysisTutorialLoadToken === loadToken) clearFirstAnalysisTutorial(false);
     } else {
       $('viewerVodStatus').textContent = keyword
         ? '“' + keyword + '” 검색 결과 ' + vodTotal.toLocaleString('ko-KR') + '개 · 통계는 직접 요청한 영상만 분석합니다.'
@@ -2795,6 +2957,7 @@ async function selectStreamer(streamer) {
   }
   setSearchHint((streamer.nickname || streamer.soopId) + '의 다시보기를 불러옵니다. 카드나 최고·최저 링크를 누르면 해당 시점부터 재생됩니다.');
   updateVodHeading();
+  watchForFirstAnalysisTutorial(loadToken);
   await loadVodPage(loadToken, 1);
 }
 

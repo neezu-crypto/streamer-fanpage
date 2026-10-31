@@ -92,6 +92,66 @@
 }
 @media(max-width:360px){.viewer-stat-link,.viewer-stat-state{min-height:60px}}
 
+.viewer-vod-main-action.viewer-tutorial-target{
+  position:relative;
+  z-index:1201;
+  outline:4px solid #fff;
+  outline-offset:2px;
+  box-shadow:0 0 0 8px #486bd64a,0 8px 24px #17243a38;
+  animation:viewer-analysis-tutorial-pulse 1.35s ease-in-out infinite alternate;
+}
+.viewer-first-analysis-tutorial{
+  position:fixed;
+  z-index:1202;
+  box-sizing:border-box;
+  width:min(340px,calc(100vw - 24px));
+  padding:15px 16px 13px;
+  border:1px solid #486bd6;
+  border-radius:12px;
+  background:#fff;
+  color:#17243a;
+  box-shadow:0 12px 34px #17243a35;
+  font-family:'DM Sans',system-ui,-apple-system,'Segoe UI','Gowun Dodum',sans-serif;
+}
+.viewer-first-analysis-tutorial::before{
+  position:absolute;
+  left:var(--tutorial-arrow-left,50%);
+  width:0;
+  height:0;
+  border-right:10px solid transparent;
+  border-left:10px solid transparent;
+  content:'';
+  transform:translateX(-50%);
+}
+.viewer-first-analysis-tutorial:not(.is-above)::before{
+  bottom:100%;
+  border-bottom:10px solid #486bd6;
+}
+.viewer-first-analysis-tutorial.is-above::before{
+  top:100%;
+  border-top:10px solid #486bd6;
+}
+.viewer-first-analysis-tutorial>strong{display:block;color:#294fae;font-size:15px;line-height:1.4}
+.viewer-first-analysis-tutorial>p{margin:6px 0 12px;color:#40516a;font-size:14px;line-height:1.55}
+.viewer-first-analysis-tutorial-dismiss{
+  display:block;
+  min-width:74px;
+  min-height:40px;
+  margin-left:auto;
+  padding:8px 13px;
+  border:1px solid #486bd6;
+  border-radius:8px;
+  background:#486bd6;
+  color:#fff;
+  font-family:inherit;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+.viewer-first-analysis-tutorial-dismiss:focus-visible{outline:3px solid #486bd64d;outline-offset:2px}
+@keyframes viewer-analysis-tutorial-pulse{from{box-shadow:0 0 0 5px #486bd63a,0 6px 18px #17243a24}to{box-shadow:0 0 0 9px #486bd65c,0 8px 25px #17243a38}}
+@media(prefers-reduced-motion:reduce){.viewer-vod-main-action.viewer-tutorial-target{animation:none}}
+
 .viewer-period-peaks{margin-top:22px;padding:18px;border:1px solid #ffffff16;border-radius:16px;background:linear-gradient(125deg,#211b29,#191720)}
 .viewer-period-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .viewer-period-heading .eyebrow{margin:0 0 4px;color:var(--pink);font-size:9px;letter-spacing:.14em}
