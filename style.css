@@ -1804,3 +1804,8 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 .weekly-cursor-sparkle{position:absolute;z-index:5;pointer-events:none;user-select:none;color:#ffe66d;-webkit-text-stroke:.7px #a132ac;text-shadow:0 0 4px #fff,0 0 10px #ff55bc,0 0 22px #ff76df;font-size:var(--spark-size,24px);line-height:1;transform:translate(-50%,-50%) rotate(var(--spark-rotate,0deg)) scale(1);animation:weekly-cursor-sparkle-fade 1.2s ease-out forwards}
 @keyframes weekly-cursor-sparkle-fade{0%{opacity:0;transform:translate(-50%,-50%) rotate(var(--spark-rotate,0deg)) scale(.35)}18%{opacity:1;transform:translate(-50%,-65%) rotate(var(--spark-rotate,0deg)) scale(1.15)}100%{opacity:0;transform:translate(-50%,-125%) rotate(calc(var(--spark-rotate,0deg) + 35deg)) scale(.25)}}
 @media(prefers-reduced-motion:reduce){.weekly-cursor-sparkle{display:none}}
+
+/* 읽기 모달의 일정표가 grid에서 축소되지 않도록 너비를 고정한다. */
+.weekly-schedule-view-frame{width:min(100%,68vw);box-sizing:border-box}
+.weekly-schedule-view-heading .profile-settings-close{width:59px;min-width:59px;height:59px;min-height:59px;padding:0;border:0;background:transparent url("assets/fanpage-kawaii/cat-paw-close.svg") center/contain no-repeat;color:#70465e;box-shadow:none;font-size:19px;line-height:1}
+@media(max-width:700px){.weekly-schedule-view-frame{width:100%;max-width:100%}}

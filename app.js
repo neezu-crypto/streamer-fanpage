@@ -8474,7 +8474,7 @@ function renderWeeklyScheduleViewDialog(page, board) {
 function openWeeklyScheduleViewDialog(page, board) {
   if (!board?._weeklyScheduleViewDialog?.isConnected) {
     const dialog = renderWeeklyScheduleViewDialog(page, board);
-    board._weeklyScheduleViewDialog = dialog; board.append(dialog);
+    board._weeklyScheduleViewDialog = dialog; document.body.append(dialog);
   }
   const dialog = board._weeklyScheduleViewDialog;
   dialog._drawWeeklyBoard?.();
