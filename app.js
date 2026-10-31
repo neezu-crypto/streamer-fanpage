@@ -7866,22 +7866,85 @@ function formatWeeklyScheduleDate(date) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 }
 
+// 원본 템플릿 1672×941px에서 장식 테두리를 피해서 측정한 실제 입력 그리드.
+// 캔버스 출력과 HTML 입력 오버레이가 이 좌표를 함께 사용한다.
+const WEEKLY_SCHEDULE_LAYOUT = Object.freeze({
+  width: 1672,
+  height: 941,
+  title: Object.freeze({ centerX: 1120, centerY: 99, maxWidth: 660, previousX: 722, nextX: 1515 }),
+  avatar: Object.freeze({ x: 94, y: 176, w: 390, h: 565 }),
+  footer: Object.freeze({ centerX: 301, centerY: 850, maxWidth: 408, field: Object.freeze({ x: 81, y: 822, w: 440, h: 56 }) }),
+  days: Object.freeze([
+    ...Array.from({ length: 4 }, (_, index) => Object.freeze({ x: 585 + index * 262, y: 171, w: 242, h: 323, time: Object.freeze({ left: 0.08, top: 0.17, width: 0.82, height: 0.18 }), content: Object.freeze({ left: 0.10, top: 0.40, width: 0.80, height: 0.34 }), linked: Object.freeze({ left: 0.08, top: 0.75, width: 0.84, height: 0.09 }), offline: Object.freeze({ top: 0.105, right: 0.08 }), weekdayY: 0.90 })),
+    ...Array.from({ length: 3 }, (_, index) => Object.freeze({ x: 588 + index * 347, y: 525, w: 317, h: 331, time: Object.freeze({ left: 0.08, top: 0.16, width: 0.82, height: 0.17 }), content: Object.freeze({ left: 0.10, top: 0.39, width: 0.80, height: 0.34 }), linked: Object.freeze({ left: 0.08, top: 0.74, width: 0.84, height: 0.09 }), offline: Object.freeze({ top: 0.10, right: 0.08 }), weekdayY: 0.90 })),
+  ]),
+});
+
+function weeklyScheduleRegion(rect, region) {
+  return {
+    x: rect.x + rect.w * region.left,
+    y: rect.y + rect.h * region.top,
+    w: rect.w * region.width,
+    h: rect.h * region.height,
+  };
+}
+
+function setWeeklySchedulePercentRect(element, rect) {
+  element.style.left = `${rect.x / WEEKLY_SCHEDULE_LAYOUT.width * 100}%`;
+  element.style.top = `${rect.y / WEEKLY_SCHEDULE_LAYOUT.height * 100}%`;
+  element.style.width = `${rect.w / WEEKLY_SCHEDULE_LAYOUT.width * 100}%`;
+  element.style.height = `${rect.h / WEEKLY_SCHEDULE_LAYOUT.height * 100}%`;
+}
+
+function setWeeklyScheduleArrowPosition(element, x) {
+  element.style.left = `${x / WEEKLY_SCHEDULE_LAYOUT.width * 100}cqw`;
+  element.style.top = `${WEEKLY_SCHEDULE_LAYOUT.title.centerY / WEEKLY_SCHEDULE_LAYOUT.width * 100}cqw`;
+}
+
+function wrapWeeklyScheduleCanvasText(ctx, value, maxWidth, maxLines) {
+  const lines = [];
+  const characters = Array.from(String(value || '').replace(/\r/g, ''));
+  let line = '';
+  let overflow = false;
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index];
+    if (character === '\n') {
+      lines.push(line.trimEnd()); line = '';
+      if (lines.length >= maxLines) { overflow = index < characters.length - 1; break; }
+      continue;
+    }
+    const candidate = line + character;
+    if (line && ctx.measureText(candidate).width > maxWidth) {
+      lines.push(line.trimEnd()); line = character.trim() ? character : '';
+      if (lines.length >= maxLines) { overflow = true; break; }
+    } else line = candidate;
+  }
+  if (line && lines.length < maxLines) lines.push(line.trimEnd());
+  if (lines.length > maxLines) { lines.length = maxLines; overflow = true; }
+  if (overflow && lines.length) {
+    let last = lines[lines.length - 1];
+    while (last && ctx.measureText(`${last}…`).width > maxWidth) last = Array.from(last).slice(0, -1).join('');
+    lines[lines.length - 1] = `${last}…`;
+  }
+  return lines;
+}
+
 function drawWeeklyScheduleTitle(ctx, value) {
   const title = String(value || '');
   let fontSize = 50;
-  const centerY = 105;
+  const { centerX, centerY, maxWidth } = WEEKLY_SCHEDULE_LAYOUT.title;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#a74464';
   ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`;
-  while (ctx.measureText(title).width > 680 && fontSize > 25) {
+  while (ctx.measureText(title).width > maxWidth && fontSize > 25) {
     fontSize -= 1;
     ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`;
   }
   const metrics = ctx.measureText(title);
   const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.75;
   const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2;
-  ctx.fillText(title, 1114, centerY + (ascent - descent) / 2, 690);
+  ctx.fillText(title, centerX, centerY + (ascent - descent) / 2, maxWidth);
   return fontSize;
 }
 
@@ -8057,10 +8120,13 @@ function renderCalendarSection(page) {
   heading.append(eyebrow, title, dateRange, status);
 
   const imageFrame = document.createElement('div'); imageFrame.className = 'weekly-schedule-board-frame';
-  const canvas = document.createElement('canvas'); canvas.width = 1672; canvas.height = 941; canvas.className = 'weekly-schedule-board-canvas';
+  const canvas = document.createElement('canvas'); canvas.width = WEEKLY_SCHEDULE_LAYOUT.width; canvas.height = WEEKLY_SCHEDULE_LAYOUT.height; canvas.className = 'weekly-schedule-board-canvas';
   const avatar = document.createElement('img'); avatar.className = 'weekly-schedule-board-avatar'; avatar.alt = `${page.streamer.nickname} 갤러리 이미지`; avatar.hidden = true;
+  setWeeklySchedulePercentRect(avatar, WEEKLY_SCHEDULE_LAYOUT.avatar);
   const previous = createWeeklyScheduleStageArrow('previous');
   const next = createWeeklyScheduleStageArrow('next');
+  setWeeklyScheduleArrowPosition(previous, WEEKLY_SCHEDULE_LAYOUT.title.previousX);
+  setWeeklyScheduleArrowPosition(next, WEEKLY_SCHEDULE_LAYOUT.title.nextX);
   const dateCaption = document.createElement('p'); dateCaption.className = 'weekly-schedule-date-caption';
   const mobileList = document.createElement('div'); mobileList.className = 'weekly-schedule-mobile-list';
   imageFrame.append(canvas, avatar, previous, next, dateCaption, mobileList);
@@ -8086,11 +8152,10 @@ function renderCalendarSection(page) {
       dateCaption.textContent = footerText;
       ctx.fillStyle = '#9b365c';
       ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
-      drawWeeklyScheduleFooterText(ctx, footerText, 285, 850, 430); ctx.shadowBlur = 0;
+      const footer = WEEKLY_SCHEDULE_LAYOUT.footer;
+      drawWeeklyScheduleFooterText(ctx, footerText, footer.centerX, footer.centerY, footer.maxWidth); ctx.shadowBlur = 0;
       const days = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
-      const topCards = Array.from({ length: 4 }, (_, index) => ({ x: 585 + index * 262, y: 171, w: 242, h: 323 }));
-      const bottomCards = Array.from({ length: 3 }, (_, index) => ({ x: 588 + index * 347, y: 525, w: 317, h: 331 }));
-      [...topCards, ...bottomCards].forEach((rect, index) => {
+      WEEKLY_SCHEDULE_LAYOUT.days.forEach((rect, index) => {
         const { x, y, w, h } = rect; const entry = state.entries[index] || {};
         const linked = state.linkedEvents[index] || [];
         const lines = [];
@@ -8099,17 +8164,20 @@ function renderCalendarSection(page) {
         const linkedHoliday = linked.some((event) => event.typeName === '휴방');
         const firstLine = entry.offline || linkedHoliday ? '휴방' : (normalizeGraphicTime(entry.time) || linked.find((event) => event.time)?.time || '');
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#a63d61'; ctx.font = '800 40px Jua, "Gowun Dodum", sans-serif';
-        if (firstLine) ctx.fillText(firstLine, x + w / 2, y + 42, w - 28);
-        ctx.fillStyle = '#a94d6b'; ctx.font = `700 ${w < 260 ? 30 : 33}px Gowun Dodum, sans-serif`;
-        const maxWidth = w - 30; const lineHeight = 39; const shown = lines.slice(0, 4);
-        const centerY = y + h / 2 + 15; const startY = centerY - ((shown.length - 1) * lineHeight) / 2;
+        const timeBox = weeklyScheduleRegion(rect, rect.time);
+        const contentBox = weeklyScheduleRegion(rect, rect.content);
+        ctx.fillStyle = '#a63d61'; ctx.font = `800 ${w < 260 ? 36 : 38}px Jua, "Gowun Dodum", sans-serif`;
+        if (firstLine) ctx.fillText(firstLine, timeBox.x + timeBox.w / 2, timeBox.y + timeBox.h / 2, timeBox.w);
+        const fontSize = w < 260 ? 29 : 31;
+        ctx.fillStyle = '#a94d6b'; ctx.font = `700 ${fontSize}px Gowun Dodum, sans-serif`;
+        const lineHeight = w < 260 ? 34 : 36;
+        const shown = lines.flatMap((line) => wrapWeeklyScheduleCanvasText(ctx, line, contentBox.w, Math.max(1, Math.floor(contentBox.h / lineHeight)))).slice(0, Math.floor(contentBox.h / lineHeight));
+        const centerY = contentBox.y + contentBox.h / 2; const startY = centerY - ((shown.length - 1) * lineHeight) / 2;
         shown.forEach((line, lineIndex) => {
-          let text = line; while (ctx.measureText(text).width > maxWidth && text.length > 3) text = `${text.slice(0, -2)}…`;
-          ctx.fillText(text, x + w / 2, startY + lineIndex * lineHeight);
+          ctx.fillText(line, contentBox.x + contentBox.w / 2, startY + lineIndex * lineHeight, contentBox.w);
         });
         ctx.fillStyle = '#a63d61'; ctx.font = '800 30px Jua, "Gowun Dodum", sans-serif';
-        ctx.fillText(days[index], x + w / 2, y + h - 28);
+        ctx.fillText(days[index], x + w / 2, y + h * rect.weekdayY, w - 24);
       });
       ctx.restore();
       mobileList.replaceChildren();
@@ -8191,10 +8259,13 @@ function renderWeeklyScheduleViewDialog(page, board) {
   const readingHint = document.createElement('p'); readingHint.className = 'weekly-schedule-view-hint'; readingHint.textContent = '주간 일정은 누구나 열람할 수 있어요.';
   const status = document.createElement('p'); status.className = 'weekly-schedule-status'; status.setAttribute('role', 'status');
   const frame = document.createElement('div'); frame.className = 'weekly-schedule-view-frame';
-  const canvas = document.createElement('canvas'); canvas.width = 1672; canvas.height = 941; canvas.className = 'weekly-schedule-view-canvas'; canvas.setAttribute('aria-label', '주간 방송표 미리보기');
+  const canvas = document.createElement('canvas'); canvas.width = WEEKLY_SCHEDULE_LAYOUT.width; canvas.height = WEEKLY_SCHEDULE_LAYOUT.height; canvas.className = 'weekly-schedule-view-canvas'; canvas.setAttribute('aria-label', '주간 방송표 미리보기');
   const avatar = document.createElement('img'); avatar.className = 'weekly-schedule-board-avatar'; avatar.alt = `${page.streamer.nickname} 갤러리 이미지`; avatar.hidden = true;
+  setWeeklySchedulePercentRect(avatar, WEEKLY_SCHEDULE_LAYOUT.avatar);
   const previous = createWeeklyScheduleStageArrow('previous');
   const next = createWeeklyScheduleStageArrow('next');
+  setWeeklyScheduleArrowPosition(previous, WEEKLY_SCHEDULE_LAYOUT.title.previousX);
+  setWeeklyScheduleArrowPosition(next, WEEKLY_SCHEDULE_LAYOUT.title.nextX);
   frame.append(canvas, avatar, previous, next);
   const detailsHeading = document.createElement('h3'); detailsHeading.className = 'weekly-schedule-view-details-title'; detailsHeading.textContent = '요일별 일정';
   const footerCaption = document.createElement('p'); footerCaption.className = 'weekly-schedule-view-footer-caption';
@@ -8495,13 +8566,28 @@ function renderWeeklyScheduleDialog(page) {
   const dayInputs = [];
   weekdays.forEach((weekday, index) => {
     const dayCard = document.createElement('section'); dayCard.className = 'weekly-schedule-day-edit';
-    const rectangles = index < 4
-      ? { x: 585 + index * 262, y: 171, w: 242, h: 323 }
-      : { x: 588 + (index - 4) * 347, y: 525, w: 317, h: 331 };
-    dayCard.style.left = `${rectangles.x / 1672 * 100}%`;
-    dayCard.style.top = `${rectangles.y / 941 * 100}%`;
-    dayCard.style.width = `${rectangles.w / 1672 * 100}%`;
-    dayCard.style.height = `${rectangles.h / 941 * 100}%`;
+    const rectangles = WEEKLY_SCHEDULE_LAYOUT.days[index];
+    setWeeklySchedulePercentRect(dayCard, rectangles);
+    const timeRect = weeklyScheduleRegion(rectangles, rectangles.time);
+    const contentRect = weeklyScheduleRegion(rectangles, rectangles.content);
+    const linkedRect = weeklyScheduleRegion(rectangles, rectangles.linked);
+    dayCard.style.setProperty('--time-font-size', `${(rectangles.w < 260 ? 36 : 38) / WEEKLY_SCHEDULE_LAYOUT.width * 100}cqw`);
+    dayCard.style.setProperty('--content-font-size', `${(rectangles.w < 260 ? 29 : 31) / WEEKLY_SCHEDULE_LAYOUT.width * 100}cqw`);
+    dayCard.style.setProperty('--linked-font-size', `${16 / WEEKLY_SCHEDULE_LAYOUT.width * 100}cqw`);
+    dayCard.style.setProperty('--time-left', `${(timeRect.x - rectangles.x) / rectangles.w * 100}%`);
+    dayCard.style.setProperty('--time-top', `${(timeRect.y - rectangles.y) / rectangles.h * 100}%`);
+    dayCard.style.setProperty('--time-width', `${timeRect.w / rectangles.w * 100}%`);
+    dayCard.style.setProperty('--time-height', `${timeRect.h / rectangles.h * 100}%`);
+    dayCard.style.setProperty('--content-left', `${(contentRect.x - rectangles.x) / rectangles.w * 100}%`);
+    dayCard.style.setProperty('--content-top', `${(contentRect.y - rectangles.y) / rectangles.h * 100}%`);
+    dayCard.style.setProperty('--content-width', `${contentRect.w / rectangles.w * 100}%`);
+    dayCard.style.setProperty('--content-height', `${contentRect.h / rectangles.h * 100}%`);
+    dayCard.style.setProperty('--linked-left', `${(linkedRect.x - rectangles.x) / rectangles.w * 100}%`);
+    dayCard.style.setProperty('--linked-top', `${(linkedRect.y - rectangles.y) / rectangles.h * 100}%`);
+    dayCard.style.setProperty('--linked-width', `${linkedRect.w / rectangles.w * 100}%`);
+    dayCard.style.setProperty('--linked-height', `${linkedRect.h / rectangles.h * 100}%`);
+    dayCard.style.setProperty('--offline-top', `${rectangles.offline.top * 100}%`);
+    dayCard.style.setProperty('--offline-right', `${rectangles.offline.right * 100}%`);
     const offlineLabel = document.createElement('label'); offlineLabel.className = 'weekly-schedule-offline-label';
     const offline = document.createElement('input'); offline.type = 'checkbox'; offline.name = `offline-${index}`;
     offlineLabel.append(offline, document.createTextNode('휴방'));
@@ -8532,13 +8618,17 @@ function renderWeeklyScheduleDialog(page) {
   previewHeading.append(previewTitle, previewNote);
   const previewFrame = document.createElement('div'); previewFrame.className = 'weekly-schedule-preview-frame weekly-schedule-template-stage';
   const previewCanvas = document.createElement('canvas'); previewCanvas.className = 'weekly-schedule-preview-canvas';
-  previewCanvas.width = 1672; previewCanvas.height = 941; previewCanvas.setAttribute('aria-label', '주간 방송표 이미지 미리보기');
+  previewCanvas.width = WEEKLY_SCHEDULE_LAYOUT.width; previewCanvas.height = WEEKLY_SCHEDULE_LAYOUT.height; previewCanvas.setAttribute('aria-label', '주간 방송표 이미지 미리보기');
   const avatarHitArea = document.createElement('button'); avatarHitArea.type = 'button'; avatarHitArea.className = 'weekly-schedule-avatar-hit-area';
+  setWeeklySchedulePercentRect(avatarHitArea, WEEKLY_SCHEDULE_LAYOUT.avatar);
   avatarHitArea.setAttribute('aria-label', '템플릿 이미지 칸에서 갤러리 사진 선택 또는 등록');
   const footerTextInput = document.createElement('input'); footerTextInput.type = 'text'; footerTextInput.className = 'weekly-schedule-footer-text';
   footerTextInput.maxLength = 48; footerTextInput.setAttribute('aria-label', '하단 리본 날짜 또는 문구');
   footerTextInput.title = '날짜 범위 또는 원하는 문구를 입력할 수 있어요.';
   previousWeek.classList.add('weekly-schedule-stage-previous'); nextWeek.classList.add('weekly-schedule-stage-next');
+  setWeeklyScheduleArrowPosition(previousWeek, WEEKLY_SCHEDULE_LAYOUT.title.previousX);
+  setWeeklyScheduleArrowPosition(nextWeek, WEEKLY_SCHEDULE_LAYOUT.title.nextX);
+  setWeeklySchedulePercentRect(footerTextInput, WEEKLY_SCHEDULE_LAYOUT.footer.field);
   previewFrame.append(previewCanvas, previousWeek, nextWeek, dayGrid, avatarHitArea, footerTextInput);
 
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
@@ -8564,27 +8654,6 @@ function renderWeeklyScheduleDialog(page) {
     start.setDate(start.getDate() + offset);
     return start;
   }
-  function wrapGraphicText(text, maxWidth, maxLines) {
-    const lines = [];
-    String(text || '').split(/\s+/).filter(Boolean).forEach((word) => {
-      const candidate = lines.length ? `${lines[lines.length - 1]} ${word}` : word;
-      if (ctx.measureText(candidate).width <= maxWidth) {
-        if (lines.length) lines[lines.length - 1] = candidate; else lines.push(candidate);
-        return;
-      }
-      if (lines.length >= maxLines) return;
-      if (ctx.measureText(word).width <= maxWidth) { lines.push(word); return; }
-      let partial = '';
-      for (const char of word) {
-        if (ctx.measureText(partial + char).width > maxWidth && partial) {
-          if (lines.length < maxLines) lines.push(partial);
-          partial = char;
-        } else partial += char;
-      }
-      if (partial && lines.length < maxLines) lines.push(partial);
-    });
-    return lines.slice(0, maxLines);
-  }
   function drawImageCover(image, x, y, width, height) {
     const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
     const sw = width / scale; const sh = height / scale;
@@ -8594,6 +8663,7 @@ function renderWeeklyScheduleDialog(page) {
   }
   function drawGraphicDay(day, index, rect, includeEditableValues = true) {
     const { x, y, w, h } = rect;
+    const layout = WEEKLY_SCHEDULE_LAYOUT.days[index];
     const input = dayInputs[index];
     const isOffline = input.offline.checked;
     const dayName = weekdays[index];
@@ -8603,8 +8673,10 @@ function renderWeeklyScheduleDialog(page) {
     const time = includeEditableValues
       ? (isOffline || linkedHoliday ? '휴방' : (normalizeGraphicTime(input.time.value) || linkedEvents.find((event) => event.time)?.time || ''))
       : '';
-    ctx.fillStyle = '#a63d61'; ctx.font = '800 40px Jua, "Gowun Dodum", sans-serif';
-    if (time) ctx.fillText(time, x + w / 2, y + 42, w - 28);
+    const timeBox = weeklyScheduleRegion(layout, layout.time);
+    const contentBox = weeklyScheduleRegion(layout, layout.content);
+    ctx.fillStyle = '#a63d61'; ctx.font = `800 ${w < 260 ? 36 : 38}px Jua, "Gowun Dodum", sans-serif`;
+    if (time) ctx.fillText(time, timeBox.x + timeBox.w / 2, timeBox.y + timeBox.h / 2, timeBox.w);
     const lines = [];
     if (includeEditableValues && input.text.innerText.trim() && !isOffline) lines.push(input.text.innerText.trim());
     if (includeEditableValues) linkedEvents.forEach((event) => {
@@ -8612,15 +8684,17 @@ function renderWeeklyScheduleDialog(page) {
       if (linked) lines.push(linked);
     });
     if (includeEditableValues && isOffline && !lines.length) lines.push('방송 일정이 없습니다');
-    ctx.fillStyle = '#a94d6b'; ctx.font = `700 ${w < 260 ? 30 : 33}px Gowun Dodum, sans-serif`;
-    const shown = lines.flatMap((line) => wrapGraphicText(line, w - 34, 3)).slice(0, 4); const lineHeight = w < 260 ? 34 : 38;
-    const startY = y + h / 2 + 16 - ((shown.length - 1) * lineHeight) / 2;
+    const fontSize = w < 260 ? 29 : 31;
+    ctx.fillStyle = '#a94d6b'; ctx.font = `700 ${fontSize}px Gowun Dodum, sans-serif`;
+    const lineHeight = w < 260 ? 34 : 36;
+    const maxLines = Math.max(1, Math.floor(contentBox.h / lineHeight));
+    const shown = lines.flatMap((line) => wrapWeeklyScheduleCanvasText(ctx, line, contentBox.w, maxLines)).slice(0, maxLines);
+    const startY = contentBox.y + contentBox.h / 2 - ((shown.length - 1) * lineHeight) / 2;
     shown.forEach((line, lineIndex) => {
-      let text = line; while (ctx.measureText(text).width > w - 34 && text.length > 3) text = `${text.slice(0, -2)}…`;
-      ctx.fillText(text, x + w / 2, startY + lineIndex * lineHeight);
+      ctx.fillText(line, contentBox.x + contentBox.w / 2, startY + lineIndex * lineHeight, contentBox.w);
     });
     ctx.fillStyle = '#a63d61'; ctx.font = '800 30px Jua, "Gowun Dodum", sans-serif';
-    ctx.fillText(`${dayName}요일`, x + w / 2, y + h - 28);
+    ctx.fillText(`${dayName}요일`, x + w / 2, y + h * layout.weekdayY, w - 24);
     ctx.restore();
   }
   async function drawPreview(includeEditableValues = false) {
@@ -8638,10 +8712,11 @@ function renderWeeklyScheduleDialog(page) {
     if (templateImage.naturalWidth) ctx.drawImage(templateImage, 0, 0, previewCanvas.width, previewCanvas.height);
     const selected = state.selectedImage;
     const avatar = selected?.image;
-    if (avatar?.complete && avatar.naturalWidth) drawImageCover(avatar, 94, 176, 390, 565);
+    const avatarBounds = WEEKLY_SCHEDULE_LAYOUT.avatar;
+    if (avatar?.complete && avatar.naturalWidth) drawImageCover(avatar, avatarBounds.x, avatarBounds.y, avatarBounds.w, avatarBounds.h);
     else {
       ctx.save(); ctx.fillStyle = '#9c8390'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = '700 26px Gowun Dodum, sans-serif'; ctx.fillText('갤러리에서 아바타를 선택하세요', 289, 456); ctx.restore();
+      ctx.font = '700 26px Gowun Dodum, sans-serif'; ctx.fillText('갤러리에서 아바타를 선택하세요', avatarBounds.x + avatarBounds.w / 2, avatarBounds.y + avatarBounds.h / 2); ctx.restore();
     }
     const graphicTitle = weeklyScheduleWeekTitle(page.streamer.nickname, weekInput.value || state.weekStart);
     title.textContent = graphicTitle; titleField.querySelector('input').value = graphicTitle;
@@ -8653,7 +8728,8 @@ function renderWeeklyScheduleDialog(page) {
     const footerText = state.footerText || defaultFooterText;
     ctx.fillStyle = '#9b365c';
     ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
-    const footerFit = drawWeeklyScheduleFooterText(ctx, footerTextInput.matches(':focus') ? '' : footerText, 285, 850, 430);
+    const footerLayout = WEEKLY_SCHEDULE_LAYOUT.footer;
+    const footerFit = drawWeeklyScheduleFooterText(ctx, footerTextInput.matches(':focus') ? '' : footerText, footerLayout.centerX, footerLayout.centerY, footerLayout.maxWidth);
     footerTextInput.style.fontSize = `calc(${footerFit.fontSize / 16.72}cqw)`;
     ctx.shadowBlur = 0;
     footerTextWarning.hidden = !footerFit.overflow;
@@ -8661,9 +8737,7 @@ function renderWeeklyScheduleDialog(page) {
       ? '문구가 리본에 다 들어가지 않아요. 더 짧게 입력하면 저장 이미지에도 전체가 표시됩니다.'
       : '';
     ctx.restore();
-    const topCards = Array.from({ length: 4 }, (_, index) => ({ x: 585 + index * 262, y: 171, w: 242, h: 323 }));
-    const bottomCards = Array.from({ length: 3 }, (_, index) => ({ x: 588 + index * 347, y: 525, w: 317, h: 331 }));
-    [...topCards, ...bottomCards].forEach((rect, index) => drawGraphicDay(dayInputs[index], index, rect, includeEditableValues));
+    WEEKLY_SCHEDULE_LAYOUT.days.forEach((rect, index) => drawGraphicDay(dayInputs[index], index, rect, includeEditableValues));
     selectedImageNote.textContent = selected ? `적용 중 · ${selected.categoryLabel || '갤러리 이미지'}` : '사진을 고르지 않으면 이 칸은 비워 둡니다.';
     clearImage.disabled = !selected; clearImage.hidden = !selected;
   }
