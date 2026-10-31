@@ -4838,10 +4838,10 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
   const scheduleRef = fanPageWeeklySchedulesRef(target.streamer.id, weekStart);
 
   if (data.action === 'get' || isEmbed) {
-    const [viewerAdmin, viewerSubscription] = await Promise.all([
-      uid ? isAdminUid(uid) : false, uid ? viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get() : null,
+    const [viewerAdmin, verifiedViewer] = await Promise.all([
+      uid ? isAdminUid(uid) : false, uid ? findVerifiedByUid(uid) : null,
     ]);
-    const canUseStarlight = viewerAdmin || (Number(viewerSubscription?.val()?.expiresAt) || 0) > Date.now();
+    const canUseStarlight = viewerAdmin || verifiedViewer?.streamer.id === target.streamer.id;
     const targetSnapshot = await scheduleRef.get();
     if (isEmbed && !targetSnapshot.exists()) throw new HttpsError('not-found', '저장된 주간 일정표가 없습니다.');
     let record = targetSnapshot.val() || {};
@@ -4928,9 +4928,8 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
     throw new HttpsError('invalid-argument', '방송표 템플릿을 확인해 주세요.');
   }
   if (templateId === 'starlight' && !isAdmin) {
-    const subscription = (await viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get()).val() || {};
-    if (!mayUseTemplate(templateId, { expiresAt: subscription.expiresAt })) {
-      throw new HttpsError('permission-denied', '별빛 방송국 템플릿은 통합 구독 중에만 적용하고 수정할 수 있습니다.');
+    if (!mayUseTemplate(templateId, { isVerifiedStreamer: verified?.streamer.id === target.streamer.id })) {
+      throw new HttpsError('permission-denied', '별빛 방송국 템플릿은 해당 팬페이지의 인증 스트리머만 적용하고 수정할 수 있습니다.');
     }
   }
   const entries = normalizeWeeklyScheduleEntries(data.entries);

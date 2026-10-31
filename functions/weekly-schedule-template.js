@@ -5,8 +5,8 @@ function resolveTemplate(requested, existing) {
   return ['default', 'starlight'].includes(template) ? template : null;
 }
 
-function mayUseTemplate(template, { isAdmin = false, expiresAt = 0, now = Date.now() } = {}) {
-  return template === 'default' || (template === 'starlight' && (isAdmin || Number(expiresAt) > now));
+function mayUseTemplate(template, { isAdmin = false, isVerifiedStreamer = false } = {}) {
+  return template === 'default' || (template === 'starlight' && (isAdmin || isVerifiedStreamer));
 }
 
 module.exports = { resolveTemplate, mayUseTemplate };
