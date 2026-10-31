@@ -135,7 +135,7 @@
           <div><p class="eyebrow">VOD LIBRARY</p><h3>방송 다시보기</h3><span id="viewerVodCount"></span></div>
           <div class="viewer-list-controls">
             <label class="viewer-vod-sort-label" for="viewerVodSort">정렬</label>
-            <button class="viewer-tooltip-trigger" type="button" aria-label="정렬 도움말" data-tooltip="날짜순은 방송국 전체 다시보기를 30개씩 불러옵니다. 시청자순은 저장된 분석 결과로 전체 목록을 정렬하며, 새 분석은 하지 않습니다. 미분석 영상은 날짜순 뒤에 표시됩니다.">i</button>
+            <button class="viewer-tooltip-trigger" type="button" aria-label="정렬 도움말" data-tooltip="날짜순은 방송국 전체 다시보기를 30개씩 불러옵니다. 시청자순은 저장된 분석 결과로 전체 목록을 정렬하며, 새 분석은 하지 않습니다. 미분석 영상은 날짜순 뒤에 표시됩니다.">?</button>
             <select class="viewer-vod-sort" id="viewerVodSort">
               <option value="date-desc">최신 날짜순</option>
               <option value="date-asc">오래된 날짜순</option>
@@ -145,7 +145,7 @@
               <option value="low-asc">최저 시청자 적은순</option>
             </select>
             <span class="viewer-list-note">1분 단위 · 시작/종료 5분 제외</span>
-            <button class="viewer-tooltip-trigger" type="button" aria-label="통계 집계 기준" data-tooltip="시청자 그래프는 1분 단위로 집계하고, 방송 시작과 종료 후 각 5분은 분석에서 제외합니다.">i</button>
+            <button class="viewer-tooltip-trigger" type="button" aria-label="통계 집계 기준" data-tooltip="시청자 그래프는 1분 단위로 집계하고, 방송 시작과 종료 후 각 5분은 분석에서 제외합니다.">?</button>
           </div>
         </div>
         <p class="viewer-vod-sort-hint">날짜순은 방송국 전체 목록을 기준으로 30개씩 불러옵니다. 최고·최저 시청자순은 전체 다시보기를 훑어 정적 통계 캐시에 반영된 분석 결과로 정렬하고, 미분석 영상은 날짜순으로 뒤에 표시합니다. 정렬할 때 새 통계는 계산하지 않습니다.</p>
@@ -163,13 +163,13 @@
 
         <details class="viewer-period-peaks viewer-collapsible-panel" aria-labelledby="viewerPeriodTitle">
           <summary class="viewer-collapsible-summary">
-            <span class="viewer-collapsible-title"><span class="eyebrow">PERIOD HIGHS</span><strong id="viewerPeriodTitle">기간별 최고 시청 순간</strong><button class="viewer-tooltip-trigger" type="button" aria-label="기간별 최고 시청 순간 도움말" data-tooltip="최근 7일·30일·90일·1년 동안의 다시보기를 살펴 각 기간의 가장 높은 시청자 순간을 찾습니다.">i</button></span>
+            <span class="viewer-collapsible-title"><span class="eyebrow">PERIOD HIGHS</span><strong id="viewerPeriodTitle">기간별 최고 시청 순간</strong><button class="viewer-tooltip-trigger" type="button" aria-label="기간별 최고 시청 순간 도움말" data-tooltip="최근 7일·30일·90일·1년 동안의 다시보기를 살펴 각 기간의 가장 높은 시청자 순간을 찾습니다.">?</button></span>
             <span class="viewer-collapsible-hint">최근 7일 · 30일 · 90일 · 1년</span>
           </summary>
           <div class="viewer-collapsible-content">
             <div class="viewer-period-heading">
               <button class="button" id="viewerPeriodScanButton" type="button">구독 전용 분석</button>
-              <button class="viewer-tooltip-trigger" type="button" aria-label="기간 분석 도움말" data-tooltip="최근 1년 다시보기를 살펴 7일·30일·90일·1년별 최고 순간을 찾습니다. 저장된 분석은 재사용하고 미분석 영상은 분석합니다. 구독 계정에서 이용할 수 있습니다.">i</button>
+              <button class="viewer-tooltip-trigger" type="button" aria-label="기간 분석 도움말" data-tooltip="최근 1년 다시보기를 살펴 7일·30일·90일·1년별 최고 순간을 찾습니다. 저장된 분석은 재사용하고 미분석 영상은 분석합니다. 구독 계정에서 이용할 수 있습니다.">?</button>
             </div>
             <p class="viewer-period-status" id="viewerPeriodStatus" role="status" aria-live="polite">분석 버튼을 누르면 구독 안내를 확인할 수 있습니다.</p>
             <div class="viewer-period-grid" id="viewerPeriodGrid"></div>
@@ -178,7 +178,7 @@
 
         <details class="viewer-comparison-panel viewer-collapsible-panel" aria-labelledby="viewerComparisonTitle">
           <summary class="viewer-collapsible-summary">
-            <span class="viewer-collapsible-title"><span class="eyebrow">SAME-DAY COMPARISON</span><strong id="viewerComparisonTitle">같은 날 스트리머 2명 비교</strong><button class="viewer-tooltip-trigger" type="button" aria-label="같은 날 비교 도움말" data-tooltip="두 스트리머와 날짜를 선택하면 그날의 다시보기를 찾아 최고 시청자 수와 평균 대비 상승률을 비교합니다.">i</button></span>
+            <span class="viewer-collapsible-title"><span class="eyebrow">SAME-DAY COMPARISON</span><strong id="viewerComparisonTitle">같은 날 스트리머 2명 비교</strong><button class="viewer-tooltip-trigger" type="button" aria-label="같은 날 비교 도움말" data-tooltip="두 스트리머와 날짜를 선택하면 그날의 다시보기를 찾아 최고 시청자 수와 평균 대비 상승률을 비교합니다.">?</button></span>
             <span class="viewer-comparison-count" id="viewerComparisonCount">0 / 2명 선택</span>
           </summary>
           <div class="viewer-collapsible-content">
@@ -221,7 +221,7 @@
 
         <details class="viewer-keyword-comparison-panel viewer-collapsible-panel" aria-labelledby="viewerKeywordComparisonTitle">
           <summary class="viewer-collapsible-summary">
-            <span class="viewer-collapsible-title"><span class="eyebrow">KEYWORD PEAK COMPARISON</span><strong id="viewerKeywordComparisonTitle">키워드로 여러 스트리머 고점 비교</strong><button class="viewer-tooltip-trigger" type="button" aria-label="키워드 비교 도움말" data-tooltip="스트리머 2~5명과 키워드를 선택하면 각 방송국의 최신 검색 결과 최대 10개를 분석해 최고 시청자 수를 비교합니다.">i</button></span>
+            <span class="viewer-collapsible-title"><span class="eyebrow">KEYWORD PEAK COMPARISON</span><strong id="viewerKeywordComparisonTitle">키워드로 여러 스트리머 고점 비교</strong><button class="viewer-tooltip-trigger" type="button" aria-label="키워드 비교 도움말" data-tooltip="스트리머 2~5명과 키워드를 선택하면 각 방송국의 최신 검색 결과 최대 10개를 분석해 최고 시청자 수를 비교합니다.">?</button></span>
             <span class="viewer-keyword-comparison-count" id="viewerKeywordComparisonCount">2~5명 선택</span>
           </summary>
           <div class="viewer-collapsible-content">
