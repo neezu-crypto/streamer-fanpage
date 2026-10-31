@@ -8407,7 +8407,8 @@ function installWeeklySparkleEffect(root) {
 
 function renderWeeklyScheduleViewDialog(page, board) {
   const state = weeklyScheduleGraphicStateFor(page.streamer.id);
-  const dialog = document.createElement('dialog'); dialog.className = 'account-dialog weekly-schedule-view-dialog';
+  const canManage = page.isOwner === true || page.isStreamerOwner === true || isAdminUser;
+  const dialog = document.createElement('dialog'); dialog.className = `account-dialog weekly-schedule-view-dialog${canManage ? '' : ' weekly-schedule-view-public'}`;
   dialog.setAttribute('aria-label', '주간 방송표');
   const card = document.createElement('section'); card.className = 'account-dialog-card weekly-schedule-view-card';
   const header = document.createElement('header'); header.className = 'weekly-schedule-view-heading';
