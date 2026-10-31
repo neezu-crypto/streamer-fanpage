@@ -8197,7 +8197,7 @@ async function loadWeeklySchedulePageData(page, weekStart, board, options = {}) 
       ? saved.data.entries.map((entry) => ({ time: String(entry.time || ''), content: String(entry.content || ''), offline: entry.offline === true }))
       : Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false }));
     state.footerText = typeof saved.data.footerText === 'string' ? saved.data.footerText.slice(0, 48) : '';
-    state.templateId = saved.data.templateId === 'starlight' && (!saved.data.carriedForwardFrom || saved.data.canUseStarlight) ? 'starlight' : 'default';
+    state.templateId = saved.data.templateId === 'starlight' ? 'starlight' : 'default';
     state.canUseStarlight = saved.data.canUseStarlight === true;
     state.animationEnabled = saved.data.animationEnabled !== false;
     state.avatarImageId = savedAvatarId;
@@ -8377,7 +8377,7 @@ function renderCalendarSection(page) {
   designPreview.addEventListener('click', () => {
     const previewDialog = document.createElement('dialog'); previewDialog.className = 'account-dialog weekly-template-preview-dialog';
     const previewCard = document.createElement('div'); previewCard.className = 'account-dialog-card weekly-template-preview-card';
-    const label = document.createElement('h3'); label.textContent = '별빛 방송국 · 구독 전용';
+    const label = document.createElement('h3'); label.textContent = '별빛 방송국 · 인증 스트리머 전용';
     const img = document.createElement('img'); img.src = new URL('./assets/weekly-schedule-starlight.png', import.meta.url).href; img.alt = '별빛 방송국 주간 일정표 디자인';
     const closePreview = document.createElement('button'); closePreview.type = 'button'; closePreview.className = 'button'; closePreview.textContent = '닫기'; closePreview.addEventListener('click', () => previewDialog.close());
     const visual = document.createElement('div'); visual.className = 'weekly-template-visual weekly-schedule-starlight'; visual.append(img);
@@ -8767,7 +8767,7 @@ function renderWeeklyScheduleDialog(page) {
   const templateControls = document.createElement('div'); templateControls.className = 'weekly-template-controls';
   const templateLabel = document.createElement('label'); templateLabel.textContent = '방송표 디자인 ';
   const templateSelect = document.createElement('select'); templateSelect.setAttribute('aria-label', '방송표 디자인');
-  templateSelect.innerHTML = '<option value="default">기본 템플릿</option><option value="starlight">별빛 방송국 · 구독 전용</option>';
+  templateSelect.innerHTML = '<option value="default">기본 템플릿</option><option value="starlight">별빛 방송국 · 인증 스트리머 전용</option>';
   const templatePreview = document.createElement('button'); templatePreview.type = 'button'; templatePreview.className = 'button'; templatePreview.textContent = '별빛 템플릿 미리보기';
   const motionToggle = document.createElement('button'); motionToggle.type = 'button'; motionToggle.className = 'button';
   const syncMotionToggle = () => { const enabled = state.animationEnabled !== false; motionToggle.textContent = enabled ? '방송표 움직임 끄기' : '방송표 움직임 켜기'; motionToggle.setAttribute('aria-pressed', String(enabled)); motionToggle.disabled = state.templateId !== 'starlight' || !state.canUseStarlight; };
@@ -8776,7 +8776,7 @@ function renderWeeklyScheduleDialog(page) {
   templateLabel.append(templateSelect); templateControls.append(templateLabel, templatePreview, motionToggle, templateHint);
   const templateDialog = document.createElement('dialog'); templateDialog.className = 'account-dialog weekly-template-preview-dialog';
   const templateCard = document.createElement('div'); templateCard.className = 'account-dialog-card weekly-template-preview-card';
-  const templateHeading = document.createElement('h3'); templateHeading.textContent = '별빛 방송국 · 구독 전용';
+  const templateHeading = document.createElement('h3'); templateHeading.textContent = '별빛 방송국 · 인증 스트리머 전용';
   const templatePicture = document.createElement('img'); templatePicture.src = new URL('./assets/weekly-schedule-starlight.png', import.meta.url).href; templatePicture.alt = '별빛 방송국 주간 일정표 디자인';
   const templateClose = document.createElement('button'); templateClose.type = 'button'; templateClose.className = 'button'; templateClose.textContent = '닫기'; templateClose.addEventListener('click', () => templateDialog.close());
   const templateVisual = document.createElement('div'); templateVisual.className = 'weekly-template-visual weekly-schedule-starlight'; templateVisual.append(templatePicture);
@@ -8802,11 +8802,13 @@ function renderWeeklyScheduleDialog(page) {
   previewFrame.append(previewCanvas, previousWeek, nextWeek, dayGrid, avatarHitArea, footerTextInput);
 
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
-  const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요. 기존 연동 일정은 수정되지 않습니다.';
+  const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요. SOOP용 HTML은 해당 팬페이지의 인증 스트리머만 복사할 수 있어요.';
   const footerTextWarning = document.createElement('small'); footerTextWarning.className = 'weekly-schedule-footer-text-warning'; footerTextWarning.setAttribute('role', 'status'); footerTextWarning.hidden = true;
   const footerActions = document.createElement('div'); footerActions.className = 'profile-editor-footer-actions';
   const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
   const copyEmbed = document.createElement('button'); copyEmbed.type = 'button'; copyEmbed.className = 'button'; copyEmbed.textContent = 'SOOP용 HTML 복사';
+  copyEmbed.title = '해당 팬페이지의 인증 스트리머 전용';
+  copyEmbed.setAttribute('aria-label', 'SOOP용 HTML 복사, 해당 팬페이지 인증 스트리머 전용');
   footerActions.append(download, copyEmbed); footer.append(saveHint, footerTextWarning, footerActions);
   dayHeading.hidden = true; previewHeading.hidden = true;
   form.append(meta, templateControls, previewFrame, linkedEventsToggle, linkedEventsPanel, footer);
@@ -9026,8 +9028,9 @@ function renderWeeklyScheduleDialog(page) {
     const locked = state.templateId === 'starlight' && !state.canUseStarlight;
     templateSelect.value = state.templateId; syncMotionToggle();
     templateSelect.options[1].disabled = !state.canUseStarlight && !locked;
-    templateHint.textContent = locked ? '구독이 만료되어 읽기만 가능합니다. 기본 템플릿을 선택하면 수정할 수 있어요.' : (!state.canUseStarlight ? '별빛 방송국은 구독 후 적용할 수 있어요.' : '');
+    templateHint.textContent = locked ? '인증 권한이 없어 읽기만 가능합니다. 기본 템플릿을 선택하면 수정할 수 있어요.' : (!state.canUseStarlight ? '별빛 방송국은 해당 팬페이지의 인증 스트리머만 적용할 수 있어요.' : '');
     footerTextInput.disabled = locked; avatarHitArea.disabled = locked; download.disabled = locked;
+    copyEmbed.disabled = !state.canUseStarlight || state.loading || state.weekNavigationBusy;
     previewFrame.classList.toggle('weekly-template-locked', locked);
     weekInput.value = state.weekStart;
     graphicTitle.value = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
@@ -9134,6 +9137,7 @@ function renderWeeklyScheduleDialog(page) {
   }
 
   copyEmbed.addEventListener('click', async () => {
+    if (!state.canUseStarlight) { showToast('SOOP용 HTML 코드는 해당 팬페이지의 인증 스트리머만 사용할 수 있어요.'); return; }
     copyEmbed.disabled = true;
     try {
       if (state.weekNavigationBusy || state.loading) throw new Error('일정을 불러온 뒤 다시 시도해 주세요.');
@@ -9146,7 +9150,7 @@ function renderWeeklyScheduleDialog(page) {
       await navigator.clipboard.writeText(code);
       showToast('SOOP용 HTML을 복사했어요.');
     } catch (error) { showToast(error.message || 'HTML을 복사하지 못했어요.'); }
-    finally { copyEmbed.disabled = false; }
+    finally { copyEmbed.disabled = !state.canUseStarlight || state.loading || state.weekNavigationBusy; }
   });
 
   function markWeeklyDirty() {
@@ -9181,6 +9185,7 @@ function renderWeeklyScheduleDialog(page) {
     const setNavigationBusy = (busy) => {
       const locked = state.templateId === 'starlight' && !state.canUseStarlight;
       previousWeek.disabled = busy; nextWeek.disabled = busy;
+      copyEmbed.disabled = busy || !state.canUseStarlight;
       footerTextInput.disabled = busy || locked; avatarHitArea.disabled = busy || locked; download.disabled = busy || locked;
       chooseImage.disabled = busy; uploadImage.disabled = busy;
       clearImage.disabled = busy || !(state.selectedImage || state.savedAvatar);
