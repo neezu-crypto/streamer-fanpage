@@ -7887,8 +7887,8 @@ function drawWeeklyScheduleTitle(ctx, value) {
 
 function drawWeeklyScheduleFooterText(ctx, value, centerX, centerY, maxWidth) {
   const fullText = String(value || '');
-  let fontSize = 38;
-  const minimumFontSize = 24;
+  let fontSize = 30;
+  const minimumFontSize = 18;
   const setFont = () => { ctx.font = `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif`; };
   setFont();
   while (ctx.measureText(fullText).width > maxWidth && fontSize > minimumFontSize) {
@@ -8398,17 +8398,14 @@ function renderWeeklyScheduleDialog(page) {
   const header = document.createElement('div'); header.className = 'profile-editor-heading';
   const headingCopy = document.createElement('div');
   const title = document.createElement('h2'); title.id = 'weeklyScheduleGraphicTitle'; title.textContent = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
-  title.className = 'weekly-schedule-sr-title';
-  const intro = document.createElement('p'); intro.className = 'weekly-schedule-intro';
-  intro.textContent = '갤러리 사진과 요일별 방송 내용을 넣고 공유용 이미지를 저장하세요.';
-  const modalTitleRow = document.createElement('div'); modalTitleRow.className = 'weekly-schedule-modal-title-row';
+  title.className = 'weekly-schedule-editor-title';
   const previousWeek = document.createElement('button'); previousWeek.type = 'button'; previousWeek.className = 'weekly-schedule-arrow'; previousWeek.setAttribute('aria-label', '이전 주 일정'); previousWeek.textContent = '‹';
   const nextWeek = document.createElement('button'); nextWeek.type = 'button'; nextWeek.className = 'weekly-schedule-arrow'; nextWeek.setAttribute('aria-label', '다음 주 일정'); nextWeek.textContent = '›';
-  modalTitleRow.append(previousWeek, title, nextWeek); modalTitleRow.hidden = true;
-  headingCopy.append(modalTitleRow, title, intro);
+  headingCopy.append(title);
+  const saveStatus = document.createElement('span'); saveStatus.className = 'weekly-schedule-save-status weekly-schedule-header-status'; saveStatus.setAttribute('role', 'status');
   const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
   close.setAttribute('aria-label', '방송표 편집 닫기'); close.textContent = '×';
-  header.append(headingCopy, close);
+  header.append(headingCopy, saveStatus, close);
 
   const form = document.createElement('form'); form.className = 'weekly-schedule-form';
   form.addEventListener('submit', (event) => event.preventDefault());
@@ -8422,11 +8419,11 @@ function renderWeeklyScheduleDialog(page) {
   weekField.append(weekInput);
   meta.append(titleField, weekField); meta.hidden = true;
 
-  const weekTools = document.createElement('div'); weekTools.className = 'weekly-schedule-tools';
-  const linkedNote = document.createElement('p'); linkedNote.className = 'weekly-schedule-linked-note'; linkedNote.textContent = '기존 SOOP·팬페이지 일정은 자동으로 연동되며 이곳에서 수정되지 않아요.';
-  const importStatus = document.createElement('small'); importStatus.className = 'weekly-schedule-import-status'; importStatus.setAttribute('role', 'status');
-  weekTools.append(linkedNote, importStatus);
+  let linkedEventsOpen = false;
+  const linkedEventsToggle = document.createElement('button'); linkedEventsToggle.type = 'button'; linkedEventsToggle.className = 'weekly-schedule-linked-toggle';
+  linkedEventsToggle.hidden = true; linkedEventsToggle.setAttribute('aria-expanded', 'false');
   const linkedEventsPanel = document.createElement('section'); linkedEventsPanel.className = 'weekly-schedule-linked-events';
+  linkedEventsPanel.id = 'weeklyScheduleLinkedEvents'; linkedEventsToggle.setAttribute('aria-controls', linkedEventsPanel.id);
   const linkedEventsHeading = document.createElement('strong'); linkedEventsHeading.textContent = '자동 연동 일정';
   const linkedEventsList = document.createElement('div'); linkedEventsList.className = 'weekly-schedule-linked-list';
   linkedEventsPanel.append(linkedEventsHeading, linkedEventsList);
@@ -8533,13 +8530,11 @@ function renderWeeklyScheduleDialog(page) {
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
   const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요. 기존 연동 일정은 수정되지 않습니다.';
   const footerTextWarning = document.createElement('small'); footerTextWarning.className = 'weekly-schedule-footer-text-warning'; footerTextWarning.setAttribute('role', 'status'); footerTextWarning.hidden = true;
-  const saveStatus = document.createElement('span'); saveStatus.className = 'weekly-schedule-save-status'; saveStatus.setAttribute('role', 'status');
   const footerActions = document.createElement('div'); footerActions.className = 'profile-editor-footer-actions';
-  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '닫기';
   const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
-  footerActions.append(cancel, download); footer.append(saveHint, footerTextWarning, saveStatus, footerActions);
+  footerActions.append(download); footer.append(saveHint, footerTextWarning, footerActions);
   dayHeading.hidden = true; previewHeading.hidden = true;
-  form.append(meta, weekTools, previewFrame, linkedEventsPanel, footer);
+  form.append(meta, previewFrame, linkedEventsToggle, linkedEventsPanel, footer);
   card.append(header, form); dialog.append(card, imageTools);
 
   const templateImage = new Image();
@@ -8644,7 +8639,7 @@ function renderWeeklyScheduleDialog(page) {
     const footerText = state.footerText || defaultFooterText;
     ctx.fillStyle = '#9b365c';
     ctx.shadowColor = '#ffffffd9'; ctx.shadowBlur = 3;
-    const footerFit = drawWeeklyScheduleFooterText(ctx, footerText, 285, 850, 430);
+    const footerFit = drawWeeklyScheduleFooterText(ctx, footerTextInput.matches(':focus') ? '' : footerText, 285, 850, 430);
     footerTextInput.style.fontSize = `calc(${footerFit.fontSize / 16.72}cqw)`;
     ctx.shadowBlur = 0;
     footerTextWarning.hidden = !footerFit.overflow;
@@ -8796,7 +8791,11 @@ function renderWeeklyScheduleDialog(page) {
     if (!linkedCount) {
       const empty = document.createElement('p'); empty.className = 'weekly-schedule-linked-empty'; empty.textContent = '이번 주에 연동된 일정이 없어요.'; linkedEventsList.append(empty);
     }
-    importStatus.textContent = state.saveStatus || '';
+    linkedEventsToggle.hidden = linkedCount === 0;
+    if (!linkedCount) linkedEventsOpen = false;
+    linkedEventsToggle.textContent = `자동 연동 일정 ${linkedCount}개 ${linkedEventsOpen ? '접기' : '펼치기'}`;
+    linkedEventsToggle.setAttribute('aria-expanded', String(linkedEventsOpen));
+    linkedEventsPanel.hidden = !linkedEventsOpen;
     saveStatus.textContent = state.saveStatus || '';
     if (state.avatarImageId && state.savedAvatar && (!state.selectedImage || state.selectedImage.id !== state.avatarImageId)) {
       void selectScheduleGalleryImage({ id: state.avatarImageId, thumbUrl: state.savedAvatar.thumbUrl, imageUrl: state.savedAvatar.imageUrl, categoryLabel: '저장된 갤러리 이미지' }, false);
@@ -8870,6 +8869,7 @@ function renderWeeklyScheduleDialog(page) {
     state.saveTimer = window.setTimeout(() => { void saveCurrentWeek(); }, 700);
   }
 
+  footerTextInput.addEventListener('focus', () => { void drawPreview(false); });
   footerTextInput.addEventListener('input', () => {
     state.footerText = footerTextInput.value.trim().slice(0, footerTextInput.maxLength);
     markWeeklyDirty();
@@ -9002,11 +9002,17 @@ function renderWeeklyScheduleDialog(page) {
   });
   galleryMore.addEventListener('click', () => loadScheduleGallery(true));
   uploadSubmit.addEventListener('click', uploadScheduleGalleryImage);
+  linkedEventsToggle.addEventListener('click', () => {
+    linkedEventsOpen = !linkedEventsOpen;
+    linkedEventsPanel.hidden = !linkedEventsOpen;
+    const count = linkedEventsList.querySelectorAll('.weekly-schedule-linked-row').length;
+    linkedEventsToggle.textContent = `자동 연동 일정 ${count}개 ${linkedEventsOpen ? '접기' : '펼치기'}`;
+    linkedEventsToggle.setAttribute('aria-expanded', String(linkedEventsOpen));
+  });
   previousWeek.addEventListener('click', () => { void moveEditorWeek(-1); });
   nextWeek.addEventListener('click', () => { void moveEditorWeek(1); });
   const closeAndSave = async () => { if (await saveCurrentWeek()) dialog.close(); };
   close.addEventListener('click', closeAndSave);
-  cancel.addEventListener('click', closeAndSave);
   dialog.addEventListener('cancel', (event) => {
     // 자식 갤러리 모달이나 파일 선택기에서 올라온 취소는 편집 모달 취소로 처리하지 않는다.
     if (event.target !== dialog) return;
