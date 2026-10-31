@@ -4835,7 +4835,22 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
   const scheduleRef = fanPageWeeklySchedulesRef(target.streamer.id, weekStart);
 
   if (data.action === 'get') {
-    const record = (await scheduleRef.get()).val() || {};
+    const targetSnapshot = await scheduleRef.get();
+    let record = targetSnapshot.val() || {};
+    let carriedForwardFrom = '';
+    if (!targetSnapshot.exists() && data.carryForward === true) {
+      const previousWeek = new Date(`${weekStart}T00:00:00.000Z`);
+      previousWeek.setUTCDate(previousWeek.getUTCDate() - 7);
+      const previousWeekStart = previousWeek.toISOString().slice(0, 10);
+      const previousSnapshot = await fanPageWeeklySchedulesRef(target.streamer.id)
+        .orderByKey().endAt(previousWeekStart).limitToLast(1).get();
+      if (previousSnapshot.exists()) {
+        previousSnapshot.forEach((child) => {
+          record = child.val() || {};
+          carriedForwardFrom = child.key || '';
+        });
+      }
+    }
     let entries = Array.from({ length: 7 }, () => ({ time: '', content: '', offline: false }));
     try {
       entries = normalizeWeeklyScheduleEntries(record.entries);
@@ -4843,21 +4858,27 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
       // 이전/손상 데이터가 공개 방송표 전체의 로딩을 막지 않도록 빈 주간표로 표시한다.
     }
     let avatar = null;
-    const avatarImageId = typeof record.avatarImageId === 'string' ? record.avatarImageId : '';
-    if (avatarImageId && /^[A-Za-z0-9_-]{8,100}$/.test(avatarImageId)) {
-      const galleryStreamerIds = await findGalleryStreamerIds(target);
-      const image = (await sharedDb.ref(`gallery/imagesPublic/${avatarImageId}`).get()).val();
-      if (image && galleryStreamerIds.includes(String(image.streamerId || '')) && isGalleryPublicUrl(image.thumbUrl)) {
-        avatar = { id: avatarImageId, thumbUrl: image.thumbUrl, imageUrl: isGalleryPublicUrl(image.imageUrl) ? image.imageUrl : image.thumbUrl };
+    const requestedAvatarImageId = typeof record.avatarImageId === 'string' ? record.avatarImageId : '';
+    if (requestedAvatarImageId && /^[A-Za-z0-9_-]{8,100}$/.test(requestedAvatarImageId)) {
+      try {
+        const galleryStreamerIds = await findGalleryStreamerIds(target);
+        const image = (await sharedDb.ref(`gallery/imagesPublic/${requestedAvatarImageId}`).get()).val();
+        if (image && galleryStreamerIds.includes(String(image.streamerId || '')) && isGalleryPublicUrl(image.thumbUrl)) {
+          avatar = { id: requestedAvatarImageId, thumbUrl: image.thumbUrl, imageUrl: isGalleryPublicUrl(image.imageUrl) ? image.imageUrl : image.thumbUrl };
+        }
+      } catch (_) {
+        // 방송표 내용은 갤러리 이미지 조회가 일시 실패해도 계속 반환한다.
       }
     }
     return {
       weekStart,
       entries,
-      footerText: typeof record.footerText === 'string' ? record.footerText.slice(0, 48) : '',
+      footerText: carriedForwardFrom ? '' : (typeof record.footerText === 'string' ? record.footerText.slice(0, 48) : ''),
       avatarImageId: avatar ? avatar.id : '',
       avatar,
-      updatedAt: Number(record.updatedAt) || 0,
+      avatarUnavailable: Boolean(requestedAvatarImageId && !avatar),
+      updatedAt: carriedForwardFrom ? 0 : (Number(record.updatedAt) || 0),
+      carriedForwardFrom,
     };
   }
 
