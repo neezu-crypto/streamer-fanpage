@@ -8373,25 +8373,36 @@ function renderCalendarSection(page) {
     const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + 7);
     void loadWeeklySchedulePageData(page, localDateKey(date), section, { carryForward: true });
   });
-  const designPreview = document.createElement('button'); designPreview.type = 'button'; designPreview.className = 'button weekly-template-view'; designPreview.textContent = '별빛 디자인 미리보기';
-  designPreview.addEventListener('click', () => {
-    const previewDialog = document.createElement('dialog'); previewDialog.className = 'account-dialog weekly-template-preview-dialog';
-    const previewCard = document.createElement('div'); previewCard.className = 'account-dialog-card weekly-template-preview-card';
-    const label = document.createElement('h3'); label.textContent = '별빛 방송국 · 인증 스트리머 전용';
-    const img = document.createElement('img'); img.src = new URL('./assets/weekly-schedule-starlight.png', import.meta.url).href; img.alt = '별빛 방송국 주간 일정표 디자인';
-    const closePreview = document.createElement('button'); closePreview.type = 'button'; closePreview.className = 'button'; closePreview.textContent = '닫기'; closePreview.addEventListener('click', () => previewDialog.close());
-    const visual = document.createElement('div'); visual.className = 'weekly-template-visual weekly-schedule-starlight'; visual.append(img);
-    previewCard.append(label, visual, closePreview); previewDialog.append(previewCard); document.body.append(previewDialog);
-    previewDialog.addEventListener('close', () => previewDialog.remove(), { once: true }); showFanPageModal(previewDialog);
-  });
-  const motionButton = document.createElement('button'); motionButton.type = 'button'; motionButton.className = 'button weekly-template-view';
-  const refreshMotion = () => { const enabled = localStorage.getItem('fanpage.schedule.motion') !== 'off'; document.documentElement.classList.toggle('weekly-motion-off', !enabled); motionButton.textContent = enabled ? '움직임 끄기' : '움직임 켜기'; motionButton.setAttribute('aria-pressed', String(enabled)); };
-  motionButton.addEventListener('click', () => { localStorage.setItem('fanpage.schedule.motion', localStorage.getItem('fanpage.schedule.motion') === 'off' ? 'on' : 'off'); refreshMotion(); }); refreshMotion();
-  section._syncWeeklyMotion = refreshMotion;
-  section.append(heading, imageFrame, designPreview, motionButton);
+  installWeeklySparkleEffect(section);
+  section.append(heading, imageFrame);
   drawBoard();
   void loadWeeklySchedulePageData(page, state.weekStart, section);
   return section;
+}
+
+function installWeeklySparkleEffect(root) {
+  if (root._weeklySparkleInstalled) return;
+  root._weeklySparkleInstalled = true;
+  let lastSparkAt = 0;
+  root.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'touch' || document.documentElement.classList.contains('weekly-motion-off') || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const frame = event.target.closest?.('.weekly-schedule-starlight');
+    if (!frame || !root.contains(frame)) return;
+    const now = performance.now();
+    if (now - lastSparkAt < 65) return;
+    lastSparkAt = now;
+    const bounds = frame.getBoundingClientRect();
+    const spark = document.createElement('span');
+    spark.className = 'weekly-cursor-sparkle';
+    spark.setAttribute('aria-hidden', 'true');
+    spark.textContent = Math.random() > 0.45 ? '✦' : '✧';
+    spark.style.left = `${event.clientX - bounds.left}px`;
+    spark.style.top = `${event.clientY - bounds.top}px`;
+    spark.style.setProperty('--spark-size', `${18 + Math.random() * 20}px`);
+    spark.style.setProperty('--spark-rotate', `${Math.round(Math.random() * 70 - 35)}deg`);
+    frame.append(spark);
+    window.setTimeout(() => spark.remove(), 1200);
+  });
 }
 
 function renderWeeklyScheduleViewDialog(page, board) {
@@ -8767,7 +8778,7 @@ function renderWeeklyScheduleDialog(page) {
   const templateControls = document.createElement('div'); templateControls.className = 'weekly-template-controls';
   const templateLabel = document.createElement('label'); templateLabel.textContent = '방송표 디자인 ';
   const templateSelect = document.createElement('select'); templateSelect.setAttribute('aria-label', '방송표 디자인');
-  templateSelect.innerHTML = '<option value="default">기본 템플릿</option><option value="starlight">별빛 방송국 · 인증 스트리머 전용</option>';
+  templateSelect.innerHTML = '<option value="default">기본 템플릿</option><option value="starlight">별빛 방송국</option>';
   const templatePreview = document.createElement('button'); templatePreview.type = 'button'; templatePreview.className = 'button'; templatePreview.textContent = '별빛 템플릿 미리보기';
   const motionToggle = document.createElement('button'); motionToggle.type = 'button'; motionToggle.className = 'button';
   const syncMotionToggle = () => { const enabled = state.animationEnabled !== false; motionToggle.textContent = enabled ? '방송표 움직임 끄기' : '방송표 움직임 켜기'; motionToggle.setAttribute('aria-pressed', String(enabled)); motionToggle.disabled = state.templateId !== 'starlight' || !state.canUseStarlight; };
@@ -8776,7 +8787,7 @@ function renderWeeklyScheduleDialog(page) {
   templateLabel.append(templateSelect); templateControls.append(templateLabel, templatePreview, motionToggle, templateHint);
   const templateDialog = document.createElement('dialog'); templateDialog.className = 'account-dialog weekly-template-preview-dialog';
   const templateCard = document.createElement('div'); templateCard.className = 'account-dialog-card weekly-template-preview-card';
-  const templateHeading = document.createElement('h3'); templateHeading.textContent = '별빛 방송국 · 인증 스트리머 전용';
+  const templateHeading = document.createElement('h3'); templateHeading.textContent = '별빛 방송국';
   const templatePicture = document.createElement('img'); templatePicture.src = new URL('./assets/weekly-schedule-starlight.png', import.meta.url).href; templatePicture.alt = '별빛 방송국 주간 일정표 디자인';
   const templateClose = document.createElement('button'); templateClose.type = 'button'; templateClose.className = 'button'; templateClose.textContent = '닫기'; templateClose.addEventListener('click', () => templateDialog.close());
   const templateVisual = document.createElement('div'); templateVisual.className = 'weekly-template-visual weekly-schedule-starlight'; templateVisual.append(templatePicture);
@@ -8787,6 +8798,7 @@ function renderWeeklyScheduleDialog(page) {
   const previewNote = document.createElement('small'); previewNote.textContent = '템플릿 이미지는 새로 제작한 팬페이지 전용 배경입니다.';
   previewHeading.append(previewTitle, previewNote);
   const previewFrame = document.createElement('div'); previewFrame.className = 'weekly-schedule-preview-frame weekly-schedule-template-stage';
+  installWeeklySparkleEffect(previewFrame);
   const previewCanvas = document.createElement('canvas'); previewCanvas.className = 'weekly-schedule-preview-canvas';
   previewCanvas.width = WEEKLY_SCHEDULE_LAYOUT.width; previewCanvas.height = WEEKLY_SCHEDULE_LAYOUT.height; previewCanvas.setAttribute('aria-label', '주간 방송표 이미지 미리보기');
   const avatarHitArea = document.createElement('button'); avatarHitArea.type = 'button'; avatarHitArea.className = 'weekly-schedule-avatar-hit-area';
@@ -8807,8 +8819,8 @@ function renderWeeklyScheduleDialog(page) {
   const footerActions = document.createElement('div'); footerActions.className = 'profile-editor-footer-actions';
   const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
   const copyEmbed = document.createElement('button'); copyEmbed.type = 'button'; copyEmbed.className = 'button'; copyEmbed.textContent = 'SOOP용 HTML 복사';
-  copyEmbed.title = '해당 팬페이지의 인증 스트리머 전용';
-  copyEmbed.setAttribute('aria-label', 'SOOP용 HTML 복사, 해당 팬페이지 인증 스트리머 전용');
+  copyEmbed.title = 'SOOP 방송국 HTML 코드 복사';
+  copyEmbed.setAttribute('aria-label', 'SOOP 방송국 HTML 코드 복사');
   footerActions.append(download, copyEmbed); footer.append(saveHint, footerTextWarning, footerActions);
   dayHeading.hidden = true; previewHeading.hidden = true;
   form.append(meta, templateControls, previewFrame, linkedEventsToggle, linkedEventsPanel, footer);
