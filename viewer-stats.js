@@ -29,6 +29,103 @@ const callSponsorAds = httpsCallable(functions, 'streamerFanPageSponsorAds');
 const callAdminSponsorAds = httpsCallable(functions, 'streamerFanPageAdminSponsorAds');
 const callSponsorLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
 const $ = (id) => document.getElementById(id);
+const viewerTooltipPopup = document.createElement('div');
+viewerTooltipPopup.id = 'viewerTooltipPopup';
+viewerTooltipPopup.className = 'viewer-tooltip-popup';
+viewerTooltipPopup.setAttribute('role', 'tooltip');
+viewerTooltipPopup.hidden = true;
+document.body.append(viewerTooltipPopup);
+
+let activeViewerTooltipTrigger = null;
+let pinnedViewerTooltipTrigger = null;
+
+function closeViewerTooltips() {
+  document.querySelectorAll('.viewer-tooltip-trigger').forEach((trigger) => {
+    trigger.classList.remove('is-open');
+    trigger.removeAttribute('aria-describedby');
+  });
+  activeViewerTooltipTrigger = null;
+  pinnedViewerTooltipTrigger = null;
+  viewerTooltipPopup.hidden = true;
+  viewerTooltipPopup.textContent = '';
+}
+
+function positionViewerTooltip(trigger) {
+  if (!trigger || viewerTooltipPopup.hidden) return;
+  const rect = trigger.getBoundingClientRect();
+  const popupWidth = viewerTooltipPopup.offsetWidth;
+  const popupHeight = viewerTooltipPopup.offsetHeight;
+  const left = Math.max(14, Math.min(rect.left + (rect.width - popupWidth) / 2, window.innerWidth - popupWidth - 14));
+  const top = rect.top >= popupHeight + 14 ? rect.top - popupHeight - 8 : rect.bottom + 8;
+  viewerTooltipPopup.style.left = left + 'px';
+  viewerTooltipPopup.style.top = Math.max(8, Math.min(top, window.innerHeight - popupHeight - 8)) + 'px';
+}
+
+function showViewerTooltip(trigger, pin = false) {
+  if (!trigger || !trigger.dataset.tooltip) return;
+  if (activeViewerTooltipTrigger !== trigger) closeViewerTooltips();
+  activeViewerTooltipTrigger = trigger;
+  if (pin) pinnedViewerTooltipTrigger = trigger;
+  viewerTooltipPopup.textContent = trigger.dataset.tooltip;
+  viewerTooltipPopup.hidden = false;
+  trigger.classList.toggle('is-open', pinnedViewerTooltipTrigger === trigger);
+  trigger.setAttribute('aria-describedby', viewerTooltipPopup.id);
+  positionViewerTooltip(trigger);
+}
+
+document.addEventListener('click', (event) => {
+  const trigger = event.target.closest('.viewer-tooltip-trigger');
+  if (trigger) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (pinnedViewerTooltipTrigger === trigger) closeViewerTooltips();
+    else showViewerTooltip(trigger, true);
+    return;
+  }
+  if (activeViewerTooltipTrigger && !viewerTooltipPopup.contains(event.target)) closeViewerTooltips();
+}, true);
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  if (!activeViewerTooltipTrigger) return;
+  closeViewerTooltips();
+});
+
+document.addEventListener('pointerover', (event) => {
+  const trigger = event.target.closest('.viewer-tooltip-trigger');
+  if (trigger && !pinnedViewerTooltipTrigger) showViewerTooltip(trigger);
+});
+
+document.addEventListener('pointerout', (event) => {
+  const trigger = event.target.closest('.viewer-tooltip-trigger');
+  if (!trigger || trigger !== activeViewerTooltipTrigger || pinnedViewerTooltipTrigger || trigger.matches(':focus')) return;
+  if (event.relatedTarget && (trigger.contains(event.relatedTarget) || viewerTooltipPopup.contains(event.relatedTarget))) return;
+  closeViewerTooltips();
+});
+
+viewerTooltipPopup.addEventListener('pointerout', (event) => {
+  if (pinnedViewerTooltipTrigger || (event.relatedTarget && activeViewerTooltipTrigger?.contains(event.relatedTarget))) return;
+  closeViewerTooltips();
+});
+
+document.addEventListener('focusin', (event) => {
+  const trigger = event.target.closest('.viewer-tooltip-trigger');
+  if (trigger) showViewerTooltip(trigger, pinnedViewerTooltipTrigger === trigger);
+});
+
+document.addEventListener('focusout', (event) => {
+  const trigger = event.target.closest('.viewer-tooltip-trigger');
+  if (trigger && trigger === activeViewerTooltipTrigger && !pinnedViewerTooltipTrigger) closeViewerTooltips();
+});
+
+window.addEventListener('resize', () => {
+  if (activeViewerTooltipTrigger) positionViewerTooltip(activeViewerTooltipTrigger);
+});
+
+window.addEventListener('scroll', () => {
+  if (activeViewerTooltipTrigger) positionViewerTooltip(activeViewerTooltipTrigger);
+}, true);
+
 const notifyViewerStatsVisit = createViewerStatsVisitNotifier(
   () => callViewerStatsVisit({}),
   (error) => console.warn('고점체크 인증 스트리머 접속을 기록하지 못했습니다:', error.message || error),
@@ -1091,6 +1188,7 @@ function createVodCard(vod, loadToken, streamerId) {
   mainAction.className = 'viewer-vod-main-action';
   mainAction.type = 'button';
   mainAction.textContent = '시청자 통계 분석하기';
+  mainAction.title = '이 다시보기의 시청자 통계를 분석해 최고·최저 시청 순간을 찾습니다.';
   mainAction.setAttribute('aria-label', (vod.title || '다시보기') + ' 시청자 통계 분석하기');
   mainAction.addEventListener('click', () => {
     const playback = mainAction.dataset.playbackUrl;
@@ -1127,6 +1225,7 @@ function showStatsLinks(card, stats) {
   card._mainAction.dataset.playbackUrl = highestUrl;
   card._mainAction.disabled = false;
   card._mainAction.textContent = '최고 시청 순간 보기 · ' + formatClock(stats.highest.second) + ' ↗';
+  card._mainAction.title = '분석된 최고 시청자 수가 기록된 시점으로 이동합니다.';
   card._mainAction.setAttribute('aria-label', (card._vod.title || '다시보기') + ' 최고 시청 순간 재생');
   card._statsActions.replaceChildren();
   const highest = document.createElement('a');
@@ -1135,12 +1234,14 @@ function showStatsLinks(card, stats) {
   highest.target = '_blank';
   highest.rel = 'noopener noreferrer';
   highest.textContent = '최고 ' + Number(stats.highest.viewers).toLocaleString('ko-KR') + '명 · ' + formatClock(stats.highest.second);
+  highest.title = '이 다시보기에서 최고 시청자 수가 기록된 시점으로 이동합니다.';
   const lowest = document.createElement('a');
   lowest.className = 'viewer-stat-link';
   lowest.href = lowestUrl;
   lowest.target = '_blank';
   lowest.rel = 'noopener noreferrer';
   lowest.textContent = '최저 ' + Number(stats.lowest.viewers).toLocaleString('ko-KR') + '명 · ' + formatClock(stats.lowest.second);
+  lowest.title = '이 다시보기에서 최저 시청자 수가 기록된 시점으로 이동합니다.';
   card._statsActions.append(highest, lowest);
   card.dataset.statsState = 'ready';
 }
@@ -2367,6 +2468,7 @@ function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !subscri
       link.rel = 'noopener noreferrer';
       link.textContent = peak.vod.title || '다시보기에서 재생';
       link.setAttribute('aria-label', period.label + ' 최고 ' + count.textContent + ' · ' + meta.textContent + ' · ' + link.textContent + ' 재생');
+      link.title = period.label + ' 기간의 최고 시청 순간을 재생합니다.';
       card.append(count, meta, link);
     } else {
       const empty = document.createElement('span');

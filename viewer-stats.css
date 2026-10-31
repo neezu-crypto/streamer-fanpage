@@ -517,6 +517,16 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 @media(max-width:720px){.viewer-stats-page .devbar-inner{width:calc(100% - 28px);padding:6px 0}.viewer-stats-page .devbar-track{gap:8px}.viewer-stats-page .devbar-label{font-size:9px}.viewer-stats-page .dev-game-link{padding:5px 9px;font-size:10px}}
 @media(prefers-reduced-motion:reduce){.viewer-stats-page .devbar-track.auto-scroll{animation:none}.viewer-stats-page .devbar-viewport{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}.viewer-stats-page .devbar-viewport::-webkit-scrollbar{display:none}}
 
+.viewer-tooltip-trigger{position:relative;display:inline-grid;width:21px;height:21px;flex:none;place-items:center;margin:0 3px;padding:0;border:1px solid #b8c5d8;border-radius:50%;background:#fff;color:#52647d;font:700 12px/1 Arial,sans-serif;cursor:help}
+.viewer-tooltip-trigger:hover,.viewer-tooltip-trigger:focus-visible,.viewer-tooltip-trigger.is-open{border-color:#486bd6;background:#eef3ff;color:#294fae;outline:2px solid #486bd633;outline-offset:2px}
+.viewer-tooltip-popup{position:fixed;z-index:3000;box-sizing:border-box;width:min(280px,calc(100vw - 28px));padding:10px 12px;border:1px solid #33445e;border-radius:7px;background:#23334c;color:#fff;box-shadow:0 8px 24px #17243a36;font:500 12px/1.55 'DM Sans',system-ui,-apple-system,'Segoe UI','Gowun Dodum',sans-serif;text-align:left;overflow-wrap:anywhere}
+.viewer-tooltip-popup[hidden]{display:none}
+.viewer-list-controls .viewer-tooltip-trigger{margin:0}
+.viewer-list-controls .viewer-vod-sort-label{margin-right:-5px}
+.viewer-collapsible-title .viewer-tooltip-trigger{margin-left:-3px;vertical-align:middle}
+.viewer-period-heading .viewer-tooltip-trigger{margin-left:0}
+@media(max-width:620px){.viewer-tooltip-trigger{width:24px;height:24px;min-width:24px}.viewer-collapsible-title .viewer-tooltip-trigger{width:22px;height:22px;min-width:22px}}
+
 /* Short, skippable creator signature opener, matching the series gallery intro. */
 .viewer-stats-page #sig-opening-stage{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(120% 140% at 50% 20%,#202b43,#101522 72%);color:#f5f7fb;font-family:'DM Sans',system-ui,-apple-system,'Segoe UI','Gowun Dodum',sans-serif;cursor:pointer}
 .viewer-stats-page #sig-opening-stage.is-playing{display:flex}
