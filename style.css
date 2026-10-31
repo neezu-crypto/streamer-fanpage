@@ -1560,6 +1560,16 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
   dialog.account-dialog{box-sizing:border-box;max-width:calc(100vw - 20px);max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
 }
 
+/* Freeze the page behind every native modal, including dialogs opened by feature modules. */
+html:has(dialog[open]),
+body:has(dialog[open]),
+html:has(#startupCover:not(.hidden)),
+body:has(#startupCover:not(.hidden)){
+  overflow:hidden;
+  overscroll-behavior:none;
+}
+dialog[open]{overscroll-behavior:contain}
+
 .search-empty-guidance{display:flex;flex-direction:column;align-items:center;gap:9px;padding:22px 16px;border:1px dashed #ffffff24;border-radius:14px;background:#ffffff04}
 .search-empty-guidance-title{color:#eee8f2;font:16px var(--display)}
 .search-empty-guidance>p{margin:0;color:#aaa2b1;font-size:12px;line-height:1.6}
