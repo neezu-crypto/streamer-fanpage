@@ -1817,8 +1817,12 @@ function renderUpboItemManager(page, state) {
     }
     const copy = document.createElement('div'); copy.className = 'upbo-item-copy';
     const name = document.createElement('strong'); name.textContent = item.name;
-    const description = document.createElement('span'); description.textContent = item.description || '설명 없음';
-    copy.append(name, description);
+    copy.append(name);
+    const descriptionText = String(item.description || '').trim();
+    if (descriptionText) {
+      const description = document.createElement('span'); description.textContent = descriptionText;
+      copy.append(description);
+    }
     const actions = document.createElement('div'); actions.className = 'upbo-row-actions';
     actions.append(
       upboButton('수정', 'upbo-small-button', () => openUpboItemEditor(page, item)),
