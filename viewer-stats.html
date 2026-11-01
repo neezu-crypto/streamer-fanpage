@@ -165,7 +165,7 @@
         <div class="viewer-vod-grid" id="viewerVodGrid"></div>
         <button class="button viewer-load-more hidden" id="viewerLoadMore" type="button">더 많은 다시보기 불러오기</button>
 
-        <details class="viewer-period-peaks viewer-collapsible-panel" aria-labelledby="viewerPeriodTitle">
+        <details class="viewer-period-peaks viewer-collapsible-panel" id="viewerPeriodPeaks" aria-labelledby="viewerPeriodTitle" hidden>
           <summary class="viewer-collapsible-summary">
             <span class="viewer-collapsible-title"><span class="eyebrow">PERIOD HIGHS</span><strong id="viewerPeriodTitle">기간별 최고 시청 순간</strong><button class="viewer-tooltip-trigger" type="button" aria-label="기간별 최고 시청 순간 도움말" data-tooltip="최근 7일·30일·90일·1년 동안의 다시보기를 살펴 각 기간의 가장 높은 시청자 순간을 찾습니다.">?</button></span>
             <span class="viewer-collapsible-hint">최근 7일 · 30일 · 90일 · 1년</span>
@@ -180,7 +180,7 @@
           </div>
         </details>
 
-        <details class="viewer-comparison-panel viewer-collapsible-panel" aria-labelledby="viewerComparisonTitle">
+        <details class="viewer-comparison-panel viewer-collapsible-panel" id="viewerComparisonPanel" aria-labelledby="viewerComparisonTitle" hidden>
           <summary class="viewer-collapsible-summary">
             <span class="viewer-collapsible-title"><span class="eyebrow">SAME-DAY COMPARISON</span><strong id="viewerComparisonTitle">같은 날 스트리머 2명 비교</strong><button class="viewer-tooltip-trigger" type="button" aria-label="같은 날 비교 도움말" data-tooltip="두 스트리머와 날짜를 선택하면 그날의 다시보기를 찾아 최고 시청자 수와 평균 대비 상승률을 비교합니다.">?</button></span>
             <span class="viewer-comparison-count" id="viewerComparisonCount">0 / 2명 선택</span>
@@ -223,7 +223,7 @@
           </div>
         </details>
 
-        <details class="viewer-keyword-comparison-panel viewer-collapsible-panel" aria-labelledby="viewerKeywordComparisonTitle">
+        <details class="viewer-keyword-comparison-panel viewer-collapsible-panel" id="viewerKeywordComparisonPanel" aria-labelledby="viewerKeywordComparisonTitle" hidden>
           <summary class="viewer-collapsible-summary">
             <span class="viewer-collapsible-title"><span class="eyebrow">KEYWORD PEAK COMPARISON</span><strong id="viewerKeywordComparisonTitle">키워드로 여러 스트리머 고점 비교</strong><button class="viewer-tooltip-trigger" type="button" aria-label="키워드 비교 도움말" data-tooltip="스트리머 2~5명과 키워드를 선택하면 각 방송국의 최신 검색 결과 최대 10개를 분석해 최고 시청자 수를 비교합니다.">?</button></span>
             <span class="viewer-keyword-comparison-count" id="viewerKeywordComparisonCount">2~5명 선택</span>
@@ -320,7 +320,7 @@
         <strong>현재 기준 구독자 전용 서비스</strong>
         <ul>
           <li><b>스트리머 주식시장</b> — 매일 출석 보상 2배 · 매일 무료 복권 1장 · 매월 홍보 이용권 5종(우측 배너 7일·차트 배너 7일·카드 배너 7일·최상단 고정 12시간·중계방 8시간) · 월 무료 보물상자 1개</li>
-          <li><b>고점체크</b> — 기간별 최고 시청 순간 분석, 같은 날 스트리머 2명 비교, 키워드로 여러 스트리머 고점 비교</li>
+          <li><b>고점체크</b> — 기간별 최고 시청 순간 분석과 스트리머 비교 기능은 현재 점검 중이며 관리자만 이용할 수 있습니다.</li>
           <li><b>스트리머 갤러리</b> — 모든 스트리머의 잠긴 이미지 상세 원본 열람 및 다운로드</li>
         </ul>
       </div>
@@ -409,6 +409,6 @@
       <p class="viewer-sponsor-dialog-status" id="sponsorRequestStatus" role="status" aria-live="polite"></p>
     </form>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261101-search-progress-v1"></script>
+  <script type="module" src="viewer-stats.js?v=20261101-subscriber-features-admin-only-v1"></script>
 </body>
 </html>

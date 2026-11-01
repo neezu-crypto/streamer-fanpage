@@ -2,6 +2,7 @@
 
 const VIEWER_STATS_WORKER_FUNCTION = 'streamerFanPageViewerStatsWorker';
 const VIEWER_STATS_QUEUE_PATH = 'streamerFanPageViewerStatsQueue';
+const VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY = true;
 const VIEWER_STATS_QUEUE_MAX_CONCURRENT = 16;
 const VIEWER_STATS_QUEUE_MAX_PER_SECOND = 16;
 const VIEWER_STATS_QUEUE_MAX_INSTANCES = 16;
@@ -43,6 +44,11 @@ function viewerStatsTier(auth, access = {}) {
     ? String(auth.token.firebase.sign_in_provider || '')
     : '';
   return signInProvider === 'anonymous' ? 'anonymous' : 'account';
+}
+
+function canAccessViewerSubscriberFeatures(access = {}, adminOnly = VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY) {
+  if (access.isAdmin === true) return true;
+  return adminOnly !== true && access.isSubscribed === true;
 }
 
 function viewerStatsRateLimit(tier, action) {
@@ -110,9 +116,11 @@ module.exports = {
   VIEWER_STATS_QUEUE_MAX_PER_SECOND,
   VIEWER_STATS_QUEUE_PATH,
   VIEWER_STATS_TIER_PRIORITY,
+  VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY,
   VIEWER_STATS_WORKER_FUNCTION,
   selectNextViewerStatsCandidate,
   viewerStatsClaimUpdate,
+  canAccessViewerSubscriberFeatures,
   viewerStatsPriorityScore,
   viewerStatsRateLimit,
   viewerStatsTier,

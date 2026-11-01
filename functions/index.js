@@ -45,8 +45,10 @@ const {
   VIEWER_STATS_QUEUE_MAX_INSTANCES,
   VIEWER_STATS_QUEUE_MAX_PER_SECOND,
   VIEWER_STATS_QUEUE_PATH,
+  VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY,
   VIEWER_STATS_WORKER_FUNCTION,
   selectNextViewerStatsCandidate,
+  canAccessViewerSubscriberFeatures,
   viewerStatsClaimUpdate,
   viewerStatsRateLimit,
   viewerStatsTier,
@@ -492,6 +494,18 @@ async function resolveViewerStatsTier(uid, auth) {
     isSubscribed: (Number(subscription.expiresAt) || 0) > Date.now(),
     isProtectedAccount: baseTier === 'account',
   });
+}
+
+async function resolveViewerSubscriberFeatureAccess(uid) {
+  const [subscriptionSnapshot, isAdmin] = await Promise.all([
+    viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
+    isAdminUid(uid),
+  ]);
+  const subscription = subscriptionSnapshot.val() || {};
+  return {
+    isAdmin,
+    isSubscribed: (Number(subscription.expiresAt) || 0) > Date.now(),
+  };
 }
 
 function viewerStatsDayKey(timestamp = Date.now()) {
@@ -2866,6 +2880,14 @@ async function getViewerStatsJobResult(uid, jobId) {
   if (job.requesterKey !== viewerStatsUidKey(uid)) {
     throw new HttpsError('permission-denied', '이 집계 요청을 확인할 권한이 없습니다.');
   }
+  if (job.includePremiumMetrics === true) {
+    const access = await resolveViewerSubscriberFeatureAccess(uid);
+    if (!canAccessViewerSubscriberFeatures(access)) {
+      throw new HttpsError('permission-denied', VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY
+        ? '평균 시청자 지표는 현재 관리자만 확인할 수 있습니다.'
+        : '구독 전용 지표를 확인할 수 없습니다.');
+    }
+  }
   if (Number(job.expiresAt) <= Date.now() && !['completed', 'failed', 'cancelled'].includes(job.status)) {
     return { status: 'expired', errorMessage: '집계 요청이 만료됐어요. 다시 요청해 주세요.' };
   }
@@ -5152,19 +5174,18 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
   }
 
   if (action === 'periodPeaks') {
-    const [subscriptionSnapshot, admin, baseTier] = await Promise.all([
-      viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
-      isAdminUid(uid),
+    const [access, baseTier] = await Promise.all([
+      resolveViewerSubscriberFeatureAccess(uid),
       resolveViewerStatsBaseTier(uid, request.auth),
     ]);
-    const subscription = subscriptionSnapshot.val() || {};
-    const isSubscribed = (Number(subscription.expiresAt) || 0) > Date.now();
-    if (!admin && !isSubscribed) {
-      throw new HttpsError('permission-denied', '기간별 최고 시청 순간은 구독 계정에서 이용할 수 있습니다.');
+    if (!canAccessViewerSubscriberFeatures(access)) {
+      throw new HttpsError('permission-denied', VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY
+        ? '기간별 최고 시청 순간은 현재 관리자만 이용할 수 있습니다.'
+        : '기간별 최고 시청 순간은 구독 계정에서 이용할 수 있습니다.');
     }
     const tier = viewerStatsTier(request.auth, {
-      isAdmin: admin,
-      isSubscribed,
+      isAdmin: access.isAdmin,
+      isSubscribed: access.isSubscribed,
       isProtectedAccount: baseTier === 'account',
     });
     await enforceViewerStatsRateLimit(uid, 'stats', { tier });
@@ -5244,19 +5265,18 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     const vodId = String(data.vodId || '').trim();
     if (!/^\d{1,20}$/.test(vodId)) throw new HttpsError('invalid-argument', '다시보기 번호를 확인해 주세요.');
     const includePremiumMetrics = data.includePremiumMetrics === true;
-    const [subscriptionSnapshot, admin, baseTier] = await Promise.all([
-      viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
-      isAdminUid(uid),
+    const [access, baseTier] = await Promise.all([
+      resolveViewerSubscriberFeatureAccess(uid),
       resolveViewerStatsBaseTier(uid, request.auth),
     ]);
-    const subscription = subscriptionSnapshot.val() || {};
-    const isSubscribed = (Number(subscription.expiresAt) || 0) > Date.now();
-    if (includePremiumMetrics && !admin && !isSubscribed) {
-      throw new HttpsError('permission-denied', '구독 전용 비교 기능은 구독 계정에서 이용할 수 있습니다.');
+    if (includePremiumMetrics && !canAccessViewerSubscriberFeatures(access)) {
+      throw new HttpsError('permission-denied', VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY
+        ? '평균 시청자 지표는 현재 관리자만 확인할 수 있습니다.'
+        : '구독 전용 비교 기능은 구독 계정에서 이용할 수 있습니다.');
     }
     const tier = viewerStatsTier(request.auth, {
-      isAdmin: admin,
-      isSubscribed,
+      isAdmin: access.isAdmin,
+      isSubscribed: access.isSubscribed,
       isProtectedAccount: baseTier === 'account',
     });
     const cacheKey = streamerId + ':' + vodId;
