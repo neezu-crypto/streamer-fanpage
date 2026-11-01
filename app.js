@@ -7328,7 +7328,7 @@ function renderVideoLibrarySection(page) {
   count.textContent = `${state.items.length.toLocaleString('ko-KR')}개 표시`;
   copy.append(eyebrow, title, count);
   const headingActions = document.createElement('div'); headingActions.className = 'video-library-heading-actions';
-  if (state.canManage) {
+  if (state.isAdmin) {
     const add = document.createElement('button'); add.type = 'button'; add.className = 'button button-primary video-library-add-open';
     add.textContent = '＋ 추가하기'; add.disabled = state.saving || state.loading;
     add.addEventListener('click', () => openVideoLibraryAddDialog(page));
@@ -7361,7 +7361,7 @@ function renderVideoLibrarySection(page) {
   section.append(categoryBar);
 
   const selectedCategory = state.categories.find((category) => category.id === state.categoryId);
-  if (state.canManage && selectedCategory) {
+  if (state.isAdmin && selectedCategory) {
     const categoryTools = document.createElement('div'); categoryTools.className = 'video-library-category-tools';
     const editorContent = document.createElement('div'); editorContent.className = 'video-library-category-editor';
     editorContent.id = 'videoLibraryCategoryEditor';
@@ -7512,7 +7512,7 @@ function renderVideoLibrarySection(page) {
       ? '첫 영상을 가져오고 있어요. 잠시 후 목록에 표시됩니다.'
       : state.isSyncing
         ? '채널 영상을 가져오고 있어요. 새로고침하면 추가된 영상을 확인할 수 있습니다.'
-        : state.canManage && !state.categories.length
+        : state.isAdmin && !state.categories.length
           ? '먼저 하위 카테고리를 추가해 주세요.' : '아직 등록된 영상이 없어요.';
     section.append(empty);
   }
@@ -7578,7 +7578,7 @@ function renderVideoLibraryItems(page, section, state) {
       ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }).format(published)
       : '날짜 정보 없음';
     body.append(source, name, meta); card.append(play, body);
-    if (state.canManage && item.sourceType === 'manual') {
+    if (state.isAdmin && item.sourceType === 'manual') {
       const actions = document.createElement('div'); actions.className = 'video-library-card-actions';
       const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'button'; edit.textContent = state.editingId === item.id ? '편집 닫기' : '편집';
       edit.addEventListener('click', () => { state.editingId = state.editingId === item.id ? '' : item.id; refreshVideoLibrarySection(page.streamer.id); });

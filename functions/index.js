@@ -6542,13 +6542,11 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
   const uid = request.auth && typeof request.auth.uid === 'string' ? request.auth.uid : '';
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const action = String(data.action || 'list');
-  const [verified, isAdmin] = uid
-    ? await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)])
-    : [null, false];
-  const canManage = isAdmin || !!verified;
+  const isAdmin = uid ? await isAdminUid(uid) : false;
+  const canManage = isAdmin;
   if (action === 'list') return readVideoLibraryPage(data, isAdmin, canManage);
   if (action === 'search') return searchVideoLibraryPage(data, isAdmin, canManage);
-  if (!canManage) throw new HttpsError('permission-denied', '인증 스트리머 또는 관리자만 영상 모음을 수정할 수 있습니다.');
+  if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 즐겨찾기를 수정할 수 있습니다.');
 
   const root = videoLibraryRef();
   const categoriesRef = videoLibraryRef('categories');
