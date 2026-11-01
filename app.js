@@ -6865,7 +6865,9 @@ async function saveOpggAccount(page, appId, gameType, accountInput, regionSelect
   button.disabled = true; button.textContent = '저장 중…';
   try {
     const result = (await callPlayedGames({
-      action: 'save-opgg-account', streamerId: page.streamer.id, appId, gameType,
+      // OP.GG accounts are unique per supported game type. Resolve the existing
+      // entry on the server by game type so stale client card IDs cannot block edits.
+      action: 'save-opgg-account', streamerId: page.streamer.id, gameType,
       accountId: accountInput.value.trim(),
       ...(gameType === 'league-of-legends' ? { opggRegion: regionSelect?.value || 'kr' } : {}),
       ...(gameType === 'overwatch' ? { overwatchRegion: regionSelect?.value || 'global' } : {}),
