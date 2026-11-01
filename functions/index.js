@@ -16,6 +16,7 @@ const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
 const { planWeFlabUpboImport } = require('./upbo-weflab-import');
 const {
+  disconnectOpggAccount,
   disconnectOpggAccountFromGames,
   getOpggGameType,
   isPlayedGameId,
@@ -7094,10 +7095,11 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
     const gameType = action === 'remove-lol-account' ? 'league-of-legends' : String(data.gameType || '').trim();
     if (appId && !isPlayedGameId(appId)) throw new HttpsError('invalid-argument', '계정 연결을 해제할 게임을 확인해 주세요.');
     if (gameType && !Object.hasOwn(OP_GG_GAME_CONFIG, gameType)) throw new HttpsError('invalid-argument', '계정 연결을 해제할 게임을 확인해 주세요.');
-    const transaction = await rootRef.transaction((current) => {
-      const result = disconnectOpggAccountFromGames(current, { requestedAppId: appId, gameType });
-      return result.ok ? result.games : undefined;
+    const target = disconnectOpggAccountFromGames((await rootRef.get()).val(), {
+      requestedAppId: appId, gameType,
     });
+    if (!target.ok) throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
+    const transaction = await rootRef.child(target.appId).transaction((current) => disconnectOpggAccount(current) || undefined);
     if (!transaction.committed) throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
     return { playedGames: normalizePlayedGames((await rootRef.get()).val()) };
   }
