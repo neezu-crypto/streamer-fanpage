@@ -7998,8 +7998,8 @@ const WEEKLY_SCHEDULE_LAYOUT = Object.freeze({
   avatar: Object.freeze({ x: 94, y: 176, w: 390, h: 565 }),
   footer: Object.freeze({ centerX: 301, centerY: 850, maxWidth: 408, field: Object.freeze({ x: 81, y: 822, w: 440, h: 56 }) }),
   days: Object.freeze([
-    ...Array.from({ length: 4 }, (_, index) => Object.freeze({ x: 585 + index * 262, y: 171, w: 242, h: 323, time: Object.freeze({ left: 0.08, top: 0.17, width: 0.82, height: 0.18 }), content: Object.freeze({ left: 0.10, top: 0.40, width: 0.80, height: 0.34 }), linked: Object.freeze({ left: 0.08, top: 0.75, width: 0.84, height: 0.09 }), offline: Object.freeze({ top: 0.105, right: 0.08 }), weekdayY: 0.90 })),
-    ...Array.from({ length: 3 }, (_, index) => Object.freeze({ x: 588 + index * 347, y: 525, w: 317, h: 331, time: Object.freeze({ left: 0.08, top: 0.16, width: 0.82, height: 0.17 }), content: Object.freeze({ left: 0.10, top: 0.39, width: 0.80, height: 0.34 }), linked: Object.freeze({ left: 0.08, top: 0.74, width: 0.84, height: 0.09 }), offline: Object.freeze({ top: 0.10, right: 0.08 }), weekdayY: 0.90 })),
+    ...Array.from({ length: 4 }, (_, index) => Object.freeze({ x: 585 + index * 262, y: 171, w: 242, h: 323, time: Object.freeze({ left: 0.08, top: 0.17, width: 0.82, height: 0.18 }), content: Object.freeze({ left: 0.10, top: 0.40, width: 0.80, height: 0.34 }), linked: Object.freeze({ left: 0.08, top: 0.75, width: 0.84, height: 0.09 }), offline: Object.freeze({ top: 0.065 }), weekdayY: 0.90 })),
+    ...Array.from({ length: 3 }, (_, index) => Object.freeze({ x: 588 + index * 347, y: 525, w: 317, h: 331, time: Object.freeze({ left: 0.08, top: 0.16, width: 0.82, height: 0.17 }), content: Object.freeze({ left: 0.10, top: 0.39, width: 0.80, height: 0.34 }), linked: Object.freeze({ left: 0.08, top: 0.74, width: 0.84, height: 0.09 }), offline: Object.freeze({ top: 0.065 }), weekdayY: 0.90 })),
   ]),
 });
 
@@ -8751,7 +8751,6 @@ function renderWeeklyScheduleDialog(page) {
     dayCard.style.setProperty('--linked-width', `${linkedRect.w / rectangles.w * 100}%`);
     dayCard.style.setProperty('--linked-height', `${linkedRect.h / rectangles.h * 100}%`);
     dayCard.style.setProperty('--offline-top', `${rectangles.offline.top * 100}%`);
-    dayCard.style.setProperty('--offline-right', `${rectangles.offline.right * 100}%`);
     const offlineLabel = document.createElement('label'); offlineLabel.className = 'weekly-schedule-offline-label';
     const offline = document.createElement('input'); offline.type = 'checkbox'; offline.name = `offline-${index}`;
     offlineLabel.append(offline, document.createTextNode('휴방'));
