@@ -575,6 +575,13 @@
 .upbo-request-note{margin:0;color:#928a9a;font-size:11px;line-height:1.55}
 .upbo-item-list,.upbo-pending-list,.upbo-record-list{display:grid;gap:8px}
 .upbo-item-row,.upbo-pending-row,.upbo-record-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:11px 12px;border:1px solid #ffffff12;border-radius:10px;background:#ffffff04}
+.upbo-item-manager .upbo-item-list{grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));align-items:stretch;gap:10px}
+.upbo-item-manager .upbo-item-row{align-content:start;align-items:flex-start;justify-content:flex-start;flex-wrap:wrap;gap:9px 10px;min-height:102px;padding:13px;border-color:#f58cac30;border-radius:12px;background:linear-gradient(145deg,#f58cac0b,#ffffff04);box-shadow:0 5px 12px #09070d18}
+.upbo-item-manager .upbo-item-copy{flex:1 1 180px;align-self:center}
+.upbo-item-manager .upbo-item-copy strong{font-size:14px;line-height:1.45}
+.upbo-item-manager .upbo-item-copy span{font-size:12px;line-height:1.5}
+.upbo-item-manager .upbo-row-actions{width:100%;justify-content:flex-end;gap:7px;margin-top:auto}
+.upbo-item-manager .upbo-row-actions .button{min-height:36px;padding:5px 11px;font-size:13px}
 .upbo-item-image-trigger{display:grid;place-items:center;flex:none;width:54px;height:54px;padding:0;overflow:hidden;border:0;border-radius:9px;background:transparent;cursor:zoom-in}
 .upbo-item-image-trigger:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 .upbo-item-image{display:block;width:54px;height:54px;border:1px solid #ffffff18;border-radius:8px;background:#111018;object-fit:cover}
