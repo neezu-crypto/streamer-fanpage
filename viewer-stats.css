@@ -92,12 +92,14 @@
 }
 @media(max-width:360px){.viewer-stat-link,.viewer-stat-state{min-height:60px}}
 
+.viewer-first-analysis-backdrop{position:fixed;inset:0;z-index:1200;pointer-events:none}
+.viewer-first-analysis-backdrop-pane{position:absolute;display:block;background:rgba(20,18,31,.74);pointer-events:auto;touch-action:none}
 .viewer-vod-main-action.viewer-tutorial-target{
   position:relative;
   z-index:1201;
   outline:4px solid #fff;
   outline-offset:2px;
-  box-shadow:0 0 0 8px #486bd64a,0 8px 24px #17243a38;
+  box-shadow:0 0 0 8px #fff9,0 0 22px 12px #7294ff9c,0 8px 24px #17243a38;
   animation:viewer-analysis-tutorial-pulse 1.35s ease-in-out infinite alternate;
 }
 .viewer-first-analysis-tutorial{
@@ -149,7 +151,7 @@
   cursor:pointer;
 }
 .viewer-first-analysis-tutorial-dismiss:focus-visible{outline:3px solid #486bd64d;outline-offset:2px}
-@keyframes viewer-analysis-tutorial-pulse{from{box-shadow:0 0 0 5px #486bd63a,0 6px 18px #17243a24}to{box-shadow:0 0 0 9px #486bd65c,0 8px 25px #17243a38}}
+@keyframes viewer-analysis-tutorial-pulse{from{box-shadow:0 0 0 5px #fff8,0 0 16px 8px #7294ff70,0 6px 18px #17243a24}to{box-shadow:0 0 0 9px #fff,0 0 25px 13px #7294ffb0,0 8px 25px #17243a38}}
 @media(prefers-reduced-motion:reduce){.viewer-vod-main-action.viewer-tutorial-target{animation:none}}
 
 .viewer-period-peaks{margin-top:22px;padding:18px;border:1px solid #ffffff16;border-radius:16px;background:linear-gradient(125deg,#211b29,#191720)}

@@ -222,6 +222,8 @@ let firstAnalysisTutorialLoadToken = 0;
 let firstAnalysisTutorialTarget = null;
 let firstAnalysisTutorialCompletedInMemory = false;
 let firstAnalysisTutorialResizeObserver = null;
+let firstAnalysisTutorialBackdrop = null;
+let firstAnalysisTutorialPreviousFocus = null;
 let selectedStreamer = null;
 let vodSortMode = 'date-desc';
 let vodSearchKeyword = '';
@@ -1148,6 +1150,25 @@ function positionFirstAnalysisTutorial() {
   const target = firstAnalysisTutorialTarget;
   if (!bubble || !target || !target.isConnected) return;
   const rect = target.getBoundingClientRect();
+  const backdrop = firstAnalysisTutorialBackdrop;
+  if (backdrop) {
+    const padding = 10;
+    const left = Math.max(0, rect.left - padding);
+    const top = Math.max(0, rect.top - padding);
+    const right = Math.min(window.innerWidth, rect.right + padding);
+    const bottom = Math.min(window.innerHeight, rect.bottom + padding);
+    const width = Math.max(0, right - left);
+    const height = Math.max(0, bottom - top);
+    const panes = backdrop.children;
+    Object.assign(panes[0].style, { left: '0', top: '0', width: '100%', height: top + 'px' });
+    Object.assign(panes[1].style, { left: '0', top: bottom + 'px', width: '100%', height: Math.max(0, window.innerHeight - bottom) + 'px' });
+    Object.assign(panes[2].style, { left: '0', top: top + 'px', width: left + 'px', height: height + 'px' });
+    Object.assign(panes[3].style, { left: right + 'px', top: top + 'px', width: Math.max(0, window.innerWidth - right) + 'px', height: height + 'px' });
+    backdrop.style.setProperty('--tutorial-hole-left', left + 'px');
+    backdrop.style.setProperty('--tutorial-hole-top', top + 'px');
+    backdrop.style.setProperty('--tutorial-hole-width', width + 'px');
+    backdrop.style.setProperty('--tutorial-hole-height', height + 'px');
+  }
   const bubbleRect = bubble.getBoundingClientRect();
   const gap = 14;
   const placeAbove = rect.top >= bubbleRect.height + gap + 12
@@ -1168,7 +1189,7 @@ function positionFirstAnalysisTutorial() {
   )) + 'px');
 }
 
-function clearFirstAnalysisTutorial(markComplete = false) {
+function clearFirstAnalysisTutorial(markComplete = false, restoreFocus = true) {
   if (firstAnalysisTutorialObserver) firstAnalysisTutorialObserver.disconnect();
   firstAnalysisTutorialObserver = null;
   firstAnalysisTutorialLoadToken = 0;
@@ -1185,6 +1206,13 @@ function clearFirstAnalysisTutorial(markComplete = false) {
   firstAnalysisTutorialTarget = null;
   const bubble = $('viewerFirstAnalysisTutorial');
   if (bubble) bubble.remove();
+  if (firstAnalysisTutorialBackdrop) firstAnalysisTutorialBackdrop.remove();
+  firstAnalysisTutorialBackdrop = null;
+  const previousFocus = firstAnalysisTutorialPreviousFocus;
+  firstAnalysisTutorialPreviousFocus = null;
+  if (restoreFocus && previousFocus && previousFocus.isConnected && typeof previousFocus.focus === 'function') {
+    previousFocus.focus({ preventScroll: true });
+  }
   if (markComplete) {
     firstAnalysisTutorialCompletedInMemory = true;
     try { localStorage.setItem(VIEWER_FIRST_ANALYSIS_TUTORIAL_KEY, 'done'); } catch (_) {}
@@ -1210,13 +1238,28 @@ function showFirstAnalysisTutorial(target, loadToken) {
   if (firstAnalysisTutorialObserver) firstAnalysisTutorialObserver.disconnect();
   firstAnalysisTutorialObserver = null;
   firstAnalysisTutorialTarget = target;
+  firstAnalysisTutorialPreviousFocus = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null;
   target.classList.add('viewer-tutorial-target');
   target.setAttribute('aria-describedby', 'viewerFirstAnalysisTutorial');
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'viewer-first-analysis-backdrop';
+  backdrop.setAttribute('aria-hidden', 'true');
+  for (let index = 0; index < 4; index += 1) {
+    const pane = document.createElement('span');
+    pane.className = 'viewer-first-analysis-backdrop-pane';
+    backdrop.append(pane);
+  }
+  document.body.append(backdrop);
+  firstAnalysisTutorialBackdrop = backdrop;
 
   const bubble = document.createElement('aside');
   bubble.id = 'viewerFirstAnalysisTutorial';
   bubble.className = 'viewer-first-analysis-tutorial';
-  bubble.setAttribute('role', 'note');
+  bubble.setAttribute('role', 'dialog');
+  bubble.setAttribute('aria-modal', 'true');
   bubble.setAttribute('aria-live', 'polite');
   const title = document.createElement('strong');
   title.textContent = '다시보기 통계 분석';
@@ -1230,7 +1273,6 @@ function showFirstAnalysisTutorial(target, loadToken) {
   dismiss.addEventListener('click', () => clearFirstAnalysisTutorial(true));
   bubble.append(title, message, dismiss);
   document.body.append(bubble);
-
   target.scrollIntoView({
     behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     block: 'center',
@@ -1243,6 +1285,7 @@ function showFirstAnalysisTutorial(target, loadToken) {
     firstAnalysisTutorialResizeObserver.observe(target);
   }
   requestAnimationFrame(positionFirstAnalysisTutorial);
+  dismiss.focus({ preventScroll: true });
 }
 
 function watchForFirstAnalysisTutorial(loadToken) {
@@ -1279,12 +1322,29 @@ function watchForFirstAnalysisTutorial(loadToken) {
 
 document.addEventListener('click', (event) => {
   if (firstAnalysisTutorialTarget && event.target.closest('.viewer-tutorial-target')) {
-    clearFirstAnalysisTutorial(true);
+    clearFirstAnalysisTutorial(true, false);
   }
 }, true);
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && $('viewerFirstAnalysisTutorial')) clearFirstAnalysisTutorial(true);
+  const bubble = $('viewerFirstAnalysisTutorial');
+  if (!bubble) return;
+  if (event.key === 'Escape') {
+    clearFirstAnalysisTutorial(true);
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const dismiss = bubble.querySelector('.viewer-first-analysis-tutorial-dismiss');
+  if (document.activeElement === dismiss) {
+    event.preventDefault();
+    firstAnalysisTutorialTarget?.focus({ preventScroll: true });
+  } else if (document.activeElement === firstAnalysisTutorialTarget) {
+    event.preventDefault();
+    dismiss?.focus({ preventScroll: true });
+  } else if (document.activeElement !== dismiss && document.activeElement !== firstAnalysisTutorialTarget) {
+    event.preventDefault();
+    dismiss?.focus({ preventScroll: true });
+  }
 });
 
 function hydrateVodCardFromStaticCache(card, streamerId, loadToken) {
