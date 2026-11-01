@@ -6888,7 +6888,7 @@ async function removeOpggAccount(page, appId, gameType, button) {
   if (!page.isOwner || button.disabled || !confirm(`${label} 연결을 해제할까요? 저장된 최고기록과 다시보기는 그대로 보존됩니다.`)) return;
   button.disabled = true;
   try {
-    const result = (await callPlayedGames({ action: 'remove-opgg-account', streamerId: page.streamer.id, appId })).data;
+    const result = (await callPlayedGames({ action: 'remove-opgg-account', streamerId: page.streamer.id, appId, gameType })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
     currentPage.playedGames = rememberFanPageContent(page.streamer.id, 'playedGames', result.playedGames, true);
     refreshPlayedGamesSection(page.streamer.id);

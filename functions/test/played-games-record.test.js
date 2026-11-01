@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   disconnectOpggAccount,
+  disconnectOpggAccountFromGames,
   disconnectLeagueOfLegendsAccount,
   getOpggGameType,
   isLeagueOfLegendsGame,
@@ -128,6 +129,34 @@ test('OP.GG 계정 연결 해제는 ID만 제거하고 게임·기록·다시보
     bestRecord: game.bestRecord, vods: game.vods,
   });
   assert.equal(disconnectOpggAccount({ name: '일반 게임' }), null);
+});
+
+test('오래된 게임 카드 ID로 연결 해제할 때 같은 게임 유형의 유일한 계정을 복구한다', () => {
+  const appId = 'custom_0123456789abcdef0123456789abcdef';
+  const games = {
+    [appId]: {
+      name: '발로란트', gameType: 'valorant', riotId: 'CodexQA#NA1',
+      bestRecord: { type: 'rank', value: '다이아' }, vods: { '123': { createdAt: 11 } },
+    },
+  };
+  const result = disconnectOpggAccountFromGames(games, {
+    requestedAppId: 'custom_fedcba9876543210fedcba9876543210', gameType: 'valorant',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.appId, appId);
+  assert.equal(result.games[appId].riotId, undefined);
+  assert.deepEqual(result.games[appId].bestRecord, games[appId].bestRecord);
+  assert.deepEqual(result.games[appId].vods, games[appId].vods);
+});
+
+test('연결 해제 대상이 모호하면 아무 계정도 변경하지 않는다', () => {
+  const games = {
+    custom_0123456789abcdef0123456789abcdef: { name: '발로란트', gameType: 'valorant', riotId: 'One#NA1' },
+    custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: { name: '발로란트', gameType: 'valorant', riotId: 'Two#NA1' },
+  };
+  assert.deepEqual(disconnectOpggAccountFromGames(games, { gameType: 'valorant' }), {
+    ok: false, error: 'ambiguous-target',
+  });
 });
 
 test('League of Legends 계정 추가는 기존 게임 데이터를 보존하고 중복 항목을 만들지 않는다', () => {
