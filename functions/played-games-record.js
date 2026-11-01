@@ -135,6 +135,36 @@ function disconnectOpggAccount(game) {
   return updated;
 }
 
+function disconnectOpggAccountFromGames(current, { requestedAppId = '', gameType = '' } = {}) {
+  const games = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
+  let appId = requestedAppId;
+  const linked = (candidate) => {
+    const candidateType = getOpggGameType(candidate);
+    const config = OP_GG_GAME_CONFIG[candidateType];
+    return Boolean(config && candidate[config.accountField]);
+  };
+
+  if (appId && games[appId] && linked(games[appId])) {
+    const updated = disconnectOpggAccount(games[appId]);
+    return updated ? { ok: true, appId, games: { ...games, [appId]: updated } } : { ok: false, error: 'not-found' };
+  }
+
+  // Recover a stale client card ID only when the requested game type has one
+  // linked account. This keeps unlink behavior consistent with account edits.
+  const expectedType = Object.hasOwn(OP_GG_GAME_CONFIG, gameType)
+    ? gameType
+    : getOpggGameType(games[appId]);
+  if (!expectedType) return { ok: false, error: 'not-found' };
+  const config = OP_GG_GAME_CONFIG[expectedType];
+  const matching = Object.entries(games).filter(([, game]) => (
+    getOpggGameType(game) === expectedType && Boolean(game[config.accountField])
+  ));
+  if (matching.length !== 1) return { ok: false, error: matching.length > 1 ? 'ambiguous-target' : 'not-found' };
+  const [resolvedAppId, game] = matching[0];
+  const updated = disconnectOpggAccount(game);
+  return updated ? { ok: true, appId: resolvedAppId, games: { ...games, [resolvedAppId]: updated } } : { ok: false, error: 'not-found' };
+}
+
 function upsertLeagueOfLegendsAccount(current, { riotId, opggRegion, requestedAppId = '', newAppId, maxItems, now = Date.now() }) {
   const games = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
   let appId = requestedAppId;
@@ -207,6 +237,7 @@ module.exports = {
   OP_GG_GAME_CONFIG,
   OVERWATCH_OP_GG_REGIONS,
   disconnectOpggAccount,
+  disconnectOpggAccountFromGames,
   disconnectLeagueOfLegendsAccount,
   getOpggGameType,
   isLeagueOfLegendsGame,
