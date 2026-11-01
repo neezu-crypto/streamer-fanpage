@@ -831,6 +831,10 @@
 .weekly-schedule-stage-time-field,.weekly-schedule-stage-content-field{position:absolute;display:block;pointer-events:auto}
 .weekly-schedule-stage-time-field{left:var(--time-left);top:var(--time-top);width:var(--time-width);height:var(--time-height)}
 .weekly-schedule-stage-content-field{left:var(--content-left);top:var(--content-top);width:var(--content-width);height:var(--content-height)}
+.weekly-schedule-stage-offline-display{position:absolute;left:var(--content-left);top:var(--content-top);width:var(--content-width);height:var(--content-height);z-index:1;display:none;place-items:center;color:#a63d61;text-align:center;text-shadow:0 1px 0 #ffffffcc;font:800 clamp(12px,2.51cqw,42px)/1.2 'Jua','Gowun Dodum',sans-serif;pointer-events:none}
+.weekly-schedule-day-edit.weekly-schedule-day-offline .weekly-schedule-stage-time-field,.weekly-schedule-day-edit.weekly-schedule-day-offline .weekly-schedule-stage-content-field,.weekly-schedule-day-edit.weekly-schedule-day-offline .weekly-schedule-stage-linked{visibility:hidden}
+.weekly-schedule-day-edit.weekly-schedule-day-offline .weekly-schedule-stage-offline-display{display:grid}
+.weekly-schedule-starlight .weekly-schedule-stage-offline-display{color:#493365}
 .weekly-schedule-stage-time-field input,.weekly-schedule-stage-content-input{width:100%;height:100%;min-height:0;padding:.3cqw;border:1px solid transparent;border-radius:.65cqw;background:transparent;color:#a74464;outline:0;text-align:center;overflow:hidden}
 .weekly-schedule-stage-time-field input{font:800 var(--time-font-size)/1 'Jua','Gowun Dodum',sans-serif}
 .weekly-schedule-stage-content-input{display:flex;align-items:center;justify-content:center;font:700 var(--content-font-size)/1.2 'Gowun Dodum',sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;cursor:text}

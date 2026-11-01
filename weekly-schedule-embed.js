@@ -46,9 +46,15 @@ async function render(data) {
   const eventMap = new Map((data.linkedDays || []).map(d => [d.date,d.events || []]));
   rectangles.forEach((r,i) => {
     const entry = data.entries?.[i] || {}; const linked = eventMap.get(dateKey(dateAt(i))) || [];
-    const time = entry.offline || linked.some(e => e.typeName === '휴방') ? '휴방' : (entry.time || linked.find(e=>e.time)?.time || '');
+    const isOffline = entry.offline === true;
+    const time = isOffline ? '' : linked.some(e => e.typeName === '휴방') ? '휴방' : (entry.time || linked.find(e=>e.time)?.time || '');
     const t = region(r,r.time); const c = region(r,r.content);
     centeredText(time,t.x+t.w/2,t.y+t.h/2,t.w,r.w<260?36:38,25,color);
+    if (isOffline) {
+      centeredText('휴방',c.x+c.w/2,c.y+c.h/2,c.w,r.w<260?42:44,25,color);
+      centeredText(days[i],r.x+r.w/2,r.y+r.h*r.weekdayY,r.w-24,30,25,color);
+      return;
+    }
     ctx.font = `700 ${r.w<260?29:31}px Gowun, sans-serif`; ctx.fillStyle = starlight ? '#594578' : '#a94d6b'; ctx.textAlign='center'; ctx.textBaseline='middle';
     const lineHeight=r.w<260?34:36; const limit=Math.floor(c.h/lineHeight);
     const content=[...(!entry.offline && entry.content?[entry.content]:[]),...linked.map(e=>`${e.time?e.time+' ':''}${e.title||e.typeName||'방송 일정'}`)].flatMap(v=>linesFor(v,c.w,limit)).slice(0,limit);

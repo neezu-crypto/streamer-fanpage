@@ -8292,18 +8292,23 @@ function renderCalendarSection(page) {
         const { x, y, w, h } = rect; const entry = state.entries[index] || {};
         const linked = state.linkedEvents[index] || [];
         const lines = [];
-        if (!entry.offline && entry.content) lines.push(entry.content);
-        linked.forEach((event) => lines.push(`${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '방송 일정'}`));
+        const isOffline = entry.offline === true;
+        if (isOffline) lines.push('휴방');
+        else if (entry.content) lines.push(entry.content);
+        if (!isOffline) linked.forEach((event) => lines.push(`${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '방송 일정'}`));
         const linkedHoliday = linked.some((event) => event.typeName === '휴방');
-        const firstLine = entry.offline || linkedHoliday ? '휴방' : (normalizeGraphicTime(entry.time) || linked.find((event) => event.time)?.time || '');
+        const firstLine = isOffline ? '' : linkedHoliday ? '휴방' : (normalizeGraphicTime(entry.time) || linked.find((event) => event.time)?.time || '');
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         const timeBox = weeklyScheduleRegion(rect, rect.time);
         const contentBox = weeklyScheduleRegion(rect, rect.content);
         ctx.fillStyle = state.templateId === 'starlight' ? '#493365' : '#a63d61'; ctx.font = `800 ${w < 260 ? 36 : 38}px Jua, "Gowun Dodum", sans-serif`;
         if (firstLine) ctx.fillText(firstLine, timeBox.x + timeBox.w / 2, timeBox.y + timeBox.h / 2, timeBox.w);
-        const fontSize = w < 260 ? 29 : 31;
-        ctx.fillStyle = state.templateId === 'starlight' ? '#594578' : '#a94d6b'; ctx.font = `700 ${fontSize}px Gowun Dodum, sans-serif`;
-        const lineHeight = w < 260 ? 34 : 36;
+        const fontSize = isOffline ? (w < 260 ? 42 : 44) : (w < 260 ? 29 : 31);
+        ctx.fillStyle = isOffline
+          ? (state.templateId === 'starlight' ? '#493365' : '#a63d61')
+          : (state.templateId === 'starlight' ? '#594578' : '#a94d6b');
+        ctx.font = isOffline ? `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif` : `700 ${fontSize}px Gowun Dodum, sans-serif`;
+        const lineHeight = isOffline ? (w < 260 ? 50 : 52) : (w < 260 ? 34 : 36);
         const shown = lines.flatMap((line) => wrapWeeklyScheduleCanvasText(ctx, line, contentBox.w, Math.max(1, Math.floor(contentBox.h / lineHeight)))).slice(0, Math.floor(contentBox.h / lineHeight));
         const centerY = contentBox.y + contentBox.h / 2; const startY = centerY - ((shown.length - 1) * lineHeight) / 2;
         shown.forEach((line, lineIndex) => {
@@ -8322,8 +8327,10 @@ function renderCalendarSection(page) {
         const entry = state.entries[index] || {}; const linked = state.linkedEvents[index] || [];
         const lines = [];
         if (entry.offline) lines.push('휴방');
-        else if (entry.time || entry.content) lines.push(`${entry.time || '시간 미정'}${entry.content ? ` · ${entry.content}` : ''}`);
-        linked.forEach((event) => lines.push(`${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '방송 일정'}`));
+        else {
+          if (entry.time || entry.content) lines.push(`${entry.time || '시간 미정'}${entry.content ? ` · ${entry.content}` : ''}`);
+          linked.forEach((event) => lines.push(`${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '방송 일정'}`));
+        }
         details.textContent = lines.length ? lines.join(' / ') : '등록된 일정 없음';
         row.append(label, details); mobileList.append(row);
       });
@@ -8453,8 +8460,10 @@ function renderWeeklyScheduleViewDialog(page, board) {
       const label = document.createElement('h4'); label.textContent = `${date.getMonth() + 1}월 ${date.getDate()}일 ${weekday}`;
       const lines = [];
       if (entry.offline) lines.push('휴방');
-      else if (entry.time || entry.content) lines.push(`${entry.time || '시간 미정'}${entry.content ? ` · ${entry.content}` : ''}`);
-      linked.forEach((event) => lines.push(`${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '방송 일정'}`.trim()));
+      else {
+        if (entry.time || entry.content) lines.push(`${entry.time || '시간 미정'}${entry.content ? ` · ${entry.content}` : ''}`);
+        linked.forEach((event) => lines.push(`${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '방송 일정'}`.trim()));
+      }
       const text = document.createElement('p'); text.textContent = lines.length ? lines.join(' / ') : '등록된 일정 없음';
       item.append(label, text); details.append(item);
     });
@@ -8754,13 +8763,19 @@ function renderWeeklyScheduleDialog(page) {
     const offlineLabel = document.createElement('label'); offlineLabel.className = 'weekly-schedule-offline-label';
     const offline = document.createElement('input'); offline.type = 'checkbox'; offline.name = `offline-${index}`;
     offlineLabel.append(offline, document.createTextNode('휴방'));
+    const offlineDisplay = document.createElement('div'); offlineDisplay.className = 'weekly-schedule-stage-offline-display';
+    offlineDisplay.textContent = '휴방'; offlineDisplay.setAttribute('aria-label', `${weekday}요일 휴방`); offlineDisplay.setAttribute('aria-hidden', 'true');
     const timeLabel = document.createElement('label'); timeLabel.className = 'weekly-schedule-stage-time-field';
     const time = document.createElement('input'); time.type = 'text'; time.inputMode = 'numeric'; time.placeholder = '시작 시간'; time.maxLength = 5; time.name = `time-${index}`; time.setAttribute('aria-label', `${weekday}요일 방송 시작 시간`); timeLabel.append(time);
     const textLabel = document.createElement('label'); textLabel.className = 'weekly-schedule-stage-content-field';
     const text = document.createElement('div'); text.className = 'weekly-schedule-stage-content-input'; text.contentEditable = 'true'; text.setAttribute('role', 'textbox');
     text.setAttribute('aria-multiline', 'true'); text.setAttribute('aria-label', `${weekday}요일 방송 콘텐츠`); text.dataset.placeholder = '방송 콘텐츠'; text.spellcheck = false; textLabel.append(text);
     const linkedDisplay = document.createElement('div'); linkedDisplay.className = 'weekly-schedule-stage-linked'; linkedDisplay.setAttribute('aria-label', `${weekday}요일 자동 연동 일정`);
-    offline.addEventListener('change', () => { time.disabled = offline.checked; text.contentEditable = offline.checked ? 'false' : 'true'; markWeeklyDirty(); });
+    offline.addEventListener('change', () => {
+      if (offline.checked) { time.value = ''; text.replaceChildren(); }
+      syncOfflineDayEditor({ dayCard, offline, offlineDisplay, time, text });
+      markWeeklyDirty();
+    });
     time.addEventListener('input', markWeeklyDirty);
     time.addEventListener('blur', () => {
       const normalized = normalizeGraphicTime(time.value);
@@ -8771,8 +8786,8 @@ function renderWeeklyScheduleDialog(page) {
       if (text.innerText.length > 100) text.innerText = text.innerText.slice(0, 100);
       markWeeklyDirty();
     });
-    dayCard.append(offlineLabel, timeLabel, textLabel, linkedDisplay); dayGrid.append(dayCard);
-    dayInputs.push({ offline, time, text, linkedDisplay });
+    dayCard.append(offlineLabel, offlineDisplay, timeLabel, textLabel, linkedDisplay); dayGrid.append(dayCard);
+    dayInputs.push({ dayCard, offline, offlineDisplay, time, text, linkedDisplay });
   });
 
   const templateControls = document.createElement('div'); templateControls.className = 'weekly-template-controls';
@@ -8846,22 +8861,25 @@ function renderWeeklyScheduleDialog(page) {
     const linkedEvents = state.linkedEvents[index] || [];
     const linkedHoliday = linkedEvents.some((event) => event.typeName === '휴방');
     const time = includeEditableValues
-      ? (isOffline || linkedHoliday ? '휴방' : (normalizeGraphicTime(input.time.value) || linkedEvents.find((event) => event.time)?.time || ''))
+      ? (isOffline ? '' : linkedHoliday ? '휴방' : (normalizeGraphicTime(input.time.value) || linkedEvents.find((event) => event.time)?.time || ''))
       : '';
     const timeBox = weeklyScheduleRegion(layout, layout.time);
     const contentBox = weeklyScheduleRegion(layout, layout.content);
     ctx.fillStyle = state.templateId === 'starlight' ? '#493365' : '#a63d61'; ctx.font = `800 ${w < 260 ? 36 : 38}px Jua, "Gowun Dodum", sans-serif`;
     if (time) ctx.fillText(time, timeBox.x + timeBox.w / 2, timeBox.y + timeBox.h / 2, timeBox.w);
     const lines = [];
-    if (includeEditableValues && input.text.innerText.trim() && !isOffline) lines.push(input.text.innerText.trim());
-    if (includeEditableValues) linkedEvents.forEach((event) => {
+    if (includeEditableValues && isOffline) lines.push('휴방');
+    else if (includeEditableValues && input.text.innerText.trim()) lines.push(input.text.innerText.trim());
+    if (includeEditableValues && !isOffline) linkedEvents.forEach((event) => {
       const linked = `${event.time && event.time !== time ? `${event.time} ` : ''}${event.title || event.typeName || '연동 일정'}`.trim();
       if (linked) lines.push(linked);
     });
-    if (includeEditableValues && isOffline && !lines.length) lines.push('방송 일정이 없습니다');
-    const fontSize = w < 260 ? 29 : 31;
-    ctx.fillStyle = state.templateId === 'starlight' ? '#594578' : '#a94d6b'; ctx.font = `700 ${fontSize}px Gowun Dodum, sans-serif`;
-    const lineHeight = w < 260 ? 34 : 36;
+    const fontSize = isOffline ? (w < 260 ? 42 : 44) : (w < 260 ? 29 : 31);
+    ctx.fillStyle = isOffline
+      ? (state.templateId === 'starlight' ? '#493365' : '#a63d61')
+      : (state.templateId === 'starlight' ? '#594578' : '#a94d6b');
+    ctx.font = isOffline ? `800 ${fontSize}px Jua, "Gowun Dodum", sans-serif` : `700 ${fontSize}px Gowun Dodum, sans-serif`;
+    const lineHeight = isOffline ? (w < 260 ? 50 : 52) : (w < 260 ? 34 : 36);
     const maxLines = Math.max(1, Math.floor(contentBox.h / lineHeight));
     const shown = lines.flatMap((line) => wrapWeeklyScheduleCanvasText(ctx, line, contentBox.w, maxLines)).slice(0, maxLines);
     const startY = contentBox.y + contentBox.h / 2 - ((shown.length - 1) * lineHeight) / 2;
@@ -9053,6 +9071,14 @@ function renderWeeklyScheduleDialog(page) {
       setScheduleUploadControlsBusy(false);
     }
   }
+  function syncOfflineDayEditor(input, locked = false) {
+    const isOffline = input.offline.checked;
+    input.dayCard.classList.toggle('weekly-schedule-day-offline', isOffline);
+    input.offlineDisplay.setAttribute('aria-hidden', String(!isOffline));
+    input.time.disabled = locked || isOffline;
+    input.text.contentEditable = locked || isOffline ? 'false' : 'true';
+    input.text.setAttribute('aria-readonly', String(locked || isOffline));
+  }
   function syncWeeklyFields() {
     const locked = state.templateId === 'starlight' && !state.canUseStarlight;
     templateSelect.value = state.templateId; syncMotionToggle();
@@ -9071,7 +9097,7 @@ function renderWeeklyScheduleDialog(page) {
       input.offline.checked = entry.offline === true;
       input.time.value = entry.time || '';
       input.text.innerText = entry.content || '';
-      input.offline.disabled = locked; input.time.disabled = locked || input.offline.checked; input.text.contentEditable = locked || input.offline.checked ? 'false' : 'true'; input.text.setAttribute('aria-readonly', String(locked || input.offline.checked));
+      input.offline.disabled = locked; syncOfflineDayEditor(input, locked);
       const events = (state.linkedEvents[index] || []).map((event) => `${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '일정'}`.trim()).filter(Boolean);
       input.linkedDisplay.replaceChildren();
       events.slice(0, 3).forEach((eventText) => {
@@ -9218,10 +9244,9 @@ function renderWeeklyScheduleDialog(page) {
       footerTextInput.disabled = busy || locked; avatarHitArea.disabled = busy || locked; download.disabled = busy || locked;
       chooseImage.disabled = busy; uploadImage.disabled = busy;
       clearImage.disabled = busy || !(state.selectedImage || state.savedAvatar);
-      dayInputs.forEach(({ offline, time, text }) => {
-        offline.disabled = busy || locked;
-        time.disabled = busy || locked || offline.checked;
-        text.contentEditable = busy || locked || offline.checked ? 'false' : 'true';
+      dayInputs.forEach((input) => {
+        input.offline.disabled = busy || locked;
+        syncOfflineDayEditor(input, busy || locked);
       });
     };
     window.clearTimeout(state.saveTimer);
