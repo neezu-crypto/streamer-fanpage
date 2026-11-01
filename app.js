@@ -8781,7 +8781,7 @@ function renderWeeklyScheduleDialog(page) {
   const templateSelect = document.createElement('select'); templateSelect.setAttribute('aria-label', '방송표 디자인');
   templateSelect.innerHTML = '<option value="default">기본 템플릿</option><option value="starlight">별빛 방송국</option>';
   const motionToggle = document.createElement('button'); motionToggle.type = 'button'; motionToggle.className = 'button';
-  const syncMotionToggle = () => { const enabled = state.animationEnabled !== false; motionToggle.textContent = enabled ? '스파클 끄기' : '스파클 켜기'; motionToggle.setAttribute('aria-pressed', String(enabled)); motionToggle.disabled = state.templateId !== 'starlight' || !state.canUseStarlight; };
+  const syncMotionToggle = () => { const enabled = state.animationEnabled !== false; motionToggle.textContent = enabled ? '특수효과 끄기' : '특수효과 켜기'; motionToggle.setAttribute('aria-pressed', String(enabled)); motionToggle.disabled = state.templateId !== 'starlight' || !state.canUseStarlight; };
   motionToggle.addEventListener('click', () => { if (!state.canUseStarlight || state.templateId !== 'starlight') return; state.animationEnabled = !state.animationEnabled; syncMotionToggle(); markWeeklyDirty(); });
   const templateHint = document.createElement('small'); templateHint.setAttribute('role', 'status');
   templateLabel.append(templateSelect); templateControls.append(templateLabel, motionToggle, templateHint);
