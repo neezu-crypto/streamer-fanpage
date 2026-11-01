@@ -120,7 +120,9 @@
 .vod-heading .eyebrow{margin:0 0 5px;font-size:9px}
 .vod-heading h2{display:inline-block;margin:0;font:23px var(--display)}
 .vod-count{margin-left:10px;color:#a9a1b1;font-size:11px}
-.vod-refresh-button{flex:none}
+.vod-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:none}
+.vod-heading-actions .button{min-height:42px;white-space:nowrap}
+.vod-refresh-button,.vod-analytics-button{flex:none}
 .vod-refresh-status{margin:11px 0 17px;color:#918a98;font-size:11px}
 .vod-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .vod-card{min-width:0;overflow:hidden;border:1px solid #ffffff13;border-radius:12px;background:#111018;color:var(--text);text-decoration:none;transition:transform .18s,border-color .18s,background .18s}
@@ -134,7 +136,7 @@
 .vod-metadata{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px;color:#8f8997;font-size:9px}
 .vod-metadata span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vod-empty-state{margin:0;padding:30px 15px;border:1px dashed #ffffff1d;border-radius:12px;color:#a29aa9;text-align:center;font-size:12px}
-@media(max-width:720px){.vod-heading{align-items:flex-start;flex-direction:column;gap:11px}.vod-heading h2{font-size:21px}.vod-refresh-button{width:100%}.vod-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.vod-copy{padding:9px}.vod-title{font-size:11px}.vod-metadata{align-items:flex-start;flex-direction:column;gap:3px;margin-top:7px}}
+@media(max-width:720px){.vod-heading{align-items:flex-start;flex-direction:column;gap:11px}.vod-heading h2{font-size:21px}.vod-heading-actions{width:100%}.vod-heading-actions .button{flex:1;min-width:0;padding-inline:10px}.vod-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.vod-copy{padding:9px}.vod-title{font-size:11px}.vod-metadata{align-items:flex-start;flex-direction:column;gap:3px;margin-top:7px}}
 @media(max-width:380px){.vod-grid{grid-template-columns:1fr}}
 
 /* In-page SOOP player and incremental VOD pages */

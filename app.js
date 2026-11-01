@@ -6046,6 +6046,18 @@ function renderVodSection(page) {
   headingCopy.append(eyebrow, title, count);
   heading.append(headingCopy);
 
+  const actions = document.createElement('div');
+  actions.className = 'vod-heading-actions';
+  const analytics = document.createElement('a');
+  analytics.className = 'button vod-analytics-button';
+  analytics.textContent = '시청자 분석';
+  analytics.target = '_blank';
+  analytics.rel = 'noopener noreferrer';
+  const analyticsUrl = new URL('viewer-stats.html', window.location.href);
+  analyticsUrl.searchParams.set('streamer', String(page.streamer.soopId || streamerId).trim());
+  analytics.href = analyticsUrl.href;
+  analytics.setAttribute('aria-label', `${page.streamer.nickname || page.streamer.soopId || streamerId} 시청자 분석을 새 탭에서 열기`);
+
   if (page.isOwner) {
     const refresh = document.createElement('button');
     refresh.type = 'button'; refresh.className = 'button button-primary vod-refresh-button';
@@ -6082,8 +6094,10 @@ function renderVodSection(page) {
         replaceVodSectionIfCurrent(streamerId);
       }
     });
-    heading.append(refresh);
+    actions.append(refresh);
   }
+  actions.append(analytics);
+  heading.append(actions);
 
   const status = document.createElement('p'); status.className = 'vod-refresh-status';
   status.textContent = vods.refreshedAt
