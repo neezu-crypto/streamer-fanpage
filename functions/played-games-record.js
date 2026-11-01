@@ -135,6 +135,16 @@ function disconnectOpggAccount(game) {
   return updated;
 }
 
+function getOpggAccountUnlinkPatch(game) {
+  const gameType = getOpggGameType(game);
+  const config = OP_GG_GAME_CONFIG[gameType];
+  if (!config || !game[config.accountField]) return null;
+  const patch = { [config.accountField]: null };
+  if (gameType === 'league-of-legends') patch.opggRegion = null;
+  if (gameType === 'overwatch') patch.overwatchRegion = null;
+  return patch;
+}
+
 function disconnectOpggAccountFromGames(current, { requestedAppId = '', gameType = '' } = {}) {
   const games = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
   let appId = requestedAppId;
@@ -238,6 +248,7 @@ module.exports = {
   OVERWATCH_OP_GG_REGIONS,
   disconnectOpggAccount,
   disconnectOpggAccountFromGames,
+  getOpggAccountUnlinkPatch,
   disconnectLeagueOfLegendsAccount,
   getOpggGameType,
   isLeagueOfLegendsGame,
