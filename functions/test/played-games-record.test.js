@@ -3,15 +3,23 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  disconnectOpggAccount,
   disconnectLeagueOfLegendsAccount,
+  getOpggGameType,
   isLeagueOfLegendsGame,
+  isOpggGame,
   isPlayedGameId,
+  normalizeOpggAccountId,
+  normalizeOverwatchOpggRegion,
   normalizeOpggRegion,
+  normalizeBattleTag,
+  normalizePubgNickname,
   normalizeRiotId,
   normalizePlayedGameBestRecord,
   normalizePlayedGameLink,
   parseCustomPlayedGameLink,
   updatePlayedGameBestRecord,
+  upsertOpggAccount,
   upsertLeagueOfLegendsAccount,
 } = require('../played-games-record');
 
@@ -26,6 +34,79 @@ test('Riot ID와 OP.GG 지역을 안전한 표시 값으로 정리한다', () =>
   assert.equal(isLeagueOfLegendsGame({ name: ' League of Legends ' }), true);
   assert.equal(isLeagueOfLegendsGame({ name: '리그 오브 레전드' }), true);
   assert.equal(isLeagueOfLegendsGame({ name: '다른 게임' }), false);
+});
+
+test('지원하는 게임을 이름 또는 종류로 식별하고 게임별 ID 형식을 검증한다', () => {
+  assert.equal(getOpggGameType({ name: '오버워치 2' }), 'overwatch');
+  assert.equal(getOpggGameType({ name: 'Valorant' }), 'valorant');
+  assert.equal(getOpggGameType({ name: 'PUBG: BATTLEGROUNDS' }), 'pubg');
+  assert.equal(getOpggGameType({ gameType: 'overwatch', name: '사용자 지정 이름' }), 'overwatch');
+  assert.equal(normalizeOpggAccountId('valorant', ' TenZ#NA1 '), 'TenZ#NA1');
+  assert.equal(normalizeOpggAccountId('overwatch', ' OVERLOG#1234 '), 'OVERLOG#1234');
+  assert.equal(normalizeOpggAccountId('overwatch', 'OVERLOG#abc'), null);
+  assert.equal(normalizeOpggAccountId('pubg', ' Player_One '), 'Player_One');
+  assert.equal(normalizeOpggAccountId('pubg', '   '), null);
+  assert.equal(normalizeBattleTag('name#12'), null);
+  assert.equal(normalizePubgNickname(`x\n`), null);
+  assert.equal(normalizeOverwatchOpggRegion('KR'), 'kr');
+  assert.equal(normalizeOverwatchOpggRegion('invalid'), 'global');
+  assert.equal(isOpggGame({ name: '오버워치' }, 'overwatch'), true);
+});
+
+test('OP.GG 계정을 게임별로 추가하고 다시보기·기록을 유지한다', () => {
+  const games = {
+    custom_0123456789abcdef0123456789abcdef: {
+      name: 'Overwatch', gameUrl: 'https://example.com/ow', createdAt: 10,
+      bestRecord: { type: 'rank', value: '마스터' }, vods: { '123': { createdAt: 11 } },
+    },
+  };
+  const result = upsertOpggAccount(games, {
+    gameType: 'overwatch', accountId: 'OVERLOG#1234', overwatchRegion: 'kr',
+    newAppId: 'custom_fedcba9876543210fedcba9876543210', maxItems: 100,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(Object.keys(result.games).length, 1);
+  assert.deepEqual(result.games[result.appId], {
+    ...games.custom_0123456789abcdef0123456789abcdef,
+    name: '오버워치 2', gameType: 'overwatch', battleTag: 'OVERLOG#1234', overwatchRegion: 'kr',
+  });
+
+  const valorant = upsertOpggAccount({}, {
+    gameType: 'valorant', accountId: 'TenZ#NA1', newAppId: 'custom_abcdef0123456789abcdef0123456789', maxItems: 100, now: 42,
+  });
+  assert.equal(valorant.games[valorant.appId].gameUrl, 'https://playvalorant.com/ko-kr/');
+  assert.equal(valorant.games[valorant.appId].riotId, 'TenZ#NA1');
+  const pubg = upsertOpggAccount({}, {
+    gameType: 'pubg', accountId: 'Player_One', newAppId: 'custom_abcdef0123456789abcdef0123456789', maxItems: 100, now: 42,
+  });
+  assert.equal(pubg.games[pubg.appId].pubgNickname, 'Player_One');
+  assert.equal(pubg.games[pubg.appId].name, '배틀그라운드');
+});
+
+test('OP.GG 계정 수정은 계정별 게임 하나만 갱신하고 이름이 다른 항목은 거부한다', () => {
+  const existing = { custom_0123456789abcdef0123456789abcdef: { name: '배틀그라운드', gameType: 'pubg', vods: {} } };
+  const updated = upsertOpggAccount(existing, {
+    gameType: 'pubg', accountId: 'New_Name', requestedAppId: 'custom_0123456789abcdef0123456789abcdef',
+    newAppId: 'custom_fedcba9876543210fedcba9876543210', maxItems: 100,
+  });
+  assert.equal(updated.appId, 'custom_0123456789abcdef0123456789abcdef');
+  assert.equal(Object.keys(updated.games).length, 1);
+  assert.equal(upsertOpggAccount(existing, {
+    gameType: 'overwatch', accountId: 'Player#1234', requestedAppId: 'custom_0123456789abcdef0123456789abcdef',
+    newAppId: 'custom_fedcba9876543210fedcba9876543210', maxItems: 100,
+  }).error, 'invalid-target');
+});
+
+test('OP.GG 계정 연결 해제는 ID만 제거하고 게임·기록·다시보기를 보존한다', () => {
+  const game = {
+    name: '배틀그라운드', gameType: 'pubg', pubgNickname: 'Player_One',
+    bestRecord: { type: 'record', value: '치킨 10회' }, vods: { '123': { createdAt: 11 } },
+  };
+  assert.deepEqual(disconnectOpggAccount(game), {
+    name: '배틀그라운드', gameType: 'pubg',
+    bestRecord: game.bestRecord, vods: game.vods,
+  });
+  assert.equal(disconnectOpggAccount({ name: '일반 게임' }), null);
 });
 
 test('League of Legends 계정 추가는 기존 게임 데이터를 보존하고 중복 항목을 만들지 않는다', () => {

@@ -6460,19 +6460,66 @@ const LEAGUE_OPGG_REGIONS = [
 ];
 
 function isLeagueOfLegendsPlayedGame(game) {
-  return Boolean(game && (game.gameType === 'league-of-legends'
-    || /^(?:league of legends|리그 오브 레전드|롤)$/i.test(String(game.name || '').trim())));
+  return getOpggGameType(game) === 'league-of-legends';
+}
+
+const OP_GG_PLAYED_GAME_CONFIG = Object.freeze({
+  'league-of-legends': {
+    label: 'League of Legends · OP.GG', accountField: 'riotId', inputLabel: 'League of Legends Riot ID',
+    placeholder: 'Riot ID (예: Hide on bush#KR1)', hint: 'Riot ID와 지역으로 OP.GG 전적 페이지를 열어요. 계정 확인이나 전적 수집은 하지 않으며 입력한 ID는 팬페이지에 공개됩니다.',
+  },
+  valorant: {
+    label: '발로란트 · OP.GG', accountField: 'riotId', inputLabel: '발로란트 Riot ID',
+    placeholder: 'Riot ID (예: TenZ#NA1)', hint: '발로란트 Riot ID를 OP.GG 전적 페이지로 연결해요. OP.GG에서 검색되지 않거나 비공개 프로필이면 전적이 보이지 않을 수 있습니다.',
+  },
+  overwatch: {
+    label: '오버워치 2 · OP.GG', accountField: 'battleTag', inputLabel: '오버워치 BattleTag',
+    placeholder: 'BattleTag (예: OVERLOG#1234)', hint: 'BattleTag는 이름과 숫자 태그를 함께 입력해 주세요. 프로필이 공개되어 있어야 OP.GG에서 전적을 볼 수 있습니다.',
+  },
+  pubg: {
+    label: '배틀그라운드 · OP.GG', accountField: 'pubgNickname', inputLabel: '배틀그라운드 닉네임',
+    placeholder: '게임 내 닉네임 (Steam/카카오 ID 아님)', hint: '배틀그라운드 게임 안에서 사용하는 닉네임을 입력해 주세요. OP.GG 검색은 PC 버전만 지원합니다.',
+  },
+});
+
+function getOpggGameType(game) {
+  if (!game || typeof game !== 'object') return '';
+  if (Object.hasOwn(OP_GG_PLAYED_GAME_CONFIG, game.gameType)) return game.gameType;
+  const name = String(game.name || '').trim();
+  if (/^(?:league of legends|리그 오브 레전드|롤)$/i.test(name)) return 'league-of-legends';
+  if (/^(?:valorant|발로란트)$/i.test(name)) return 'valorant';
+  if (/^(?:overwatch(?:\s*2)?|오버워치(?:\s*2)?)$/i.test(name)) return 'overwatch';
+  if (/^(?:pubg(?:\s*:\s*battlegrounds)?|playerunknown'?s battlegrounds|배틀그라운드|펍지)$/i.test(name)) return 'pubg';
+  return '';
+}
+
+function getOpggAccountId(game, gameType = getOpggGameType(game)) {
+  const field = OP_GG_PLAYED_GAME_CONFIG[gameType]?.accountField;
+  return field && typeof game?.[field] === 'string' ? game[field].trim() : '';
 }
 
 function buildOpggProfileUrl(game) {
-  if (!game || !LEAGUE_OPGG_REGIONS.some(([region]) => region === game.opggRegion)) return '';
-  const riotId = typeof game.riotId === 'string' ? game.riotId.trim() : '';
-  const separator = riotId.indexOf('#');
-  if (separator < 1 || separator !== riotId.lastIndexOf('#')) return '';
-  const gameName = riotId.slice(0, separator).trim();
-  const tagLine = riotId.slice(separator + 1).trim();
-  if (!gameName || !tagLine) return '';
-  return `https://op.gg/lol/summoners/${game.opggRegion}/${encodeURIComponent(`${gameName}-${tagLine}`)}`;
+  const gameType = getOpggGameType(game);
+  const accountId = getOpggAccountId(game, gameType);
+  if (!gameType || !accountId) return '';
+  if (gameType === 'league-of-legends') {
+    if (!LEAGUE_OPGG_REGIONS.some(([region]) => region === game.opggRegion)) return '';
+    const [gameName, tagLine, ...extra] = accountId.split('#');
+    if (!gameName?.trim() || !tagLine?.trim() || extra.length) return '';
+    return `https://op.gg/lol/summoners/${game.opggRegion}/${encodeURIComponent(`${gameName.trim()}-${tagLine.trim()}`)}`;
+  }
+  if (gameType === 'valorant') {
+    const [gameName, tagLine, ...extra] = accountId.split('#');
+    if (!gameName?.trim() || !tagLine?.trim() || extra.length) return '';
+    return `https://op.gg/valorant/profile/${encodeURIComponent(`${gameName.trim()}-${tagLine.trim()}`)}`;
+  }
+  if (gameType === 'overwatch') {
+    if (!/^[^#]+#\d{3,12}$/.test(accountId)) return '';
+    const region = ['global', 'us', 'eu', 'kr'].includes(game.overwatchRegion) ? game.overwatchRegion : 'global';
+    return `https://op.gg/overwatch/search?playerName=${encodeURIComponent(accountId)}&region=${region}`;
+  }
+  if (gameType === 'pubg') return `https://op.gg/pubg/user/${encodeURIComponent(accountId)}`;
+  return '';
 }
 
 function createOpggRegionSelect(selectedRegion = 'kr') {
@@ -6484,6 +6531,52 @@ function createOpggRegionSelect(selectedRegion = 'kr') {
     select.append(option);
   });
   return select;
+}
+
+function createOverwatchOpggRegionSelect(selectedRegion = 'global') {
+  const select = document.createElement('select'); select.name = 'overwatchRegion';
+  select.setAttribute('aria-label', 'OP.GG 오버워치 검색 지역');
+  [['global', '전체'], ['kr', '한국'], ['us', '미국'], ['eu', '유럽']].forEach(([region, label]) => {
+    const option = document.createElement('option'); option.value = region; option.textContent = label;
+    if (region === selectedRegion) option.selected = true;
+    select.append(option);
+  });
+  return select;
+}
+
+function createOpggAccountForm(page, appId, gameType, initialGame = null, isAddForm = false) {
+  const config = OP_GG_PLAYED_GAME_CONFIG[gameType];
+  const form = document.createElement('form');
+  form.className = isAddForm ? 'played-games-add-form played-games-opgg-form' : 'played-game-opgg-editor';
+  form.dataset.gameType = gameType;
+  const input = document.createElement('input'); input.type = 'text'; input.name = 'accountId';
+  input.required = true; input.maxLength = 120; input.autocomplete = 'off';
+  input.value = getOpggAccountId(initialGame, gameType);
+  input.placeholder = config.placeholder; input.setAttribute('aria-label', config.inputLabel);
+  form.append(input);
+  let regionSelect = null;
+  if (gameType === 'league-of-legends') {
+    regionSelect = createOpggRegionSelect(initialGame?.opggRegion || 'kr');
+    form.append(regionSelect);
+  } else if (gameType === 'overwatch') {
+    regionSelect = createOverwatchOpggRegionSelect(initialGame?.overwatchRegion || 'global');
+    form.append(regionSelect);
+  }
+  if (regionSelect) form.classList.add('has-region-selector');
+  const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary';
+  save.textContent = isAddForm ? '계정 저장' : '저장';
+  form.append(save);
+  if (isAddForm) {
+    const hint = document.createElement('small'); hint.className = 'played-games-owner-hint';
+    hint.textContent = config.hint;
+    form.append(hint);
+  }
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (!page.isOwner || !form.reportValidity()) return;
+    saveOpggAccount(page, appId, gameType, input, regionSelect, save);
+  });
+  return { form, input, regionSelect, save };
 }
 
 function renderPlayedGamesSection(page) {
@@ -6509,7 +6602,7 @@ function renderPlayedGamesSection(page) {
     const addPanel = document.createElement('div'); addPanel.className = 'played-games-add-panel';
     const gameType = document.createElement('select'); gameType.className = 'played-games-type-select';
     gameType.setAttribute('aria-label', '추가할 게임 종류');
-    [['custom', '일반 게임'], ['league-of-legends', 'League of Legends · OP.GG 전적 링크']].forEach(([value, label]) => {
+    [['custom', '일반 게임'], ...Object.entries(OP_GG_PLAYED_GAME_CONFIG).map(([value, config]) => [value, config.label])].forEach(([value, label]) => {
       const option = document.createElement('option'); option.value = value; option.textContent = label; gameType.append(option);
     });
     addPanel.append(gameType);
@@ -6530,26 +6623,21 @@ function renderPlayedGamesSection(page) {
       event.preventDefault();
       if (form.reportValidity()) addPlayedGame(page, nameInput, linkInput, add);
     });
-    const leagueForm = document.createElement('form'); leagueForm.className = 'played-games-add-form played-games-lol-form'; leagueForm.hidden = true;
-    const riotIdInput = document.createElement('input'); riotIdInput.type = 'text'; riotIdInput.name = 'riotId';
-    riotIdInput.required = true; riotIdInput.maxLength = 120; riotIdInput.autocomplete = 'off';
-    riotIdInput.placeholder = 'Riot ID (예: Hide on bush#KR1)'; riotIdInput.setAttribute('aria-label', 'League of Legends Riot ID');
-    const regionSelect = createOpggRegionSelect();
-    const saveLeagueAccount = document.createElement('button'); saveLeagueAccount.type = 'submit'; saveLeagueAccount.className = 'button button-primary';
-    saveLeagueAccount.textContent = 'Riot ID 저장';
-    const leagueHint = document.createElement('small'); leagueHint.className = 'played-games-owner-hint';
-    leagueHint.textContent = 'Riot ID와 서버 지역으로 OP.GG 프로필 링크를 만들어요. 계정 확인이나 전적 수집은 하지 않으며 입력한 ID는 팬페이지에 공개됩니다.';
-    leagueForm.append(riotIdInput, regionSelect, saveLeagueAccount, leagueHint);
-    leagueForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (leagueForm.reportValidity()) saveLeagueOfLegendsAccount(page, '', riotIdInput, regionSelect, saveLeagueAccount);
-    });
+    let opggEditor = createOpggAccountForm(page, '', 'league-of-legends', null, true);
+    opggEditor.form.hidden = true;
     gameType.addEventListener('change', () => {
-      const showLeague = gameType.value === 'league-of-legends';
-      form.hidden = showLeague; leagueForm.hidden = !showLeague;
-      (showLeague ? riotIdInput : nameInput).focus();
+      const selectedType = gameType.value;
+      const showOpgg = Boolean(OP_GG_PLAYED_GAME_CONFIG[selectedType]);
+      form.hidden = showOpgg;
+      opggEditor.form.hidden = !showOpgg;
+      if (showOpgg && opggEditor.form.dataset.gameType !== selectedType) {
+        const replacement = createOpggAccountForm(page, '', selectedType, null, true);
+        opggEditor.form.replaceWith(replacement.form);
+        opggEditor = replacement;
+      }
+      (showOpgg ? opggEditor.input : nameInput).focus();
     });
-    addPanel.append(form, leagueForm); section.append(addPanel);
+    addPanel.append(form, opggEditor.form); section.append(addPanel);
   }
 
   if (!games.length) {
@@ -6605,58 +6693,60 @@ function renderPlayedGamesSection(page) {
     }
     card.append(top);
 
-    const isLeagueOfLegends = isLeagueOfLegendsPlayedGame(game);
-    const opggUrl = isLeagueOfLegends ? buildOpggProfileUrl(game) : '';
-    if (isLeagueOfLegends) {
-      const leagueAccount = document.createElement('div'); leagueAccount.className = 'played-game-league-account';
+    const opggGameType = getOpggGameType(game);
+    const opggConfig = OP_GG_PLAYED_GAME_CONFIG[opggGameType];
+    const opggAccountId = getOpggAccountId(game, opggGameType);
+    const opggUrl = opggGameType ? buildOpggProfileUrl(game) : '';
+    if (opggGameType) {
+      const accountPanel = document.createElement('div'); accountPanel.className = 'played-game-opgg-account';
       if (opggUrl) {
-        const accountCopy = document.createElement('div'); accountCopy.className = 'played-game-league-copy';
-        const riotId = document.createElement('strong'); riotId.textContent = game.riotId;
-        const regionLabel = LEAGUE_OPGG_REGIONS.find(([region]) => region === game.opggRegion)?.[1] || game.opggRegion.toUpperCase();
-        const region = document.createElement('span'); region.textContent = `${regionLabel} 서버`;
-        accountCopy.append(riotId, region);
+        const accountCopy = document.createElement('div'); accountCopy.className = 'played-game-opgg-copy';
+        const accountId = document.createElement('strong'); accountId.textContent = opggAccountId;
+        accountCopy.append(accountId);
+        if (opggGameType === 'league-of-legends') {
+          const regionLabel = LEAGUE_OPGG_REGIONS.find(([region]) => region === game.opggRegion)?.[1] || String(game.opggRegion || 'kr').toUpperCase();
+          const region = document.createElement('span'); region.textContent = `${regionLabel} 서버`;
+          accountCopy.append(region);
+        } else if (opggGameType === 'overwatch') {
+          const regionLabel = { global: '전체', kr: '한국', us: '미국', eu: '유럽' }[game.overwatchRegion] || '전체';
+          const region = document.createElement('span'); region.textContent = `${regionLabel} 검색`;
+          accountCopy.append(region);
+        }
         const opggLink = document.createElement('a'); opggLink.className = 'button button-primary played-game-opgg-link';
         opggLink.href = opggUrl; opggLink.target = '_blank'; opggLink.rel = 'noopener noreferrer';
-        opggLink.textContent = '전적 보러가기 ↗'; opggLink.setAttribute('aria-label', `${game.riotId} OP.GG 전적 새 탭에서 열기`);
-        leagueAccount.append(accountCopy, opggLink);
+        opggLink.textContent = '전적 보러가기 ↗'; opggLink.setAttribute('aria-label', `${opggAccountId} OP.GG 전적 새 탭에서 열기`);
+        accountPanel.append(accountCopy, opggLink);
       } else {
-        const disconnected = document.createElement('span'); disconnected.className = 'played-game-league-unlinked';
-        disconnected.textContent = page.isOwner ? 'Riot ID를 연결하면 OP.GG 전적 링크가 표시돼요.' : '아직 전적 계정이 연결되지 않았어요.';
-        leagueAccount.append(disconnected);
+        const disconnected = document.createElement('span'); disconnected.className = 'played-game-opgg-unlinked';
+        disconnected.textContent = page.isOwner ? `${opggConfig.inputLabel}를 연결하면 OP.GG 전적 링크가 표시돼요.` : '아직 전적 계정이 연결되지 않았어요.';
+        accountPanel.append(disconnected);
       }
       if (page.isOwner) {
-        const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'button played-game-league-edit';
-        toggle.textContent = opggUrl ? 'Riot ID 수정' : 'Riot ID 연결';
-        const editForm = document.createElement('form'); editForm.className = 'played-game-league-editor'; editForm.hidden = true;
-        const riotIdInput = document.createElement('input'); riotIdInput.type = 'text'; riotIdInput.name = 'riotId';
-        riotIdInput.required = true; riotIdInput.maxLength = 120; riotIdInput.autocomplete = 'off';
-        riotIdInput.value = typeof game.riotId === 'string' ? game.riotId : '';
-        riotIdInput.placeholder = '예: Hide on bush#KR1'; riotIdInput.setAttribute('aria-label', `${game.name} Riot ID`);
-        const regionSelect = createOpggRegionSelect(game.opggRegion || 'kr');
-        const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = '저장';
-        const actions = document.createElement('div'); actions.className = 'played-game-league-actions';
+        const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'button played-game-opgg-edit';
+        toggle.textContent = opggUrl ? '계정 ID 수정' : '계정 ID 연결';
+        const editor = createOpggAccountForm(page, appId, opggGameType, game);
+        editor.form.hidden = true;
+        const actions = document.createElement('div'); actions.className = 'played-game-opgg-actions';
+        const save = editor.save;
+        save.remove();
         const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
-        cancel.addEventListener('click', () => { editForm.hidden = true; toggle.hidden = false; });
+        cancel.addEventListener('click', () => { editor.form.hidden = true; toggle.hidden = false; });
         actions.append(save, cancel);
-        editForm.append(riotIdInput, regionSelect, actions);
-        editForm.addEventListener('submit', (event) => {
-          event.preventDefault();
-          if (editForm.reportValidity()) saveLeagueOfLegendsAccount(page, appId, riotIdInput, regionSelect, save);
-        });
-        toggle.addEventListener('click', () => { toggle.hidden = true; editForm.hidden = false; riotIdInput.focus(); });
-        leagueAccount.append(toggle, editForm);
+        editor.form.append(actions);
+        toggle.addEventListener('click', () => { toggle.hidden = true; editor.form.hidden = false; editor.input.focus(); });
+        accountPanel.append(toggle, editor.form);
         if (opggUrl) {
-          const unlink = document.createElement('button'); unlink.type = 'button'; unlink.className = 'played-game-league-unlink';
+          const unlink = document.createElement('button'); unlink.type = 'button'; unlink.className = 'played-game-opgg-unlink';
           unlink.textContent = '연결 해제';
-          unlink.addEventListener('click', () => removeLeagueOfLegendsAccount(page, appId, unlink));
-          leagueAccount.append(unlink);
+          unlink.addEventListener('click', () => removeOpggAccount(page, appId, opggGameType, unlink));
+          accountPanel.append(unlink);
         }
       }
-      card.append(leagueAccount);
+      card.append(accountPanel);
     }
 
     const record = game.bestRecord && typeof game.bestRecord === 'object' ? game.bestRecord : null;
-    if (!(isLeagueOfLegends && opggUrl) && (record || page.isOwner)) {
+    if (!(opggGameType && opggUrl) && (record || page.isOwner)) {
     const recordSection = document.createElement('div'); recordSection.className = 'played-game-record';
     const recordCopy = document.createElement('div'); recordCopy.className = 'played-game-record-copy';
     const recordLabel = document.createElement('span'); recordLabel.className = 'played-game-record-label';
@@ -6769,37 +6859,40 @@ async function addPlayedGame(page, nameInput, linkInput, button) {
   }
 }
 
-async function saveLeagueOfLegendsAccount(page, appId, riotIdInput, regionSelect, button) {
+async function saveOpggAccount(page, appId, gameType, accountInput, regionSelect, button) {
   if (!page.isOwner || button.disabled) return;
   const originalText = button.textContent;
   button.disabled = true; button.textContent = '저장 중…';
   try {
     const result = (await callPlayedGames({
-      action: 'save-lol-account', streamerId: page.streamer.id, appId,
-      riotId: riotIdInput.value.trim(), opggRegion: regionSelect.value,
+      action: 'save-opgg-account', streamerId: page.streamer.id, appId, gameType,
+      accountId: accountInput.value.trim(),
+      ...(gameType === 'league-of-legends' ? { opggRegion: regionSelect?.value || 'kr' } : {}),
+      ...(gameType === 'overwatch' ? { overwatchRegion: regionSelect?.value || 'global' } : {}),
     })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
     currentPage.playedGames = rememberFanPageContent(page.streamer.id, 'playedGames', result.playedGames, true);
     refreshPlayedGamesSection(page.streamer.id);
-    showToast('Riot ID를 저장했어요. 전적 링크를 사용할 수 있어요.');
+    showToast(`${OP_GG_PLAYED_GAME_CONFIG[gameType]?.inputLabel || '계정 ID'}를 저장했어요. 전적 링크를 사용할 수 있어요.`);
   } catch (error) {
-    showToast(error.message || 'Riot ID를 저장하지 못했어요.');
+    showToast(error.message || '계정 ID를 저장하지 못했어요.');
   } finally {
     button.disabled = false; button.textContent = originalText;
   }
 }
 
-async function removeLeagueOfLegendsAccount(page, appId, button) {
-  if (!page.isOwner || button.disabled || !confirm('Riot ID 연결을 해제할까요? 저장된 최고랭크는 그대로 보존됩니다.')) return;
+async function removeOpggAccount(page, appId, gameType, button) {
+  const label = OP_GG_PLAYED_GAME_CONFIG[gameType]?.inputLabel || '계정 ID';
+  if (!page.isOwner || button.disabled || !confirm(`${label} 연결을 해제할까요? 저장된 최고기록과 다시보기는 그대로 보존됩니다.`)) return;
   button.disabled = true;
   try {
-    const result = (await callPlayedGames({ action: 'remove-lol-account', streamerId: page.streamer.id, appId })).data;
+    const result = (await callPlayedGames({ action: 'remove-opgg-account', streamerId: page.streamer.id, appId })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
     currentPage.playedGames = rememberFanPageContent(page.streamer.id, 'playedGames', result.playedGames, true);
     refreshPlayedGamesSection(page.streamer.id);
-    showToast('Riot ID 연결을 해제했어요.');
+    showToast('OP.GG 계정 연결을 해제했어요.');
   } catch (error) {
-    showToast(error.message || 'Riot ID 연결을 해제하지 못했어요.');
+    showToast(error.message || 'OP.GG 계정 연결을 해제하지 못했어요.');
     button.disabled = false;
   }
 }
