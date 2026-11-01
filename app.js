@@ -8772,7 +8772,6 @@ function renderWeeklyScheduleDialog(page) {
     text.setAttribute('aria-multiline', 'true'); text.setAttribute('aria-label', `${weekday}요일 방송 콘텐츠`); text.dataset.placeholder = '방송 콘텐츠'; text.spellcheck = false; textLabel.append(text);
     const linkedDisplay = document.createElement('div'); linkedDisplay.className = 'weekly-schedule-stage-linked'; linkedDisplay.setAttribute('aria-label', `${weekday}요일 자동 연동 일정`);
     offline.addEventListener('change', () => {
-      if (offline.checked) { time.value = ''; text.replaceChildren(); }
       syncOfflineDayEditor({ dayCard, offline, offlineDisplay, time, text });
       markWeeklyDirty();
     });
@@ -9136,9 +9135,9 @@ function renderWeeklyScheduleDialog(page) {
   });
   function collectWeeklyEntries() {
     return dayInputs.map(({ offline, time, text }) => {
-      const normalized = offline.checked ? '' : normalizeGraphicTime(time.value);
-      if (normalized === null) throw new Error('시간은 0~23 또는 7:30 형식으로 입력해 주세요.');
-      return { time: normalized || '', content: offline.checked ? '' : text.innerText.trim().slice(0, 100), offline: offline.checked };
+      const normalized = normalizeGraphicTime(time.value);
+      if (normalized === null && !offline.checked) throw new Error('시간은 0~23 또는 7:30 형식으로 입력해 주세요.');
+      return { time: normalized || '', content: text.innerText.trim().slice(0, 100), offline: offline.checked };
     });
   }
 
