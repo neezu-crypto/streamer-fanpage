@@ -1649,7 +1649,7 @@ dialog[open]{overscroll-behavior:contain}
 #fanPageView .video-library-heading h2{display:inline-block;margin:0 8px 0 0;font:22px/1.25 var(--display)}
 #fanPageView .video-library-heading .eyebrow{margin:0 0 5px;font-size:9px;letter-spacing:.2em}
 #fanPageView .video-library-count{color:var(--muted);font-size:11px}
-#fanPageView .video-library-heading-actions{display:flex;align-items:center;gap:8px}
+#fanPageView .video-library-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 #fanPageView .video-library-description{margin:0;color:var(--muted);font-size:12px;line-height:1.6}
 #fanPageView :is(.video-library-category-manager,.video-library-category-form,.video-library-category-edit-form,.video-library-category-edit-actions,.video-library-add-form,.video-library-channel-form,.video-library-edit-form){display:flex;align-items:center;gap:8px;min-width:0}
 #fanPageView .video-library-category-form input,#fanPageView .video-library-category-edit-form input,#fanPageView .video-library-add-form input,#fanPageView .video-library-add-form select,#fanPageView .video-library-channel-form input,#fanPageView .video-library-channel-form select,#fanPageView .video-library-edit-form input,#fanPageView .video-library-edit-form select,#fanPageView .video-library-search{min-width:0;min-height:40px;padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:#100f16;color:var(--text);font:12px var(--font)}
@@ -1671,13 +1671,16 @@ dialog[open]{overscroll-behavior:contain}
 #fanPageView .video-library-search{width:min(360px,100%);background:#17151e}
 #fanPageView .video-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;min-width:0}
 #fanPageView .video-library-card{min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:15px;background:#ffffff06}
-#fanPageView .video-library-play{display:block;width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left}
+#fanPageView .video-library-play{display:block;width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left;text-decoration:none;cursor:pointer}
+#fanPageView .video-library-play:disabled{opacity:.72;cursor:not-allowed}
 #fanPageView .video-library-thumbnail-frame{position:relative;display:grid;place-items:center;aspect-ratio:16/9;overflow:hidden;background:#24212d}
 #fanPageView .video-library-thumbnail-frame img{display:block;width:100%;height:100%;object-fit:cover}
 #fanPageView .video-library-thumbnail-frame.is-missing{background:linear-gradient(135deg,#262330,#181720)}
 #fanPageView .video-library-play-icon{position:absolute;display:grid;place-items:center;width:42px;height:30px;border-radius:10px;background:#ed1c24dd;color:white;font-size:15px;opacity:.95}
 #fanPageView .video-library-card-body{display:grid;gap:5px;padding:11px 12px 12px;min-width:0}
 #fanPageView .video-library-source{overflow:hidden;color:var(--pink);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+#fanPageView .video-library-cinety-meta{margin:-3px 0 0;color:var(--muted);font-size:10px;line-height:1.5}
+#fanPageView .video-library-cinety-refresh{min-height:36px;padding:7px 11px;font-size:11px}
 #fanPageView .video-library-card h3{display:-webkit-box;overflow:hidden;margin:0;color:var(--text);font:14px/1.45 var(--font);-webkit-box-orient:vertical;-webkit-line-clamp:2}
 #fanPageView .video-library-card-body small{color:var(--muted);font-size:10px}
 #fanPageView .video-library-card-actions{display:flex;gap:6px;padding:0 10px 10px}
@@ -1729,6 +1732,8 @@ dialog[open]{overscroll-behavior:contain}
 @media(max-width:560px){
   #fanPageView .video-library-heading{align-items:flex-start}
   #fanPageView .video-library-heading h2{font-size:20px}
+  #fanPageView .video-library-heading-actions{gap:6px}
+  #fanPageView .video-library-cinety-refresh{min-height:34px;padding:6px 9px;font-size:10px}
   #fanPageView .video-library-category-form,#fanPageView .video-library-category-edit-form,#fanPageView .video-library-add-form,#fanPageView .video-library-channel-form{display:grid;grid-template-columns:minmax(0,1fr)}
   #fanPageView .video-library-category-edit-form .button{width:100%}
   #fanPageView .video-library-category-edit-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
