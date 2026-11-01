@@ -363,8 +363,13 @@
 .played-games-count{margin-left:9px;color:var(--muted);font-size:12px}
 .played-games-description{margin:8px 0 14px;color:#aaa3b1;font-size:12px;line-height:1.6}
 .played-games-add-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;margin-bottom:14px}
-.played-games-add-form input,.played-game-vod-form input{width:100%;min-width:0;min-height:40px;padding:9px 11px;border:1px solid #ffffff20;border-radius:10px;background:#111018;color:var(--text);outline:0;font:12px var(--font)}
+.played-games-add-panel{display:grid;gap:8px;margin-bottom:14px}
+.played-games-type-select,.played-games-add-form input,.played-games-add-form select,.played-game-vod-form input{width:100%;min-width:0;min-height:40px;padding:9px 11px;border:1px solid #ffffff20;border-radius:10px;background:#111018;color:var(--text);outline:0;font:12px var(--font)}
+.played-games-type-select{max-width:340px;background-color:#17141d}
+.played-games-add-form[hidden],.played-game-league-editor[hidden]{display:none}
+.played-games-lol-form{grid-template-columns:minmax(0,1fr) minmax(130px,.55fr) auto}
 .played-games-add-form input:focus,.played-game-vod-form input:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
+.played-games-add-form select:focus,.played-games-type-select:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
 .played-games-add-form .button{white-space:nowrap}
 .played-games-owner-hint{grid-column:1/-1;color:#8f8997;font-size:11px;line-height:1.5}
 .played-games-empty-state{margin:0;padding:15px;border-radius:10px;background:#ffffff04;color:#96909d;text-align:center;font-size:12px}
@@ -391,6 +396,16 @@
 .played-game-details strong{overflow:hidden;font-size:14px;text-overflow:ellipsis;white-space:nowrap;transition:color .18s}
 .played-game-steam-link:hover .played-game-details strong{color:var(--pink)}
 .played-game-details>span{color:#928a9a;font-size:11px}
+.played-game-league-account{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;margin-top:10px;padding:9px;border:1px solid #ffffff16;border-radius:10px;background:#ffffff04}
+.played-game-league-copy{display:grid;gap:3px;min-width:0}
+.played-game-league-copy strong{overflow-wrap:anywhere;color:var(--text);font-size:12px}
+.played-game-league-copy span,.played-game-league-unlinked{color:#aaa3b1;font-size:11px;line-height:1.5}
+.played-game-opgg-link{grid-column:2;grid-row:1/3;white-space:nowrap;font-size:11px}
+.played-game-league-edit,.played-game-league-unlink{justify-self:start;padding:5px 8px;font-size:10px}
+.played-game-league-unlink{border:0;background:none;color:#b17b8c;text-decoration:underline}
+.played-game-league-editor{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,.65fr);gap:7px;width:100%}
+.played-game-league-editor input,.played-game-league-editor select{min-width:0;min-height:36px;padding:8px 10px;border:1px solid #ffffff20;border-radius:9px;background:#111018;color:var(--text);outline:0;font:11px var(--font)}
+.played-game-league-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:6px}
 .played-game-delete-button{flex:none;padding:6px 8px;color:#efb0bd;font-size:10px}
 .played-game-vods-heading{display:flex;align-items:center;gap:7px;margin-top:11px;padding-top:9px;border-top:1px solid #ffffff10;font-size:11px}
 .played-game-vods-heading span{color:#928a9a}
@@ -403,7 +418,7 @@
 .played-game-vod-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin-top:8px}
 .played-game-vod-form input{min-height:34px;padding:7px 9px;font-size:11px}
 .played-game-vod-form .button{padding:6px 9px;font-size:10px;white-space:nowrap}
-@media(max-width:720px){.played-games-heading h2{font-size:21px}.played-games-add-form{grid-template-columns:1fr}.played-games-add-form .button{width:100%}.played-games-grid{grid-template-columns:1fr 1fr;gap:8px}.played-game-card{padding:8px}.played-game-details strong{font-size:13px}.played-game-vod-form{grid-template-columns:1fr}.played-game-vod-form .button{width:100%}}
+@media(max-width:720px){.played-games-heading h2{font-size:21px}.played-games-add-form,.played-games-lol-form{grid-template-columns:1fr}.played-games-add-form .button{width:100%}.played-games-type-select{max-width:none}.played-games-grid{grid-template-columns:1fr 1fr;gap:8px}.played-game-card{padding:8px}.played-game-details strong{font-size:13px}.played-game-vod-form{grid-template-columns:1fr}.played-game-vod-form .button{width:100%}.played-game-league-account{grid-template-columns:1fr}.played-game-opgg-link{grid-column:auto;grid-row:auto;width:100%;text-align:center}.played-game-league-editor{grid-template-columns:1fr}}
 @media(max-width:420px){.played-games-grid{grid-template-columns:1fr}.played-game-vod-form{grid-template-columns:minmax(0,1fr) auto}.played-game-vod-form .button{width:auto}}
 .calendar-section{margin-top:18px}
 .calendar-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
