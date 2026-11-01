@@ -8683,7 +8683,7 @@ function renderWeeklyScheduleDialog(page) {
   const imageCard = document.createElement('div'); imageCard.className = 'account-dialog-card weekly-schedule-gallery-card';
   const imageHeading = document.createElement('div'); imageHeading.className = 'weekly-schedule-image-heading';
   const imageLabel = document.createElement('strong'); imageLabel.textContent = '갤러리 이미지';
-  const imageNote = document.createElement('small'); imageNote.textContent = '이미지를 선택하면 방송표에 바로 적용돼요.';
+  const imageNote = document.createElement('small'); imageNote.textContent = '갤러리에서 선택하거나, 템플릿의 사진 칸에 파일을 끌어 놓으면 갤러리에 등록하고 바로 적용해요.';
   imageHeading.append(imageLabel, imageNote);
   const imageActions = document.createElement('div'); imageActions.className = 'weekly-schedule-image-actions';
   const chooseImage = document.createElement('button'); chooseImage.type = 'button'; chooseImage.className = 'button'; chooseImage.textContent = '갤러리에서 선택';
@@ -8795,7 +8795,8 @@ function renderWeeklyScheduleDialog(page) {
   previewCanvas.width = WEEKLY_SCHEDULE_LAYOUT.width; previewCanvas.height = WEEKLY_SCHEDULE_LAYOUT.height; previewCanvas.setAttribute('aria-label', '주간 방송표 이미지 미리보기');
   const avatarHitArea = document.createElement('button'); avatarHitArea.type = 'button'; avatarHitArea.className = 'weekly-schedule-avatar-hit-area';
   setWeeklySchedulePercentRect(avatarHitArea, WEEKLY_SCHEDULE_LAYOUT.avatar);
-  avatarHitArea.setAttribute('aria-label', '템플릿 이미지 칸에서 갤러리 사진 선택 또는 등록');
+  avatarHitArea.setAttribute('aria-label', '템플릿 이미지 칸에서 갤러리 사진을 선택하거나 파일을 끌어 놓아 등록');
+  avatarHitArea.title = '클릭해 갤러리 이미지를 선택하거나, 이미지 파일을 이 칸에 끌어 놓으세요.';
   const footerTextInput = document.createElement('input'); footerTextInput.type = 'text'; footerTextInput.className = 'weekly-schedule-footer-text';
   footerTextInput.maxLength = 48; footerTextInput.setAttribute('aria-label', '하단 리본 날짜 또는 문구');
   footerTextInput.title = '날짜 범위 또는 원하는 문구를 입력할 수 있어요.';
@@ -8816,7 +8817,7 @@ function renderWeeklyScheduleDialog(page) {
   footerActions.append(download, copyEmbed); footer.append(saveHint, footerTextWarning, footerActions);
   dayHeading.hidden = true; previewHeading.hidden = true;
   form.append(meta, templateControls, previewFrame, linkedEventsToggle, linkedEventsPanel, footer);
-  card.append(header, form); dialog.append(card, imageTools, templateDialog);
+  card.append(header, form); dialog.append(card, imageTools);
 
   const templateImages = new Map();
   let drawRequest = 0;
@@ -8981,28 +8982,50 @@ function renderWeeklyScheduleDialog(page) {
       image.src = objectUrl;
     });
   }
-  async function uploadScheduleGalleryImage() {
-    const file = fileInput.files?.[0];
+  function setScheduleUploadControlsBusy(busy) {
+    const locked = state.templateId === 'starlight' && !state.canUseStarlight;
+    previousWeek.disabled = busy || state.weekNavigationBusy;
+    nextWeek.disabled = busy || state.weekNavigationBusy;
+    avatarHitArea.disabled = busy || state.weekNavigationBusy || locked;
+    chooseImage.disabled = busy || state.weekNavigationBusy;
+    uploadImage.disabled = busy || state.weekNavigationBusy;
+    clearImage.disabled = busy || state.weekNavigationBusy || !(state.selectedImage || state.savedAvatar);
+    uploadSubmit.disabled = busy;
+    close.disabled = busy;
+  }
+  async function uploadScheduleGalleryImage(fileOverride = null, directDrop = false) {
+    const file = fileOverride || fileInput.files?.[0];
+    const setStatus = (message) => {
+      uploadStatus.textContent = message;
+      if (directDrop && dialog.open) { state.saveStatus = message; saveStatus.textContent = message; }
+    };
+    const rejectUpload = (message) => {
+      setStatus(message);
+      if (directDrop) showToast(message);
+    };
     const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-    if (!file) { uploadStatus.textContent = '이미지 파일을 선택해 주세요.'; return; }
-    if (!allowed.has(file.type)) { uploadStatus.textContent = 'jpg/png/webp/gif 이미지만 등록할 수 있어요.'; return; }
-    if (file.size <= 0 || file.size > 15 * 1024 * 1024) { uploadStatus.textContent = '이미지 용량은 15MB 이하여야 해요.'; return; }
-    if (state.uploadBusy) return;
+    if (!file) { rejectUpload('이미지 파일을 선택해 주세요.'); return; }
+    if (!allowed.has(file.type)) { rejectUpload('jpg/png/webp/gif 이미지만 등록할 수 있어요.'); return; }
+    if (file.size <= 0 || file.size > 15 * 1024 * 1024) { rejectUpload('이미지 용량은 15MB 이하여야 해요.'); return; }
+    if (state.uploadBusy || state.weekNavigationBusy || state.loading) {
+      rejectUpload('일정이나 이미지 등록이 진행 중이에요. 완료된 뒤 다시 시도해 주세요.'); return;
+    }
     state.uploadBusy = true; uploadSubmit.disabled = true; uploadSubmit.textContent = '등록 중…';
+    setScheduleUploadControlsBusy(true);
     let uploadedToR2 = false;
     try {
-      uploadStatus.textContent = '갤러리 형식의 썸네일을 만드는 중…';
+      setStatus('갤러리 형식의 썸네일을 만드는 중…');
       const thumb = await makeGalleryThumbnail(file);
-      uploadStatus.textContent = '갤러리 저장 공간을 준비하는 중…';
+      setStatus('갤러리 저장 공간을 준비하는 중…');
       const target = (await callGalleryUploadTarget({ streamerId: page.streamer.id, view: 'upload-target' })).data;
       const prepared = (await callGalleryUploadPrepare({ contentType: file.type, fileSize: file.size, thumbFileSize: thumb.blob.size })).data;
-      uploadStatus.textContent = '이미지와 썸네일을 갤러리에 올리는 중…';
+      setStatus('이미지와 썸네일을 갤러리에 올리는 중…');
       const imagePut = await fetch(prepared.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
       if (!imagePut.ok) throw new Error(`원본 업로드에 실패했어요 (${imagePut.status}).`);
       uploadedToR2 = true;
       const thumbPut = await fetch(prepared.thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumb.blob });
       if (!thumbPut.ok) throw new Error(`썸네일 업로드에 실패했어요 (${thumbPut.status}).`);
-      uploadStatus.textContent = '갤러리에 이미지를 등록하는 중…';
+      setStatus('갤러리에 이미지를 등록하는 중…');
       const registered = (await callGalleryImageRegister({
         imageId: prepared.imageId, key: prepared.key, thumbKey: prepared.thumbKey,
         streamerId: target.streamerId, streamerName: target.streamerName, category: category.value,
@@ -9018,14 +9041,17 @@ function renderWeeklyScheduleDialog(page) {
       state.galleryItems = [{ ...state.selectedImage, thumbUrl: registered.thumbUrl }, ...state.galleryItems.filter((item) => item.id !== registered.imageId)];
       state.galleryLoaded = true; state.galleryOpen = false; state.uploadOpen = false;
       galleryPanel.hidden = true; uploadPanel.hidden = true; if (imageTools.open) imageTools.close(); fileInput.value = '';
-      uploadStatus.textContent = '갤러리 등록을 마치고 방송표에 적용했어요.';
+      setStatus('갤러리 등록을 마치고 방송표에 적용했어요.');
       markWeeklyDirty(); showToast('갤러리에 이미지를 등록하고 방송표에 넣었어요.');
     } catch (error) {
-      uploadStatus.textContent = uploadedToR2
+      const message = uploadedToR2
         ? `${error.message || '등록하지 못했어요.'} 파일 업로드 후 갤러리 등록 단계에서 실패했을 수 있어요.`
         : (error.message || '갤러리에 이미지를 등록하지 못했어요.');
+      setStatus(message);
+      if (directDrop) showToast(message);
     } finally {
-      state.uploadBusy = false; uploadSubmit.disabled = false; uploadSubmit.textContent = '갤러리에 등록하고 선택';
+      state.uploadBusy = false; uploadSubmit.textContent = '갤러리에 등록하고 선택';
+      setScheduleUploadControlsBusy(false);
     }
   }
   function syncWeeklyFields() {
@@ -9182,7 +9208,7 @@ function renderWeeklyScheduleDialog(page) {
   });
 
   async function moveEditorWeek(offset) {
-    if (state.weekNavigationBusy) return;
+    if (state.weekNavigationBusy || state.uploadBusy) return;
     let entries;
     try { entries = collectWeeklyEntries(); }
     catch (error) { state.saveStatus = error.message; saveStatus.textContent = error.message; return; }
@@ -9308,11 +9334,45 @@ function renderWeeklyScheduleDialog(page) {
     if (state.galleryOpen) { state.uploadOpen = false; uploadPanel.hidden = true; }
   });
   avatarHitArea.addEventListener('click', () => {
+    if (state.uploadBusy || state.weekNavigationBusy) return;
     state.galleryOpen = false; state.uploadOpen = false;
     galleryPanel.hidden = true; uploadPanel.hidden = true;
     clearImage.hidden = !(state.selectedImage || state.savedAvatar);
     showFanPageModal(imageTools);
   });
+  let avatarDragDepth = 0;
+  const isFileDrag = (event) => Array.from(event.dataTransfer?.types || []).includes('Files');
+  avatarHitArea.addEventListener('dragenter', (event) => {
+    if (!isFileDrag(event) || state.uploadBusy || state.weekNavigationBusy || state.loading || avatarHitArea.disabled) return;
+    event.preventDefault(); event.stopPropagation(); avatarDragDepth += 1;
+    avatarHitArea.classList.add('weekly-schedule-drop-target-active');
+  });
+  avatarHitArea.addEventListener('dragover', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault(); event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    if (!state.uploadBusy && !state.weekNavigationBusy && !state.loading && !avatarHitArea.disabled) {
+      avatarHitArea.classList.add('weekly-schedule-drop-target-active');
+    }
+  });
+  avatarHitArea.addEventListener('dragleave', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault(); event.stopPropagation(); avatarDragDepth = Math.max(0, avatarDragDepth - 1);
+    if (avatarDragDepth === 0) avatarHitArea.classList.remove('weekly-schedule-drop-target-active');
+  });
+  avatarHitArea.addEventListener('drop', (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault(); event.stopPropagation(); avatarDragDepth = 0;
+    avatarHitArea.classList.remove('weekly-schedule-drop-target-active');
+    if (avatarHitArea.disabled || state.uploadBusy || state.weekNavigationBusy || state.loading) {
+      showToast('일정이나 이미지 등록이 진행 중이에요. 완료된 뒤 다시 시도해 주세요.'); return;
+    }
+    const files = Array.from(event.dataTransfer?.files || []);
+    if (files.length !== 1) { showToast('한 번에 이미지 파일 한 개만 끌어 놓을 수 있어요.'); return; }
+    void uploadScheduleGalleryImage(files[0], true);
+  });
+  dialog.addEventListener('dragover', (event) => { if (isFileDrag(event)) event.preventDefault(); });
+  dialog.addEventListener('drop', (event) => { if (isFileDrag(event)) event.preventDefault(); });
   closeImageTools.addEventListener('click', () => { imageTools.close(); });
   uploadImage.addEventListener('click', () => {
     state.uploadOpen = !state.uploadOpen; uploadPanel.hidden = !state.uploadOpen;
@@ -9334,7 +9394,10 @@ function renderWeeklyScheduleDialog(page) {
   });
   previousWeek.addEventListener('click', () => { void moveEditorWeek(-1); });
   nextWeek.addEventListener('click', () => { void moveEditorWeek(1); });
-  const closeAndSave = async () => { if (await saveCurrentWeek()) dialog.close(); };
+  const closeAndSave = async () => {
+    if (state.uploadBusy) { showToast('이미지 등록이 끝난 뒤 방송표를 닫을 수 있어요.'); return; }
+    if (await saveCurrentWeek()) dialog.close();
+  };
   close.addEventListener('click', closeAndSave);
   dialog.addEventListener('cancel', (event) => {
     // 자식 갤러리 모달이나 파일 선택기에서 올라온 취소는 편집 모달 취소로 처리하지 않는다.
