@@ -1052,6 +1052,16 @@ function setSearchHint(message, isError = false) {
   hint.classList.toggle('is-error', isError);
 }
 
+function setSearchProgress(message = '', requestId = searchRequestId) {
+  if (requestId !== searchRequestId) return;
+  const progress = $('viewerSearchProgress');
+  const label = $('viewerSearchProgressLabel');
+  const isActive = Boolean(message);
+  label.textContent = message;
+  progress.setAttribute('aria-valuetext', message);
+  progress.classList.toggle('hidden', !isActive);
+}
+
 function renderSearchResults(streamers) {
   const results = $('viewerSearchResults');
   results.replaceChildren();
@@ -3032,12 +3042,16 @@ async function runSearch(query, options = {}) {
   const idFromInput = parseSoopId(cleanQuery);
   const searchQuery = idFromInput || cleanQuery;
   setSearchHint('스트리머를 찾고 있어요…');
+  setSearchProgress('검색 요청을 준비하고 있어요…', requestId);
   $('viewerSearchButton').disabled = true;
   renderSearchResults([]);
   try {
     await getAuthReady();
+    if (requestId !== searchRequestId) return;
+    setSearchProgress('SOOP 방송국 정보를 찾고 있어요…', requestId);
     const response = await callViewerStats({ action: 'search', query: searchQuery });
     if (requestId !== searchRequestId) return;
+    setSearchProgress('검색 결과를 정리하고 있어요…', requestId);
     const streamers = Array.isArray(response.data && response.data.streamers) ? response.data.streamers : [];
     const candidates = streamers.slice();
     const exactSoopId = parseSoopId(options.exactSoopId || '');
@@ -3045,6 +3059,7 @@ async function runSearch(query, options = {}) {
       const exactStreamer = candidates.find((item) => String(item.soopId || '').toLowerCase() === exactSoopId)
         || streamerForId(exactSoopId);
       renderSearchResults([exactStreamer]);
+      setSearchProgress('스트리머를 찾았어요. 다시보기 목록을 불러오고 있어요…', requestId);
       await selectStreamer(exactStreamer);
       return;
     }
@@ -3057,11 +3072,13 @@ async function runSearch(query, options = {}) {
       || String(item.nickname).toLocaleLowerCase() === searchQuery.toLocaleLowerCase());
     if (exactMatches.length === 1) {
       renderSearchResults(candidates);
+      setSearchProgress('스트리머를 찾았어요. 다시보기 목록을 불러오고 있어요…', requestId);
       await selectStreamer(exactMatches[0]);
       return;
     }
     if (candidates.length === 1) {
       renderSearchResults(candidates);
+      setSearchProgress('스트리머를 찾았어요. 다시보기 목록을 불러오고 있어요…', requestId);
       await selectStreamer(candidates[0]);
       return;
     }
@@ -3074,7 +3091,10 @@ async function runSearch(query, options = {}) {
   } catch (error) {
     if (requestId === searchRequestId) setSearchHint(viewerStatsErrorMessage(error, '스트리머 검색에 실패했어요.'), true);
   } finally {
-    if (requestId === searchRequestId) $('viewerSearchButton').disabled = false;
+    if (requestId === searchRequestId) {
+      setSearchProgress('', requestId);
+      $('viewerSearchButton').disabled = false;
+    }
   }
 }
 
@@ -3088,7 +3108,24 @@ $('viewerSearchResults').addEventListener('click', (event) => {
   if (!button) return;
   const streamers = $('viewerSearchResults')._streamers || [];
   const streamer = streamers[Number(button.dataset.streamerIndex)];
-  if (streamer) selectStreamer(streamer);
+  if (!streamer) return;
+  const requestId = ++searchRequestId;
+  $('viewerSearchButton').disabled = true;
+  setSearchProgress('스트리머를 선택했어요. 다시보기 목록을 불러오고 있어요…', requestId);
+  void (async () => {
+    try {
+      await selectStreamer(streamer);
+    } catch (error) {
+      if (requestId === searchRequestId) {
+        setSearchHint(viewerStatsErrorMessage(error, '다시보기 목록을 불러오지 못했어요.'), true);
+      }
+    } finally {
+      if (requestId === searchRequestId) {
+        setSearchProgress('', requestId);
+        $('viewerSearchButton').disabled = false;
+      }
+    }
+  })();
 });
 
 $('viewerLoadMore').addEventListener('click', () => {
