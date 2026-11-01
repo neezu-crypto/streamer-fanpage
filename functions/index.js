@@ -16,8 +16,8 @@ const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
 const { planWeFlabUpboImport } = require('./upbo-weflab-import');
 const {
-  disconnectOpggAccount,
   disconnectOpggAccountFromGames,
+  getOpggAccountUnlinkPatch,
   getOpggGameType,
   isPlayedGameId,
   OP_GG_GAME_CONFIG,
@@ -7105,20 +7105,14 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
       throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
     }
     const gameRef = rootRef.child(target.appId);
-    const before = await gameRef.get();
-    let callbackState = null;
-    const transaction = await gameRef.transaction((current) => {
-      callbackState = current;
-      return disconnectOpggAccount(current) || undefined;
-    });
-    if (!transaction.committed) {
-      console.warn('OP.GG unlink transaction did not commit', {
-        gameType: gameType || '', hasRequestedAppId: Boolean(appId), targetExistsBefore: before.exists(),
-        targetTypeBefore: getOpggGameType(before.val()), callbackHasCurrent: Boolean(callbackState),
-        callbackType: getOpggGameType(callbackState),
-      });
+    const game = (await gameRef.get()).val();
+    const resolvedGameType = getOpggGameType(game);
+    const patch = getOpggAccountUnlinkPatch(game);
+    if (!patch || (gameType && resolvedGameType !== gameType)) {
+      console.warn('OP.GG unlink target changed before update', { gameType: gameType || '', targetType: resolvedGameType });
       throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
     }
+    await gameRef.update(patch);
     return { playedGames: normalizePlayedGames((await rootRef.get()).val()) };
   }
 

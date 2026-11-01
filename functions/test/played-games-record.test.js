@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   disconnectOpggAccount,
   disconnectOpggAccountFromGames,
+  getOpggAccountUnlinkPatch,
   disconnectLeagueOfLegendsAccount,
   getOpggGameType,
   isLeagueOfLegendsGame,
@@ -157,6 +158,16 @@ test('연결 해제 대상이 모호하면 아무 계정도 변경하지 않는�
   assert.deepEqual(disconnectOpggAccountFromGames(games, { gameType: 'valorant' }), {
     ok: false, error: 'ambiguous-target',
   });
+});
+
+test('계정 연결 해제 패치는 계정 ID와 게임별 지역만 제거한다', () => {
+  assert.deepEqual(getOpggAccountUnlinkPatch({
+    gameType: 'valorant', riotId: 'Player#NA1', opggRegion: 'kr', bestRecord: { type: 'rank', value: '다이아' },
+  }), { riotId: null });
+  assert.deepEqual(getOpggAccountUnlinkPatch({
+    gameType: 'overwatch', battleTag: 'Player#1234', overwatchRegion: 'kr',
+  }), { battleTag: null, overwatchRegion: null });
+  assert.equal(getOpggAccountUnlinkPatch({ gameType: 'pubg', name: '배틀그라운드' }), null);
 });
 
 test('League of Legends 계정 추가는 기존 게임 데이터를 보존하고 중복 항목을 만들지 않는다', () => {
