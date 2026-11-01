@@ -8509,6 +8509,7 @@ async function loadWeeklySchedulePageData(page, weekStart, board, options = {}) 
     state.footerText = typeof saved.data.footerText === 'string' ? saved.data.footerText.slice(0, 48) : '';
     state.templateId = saved.data.templateId === 'starlight' ? 'starlight' : 'default';
     state.canUseStarlight = saved.data.canUseStarlight === true;
+    state.canCopyWeeklyScheduleHtml = saved.data.canCopyWeeklyScheduleHtml === true;
     state.animationEnabled = saved.data.animationEnabled !== false;
     state.avatarImageId = savedAvatarId;
     state.updatedAt = Number(saved.data.updatedAt) || 0;
@@ -8929,6 +8930,7 @@ function weeklyScheduleGraphicStateFor(streamerId) {
       footerText: '',
       templateId: 'default',
       canUseStarlight: false,
+      canCopyWeeklyScheduleHtml: false,
       animationEnabled: true,
       selectedImage: null,
       avatarImageId: '',
@@ -9245,7 +9247,7 @@ function renderWeeklyScheduleDialog(page) {
     ctx.restore();
     WEEKLY_SCHEDULE_LAYOUT.days.forEach((rect, index) => drawGraphicDay(dayInputs[index], index, rect, includeEditableValues));
     selectedImageNote.textContent = selected ? `적용 중 · ${selected.categoryLabel || '갤러리 이미지'}` : '사진을 고르지 않으면 이 칸은 비워 둡니다.';
-    clearImage.disabled = !selected; clearImage.hidden = !selected;
+    clearImage.disabled = (state.templateId === 'starlight' && !state.canUseStarlight) || !selected; clearImage.hidden = !selected;
   }
 
   async function loadScheduleGallery(append = false) {
@@ -9268,6 +9270,7 @@ function renderWeeklyScheduleDialog(page) {
     galleryStatus.textContent = state.galleryItems.length ? '' : '선택할 수 있는 공개 갤러리 이미지가 없어요.';
     state.galleryItems.forEach((item) => {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'weekly-schedule-gallery-image';
+      button.disabled = state.templateId === 'starlight' && !state.canUseStarlight;
       button.setAttribute('aria-label', `${item.categoryLabel || '갤러리'} 이미지 선택`);
       const image = document.createElement('img'); image.src = item.thumbUrl; image.alt = ''; image.loading = 'lazy';
       button.append(image); button.addEventListener('click', () => selectScheduleGalleryImage(item)); galleryGrid.append(button);
@@ -9313,10 +9316,10 @@ function renderWeeklyScheduleDialog(page) {
     previousWeek.disabled = busy || state.weekNavigationBusy;
     nextWeek.disabled = busy || state.weekNavigationBusy;
     avatarHitArea.disabled = busy || state.weekNavigationBusy || locked;
-    chooseImage.disabled = busy || state.weekNavigationBusy;
-    uploadImage.disabled = busy || state.weekNavigationBusy;
-    clearImage.disabled = busy || state.weekNavigationBusy || !(state.selectedImage || state.savedAvatar);
-    uploadSubmit.disabled = busy;
+    chooseImage.disabled = busy || state.weekNavigationBusy || locked;
+    uploadImage.disabled = busy || state.weekNavigationBusy || locked;
+    clearImage.disabled = busy || state.weekNavigationBusy || locked || !(state.selectedImage || state.savedAvatar);
+    uploadSubmit.disabled = busy || locked;
     close.disabled = busy;
   }
   async function uploadScheduleGalleryImage(fileOverride = null, directDrop = false) {
@@ -9392,9 +9395,11 @@ function renderWeeklyScheduleDialog(page) {
     const locked = state.templateId === 'starlight' && !state.canUseStarlight;
     templateSelect.value = state.templateId; syncMotionToggle();
     templateSelect.options[1].disabled = !state.canUseStarlight && !locked;
-    templateHint.textContent = locked ? '인증 권한이 없어 읽기만 가능합니다. 기본 템플릿을 선택하면 수정할 수 있어요.' : (!state.canUseStarlight ? '별빛 방송국은 해당 팬페이지의 인증 스트리머만 적용할 수 있어요.' : '');
+    templateHint.textContent = locked ? '고급 템플릿은 관리자 전용입니다. 기본 템플릿을 선택하면 일정을 수정할 수 있어요.' : (!state.canUseStarlight ? '고급 템플릿은 관리자만 선택할 수 있어요.' : '');
     footerTextInput.disabled = locked; avatarHitArea.disabled = locked; download.disabled = locked;
-    copyEmbed.disabled = !state.canUseStarlight || state.loading || state.weekNavigationBusy;
+    chooseImage.disabled = locked; uploadImage.disabled = locked;
+    clearImage.disabled = locked || !(state.selectedImage || state.savedAvatar); uploadSubmit.disabled = locked;
+    copyEmbed.disabled = !state.canCopyWeeklyScheduleHtml || state.loading || state.weekNavigationBusy;
     previewFrame.classList.toggle('weekly-template-locked', locked);
     weekInput.value = state.weekStart;
     graphicTitle.value = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
@@ -9501,7 +9506,7 @@ function renderWeeklyScheduleDialog(page) {
   }
 
   copyEmbed.addEventListener('click', async () => {
-    if (!state.canUseStarlight) { showToast('SOOP용 HTML 코드는 해당 팬페이지의 인증 스트리머만 사용할 수 있어요.'); return; }
+    if (!state.canCopyWeeklyScheduleHtml) { showToast('SOOP용 HTML 코드는 해당 팬페이지의 인증 스트리머만 사용할 수 있어요.'); return; }
     copyEmbed.disabled = true;
     try {
       if (state.weekNavigationBusy || state.loading) throw new Error('일정을 불러온 뒤 다시 시도해 주세요.');
@@ -9514,7 +9519,7 @@ function renderWeeklyScheduleDialog(page) {
       await navigator.clipboard.writeText(code);
       showToast('SOOP용 HTML을 복사했어요.');
     } catch (error) { showToast(error.message || 'HTML을 복사하지 못했어요.'); }
-    finally { copyEmbed.disabled = !state.canUseStarlight || state.loading || state.weekNavigationBusy; }
+    finally { copyEmbed.disabled = !state.canCopyWeeklyScheduleHtml || state.loading || state.weekNavigationBusy; }
   });
 
   function markWeeklyDirty() {
@@ -9549,10 +9554,10 @@ function renderWeeklyScheduleDialog(page) {
     const setNavigationBusy = (busy) => {
       const locked = state.templateId === 'starlight' && !state.canUseStarlight;
       previousWeek.disabled = busy; nextWeek.disabled = busy;
-      copyEmbed.disabled = busy || !state.canUseStarlight;
+      copyEmbed.disabled = busy || !state.canCopyWeeklyScheduleHtml;
       footerTextInput.disabled = busy || locked; avatarHitArea.disabled = busy || locked; download.disabled = busy || locked;
-      chooseImage.disabled = busy; uploadImage.disabled = busy;
-      clearImage.disabled = busy || !(state.selectedImage || state.savedAvatar);
+      chooseImage.disabled = busy || locked; uploadImage.disabled = busy || locked;
+      clearImage.disabled = busy || locked || !(state.selectedImage || state.savedAvatar);
       dayInputs.forEach((input) => {
         input.offline.disabled = busy || locked;
         syncOfflineDayEditor(input, busy || locked);
