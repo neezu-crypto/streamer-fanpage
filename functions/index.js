@@ -108,6 +108,9 @@ const MAX_LOADED_VIDEO_ITEMS = 500;
 const FANPAGE_VOD_COMMENT_PAGE_SIZE = 50;
 const FANPAGE_VOD_COMMENT_MAX_LENGTH = 500;
 const VOD_REFRESH_LOCK_TTL_MS = 2 * 60 * 1000;
+const VOD_AUTO_REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+const VOD_AUTO_REFRESH_LEASE_MS = 70 * 60 * 1000;
+const VOD_AUTO_REFRESH_RETRY_DELAY_MS = 15 * 60 * 1000;
 const SOOP_VOD_API = 'https://chapi.sooplive.com/api';
 const SOOP_VOD_INFO_API = 'https://api.m.sooplive.com/station/video/a/view';
 const SOOP_VOD_STAR2_STATS_API = 'https://apisabana.sooplive.com/service/vod_star2_stats.php';
@@ -1422,6 +1425,49 @@ function vodListRef(streamerId) {
 
 function vodRefreshLockRef(streamerId) {
   return db.ref(`streamerFanPageVodRefreshLocks/${streamerId}`);
+}
+
+function vodAutoRefreshStateRef(streamerId) {
+  return db.ref(`streamerFanPageVodAutoRefresh/${streamerId}`);
+}
+
+async function reserveVodAutoRefresh(streamerId) {
+  const now = Date.now();
+  const token = randomUUID();
+  const stateRef = vodAutoRefreshStateRef(streamerId);
+  const result = await stateRef.transaction((current) => {
+    const state = current && typeof current === 'object' ? current : {};
+    const lastSuccessAt = Number(state.lastSuccessAt) || 0;
+    if (lastSuccessAt && now - lastSuccessAt < VOD_AUTO_REFRESH_INTERVAL_MS) return;
+    if (Number(state.retryAfterAt) > now || Number(state.leaseExpiresAt) > now) return;
+    return {
+      lastSuccessAt: lastSuccessAt || null,
+      leaseToken: token,
+      leaseExpiresAt: now + VOD_AUTO_REFRESH_LEASE_MS,
+    };
+  });
+  const state = result.snapshot.val() || {};
+  if (result.committed && state.leaseToken === token) {
+    return { reserved: true, token, stateRef };
+  }
+  const lastSuccessAt = Number(state.lastSuccessAt) || 0;
+  return {
+    reserved: false,
+    reason: lastSuccessAt && now - lastSuccessAt < VOD_AUTO_REFRESH_INTERVAL_MS ? 'interval' : 'in-progress',
+    nextRefreshAt: lastSuccessAt ? lastSuccessAt + VOD_AUTO_REFRESH_INTERVAL_MS : null,
+  };
+}
+
+async function finishVodAutoRefresh(reservation, succeeded) {
+  if (!reservation || !reservation.stateRef || !reservation.token) return;
+  const now = Date.now();
+  await reservation.stateRef.transaction((current) => {
+    if (!current || current.leaseToken !== reservation.token) return;
+    if (succeeded) {
+      return { lastSuccessAt: now };
+    }
+    return { lastSuccessAt: Number(current.lastSuccessAt) || null, retryAfterAt: now + VOD_AUTO_REFRESH_RETRY_DELAY_MS };
+  });
 }
 
 function vodItemKey(index) {
@@ -7681,9 +7727,13 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
 
 exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3600, memory: '1GiB' }, async (request) => {
   const uid = requireAuth(request);
+  const automatic = !!(request.data && request.data.automatic === true);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   let targetStreamer;
-  if (isAdmin) {
+  if (automatic) {
+    if (!verified) throw new HttpsError('permission-denied', '인증된 스트리머 본인만 자동 갱신할 수 있습니다.');
+    targetStreamer = verified;
+  } else if (isAdmin) {
     const targetId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
     if (!targetId) throw new HttpsError('invalid-argument', '갱신할 팬페이지를 지정해 주세요.');
     targetStreamer = await findVerifiedBySoopId(targetId);
@@ -7693,11 +7743,25 @@ exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3
     targetStreamer = verified;
   }
 
+  let autoRefreshReservation = null;
+  if (automatic) {
+    autoRefreshReservation = await reserveVodAutoRefresh(targetStreamer.streamer.id);
+    if (!autoRefreshReservation.reserved) {
+      return autoRefreshReservation.reason === 'interval'
+        ? { skipped: true, reason: 'interval', nextRefreshAt: autoRefreshReservation.nextRefreshAt }
+        : { inProgress: true };
+    }
+  }
+
   const lock = await acquireVodRefreshLock(targetStreamer.streamer.id);
   if (!lock.acquired) {
+    await finishVodAutoRefresh(autoRefreshReservation, false).catch((error) => {
+      console.warn('Could not release the SOOP VOD auto-refresh reservation:', error);
+    });
     return { inProgress: true, retryAfterMs: lock.retryAfterMs };
   }
   const { token, lockRef } = lock;
+  let autoRefreshSucceeded = false;
   try {
     try {
       const vods = await stageAndPublishSoopVods(
@@ -7706,6 +7770,7 @@ exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3
         token,
         lockRef,
       );
+      autoRefreshSucceeded = automatic;
       return { vods };
     } catch (error) {
       if (error instanceof HttpsError && error.details && error.details.reason === 'vod-refresh-in-progress') {
@@ -7714,6 +7779,9 @@ exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3
       throw error;
     }
   } finally {
+    await finishVodAutoRefresh(autoRefreshReservation, autoRefreshSucceeded).catch((error) => {
+      console.warn('Could not update the SOOP VOD auto-refresh state:', error);
+    });
     await lockRef.transaction((current) => (current && current.token === token ? null : undefined)).catch((error) => {
       console.warn('Could not release the SOOP VOD refresh lock:', error);
     });

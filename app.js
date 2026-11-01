@@ -371,6 +371,7 @@ let verifiedStatusUnsubscribe = null;
 let switchApprovalUnsubscribe = null;
 let switchHandoffInProgress = false;
 const vodRefreshesInProgress = new Set();
+const vodAutoRefreshAttempts = new Set();
 const vodPageLoadsInProgress = new Set();
 let vodCommentState = null;
 let vodCommentRequestId = 0;
@@ -4695,6 +4696,8 @@ function renderFanPage(page, options = {}) {
     footer.append(note, footerActions); editor.append(grid, footer); editorDialog.append(editor);
     view.append(editorDialog);
   }
+
+  if (page.isStreamerOwner) void refreshVodsOnStreamerVisit(page);
 }
 
 function createFanPageQuickRemote(view) {
@@ -10077,6 +10080,28 @@ function replaceVodSectionIfCurrent(streamerId) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const section = $('vodSection');
   if (section) section.replaceWith(renderVodSection(currentPage));
+}
+
+async function refreshVodsOnStreamerVisit(page) {
+  const streamerId = String(page && page.streamer && page.streamer.id || '').trim().toLowerCase();
+  if (!streamerId || page.isStreamerOwner !== true
+    || vodAutoRefreshAttempts.has(streamerId)
+    || vodRefreshesInProgress.has(streamerId)) return;
+
+  vodAutoRefreshAttempts.add(streamerId);
+  vodRefreshesInProgress.add(streamerId);
+  replaceVodSectionIfCurrent(streamerId);
+  try {
+    const result = await callVodRefresh({ automatic: true });
+    if (result.data && result.data.vods && currentPage?.streamer.id === streamerId) {
+      currentPage.vods = result.data.vods;
+    }
+  } catch (error) {
+    console.warn('SOOP VOD auto-refresh failed:', error.message || error);
+  } finally {
+    vodRefreshesInProgress.delete(streamerId);
+    replaceVodSectionIfCurrent(streamerId);
+  }
 }
 
 async function loadMoreVods(streamerId, currentVods) {
