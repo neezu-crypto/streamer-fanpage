@@ -7104,10 +7104,18 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
       });
       throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
     }
-    const transaction = await rootRef.child(target.appId).transaction((current) => disconnectOpggAccount(current) || undefined);
+    const gameRef = rootRef.child(target.appId);
+    const before = await gameRef.get();
+    let callbackState = null;
+    const transaction = await gameRef.transaction((current) => {
+      callbackState = current;
+      return disconnectOpggAccount(current) || undefined;
+    });
     if (!transaction.committed) {
       console.warn('OP.GG unlink transaction did not commit', {
-        gameType: gameType || '', hasRequestedAppId: Boolean(appId), resolvedGameType: getOpggGameType(transaction.snapshot.val()),
+        gameType: gameType || '', hasRequestedAppId: Boolean(appId), targetExistsBefore: before.exists(),
+        targetTypeBefore: getOpggGameType(before.val()), callbackHasCurrent: Boolean(callbackState),
+        callbackType: getOpggGameType(callbackState),
       });
       throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
     }
