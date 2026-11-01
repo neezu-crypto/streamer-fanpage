@@ -533,6 +533,9 @@
 .upbo-request-form .profile-editor-field textarea{min-height:78px;resize:vertical;line-height:1.55}
 .upbo-request-form .profile-editor-field input:focus,.upbo-request-form .profile-editor-field textarea:focus{border-color:#f58cac88;box-shadow:0 0 0 3px #f58cac14}
 .upbo-choice-panel,.upbo-cart-panel{display:grid;gap:9px;min-width:0}
+.upbo-choice-scrollbox,.upbo-item-scrollbox{min-width:0;max-height:min(48vh,440px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#8a7182 #ffffff08;border:1px solid #f58cac35;border-radius:12px;background:#100e1608;padding:10px}
+.upbo-choice-scrollbox{display:grid;align-content:start;gap:9px}
+.upbo-choice-scrollbox h5{position:sticky;top:0;z-index:2;margin:0;padding:8px 0;background:var(--panel);border-bottom:1px solid #f58cac22}
 .upbo-choice-panel h5,.upbo-cart-heading h5{margin:0;font:15px var(--display)}
 .upbo-choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
 .upbo-choice-option{position:relative;z-index:1;min-width:0}
@@ -576,6 +579,9 @@
 .upbo-request-submit:disabled{opacity:.55;cursor:not-allowed}
 .upbo-request-note{margin:0;color:#928a9a;font-size:11px;line-height:1.55}
 .upbo-item-list,.upbo-pending-list,.upbo-record-list{display:grid;gap:8px}
+.upbo-item-scrollbox{display:grid;align-content:start;gap:10px}
+.upbo-item-scroll-heading{position:sticky;top:0;z-index:2;justify-content:flex-start;margin:0;padding:8px 0;background:var(--panel);border-bottom:1px solid #f58cac22}
+.upbo-item-scroll-heading h4{margin:0;font:16px var(--display)}
 .upbo-item-row,.upbo-pending-row,.upbo-record-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:11px 12px;border:1px solid #ffffff12;border-radius:10px;background:#ffffff04}
 .upbo-item-manager .upbo-item-list{grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));align-items:stretch;gap:10px}
 .upbo-item-manager .upbo-item-row{align-content:start;align-items:flex-start;justify-content:flex-start;flex-wrap:wrap;gap:9px 10px;min-height:102px;padding:13px;border-color:#f58cac30;border-radius:12px;background:linear-gradient(145deg,#f58cac0b,#ffffff04);box-shadow:0 5px 12px #09070d18}

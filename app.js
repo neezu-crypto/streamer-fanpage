@@ -1573,6 +1573,7 @@ function renderUpboRequestForm(page, state) {
   nickname.field.addEventListener('input', () => { draft.nickname = nickname.field.value; });
 
   const availablePanel = document.createElement('div'); availablePanel.className = 'upbo-choice-panel';
+  const availableScrollbox = document.createElement('div'); availableScrollbox.className = 'upbo-choice-scrollbox';
   const availableHeading = document.createElement('h5'); availableHeading.textContent = '신청할 항목을 선택해 주세요';
   const availableGrid = document.createElement('div'); availableGrid.className = 'upbo-choice-grid';
   items.forEach((entry) => {
@@ -1611,8 +1612,15 @@ function renderUpboRequestForm(page, state) {
     const placePreview = () => {
       const bounds = button.getBoundingClientRect();
       const previewHeight = preview.getBoundingClientRect().height;
+      const previewWidth = Math.min(340, Math.max(0, window.innerWidth - 32));
+      const left = Math.min(Math.max(16, bounds.left), Math.max(16, window.innerWidth - previewWidth - 16));
+      const placeBelow = bounds.top < previewHeight + 16;
+      const desiredTop = placeBelow ? bounds.bottom + 8 : bounds.top - previewHeight - 8;
+      const top = Math.min(Math.max(14, desiredTop), Math.max(14, window.innerHeight - previewHeight - 14));
       option.classList.toggle('preview-align-right', bounds.left + bounds.width / 2 > window.innerWidth / 2);
-      option.classList.toggle('preview-below', bounds.top < previewHeight + 16);
+      option.classList.toggle('preview-below', placeBelow);
+      preview.style.position = 'fixed'; preview.style.left = `${left}px`; preview.style.right = 'auto';
+      preview.style.top = `${top}px`; preview.style.bottom = 'auto';
     };
     button.addEventListener('pointerenter', (event) => { if (event.pointerType === 'mouse') placePreview(); });
     button.addEventListener('focus', placePreview);
@@ -1660,7 +1668,8 @@ function renderUpboRequestForm(page, state) {
     const mark = document.createElement('span'); mark.className = 'upbo-choice-mark'; mark.textContent = '+';
     button.append(copy, mark); option.append(button, preview); availableGrid.append(option);
   });
-  availablePanel.append(availableHeading, availableGrid);
+  availableScrollbox.append(availableHeading, availableGrid);
+  availablePanel.append(availableScrollbox);
 
   const cartPanel = document.createElement('div'); cartPanel.className = 'upbo-cart-panel';
   const cartHeading = document.createElement('div'); cartHeading.className = 'upbo-cart-heading';
@@ -1774,10 +1783,6 @@ function renderUpboRequestForm(page, state) {
 function renderUpboItemManager(page, state) {
   const panel = document.createElement('section'); panel.className = 'upbo-subsection upbo-item-manager';
   const heading = document.createElement('div'); heading.className = 'upbo-subsection-heading upbo-manager-heading';
-  const headingCopy = document.createElement('div'); headingCopy.className = 'upbo-manager-heading-copy';
-  const title = document.createElement('h4'); title.textContent = '신청 가능한 항목';
-  const count = document.createElement('span'); count.className = 'upbo-viewer-total'; count.textContent = `${state.items.length} / 100`;
-  headingCopy.append(title, count);
   const actions = document.createElement('div'); actions.className = 'upbo-manager-actions';
   const addItem = upboButton('+ 항목 추가', 'button-primary upbo-small-button upbo-add-item-inline', () => openUpboItemEditor(page));
   addItem.disabled = state.saving || state.items.length >= MAX_UPBO_ITEMS;
@@ -1792,15 +1797,20 @@ function renderUpboItemManager(page, state) {
     ? '프로필 설정에 위플랩 공개 룰렛 링크를 먼저 등록해 주세요.'
     : state.items.length >= MAX_UPBO_ITEMS ? '신청 항목은 최대 100개까지 등록할 수 있어요.' : '';
   actions.append(importItems, addItem);
-  heading.append(headingCopy, actions); panel.append(heading);
+  heading.append(actions); panel.append(heading);
   const importNote = document.createElement('p'); importNote.className = 'upbo-import-note';
   importNote.textContent = hasRouletteLink
     ? '프로필에 등록된 위플랩 공개 링크 한 개에서 항목 이름만 가져와요. 확률과 종류는 이름에 포함하지 않고, 중복 항목은 건너뜁니다.'
     : '자동으로 가져오려면 프로필 설정의 룰렛 확률에 위플랩 공개 링크 한 개를 등록해 주세요.';
   panel.append(importNote);
+  const scrollbox = document.createElement('div'); scrollbox.className = 'upbo-item-scrollbox';
+  const scrollHeading = document.createElement('div'); scrollHeading.className = 'upbo-subsection-heading upbo-item-scroll-heading';
+  const title = document.createElement('h4'); title.textContent = '신청 가능한 항목';
+  const count = document.createElement('span'); count.className = 'upbo-viewer-total'; count.textContent = `${state.items.length} / 100`;
+  scrollHeading.append(title, count); scrollbox.append(scrollHeading);
   if (!state.items.length) {
     const empty = document.createElement('p'); empty.className = 'upbo-inline-empty'; empty.textContent = '아직 항목이 없어요. 위플랩 항목 가져오기 또는 항목 추가 버튼으로 등록해 주세요.';
-    panel.append(empty); return panel;
+    scrollbox.append(empty); panel.append(scrollbox); return panel;
   }
   const list = document.createElement('div'); list.className = 'upbo-item-list';
   state.items.forEach((item) => {
@@ -1830,7 +1840,7 @@ function renderUpboItemManager(page, state) {
     );
     row.append(copy, actions); list.append(row);
   });
-  panel.append(list); return panel;
+  scrollbox.append(list); panel.append(scrollbox); return panel;
 }
 
 function normalizeUpboImageUrl(value) {
