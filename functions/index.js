@@ -16,10 +16,15 @@ const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
 const { planWeFlabUpboImport } = require('./upbo-weflab-import');
 const {
+  disconnectLeagueOfLegendsAccount,
+  isLeagueOfLegendsGame,
   isPlayedGameId,
+  normalizeOpggRegion,
   normalizePlayedGameBestRecord,
   normalizePlayedGameLink,
+  normalizeRiotId,
   parseCustomPlayedGameLink,
+  upsertLeagueOfLegendsAccount,
   updatePlayedGameBestRecord,
 } = require('./played-games-record');
 const {
@@ -3447,9 +3452,12 @@ function normalizePlayedGames(value) {
       return {
         appId: key,
         isSteam,
+        gameType: isLeagueOfLegendsGame(raw) ? 'league-of-legends' : (typeof raw.gameType === 'string' ? raw.gameType.slice(0, 40) : ''),
         name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 100) : (isSteam ? `Steam 게임 ${key}` : '게임'),
         gameUrl: normalizePlayedGameLink(raw.gameUrl, key),
         thumbnailUrl,
+        riotId: normalizeRiotId(raw.riotId) || '',
+        opggRegion: normalizeOpggRegion(raw.opggRegion),
         createdAt: Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : 0,
         bestRecord: normalizePlayedGameBestRecord(raw.bestRecord),
         vods,
@@ -7038,6 +7046,45 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
   }
 
   const rootRef = playedGamesRef(targetStreamer.streamer.id);
+  if (action === 'save-lol-account') {
+    const riotId = normalizeRiotId(data.riotId);
+    const opggRegion = normalizeOpggRegion(data.opggRegion);
+    if (!riotId) throw new HttpsError('invalid-argument', 'Riot ID를 이름#태그 형식으로 입력해 주세요.');
+    if (!opggRegion) throw new HttpsError('invalid-argument', 'OP.GG 지역을 선택해 주세요.');
+    const requestedAppId = String(data.appId || '').trim();
+    if (requestedAppId && !isPlayedGameId(requestedAppId)) throw new HttpsError('invalid-argument', '연결할 리그 오브 레전드 항목을 확인해 주세요.');
+    const newAppId = `custom_${randomUUID().replace(/-/g, '')}`;
+    let resolvedAppId = requestedAppId || newAppId;
+    let writeError = '';
+    const transaction = await rootRef.transaction((current) => {
+      const update = upsertLeagueOfLegendsAccount(current, {
+        riotId, opggRegion, requestedAppId, newAppId,
+        maxItems: FANPAGE_PLAYED_GAMES_MAX_ITEMS,
+      });
+      if (!update.ok) { writeError = update.error; return undefined; }
+      resolvedAppId = update.appId;
+      return update.games;
+    });
+    if (!transaction.committed) {
+      const latest = (await rootRef.get()).val() || {};
+      if (writeError === 'invalid-target' || (requestedAppId && (!latest[requestedAppId] || !isLeagueOfLegendsGame(latest[requestedAppId])))) {
+        throw new HttpsError('not-found', '연결할 리그 오브 레전드 게임을 찾을 수 없습니다.');
+      }
+      throw new HttpsError('resource-exhausted', `게임은 최대 ${FANPAGE_PLAYED_GAMES_MAX_ITEMS}개까지 등록할 수 있어요.`);
+    }
+    return { playedGames: normalizePlayedGames(transaction.snapshot.val()), appId: resolvedAppId };
+  }
+
+  if (action === 'remove-lol-account') {
+    const appId = String(data.appId || '').trim();
+    if (!isPlayedGameId(appId)) throw new HttpsError('invalid-argument', '연결을 해제할 게임을 확인해 주세요.');
+    const transaction = await rootRef.child(appId).transaction((current) => {
+      return disconnectLeagueOfLegendsAccount(current) || undefined;
+    });
+    if (!transaction.committed) throw new HttpsError('not-found', '연결된 리그 오브 레전드 게임을 찾을 수 없습니다.');
+    return { playedGames: normalizePlayedGames((await rootRef.get()).val()) };
+  }
+
   if (action === 'set-record') {
     const appId = String(data.appId || '').trim();
     const type = String(data.recordType || '').trim();
