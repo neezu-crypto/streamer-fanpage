@@ -97,6 +97,27 @@ test('OP.GG 계정 수정은 계정별 게임 하나만 갱신하고 이름이 �
   }).error, 'invalid-target');
 });
 
+test('OP.GG 수정 시 카드 ID가 오래됐으면 유일한 같은 게임 항목으로 복구한다', () => {
+  const appId = 'custom_0123456789abcdef0123456789abcdef';
+  const games = { [appId]: { name: '오버워치 2', gameType: 'overwatch', battleTag: 'OldName#1234', vods: {} } };
+  const recovered = upsertOpggAccount(games, {
+    gameType: 'overwatch', accountId: 'NewName#5678', requestedAppId: 'custom_fedcba9876543210fedcba9876543210',
+    newAppId: 'custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', maxItems: 100,
+  });
+  assert.equal(recovered.ok, true);
+  assert.equal(recovered.appId, appId);
+  assert.equal(recovered.games[appId].battleTag, 'NewName#5678');
+
+  const ambiguous = {
+    ...games,
+    custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: { name: '오버워치 2', gameType: 'overwatch', battleTag: 'Other#9876' },
+  };
+  assert.equal(upsertOpggAccount(ambiguous, {
+    gameType: 'overwatch', accountId: 'NewName#5678', requestedAppId: 'custom_fedcba9876543210fedcba9876543210',
+    newAppId: 'custom_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', maxItems: 100,
+  }).error, 'invalid-target');
+});
+
 test('OP.GG 계정 연결 해제는 ID만 제거하고 게임·기록·다시보기를 보존한다', () => {
   const game = {
     name: '배틀그라운드', gameType: 'pubg', pubgNickname: 'Player_One',

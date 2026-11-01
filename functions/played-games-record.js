@@ -101,7 +101,13 @@ function upsertOpggAccount(current, { gameType, accountId, opggRegion, overwatch
   if (!config || !normalizedAccountId) return { ok: false, error: 'invalid-account' };
   const games = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
   let appId = requestedAppId;
-  if (appId && (!games[appId] || !isOpggGame(games[appId], gameType))) return { ok: false, error: 'invalid-target' };
+  if (appId && (!games[appId] || !isOpggGame(games[appId], gameType))) {
+    // A client may hold a stale card ID after a concurrent refresh. Recover only
+    // when this game type has exactly one possible target; otherwise fail closed.
+    const matching = Object.entries(games).filter(([, game]) => isOpggGame(game, gameType));
+    if (matching.length !== 1) return { ok: false, error: 'invalid-target' };
+    appId = matching[0][0];
+  }
   if (!appId) appId = Object.entries(games).find(([, game]) => isOpggGame(game, gameType))?.[0] || '';
   const existing = appId ? games[appId] : null;
   if (!existing && Object.keys(games).length >= maxItems) return { ok: false, error: 'full' };
