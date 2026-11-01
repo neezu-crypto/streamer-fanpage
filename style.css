@@ -841,6 +841,9 @@
 .weekly-schedule-stage-linked span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .weekly-schedule-avatar-hit-area{position:absolute;z-index:3;padding:0;border:0;border-radius:.7cqw;background:transparent;cursor:pointer}
 .weekly-schedule-avatar-hit-area:hover,.weekly-schedule-avatar-hit-area:focus-visible{outline:.24cqw solid #e89ab3;outline-offset:-.24cqw}
+.weekly-schedule-avatar-hit-area.weekly-schedule-drop-target-active{display:grid;place-items:center;outline:.42cqw dashed #d94e83;outline-offset:-.8cqw;background:#fff2f8d9;box-shadow:inset 0 0 0 .36cqw #fff9}
+.weekly-schedule-avatar-hit-area.weekly-schedule-drop-target-active::after{content:'이미지를 놓으면 갤러리에 등록하고 적용해요';max-width:82%;padding:.8cqw 1.4cqw;border:1px solid #d94e83;border-radius:999px;background:#fffafd;color:#9c315b;box-shadow:0 .35cqw 1cqw #75324b33;text-align:center;font:800 clamp(14px,1.25cqw,22px)/1.35 'Jua','Gowun Dodum',sans-serif;pointer-events:none}
+.weekly-schedule-avatar-hit-area:disabled{cursor:not-allowed}
 .weekly-schedule-footer-text{position:absolute;z-index:5;display:grid;place-items:center;padding:0 .35cqw;border:1px solid transparent;border-radius:.5cqw;outline:0;background:transparent;color:transparent;caret-color:#9b365c;text-align:center;font:800 clamp(12px,1.45cqw,24px)/1 'Jua','Gowun Dodum',sans-serif;cursor:text}
 .weekly-schedule-footer-text:hover{border-color:#eab1c4aa;background:transparent}
 .weekly-schedule-footer-text:focus{border-color:#da8ca8;background:transparent;color:#8f2e50;box-shadow:0 0 0 .2cqw #da8ca833}
