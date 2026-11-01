@@ -206,6 +206,7 @@ const VIEWER_STATS_INSUFFICIENT_WINDOW_CODE = 'insufficient-analysis-window';
 const MAX_BROWSER_STATS_CACHE_ITEMS = 800;
 const VIEWER_STATS_STATIC_CACHE_SCHEMA_VERSION = 1;
 const VIEWER_FIRST_ANALYSIS_TUTORIAL_KEY = 'streamerFanPage.viewerStats.firstAnalysisTutorial.v1';
+const VIEWER_ANALYZE_BUTTON_LABEL = '클릭해서 분석 시작';
 try { window.localStorage.removeItem('streamerFanPage.viewerStats.recentStreamers.v1'); } catch (_) {}
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
 const VIEWER_PEAK_PERIODS = [
@@ -1198,7 +1199,7 @@ function findFirstAnalysisTutorialTarget(loadToken) {
       || card.dataset.staticHydration === 'pending') continue;
     const button = card._mainAction;
     if (!button || button.disabled || button.dataset.playbackUrl
-      || button.textContent.trim() !== '시청자 통계 분석하기') continue;
+      || button.textContent.trim() !== VIEWER_ANALYZE_BUTTON_LABEL) continue;
     return button;
   }
   return null;
@@ -1348,9 +1349,9 @@ function createVodCard(vod, loadToken, streamerId) {
   const mainAction = document.createElement('button');
   mainAction.className = 'viewer-vod-main-action';
   mainAction.type = 'button';
-  mainAction.textContent = '시청자 통계 분석하기';
+  mainAction.textContent = VIEWER_ANALYZE_BUTTON_LABEL;
   mainAction.title = '이 다시보기의 시청자 통계를 분석해 최고·최저 시청 순간을 찾습니다.';
-  mainAction.setAttribute('aria-label', (vod.title || '다시보기') + ' 시청자 통계 분석하기');
+  mainAction.setAttribute('aria-label', (vod.title || '다시보기') + ' ' + VIEWER_ANALYZE_BUTTON_LABEL);
   mainAction.addEventListener('click', () => {
     const playback = mainAction.dataset.playbackUrl;
     if (playback) {
@@ -1492,7 +1493,7 @@ function showStatsError(card, error, loadToken) {
     retry.addEventListener('click', () => {
       card.dataset.statsState = 'idle';
       card._mainAction.disabled = false;
-      card._mainAction.textContent = '시청자 통계 분석하기';
+      card._mainAction.textContent = VIEWER_ANALYZE_BUTTON_LABEL;
       delete card._mainAction.dataset.playbackUrl;
       card._statsActions.replaceChildren();
       const status = document.createElement('span');
