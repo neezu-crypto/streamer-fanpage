@@ -3022,7 +3022,7 @@ async function selectStreamer(streamer) {
   await loadVodPage(loadToken, 1);
 }
 
-async function runSearch(query) {
+async function runSearch(query, options = {}) {
   const cleanQuery = String(query || '').trim();
   if (!cleanQuery) {
     setSearchHint('닉네임, SOOP 아이디 또는 방송국 주소를 입력해 주세요.');
@@ -3040,6 +3040,14 @@ async function runSearch(query) {
     if (requestId !== searchRequestId) return;
     const streamers = Array.isArray(response.data && response.data.streamers) ? response.data.streamers : [];
     const candidates = streamers.slice();
+    const exactSoopId = parseSoopId(options.exactSoopId || '');
+    if (exactSoopId) {
+      const exactStreamer = candidates.find((item) => String(item.soopId || '').toLowerCase() === exactSoopId)
+        || streamerForId(exactSoopId);
+      renderSearchResults([exactStreamer]);
+      await selectStreamer(exactStreamer);
+      return;
+    }
     const isStationUrl = /^https?:\/\//i.test(cleanQuery) && Boolean(idFromInput);
     if (idFromInput && !candidates.some((item) => String(item.soopId).toLowerCase() === idFromInput)
       && (isStationUrl || candidates.length === 0)) {
@@ -3914,6 +3922,12 @@ onAuthStateChanged(auth, (user) => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') refreshSubscriptionStatus();
 });
+
+const initialStreamerId = parseSoopId(new URLSearchParams(window.location.search).get('streamer'));
+if (initialStreamerId) {
+  $('viewerSearchInput').value = initialStreamerId;
+  void runSearch(initialStreamerId, { exactSoopId: initialStreamerId });
+}
 
 setupDevbarMarquee();
 document.querySelectorAll('.viewer-affiliate-image img').forEach((image) => {
