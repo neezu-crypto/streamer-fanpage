@@ -7098,9 +7098,19 @@ exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request
     const target = disconnectOpggAccountFromGames((await rootRef.get()).val(), {
       requestedAppId: appId, gameType,
     });
-    if (!target.ok) throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
+    if (!target.ok) {
+      console.warn('OP.GG unlink target selection failed', {
+        gameType: gameType || '', hasRequestedAppId: Boolean(appId), targetError: target.error,
+      });
+      throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
+    }
     const transaction = await rootRef.child(target.appId).transaction((current) => disconnectOpggAccount(current) || undefined);
-    if (!transaction.committed) throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
+    if (!transaction.committed) {
+      console.warn('OP.GG unlink transaction did not commit', {
+        gameType: gameType || '', hasRequestedAppId: Boolean(appId), resolvedGameType: getOpggGameType(transaction.snapshot.val()),
+      });
+      throw new HttpsError('not-found', '연결된 OP.GG 계정을 찾을 수 없습니다.');
+    }
     return { playedGames: normalizePlayedGames((await rootRef.get()).val()) };
   }
 
