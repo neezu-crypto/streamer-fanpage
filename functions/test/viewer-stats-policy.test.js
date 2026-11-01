@@ -6,6 +6,8 @@ const {
   VIEWER_STATS_PRIORITY_AGE_STEP_MS,
   VIEWER_STATS_QUEUE_MAX_CONCURRENT,
   VIEWER_STATS_TIER_PRIORITY,
+  VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY,
+  canAccessViewerSubscriberFeatures,
   selectNextViewerStatsCandidate,
   viewerStatsRateLimit,
   viewerStatsClaimUpdate,
@@ -13,6 +15,19 @@ const {
   viewerStatsTier,
   viewerStatsWakeCandidate,
 } = require('../viewer-stats-policy');
+
+test('subscriber-only high-point features are temporarily restricted to admins', () => {
+  assert.equal(VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY, true);
+  assert.equal(canAccessViewerSubscriberFeatures({ isAdmin: true, isSubscribed: false }), true);
+  assert.equal(canAccessViewerSubscriberFeatures({ isAdmin: false, isSubscribed: true }), false);
+  assert.equal(canAccessViewerSubscriberFeatures({ isAdmin: false, isSubscribed: false }), false);
+});
+
+test('the subscriber feature policy can be restored without changing entitlements', () => {
+  assert.equal(canAccessViewerSubscriberFeatures({ isAdmin: true, isSubscribed: false }, false), true);
+  assert.equal(canAccessViewerSubscriberFeatures({ isAdmin: false, isSubscribed: true }, false), true);
+  assert.equal(canAccessViewerSubscriberFeatures({ isAdmin: false, isSubscribed: false }, false), false);
+});
 
 test('anonymous auth is classified as the lowest-priority tier', () => {
   assert.equal(viewerStatsTier({ token: { firebase: { sign_in_provider: 'anonymous' } } }), 'anonymous');

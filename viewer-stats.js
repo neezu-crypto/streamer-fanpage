@@ -260,6 +260,7 @@ let subscriptionState = {
   accountProtected: false,
   isAdmin: false,
   subscribed: false,
+  subscriberFeaturesAdminOnly: true,
   expiresAt: 0,
   pending: false,
   pendingRequestId: '',
@@ -387,11 +388,21 @@ function formatSubscriptionDate(value) {
   }).format(new Date(timestamp));
 }
 
+function canViewSubscriberFeatures() {
+  return subscriptionState.loaded && (subscriptionState.isAdmin || (
+    subscriptionState.subscribed && subscriptionState.subscriberFeaturesAdminOnly !== true
+  ));
+}
+
 function renderSubscriptionControls() {
   const state = subscriptionState;
-  $('viewerPeriodScanButton').textContent = state.loaded && (state.isAdmin || state.subscribed)
+  const canViewFeatures = canViewSubscriberFeatures();
+  $('viewerPeriodPeaks').hidden = !canViewFeatures;
+  $('viewerComparisonPanel').hidden = !canViewFeatures;
+  $('viewerKeywordComparisonPanel').hidden = !canViewFeatures;
+  $('viewerPeriodScanButton').textContent = canViewFeatures
     ? '최근 1년 분석'
-    : '구독 전용 분석';
+    : state.loaded && state.subscriberFeaturesAdminOnly !== true ? '구독 전용 분석' : '관리자 전용 분석';
 }
 
 function scheduleSubscriptionStatusRefresh() {
@@ -418,13 +429,14 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
     await getAuthReady();
     const response = await callViewerSubscription({ action: 'status' });
     if (token !== subscriptionRefreshToken) return;
-    const previousAccess = subscriptionState.subscribed;
+    const previousFeatureAccess = canViewSubscriberFeatures();
     const data = response.data || {};
     subscriptionState = {
       loaded: true,
       accountProtected: data.accountProtected === true,
       isAdmin: data.isAdmin === true,
       subscribed: data.subscribed === true,
+      subscriberFeaturesAdminOnly: data.subscriberFeaturesAdminOnly !== false,
       expiresAt: Number(data.expiresAt) || 0,
       pending: data.pending === true,
       pendingRequestId: typeof data.pendingRequestId === 'string' ? data.pendingRequestId : '',
@@ -440,32 +452,28 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
     };
     renderSubscriptionControls();
     scheduleSubscriptionStatusRefresh();
-    if (previousAccess !== subscriptionState.subscribed) {
+    if (previousFeatureAccess !== canViewSubscriberFeatures()) {
       if (selectedStreamer) {
         periodScanToken += 1;
         $('viewerPeriodScanButton').disabled = false;
-        $('viewerPeriodStatus').textContent = subscriptionState.subscribed
-          ? '구독이 확인됐어요. 최근 1년 분석을 시작하면 7일·30일·90일·1년 최고 순간을 찾습니다.'
-          : '구독이 만료됐어요. 기간별 최고 시청 순간은 구독 계정에서 이용할 수 있습니다.';
-        renderPeriodPeakCards(new Map(), new Map(), false, !subscriptionState.subscribed);
+        $('viewerPeriodStatus').textContent = canViewSubscriberFeatures()
+          ? '이용 권한이 확인됐어요. 최근 1년 분석을 시작하면 7일·30일·90일·1년 최고 순간을 찾습니다.'
+          : '기간별 최고 시청 순간과 비교 기능은 현재 관리자만 이용할 수 있습니다.';
+        renderPeriodPeakCards(new Map(), new Map(), false, !canViewSubscriberFeatures());
       }
     }
-    if (pendingComparisonRequest && !subscriptionState.isAdmin && !subscriptionState.subscribed) {
-      comparisonGateWaiting = true;
-      setComparisonStatus(subscriptionState.accountProtected
-        ? subscriptionState.pending
-          ? '구독 인증 신청 승인 대기 중이에요. 관리자가 SOOP 구독 상태를 확인해 승인하면 선택한 스트리머와 날짜의 비교 결과가 열립니다.'
-          : '로그인이 확인됐어요. 방송국 구독 인증을 신청하면 승인 후 비교 결과가 자동으로 열립니다.'
-        : '선택한 스트리머와 날짜는 유지돼요. 새 탭에서 로그인한 뒤 이 화면으로 돌아와 주세요.');
+    if (pendingComparisonRequest && !canViewSubscriberFeatures()) {
+      pendingComparisonRequest = null;
+      comparisonRunning = false;
+      comparisonGateWaiting = false;
+      setComparisonStatus('스트리머 비교 기능은 현재 점검 중이며 관리자만 이용할 수 있습니다.');
       renderComparisonSelection();
     }
-    if (pendingKeywordComparisonRequest && !subscriptionState.isAdmin && !subscriptionState.subscribed) {
-      keywordComparisonGateWaiting = true;
-      setKeywordComparisonStatus(subscriptionState.accountProtected
-        ? subscriptionState.pending
-          ? '구독 인증 신청 승인 대기 중이에요. 관리자가 SOOP 구독 상태를 확인해 승인하면 키워드 고점 비교 결과가 열립니다.'
-          : '로그인이 확인됐어요. 방송국 구독 인증을 신청하면 승인 후 키워드 고점 비교 결과가 자동으로 열립니다.'
-        : '선택한 키워드와 스트리머는 유지돼요. 로그인한 뒤 이 화면으로 돌아와 주세요.');
+    if (pendingKeywordComparisonRequest && !canViewSubscriberFeatures()) {
+      pendingKeywordComparisonRequest = null;
+      keywordComparisonRunning = false;
+      keywordComparisonGateWaiting = false;
+      setKeywordComparisonStatus('키워드 고점 비교는 현재 점검 중이며 관리자만 이용할 수 있습니다.');
       renderKeywordComparisonSelection();
     }
     if ($('viewerSubscriptionDialog').open) renderSubscriptionDialogStatus();
@@ -2079,11 +2087,11 @@ async function loadComparisonResults(request) {
       comparisonGateWaiting = true;
       await refreshSubscriptionStatus({ resumeComparison: false });
       if (!isCurrentComparisonRequest(request)) return;
-      if (!subscriptionState.isAdmin && !subscriptionState.subscribed) {
-        setComparisonStatus('구독 승인이 만료되었거나 확인이 필요해요. 선택한 스트리머와 날짜는 유지됩니다.');
+      if (!canViewSubscriberFeatures()) {
+        pendingComparisonRequest = null;
+        comparisonGateWaiting = false;
+        setComparisonStatus('스트리머 비교 기능은 현재 점검 중이며 관리자만 이용할 수 있습니다.');
         renderComparisonSelection();
-        renderSubscriptionDialogStatus();
-        openSubscriptionDialog();
         return;
       }
       pendingComparisonRequest = null;
@@ -2100,7 +2108,7 @@ async function loadComparisonResults(request) {
 
 function resumePendingComparisonIfReady() {
   const request = pendingComparisonRequest;
-  if (!request || comparisonRunning || (!subscriptionState.isAdmin && !subscriptionState.subscribed)) return;
+  if (!request || comparisonRunning || !canViewSubscriberFeatures()) return;
   if (!isCurrentComparisonRequest(request)) {
     pendingComparisonRequest = null;
     comparisonGateWaiting = false;
@@ -2141,6 +2149,7 @@ async function runComparison() {
     if (!isCurrentComparisonRequest(request)) return;
     const access = response.data || {};
     subscriptionState.isAdmin = access.isAdmin === true;
+    subscriptionState.subscriberFeaturesAdminOnly = access.subscriberFeaturesAdminOnly !== false;
     subscriptionState.accountProtected = subscriptionState.accountProtected || subscriptionState.isAdmin;
     subscriptionState.subscribed = true;
     subscriptionState.expiresAt = Number(access.expiresAt) || subscriptionState.expiresAt;
@@ -2169,21 +2178,16 @@ async function runComparison() {
       renderComparisonSelection();
       return;
     }
-    if (subscriptionState.isAdmin || subscriptionState.subscribed) {
+    if (canViewSubscriberFeatures()) {
       comparisonRunning = false;
       resumePendingComparisonIfReady();
       return;
     }
+    pendingComparisonRequest = null;
     comparisonRunning = false;
-    comparisonGateWaiting = true;
-    setComparisonStatus(subscriptionState.accountProtected
-      ? subscriptionState.pending
-        ? '구독 인증 신청 승인 대기 중이에요. 승인되면 선택한 스트리머와 날짜의 비교 결과가 자동으로 열립니다.'
-        : '선택한 스트리머와 날짜는 유지됩니다. 로그인 계정에 구독을 신청하고 승인을 기다려 주세요.'
-      : '선택한 스트리머와 날짜는 유지됩니다. 로그인한 뒤 구독 신청을 진행해 주세요.');
+    comparisonGateWaiting = false;
+    setComparisonStatus('스트리머 비교 기능은 현재 점검 중이며 관리자만 이용할 수 있습니다.');
     renderComparisonSelection();
-    renderSubscriptionDialogStatus();
-    openSubscriptionDialog();
   }
 }
 
@@ -2443,10 +2447,11 @@ async function loadKeywordComparisonResults(request) {
       keywordComparisonGateWaiting = true;
       const refreshed = await refreshSubscriptionStatus({ resumeComparison: false, resumeKeywordComparison: false });
       if (!isCurrentKeywordComparisonRequest(request)) return;
-      if (refreshed && !subscriptionState.isAdmin && !subscriptionState.subscribed) {
-        setKeywordComparisonStatus('구독을 확인하지 못했어요. 선택한 키워드와 스트리머는 유지됩니다.');
+      if (refreshed && !canViewSubscriberFeatures()) {
+        pendingKeywordComparisonRequest = null;
+        keywordComparisonGateWaiting = false;
+        setKeywordComparisonStatus('키워드 고점 비교는 현재 점검 중이며 관리자만 이용할 수 있습니다.');
         renderKeywordComparisonSelection();
-        openSubscriptionDialog();
         return;
       }
       pendingKeywordComparisonRequest = null;
@@ -2468,7 +2473,7 @@ async function loadKeywordComparisonResults(request) {
 
 function resumePendingKeywordComparisonIfReady() {
   const request = pendingKeywordComparisonRequest;
-  if (!request || keywordComparisonRunning || (!subscriptionState.isAdmin && !subscriptionState.subscribed)) return;
+  if (!request || keywordComparisonRunning || !canViewSubscriberFeatures()) return;
   if (!isCurrentKeywordComparisonRequest(request)) {
     pendingKeywordComparisonRequest = null;
     keywordComparisonGateWaiting = false;
@@ -2516,6 +2521,7 @@ async function runKeywordComparison() {
     if (!isCurrentKeywordComparisonRequest(request)) return;
     const access = response.data || {};
     subscriptionState.isAdmin = access.isAdmin === true;
+    subscriptionState.subscriberFeaturesAdminOnly = access.subscriberFeaturesAdminOnly !== false;
     subscriptionState.accountProtected = subscriptionState.accountProtected || subscriptionState.isAdmin;
     subscriptionState.subscribed = true;
     subscriptionState.expiresAt = Number(access.expiresAt) || subscriptionState.expiresAt;
@@ -2544,21 +2550,16 @@ async function runKeywordComparison() {
       renderKeywordComparisonSelection();
       return;
     }
-    if (subscriptionState.isAdmin || subscriptionState.subscribed) {
+    if (canViewSubscriberFeatures()) {
       keywordComparisonRunning = false;
       resumePendingKeywordComparisonIfReady();
       return;
     }
+    pendingKeywordComparisonRequest = null;
     keywordComparisonRunning = false;
-    keywordComparisonGateWaiting = true;
-    setKeywordComparisonStatus(subscriptionState.accountProtected
-      ? subscriptionState.pending
-        ? '구독 인증 신청 승인 대기 중이에요. 승인되면 키워드 고점 비교 결과가 자동으로 열립니다.'
-        : '선택한 키워드와 스트리머는 유지됩니다. 로그인 계정에 구독을 신청해 주세요.'
-      : '선택한 키워드와 스트리머는 유지됩니다. 로그인한 뒤 구독 신청을 진행해 주세요.');
+    keywordComparisonGateWaiting = false;
+    setKeywordComparisonStatus('키워드 고점 비교는 현재 점검 중이며 관리자만 이용할 수 있습니다.');
     renderKeywordComparisonSelection();
-    renderSubscriptionDialogStatus();
-    openSubscriptionDialog();
   }
 }
 
@@ -2676,7 +2677,7 @@ async function loadVodPage(loadToken, page) {
   }
 }
 
-function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !subscriptionState.subscribed) {
+function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !canViewSubscriberFeatures()) {
   const grid = $('viewerPeriodGrid');
   grid.replaceChildren();
   VIEWER_PEAK_PERIODS.forEach((period) => {
@@ -2744,7 +2745,7 @@ function showSharedPeriodPeakResult(data) {
 }
 
 function isCurrentPeriodScan(scanToken, loadToken) {
-  return scanToken === periodScanToken && loadToken === activeLoadToken && !!selectedStreamer && subscriptionState.subscribed;
+  return scanToken === periodScanToken && loadToken === activeLoadToken && !!selectedStreamer && canViewSubscriberFeatures();
 }
 
 async function fetchRecentYearVods(scanToken, loadToken, yearCutoff) {
@@ -2800,6 +2801,7 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
     const access = await callViewerSubscription({ action: 'periodAccess' });
     if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
     subscriptionState.isAdmin = access.data && access.data.isAdmin === true;
+    subscriptionState.subscriberFeaturesAdminOnly = !access.data || access.data.subscriberFeaturesAdminOnly !== false;
     if (subscriptionState.isAdmin) subscriptionState.accountProtected = true;
     subscriptionState.subscribed = true;
     subscriptionState.expiresAt = Number(access.data && access.data.expiresAt) || subscriptionState.expiresAt;
@@ -2809,10 +2811,9 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
   } catch (error) {
     await refreshSubscriptionStatus();
     if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
-    $('viewerPeriodStatus').textContent = '기간별 최고 시청 순간은 구독 계정에서 이용할 수 있어요.';
+    $('viewerPeriodStatus').textContent = '기간별 최고 시청 순간은 현재 관리자만 이용할 수 있습니다.';
     $('viewerPeriodStatus').classList.remove('is-error');
     renderPeriodPeakCards(new Map(), new Map(), false, true);
-    openSubscriptionDialog();
     return;
   }
   const scanToken = ++periodScanToken;
@@ -3007,10 +3008,14 @@ async function selectStreamer(streamer) {
   $('viewerVodGrid').replaceChildren();
   $('viewerLoadMore').classList.add('hidden');
   $('viewerPeriodScanButton').disabled = false;
-  $('viewerPeriodScanButton').textContent = subscriptionState.subscribed ? '최근 1년 분석' : '구독 전용 분석';
-  $('viewerPeriodStatus').textContent = subscriptionState.subscribed
+  $('viewerPeriodScanButton').textContent = canViewSubscriberFeatures()
+    ? '최근 1년 분석'
+    : subscriptionState.loaded && subscriptionState.subscriberFeaturesAdminOnly !== true ? '구독 전용 분석' : '관리자 전용 분석';
+  $('viewerPeriodStatus').textContent = canViewSubscriberFeatures()
     ? '최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 순간을 찾습니다.'
-    : '분석 버튼을 누르면 구독 안내를 확인할 수 있습니다.';
+    : subscriptionState.subscriberFeaturesAdminOnly
+      ? '기간별 최고 시청 순간은 현재 관리자만 이용할 수 있습니다.'
+      : '기간별 최고 시청 순간은 구독 계정에서 이용할 수 있습니다.';
   $('viewerPeriodStatus').classList.remove('is-error');
   renderPeriodPeakCards(new Map(), new Map(), false);
   $('viewerResults').classList.remove('hidden');

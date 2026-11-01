@@ -3,6 +3,10 @@
 const crypto = require('node:crypto');
 const { getDatabase } = require('firebase-admin/database');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
+const {
+  canAccessViewerSubscriberFeatures,
+  VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY,
+} = require('./viewer-stats-policy');
 
 const SUBSCRIPTIONS_PATH = 'streamerFanPageViewerSubscriptions';
 const REQUESTS_PATH = 'streamerFanPageViewerSubscriptionRequests';
@@ -152,6 +156,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
       accountProtected: access.accountProtected,
       isAdmin: access.isAdmin,
       subscribed: access.isAdmin || info.subscribed,
+      subscriberFeaturesAdminOnly: VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY,
       expiresAt: info.expiresAt,
       pending: isPending,
       pendingRequestId: isPending ? info.pendingRequestId : '',
@@ -332,8 +337,17 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
   if (action === 'periodAccess') {
     const [subscriptionSnapshot, admin] = await Promise.all([subscriptionRef.get(), isAdmin(uid)]);
     const info = subscriptionInfo(subscriptionSnapshot.val(), Date.now());
-    if (!admin && !info.subscribed) throw new HttpsError('permission-denied', '구독 계정에서 이용할 수 있습니다.');
-    return { subscribed: true, isAdmin: admin, expiresAt: info.expiresAt };
+    if (!canAccessViewerSubscriberFeatures({ isAdmin: admin, isSubscribed: info.subscribed })) {
+      throw new HttpsError('permission-denied', VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY
+        ? '고점체크 구독자 전용 분석은 현재 관리자만 이용할 수 있습니다.'
+        : '구독 계정에서 이용할 수 있습니다.');
+    }
+    return {
+      subscribed: true,
+      isAdmin: admin,
+      expiresAt: info.expiresAt,
+      subscriberFeaturesAdminOnly: VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY,
+    };
   }
 
   throw new HttpsError('invalid-argument', '구독 요청을 확인해 주세요.');
