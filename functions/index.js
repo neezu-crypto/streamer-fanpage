@@ -72,11 +72,16 @@ const {
   validateAdminStatsSnapshot,
 } = require('./admin-stats-snapshot');
 const {
+  CINETY_CATEGORY_DEFINITIONS,
+  isCinetyCategoryId,
+  normalizeCinetyCategory,
+  normalizeCinetyCatalogItem,
   VIDEO_LIBRARY_CATEGORY_ID_PATTERN,
   VIDEO_LIBRARY_CHANNEL_ID_PATTERN,
   VIDEO_LIBRARY_ITEM_ID_PATTERN,
   hasInitialVideoLibraryImport,
   hasVideoLibrarySyncInProgress,
+  isBeforeVideoLibraryCursor,
   isStaleVideoLibrarySync,
   VIDEO_LIBRARY_TITLE_MAX_LENGTH,
   normalizeVideoLibraryCategory,
@@ -158,6 +163,11 @@ const VIDEO_LIBRARY_MAX_CHANNELS = 100;
 const VIDEO_LIBRARY_CHANNEL_PAGE_SIZE = 50;
 const VIDEO_LIBRARY_SYNC_BATCH_SIZE = 50;
 const VIDEO_LIBRARY_CATEGORY_NAME_MAX_LENGTH = 32;
+const CINETY_CATALOG_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
+const CINETY_CATALOG_LOCK_STALE_MS = 10 * 60 * 1000;
+const CINETY_CATALOG_MANUAL_REFRESH_COOLDOWN_MS = 60 * 1000;
+const CINETY_API_BASE = 'https://cinety.sooplive.com/api/page.php';
+let cinetyCatalogRefreshPromise = null;
 const FANPAGE_TAMAGOTCHI_MAX_APPLICATIONS_PER_STREAMER = 20;
 const FANPAGE_TAMAGOTCHI_INTERACTIONS = new Set(['pet', 'feed', 'play', 'talk', 'live', 'idle', 'sound']);
 const FANPAGE_ROLLING_PAPER_MAX_ITEMS = 300;
@@ -6322,22 +6332,204 @@ function normalizeVideoLibraryStoredItem(id, value, source = {}) {
   return item;
 }
 
+function validateVideoLibraryReadCategoryId(value) {
+  const categoryId = String(value || '').trim();
+  if (VIDEO_LIBRARY_CATEGORY_ID_PATTERN.test(categoryId) || isCinetyCategoryId(categoryId)) return categoryId;
+  throw new HttpsError('invalid-argument', '카테고리를 선택해 주세요.');
+}
+
+function videoLibraryCinetyCategorySnapshot(snapshot) {
+  const cached = snapshot && snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
+  return CINETY_CATEGORY_DEFINITIONS.map((definition) => normalizeCinetyCategory(definition.id, cached[definition.id] || {}));
+}
+
+function hasFullCinetyCatalogCache(snapshot) {
+  const cached = snapshot && snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
+  return CINETY_CATEGORY_DEFINITIONS.every((category) => {
+    const entry = cached[category.id];
+    return entry && Number(entry.fetchedAt) > 0 && entry.items && typeof entry.items === 'object';
+  });
+}
+
+function videoLibraryCinetyItems(snapshot, categoryId = '', query = '', cursor = null) {
+  const cached = snapshot && snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
+  const sources = [];
+  for (const category of CINETY_CATEGORY_DEFINITIONS) {
+    if (categoryId && category.id !== categoryId) continue;
+    const categoryCache = cached[category.id];
+    const records = categoryCache && categoryCache.items && typeof categoryCache.items === 'object'
+      ? Object.entries(categoryCache.items) : [];
+    const items = records.map(([contentNo, value], index) => {
+      if (!value || typeof value !== 'object') return null;
+      const normalized = normalizeCinetyCatalogItem(category.id, { ...value, contentNo }, index);
+      if (!normalized) return null;
+      return normalizeVideoLibraryStoredItem(normalized.id, normalized, {
+        sourceType: 'cinety', categoryId: category.id, categoryName: category.name,
+      });
+    }).filter((item) => item && isBeforeVideoLibraryCursor(item, cursor)
+      && (!query || matchesVideoLibrarySearch(item, query)));
+    sources.push(items);
+  }
+  return sources;
+}
+
+async function fetchCinetyCategoryCatalog(category) {
+  const url = new URL(CINETY_API_BASE);
+  url.searchParams.set('work', 'getContentList');
+  url.searchParams.set('categoryNo', String(category.categoryNo));
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        accept: 'application/json',
+        referer: `https://cinety.sooplive.com/content/${category.categoryNo}`,
+        'user-agent': 'Mozilla/5.0 (compatible; StreamerFanPage/1.0)',
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+  } catch (error) {
+    console.warn(`Cinety category ${category.categoryNo} request failed:`, error.message || error);
+    throw new HttpsError('unavailable', '시네티 작품 목록을 가져오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!response.ok) {
+    console.warn(`Cinety category ${category.categoryNo} returned HTTP ${response.status}.`);
+    throw new HttpsError('unavailable', '시네티 작품 목록을 가져오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  let payload;
+  try { payload = await response.json(); }
+  catch (_) { throw new HttpsError('unavailable', '시네티 작품 목록 응답을 읽지 못했어요.'); }
+  if (!payload || !Array.isArray(payload.data) || payload.data.length > 500) {
+    throw new HttpsError('unavailable', '시네티 작품 목록 형식이 바뀌어 동기화하지 못했어요.');
+  }
+  const normalizedItems = payload.data.map((item, index) => normalizeCinetyCatalogItem(category.id, item, index)).filter(Boolean);
+  if (!normalizedItems.length || normalizedItems.length !== payload.data.length) {
+    throw new HttpsError('unavailable', '시네티 작품 목록을 완전히 읽지 못해 기존 목록을 유지했어요.');
+  }
+  const items = {};
+  normalizedItems.forEach((item) => {
+    items[item.contentNo] = {
+      contentNo: item.contentNo,
+      title: item.title,
+      originalTitle: item.originalTitle,
+      thumbnailUrl: item.thumbnailUrl,
+      isUnavailable: item.isUnavailable,
+      sortAt: item.sortAt,
+    };
+  });
+  return { categoryId: category.id, categoryNo: category.categoryNo, itemCount: normalizedItems.length, items };
+}
+
+async function syncCinetyCatalogs(options = {}) {
+  const force = options.force === true;
+  const now = Date.now();
+  const metaRef = videoLibraryRef('cinetyCatalogMeta');
+  let skipReason = '';
+  const transaction = await metaRef.transaction((currentValue) => {
+    const current = currentValue && typeof currentValue === 'object' ? currentValue : {};
+    const startedAt = Math.max(0, Number(current.startedAt) || 0);
+    if (current.status === 'syncing' && now - startedAt < CINETY_CATALOG_LOCK_STALE_MS) {
+      skipReason = 'syncing';
+      return undefined;
+    }
+    if (!force && Number(current.lastSuccessAt) > now - CINETY_CATALOG_CACHE_TTL_MS) {
+      skipReason = 'fresh';
+      return undefined;
+    }
+    if (force && Number(current.lastManualRefreshAt) > now - CINETY_CATALOG_MANUAL_REFRESH_COOLDOWN_MS) {
+      skipReason = 'cooldown';
+      return undefined;
+    }
+    return {
+      ...current,
+      status: 'syncing',
+      startedAt: now,
+      lastAttemptAt: now,
+      lastManualRefreshAt: force ? now : Math.max(0, Number(current.lastManualRefreshAt) || 0),
+      lastError: '',
+    };
+  });
+  if (!transaction.committed) {
+    if (skipReason === 'syncing' && cinetyCatalogRefreshPromise) return cinetyCatalogRefreshPromise;
+    return { refreshed: false, reason: skipReason || 'syncing' };
+  }
+
+  if (cinetyCatalogRefreshPromise) return cinetyCatalogRefreshPromise;
+  cinetyCatalogRefreshPromise = (async () => {
+    try {
+      const catalogs = await Promise.all(CINETY_CATEGORY_DEFINITIONS.map(fetchCinetyCategoryCatalog));
+      const fetchedAt = Date.now();
+      const updates = {};
+      catalogs.forEach((catalog) => {
+        updates[`${VIDEO_LIBRARY_ROOT}/cinetyCatalog/${catalog.categoryId}`] = {
+          categoryNo: catalog.categoryNo,
+          itemCount: catalog.itemCount,
+          fetchedAt,
+          items: catalog.items,
+        };
+      });
+      await db.ref().update(updates);
+      await metaRef.update({
+        status: 'ready', lastSuccessAt: fetchedAt, lastError: '',
+        itemCount: catalogs.reduce((count, catalog) => count + catalog.itemCount, 0),
+        updatedAt: fetchedAt,
+      });
+      return { refreshed: true, itemCount: catalogs.reduce((count, catalog) => count + catalog.itemCount, 0), fetchedAt };
+    } catch (error) {
+      const message = error instanceof HttpsError ? error.message : '외부 목록 동기화에 실패했어요.';
+      await metaRef.update({ status: 'error', lastError: message.slice(0, 160), updatedAt: Date.now() }).catch(() => {});
+      throw error instanceof HttpsError ? error : new HttpsError('unavailable', message);
+    } finally {
+      cinetyCatalogRefreshPromise = null;
+    }
+  })();
+  return cinetyCatalogRefreshPromise;
+}
+
+async function readVideoLibraryCatalogContext() {
+  let [categoriesSnapshot, channelsSnapshot, cinetySnapshot, metaSnapshot] = await Promise.all([
+    videoLibraryRef('categories').get(), videoLibraryRef('channels').get(),
+    videoLibraryRef('cinetyCatalog').get(), videoLibraryRef('cinetyCatalogMeta').get(),
+  ]);
+  let syncError = '';
+  if (!hasFullCinetyCatalogCache(cinetySnapshot)) {
+    try { await syncCinetyCatalogs(); }
+    catch (error) {
+      syncError = error.message || '시네티 작품 목록을 가져오지 못했어요.';
+      console.warn('Cinety catalog is unavailable; serving cached favorites without it.', error.message || error);
+    }
+    [cinetySnapshot, metaSnapshot] = await Promise.all([
+      videoLibraryRef('cinetyCatalog').get(), videoLibraryRef('cinetyCatalogMeta').get(),
+    ]);
+  }
+  const meta = metaSnapshot.val() && typeof metaSnapshot.val() === 'object' ? metaSnapshot.val() : {};
+  const categories = [
+    ...normalizeVideoLibraryCategories(categoriesSnapshot.val()),
+    ...videoLibraryCinetyCategorySnapshot(cinetySnapshot),
+  ];
+  return {
+    categoriesSnapshot,
+    channelsSnapshot,
+    cinetySnapshot,
+    meta,
+    categories,
+    syncError: syncError || (meta.status === 'error' ? String(meta.lastError || '') : ''),
+  };
+}
+
 async function readVideoLibraryPage(data, isAdmin, canManage) {
-  const categoryId = data.categoryId ? validateVideoLibraryCategoryId(data.categoryId) : '';
+  const categoryId = data.categoryId ? validateVideoLibraryReadCategoryId(data.categoryId) : '';
   const limit = Math.max(1, Math.min(50, Math.floor(Number(data.limit) || VIDEO_LIBRARY_PAGE_SIZE)));
   const cursor = normalizeVideoLibraryCursor(data.cursor);
   if (data.cursor && !cursor) throw new HttpsError('invalid-argument', '영상 목록 위치를 확인해 주세요.');
-  const [categoriesSnapshot, channelsSnapshot] = await Promise.all([
-    videoLibraryRef('categories').get(),
-    videoLibraryRef('channels').get(),
-  ]);
-  const categories = normalizeVideoLibraryCategories(categoriesSnapshot.val());
+  const context = await readVideoLibraryCatalogContext();
+  const { categories, channelsSnapshot, cinetySnapshot } = context;
   if (categoryId && !categories.some((category) => category.id === categoryId)) {
     throw new HttpsError('not-found', '선택한 카테고리를 찾을 수 없습니다.');
   }
 
   const sources = [];
-  const manualRows = await readVideoLibraryIndexPage(videoLibraryIndexRef(categoryId), cursor, limit);
+  const isCinetyCategory = isCinetyCategoryId(categoryId);
+  const manualRows = isCinetyCategory ? [] : await readVideoLibraryIndexPage(videoLibraryIndexRef(categoryId), cursor, limit);
   if (manualRows.length) {
     const manualItems = await Promise.all(manualRows.map(async ({ id }) => {
       const value = (await videoLibraryManualVideoRef(id).get()).val();
@@ -6374,6 +6566,7 @@ async function readVideoLibraryPage(data, isAdmin, canManage) {
     return items;
   }));
   sources.push(...channelSources.filter(Boolean));
+  sources.push(...videoLibraryCinetyItems(cinetySnapshot, categoryId, '', cursor));
 
   const page = paginateVideoLibraryEntries(sources, cursor, limit);
   return {
@@ -6385,6 +6578,8 @@ async function readVideoLibraryPage(data, isAdmin, canManage) {
     isAdmin,
     isInitialImporting,
     isSyncing,
+    cinetySyncAt: Math.max(0, Number(context.meta.lastSuccessAt) || 0),
+    cinetySyncError: context.syncError,
     channels: isAdmin ? publicChannels.sort((left, right) => left.channelTitle.localeCompare(right.channelTitle, 'ko')) : [],
   };
 }
@@ -6396,26 +6591,24 @@ async function searchVideoLibraryPage(data, isAdmin, canManage) {
     || queryLength > VIDEO_LIBRARY_SEARCH_MAX_QUERY_LENGTH) {
     throw new HttpsError('invalid-argument', `검색어를 ${VIDEO_LIBRARY_SEARCH_MIN_QUERY_LENGTH}자 이상 ${VIDEO_LIBRARY_SEARCH_MAX_QUERY_LENGTH}자 이하로 입력해 주세요.`);
   }
-  const categoryId = data.categoryId ? validateVideoLibraryCategoryId(data.categoryId) : '';
+  const categoryId = data.categoryId ? validateVideoLibraryReadCategoryId(data.categoryId) : '';
   const limit = Math.max(1, Math.min(50, Math.floor(Number(data.limit) || VIDEO_LIBRARY_PAGE_SIZE)));
   const cursor = normalizeVideoLibraryCursor(data.cursor);
   if (data.cursor && !cursor) throw new HttpsError('invalid-argument', '검색 결과 위치를 확인해 주세요.');
 
-  const [categoriesSnapshot, channelsSnapshot, manualSnapshot] = await Promise.all([
-    videoLibraryRef('categories').get(),
-    videoLibraryRef('channels').get(),
-    videoLibraryRef('manualVideos').get(),
-  ]);
-  const categories = normalizeVideoLibraryCategories(categoriesSnapshot.val());
+  const context = await readVideoLibraryCatalogContext();
+  const { categories, channelsSnapshot, cinetySnapshot } = context;
+  const manualSnapshot = await videoLibraryRef('manualVideos').get();
   if (categoryId && !categories.some((category) => category.id === categoryId)) {
     throw new HttpsError('not-found', '선택한 카테고리를 찾을 수 없습니다.');
   }
 
   const sources = [];
+  const isCinetyCategory = isCinetyCategoryId(categoryId);
   const manualVideos = manualSnapshot.val() && typeof manualSnapshot.val() === 'object'
     ? Object.entries(manualSnapshot.val()) : [];
   const manualItems = manualVideos.map(([id, value]) => {
-    if (!value || (categoryId && String(value.categoryId || '') !== categoryId)) return null;
+    if (!value || isCinetyCategory || (categoryId && String(value.categoryId || '') !== categoryId)) return null;
     const item = normalizeVideoLibraryStoredItem(id, value, { sourceType: 'manual', categoryId: value.categoryId });
     return item && matchesVideoLibrarySearch(item, query) ? item : null;
   }).filter(Boolean);
@@ -6425,7 +6618,7 @@ async function searchVideoLibraryPage(data, isAdmin, canManage) {
     ? Object.entries(channelsSnapshot.val()) : [];
   const relevantChannels = channelEntries.flatMap(([channelId, value]) => {
     const channel = videoLibraryChannelPublic(channelId, value);
-    if (!channel || (categoryId && channel.categoryId !== categoryId)) return [];
+    if (!channel || isCinetyCategory || (categoryId && channel.categoryId !== categoryId)) return [];
     return [{ channelId, value, channel }];
   });
   const relevantChannelValues = relevantChannels.map(({ value }) => value);
@@ -6454,6 +6647,7 @@ async function searchVideoLibraryPage(data, isAdmin, canManage) {
     channelItems.push(...results.flat());
   }
   sources.push(channelItems);
+  sources.push(...videoLibraryCinetyItems(cinetySnapshot, categoryId, query, cursor));
 
   const page = paginateVideoLibraryEntries(sources, cursor, limit);
   return {
@@ -6465,6 +6659,8 @@ async function searchVideoLibraryPage(data, isAdmin, canManage) {
     isAdmin,
     isInitialImporting,
     isSyncing,
+    cinetySyncAt: Math.max(0, Number(context.meta.lastSuccessAt) || 0),
+    cinetySyncError: context.syncError,
     channels: isAdmin ? relevantChannels.map(({ channel }) => channel)
       .sort((left, right) => left.channelTitle.localeCompare(right.channelTitle, 'ko')) : [],
   };
@@ -6556,6 +6752,15 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
   if (action === 'list') return readVideoLibraryPage(data, isAdmin, canManage);
   if (action === 'search') return searchVideoLibraryPage(data, isAdmin, canManage);
   if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 즐겨찾기를 수정할 수 있습니다.');
+
+  if (action === 'cinety-refresh') {
+    const result = await syncCinetyCatalogs({ force: true });
+    if (!result.refreshed) {
+      if (result.reason === 'cooldown') throw new HttpsError('resource-exhausted', '시네티 목록을 방금 갱신했어요. 잠시 후 다시 시도해 주세요.');
+      throw new HttpsError('failed-precondition', '시네티 목록을 갱신 중이에요. 잠시 후 다시 확인해 주세요.');
+    }
+    return { refreshed: true, itemCount: result.itemCount, fetchedAt: result.fetchedAt };
+  }
 
   const root = videoLibraryRef();
   const categoriesRef = videoLibraryRef('categories');
@@ -7009,6 +7214,8 @@ exports.streamerFanPageVideoLibrarySyncRecovery = onSchedule({
 exports.streamerFanPageVideoLibraryIncrementalSync = onSchedule({
   schedule: 'every 72 hours', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
 }, async () => {
+  try { await syncCinetyCatalogs(); }
+  catch (error) { console.warn('Could not refresh Cinety catalogs:', error.message || error); }
   const snapshot = await videoLibraryRef('channels').get();
   const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
   await Promise.all(Object.entries(channels).map(async ([channelId, channel]) => {

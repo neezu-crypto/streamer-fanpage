@@ -3,6 +3,10 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
+  CINETY_CATEGORY_DEFINITIONS,
+  isCinetyCategoryId,
+  normalizeCinetyCategory,
+  normalizeCinetyCatalogItem,
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
@@ -12,6 +16,7 @@ const {
   paginateVideoLibraryEntries,
   hasInitialVideoLibraryImport,
   hasVideoLibrarySyncInProgress,
+  isBeforeVideoLibraryCursor,
   isInitialVideoLibraryImport,
   isStaleVideoLibrarySync,
   shouldActivateVideoLibraryGeneration,
@@ -29,6 +34,47 @@ test('video library categories normalize whitespace and reject invalid names or 
   assert.equal(normalizeVideoLibraryCategory('bad-id', { name: '게임' }), null);
   assert.equal(normalizeVideoLibraryCategory(categoryId, { name: ' '.repeat(3) }), null);
   assert.equal(normalizeVideoLibraryCategory(categoryId, { name: 'a'.repeat(33) }), null);
+});
+
+test('Cinety category sources are fixed, distinct from editable categories, and expose cached counts', () => {
+  assert.deepEqual(CINETY_CATEGORY_DEFINITIONS.map(({ id, categoryNo }) => [id, categoryNo]), [
+    ['cinety-43', 43], ['cinety-39', 39], ['cinety-41', 41],
+  ]);
+  assert.equal(isCinetyCategoryId('cinety-43'), true);
+  assert.equal(isCinetyCategoryId('cinety-42'), false);
+  assert.deepEqual(normalizeCinetyCategory('cinety-43', { itemCount: 61, fetchedAt: 123 }), {
+    id: 'cinety-43', categoryNo: 43, name: '시네티 · 애니메이션', sourceType: 'cinety', itemCount: 61, fetchedAt: 123,
+  });
+  assert.equal(normalizeCinetyCategory('cinety-42'), null);
+});
+
+test('Cinety catalog items use Korean titles, safe SOOP thumbnails, generated detail links, and service status', () => {
+  const item = normalizeCinetyCatalogItem('cinety-43', {
+    content_no: '26100844', title: 'One-Punch Man Season 1',
+    translation_title: JSON.stringify({ ko_KR: '원펀맨 1기', en_US: 'One-Punch Man Season 1' }),
+    thumb_pc_url: '//admin.img.sooplive.com/af_original/content/26100844/thumb_pc.jpeg?t=1',
+    is_short: '0',
+  });
+  assert.equal(item.id, 'cinety_43_26100844');
+  assert.equal(item.title, '원펀맨 1기');
+  assert.equal(item.originalTitle, 'One-Punch Man Season 1');
+  assert.equal(item.thumbnailUrl, 'https://admin.img.sooplive.com/af_original/content/26100844/thumb_pc.jpeg?t=1');
+  assert.equal(item.url, undefined);
+  const normalized = normalizeVideoLibraryItem(item.id, item, { sourceType: 'cinety', categoryId: item.categoryId, categoryName: item.categoryName });
+  assert.equal(normalized.url, 'https://cinety.sooplive.com/content/detail/26100844');
+  assert.equal(normalized.sourceType, 'cinety');
+  assert.equal(normalized.categoryName, '시네티 · 애니메이션');
+  assert.equal(matchesVideoLibrarySearch(normalized, '원펀맨'), true);
+  assert.equal(matchesVideoLibrarySearch(normalized, 'One-Punch'), true);
+
+  const unavailable = normalizeCinetyCatalogItem('cinety-39', {
+    content_no: '26101298', title: 'Miss Granny', thumb_pc_url: 'https://admin.img.sooplive.com/movie.jpg', is_short: '2',
+  });
+  assert.equal(unavailable.isUnavailable, true);
+  assert.equal(normalizeCinetyCatalogItem('cinety-43', {
+    content_no: '26100999', title: 'Invalid image', thumb_pc_url: 'https://attacker.example/image.jpg',
+  }).thumbnailUrl, '');
+  assert.equal(normalizeCinetyCatalogItem('cinety-43', { content_no: '../bad', title: 'bad' }), null);
 });
 
 test('manual and channel videos normalize to safe platform links and metadata', () => {
@@ -64,6 +110,15 @@ test('video library pagination sorts newest first, deduplicates sources, and adv
   const second = paginateVideoLibraryEntries([manual, channel], first.nextCursor, 2);
   assert.deepEqual(second.items.map((item) => item.id), ['youtube_lmnopqrstuv']);
   assert.equal(second.hasMore, false);
+});
+
+test('video library cursor comparison keeps items before the current page boundary', () => {
+  const cursor = { sortAt: 10, id: 'youtube_abcdefghijk' };
+  assert.equal(isBeforeVideoLibraryCursor({ sortAt: 11, id: 'youtube_aaaaaaaaaaa' }, cursor), false);
+  assert.equal(isBeforeVideoLibraryCursor({ sortAt: 9, id: 'youtube_zzzzzzzzzzz' }, cursor), true);
+  assert.equal(isBeforeVideoLibraryCursor({ sortAt: 10, id: 'youtube_aaaaaaaaaaa' }, cursor), true);
+  assert.equal(isBeforeVideoLibraryCursor({ sortAt: 10, id: 'youtube_zzzzzzzzzzz' }, cursor), false);
+  assert.equal(isBeforeVideoLibraryCursor({ sortAt: 1, id: 'youtube_aaaaaaaaaaa' }, null), true);
 });
 
 test('video library search matches complete titles and channel names case-insensitively', () => {

@@ -7220,7 +7220,7 @@ function videoLibraryStateFor(streamerId) {
       loaded: false, loading: false, saving: false, error: '', categories: [], items: [],
       categoryId: '', cursor: null, hasMore: false, canManage: false, isAdmin: false,
       channels: [], isInitialImporting: false, isSyncing: false, searchQuery: '', editingId: '', editingCategoryId: '', syncTimer: 0,
-      searchMode: false, searchLoading: false, searchTimer: 0, searchRevision: 0,
+      searchMode: false, searchLoading: false, searchTimer: 0, searchRevision: 0, cinetySyncAt: 0, cinetySyncError: '',
     };
     videoLibraryStates.set(streamerId, state);
   }
@@ -7248,7 +7248,7 @@ function refreshVideoLibrarySection(streamerId, options = {}) {
 function videoLibraryCategorySelect(categories, selectedId, label) {
   const select = document.createElement('select');
   select.setAttribute('aria-label', label);
-  categories.forEach((category) => {
+  categories.filter((category) => category.sourceType !== 'cinety').forEach((category) => {
     const option = document.createElement('option');
     option.value = category.id; option.textContent = category.name;
     option.selected = category.id === selectedId;
@@ -7259,6 +7259,7 @@ function videoLibraryCategorySelect(categories, selectedId, label) {
 
 function openVideoLibraryAddDialog(page) {
   const state = videoLibraryStateFor(page.streamer.id);
+  const editableCategories = state.categories.filter((category) => category.sourceType !== 'cinety');
   const dialog = document.createElement('dialog');
   dialog.className = 'account-dialog video-library-add-dialog';
   dialog.setAttribute('aria-labelledby', 'videoLibraryAddTitle');
@@ -7314,12 +7315,12 @@ function openVideoLibraryAddDialog(page) {
         options.append(button);
       };
       addOption('category', '▦', '카테고리', '영상을 주제별로 나눌 새 카테고리');
-      addOption('video', '▶', '영상', state.categories.length ? 'YouTube 또는 SOOP 다시보기 링크' : '먼저 카테고리를 추가해 주세요.', !state.categories.length);
-      if (state.isAdmin) addOption('channel', '▣', 'YouTube 채널', state.categories.length ? '채널의 전체 공개 영상 가져오기' : '먼저 카테고리를 추가해 주세요.', !state.categories.length);
+      addOption('video', '▶', '영상', editableCategories.length ? 'YouTube 또는 SOOP 다시보기 링크' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
+      if (state.isAdmin) addOption('channel', '▣', 'YouTube 채널', editableCategories.length ? '채널의 전체 공개 영상 가져오기' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
       card.append(options);
-      if (!state.categories.length) {
+      if (!editableCategories.length) {
         const hint = document.createElement('p'); hint.className = 'video-library-add-dialog-hint';
-        hint.textContent = '카테고리를 만든 뒤 이 창에서 영상이나 채널을 이어서 추가할 수 있어요.'; card.append(hint);
+        hint.textContent = '시네티 작품 카테고리는 자동으로 관리돼요. 개별 영상이나 YouTube 채널을 추가하려면 직접 관리할 카테고리를 먼저 만들어 주세요.'; card.append(hint);
       }
     } else if (mode === 'category') {
       const form = document.createElement('form'); form.className = 'video-library-add-dialog-form';
@@ -7342,7 +7343,8 @@ function openVideoLibraryAddDialog(page) {
     } else if (mode === 'video') {
       const form = document.createElement('form'); form.className = 'video-library-add-dialog-form';
       const categoryLabel = document.createElement('label'); categoryLabel.className = 'video-library-add-dialog-field'; categoryLabel.textContent = '카테고리';
-      const category = videoLibraryCategorySelect(state.categories, state.categoryId || state.categories[0]?.id || '', '추가할 영상 카테고리');
+      const category = videoLibraryCategorySelect(editableCategories, editableCategories.some((item) => item.id === state.categoryId)
+        ? state.categoryId : editableCategories[0]?.id || '', '추가할 영상 카테고리');
       categoryLabel.append(category);
       const urlLabel = document.createElement('label'); urlLabel.className = 'video-library-add-dialog-field'; urlLabel.textContent = '영상 링크';
       const url = document.createElement('input'); url.type = 'url'; url.required = true; url.maxLength = 500;
@@ -7360,7 +7362,8 @@ function openVideoLibraryAddDialog(page) {
     } else if (mode === 'channel' && state.isAdmin) {
       const form = document.createElement('form'); form.className = 'video-library-add-dialog-form';
       const categoryLabel = document.createElement('label'); categoryLabel.className = 'video-library-add-dialog-field'; categoryLabel.textContent = '추가할 카테고리';
-      const category = videoLibraryCategorySelect(state.categories, state.categoryId || state.categories[0]?.id || '', '가져올 영상 카테고리'); categoryLabel.append(category);
+      const category = videoLibraryCategorySelect(editableCategories, editableCategories.some((item) => item.id === state.categoryId)
+        ? state.categoryId : editableCategories[0]?.id || '', '가져올 영상 카테고리'); categoryLabel.append(category);
       const urlLabel = document.createElement('label'); urlLabel.className = 'video-library-add-dialog-field'; urlLabel.textContent = 'YouTube 채널 링크';
       const url = document.createElement('input'); url.type = 'url'; url.required = true; url.maxLength = 500;
       url.placeholder = 'YouTube 채널 또는 @핸들 링크'; url.setAttribute('aria-label', 'YouTube 채널 주소'); urlLabel.append(url);
@@ -7443,10 +7446,19 @@ function renderVideoLibrarySection(page) {
   refresh.disabled = state.loading || state.saving;
   refresh.textContent = state.loading ? '불러오는 중…' : '↻ 새로고침';
   refresh.addEventListener('click', () => loadVideoLibrary(page, { refresh: true }));
-  headingActions.append(refresh); heading.append(copy, headingActions); section.append(heading);
+  headingActions.append(refresh);
+  if (state.isAdmin) {
+    const cinetyRefresh = document.createElement('button'); cinetyRefresh.type = 'button';
+    cinetyRefresh.className = 'button video-library-cinety-refresh';
+    cinetyRefresh.disabled = state.loading || state.saving;
+    cinetyRefresh.textContent = '시네티 목록 갱신';
+    cinetyRefresh.addEventListener('click', () => runVideoLibraryMutation(page, 'cinety-refresh', {}, '시네티 작품 목록을 갱신했어요.'));
+    headingActions.append(cinetyRefresh);
+  }
+  heading.append(copy, headingActions); section.append(heading);
 
   const description = document.createElement('p'); description.className = 'video-library-description';
-  description.textContent = '스트리머가 라이브에서 자주 시청하는 영상을 모았습니다.';
+  description.textContent = '스트리머가 즐겨보는 영상과 SOOP 시네티의 애니메이션·영화·드라마 작품을 모았습니다.';
   section.append(description);
 
   const categoryBar = document.createElement('div'); categoryBar.className = 'video-library-categories';
@@ -7466,7 +7478,7 @@ function renderVideoLibrarySection(page) {
   section.append(categoryBar);
 
   const selectedCategory = state.categories.find((category) => category.id === state.categoryId);
-  if (state.isAdmin && selectedCategory) {
+  if (state.isAdmin && selectedCategory && selectedCategory.sourceType !== 'cinety') {
     const categoryTools = document.createElement('div'); categoryTools.className = 'video-library-category-tools';
     const editorContent = document.createElement('div'); editorContent.className = 'video-library-category-editor';
     editorContent.id = 'videoLibraryCategoryEditor';
@@ -7502,13 +7514,14 @@ function renderVideoLibrarySection(page) {
       editorContent.append(editForm, deleteNote);
 
       const actions = document.createElement('div'); actions.className = 'video-library-category-edit-actions';
-      const index = state.categories.findIndex((category) => category.id === selectedCategory.id);
+      const editableCategories = state.categories.filter((category) => category.sourceType !== 'cinety');
+      const index = editableCategories.findIndex((category) => category.id === selectedCategory.id);
       const up = document.createElement('button'); up.type = 'button'; up.className = 'button';
       up.textContent = '↑ 위로'; up.disabled = state.saving || index <= 0;
-      up.addEventListener('click', () => reorderVideoLibraryCategory(page, index, index - 1));
+      up.addEventListener('click', () => reorderVideoLibraryCategory(page, editableCategories, index, index - 1));
       const down = document.createElement('button'); down.type = 'button'; down.className = 'button';
-      down.textContent = '↓ 아래로'; down.disabled = state.saving || index < 0 || index >= state.categories.length - 1;
-      down.addEventListener('click', () => reorderVideoLibraryCategory(page, index, index + 1));
+      down.textContent = '↓ 아래로'; down.disabled = state.saving || index < 0 || index >= editableCategories.length - 1;
+      down.addEventListener('click', () => reorderVideoLibraryCategory(page, editableCategories, index, index + 1));
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button video-library-category-delete';
       const categoryHasContent = !state.loaded || state.items.length > 0 || state.hasMore
         || state.channels.some((channel) => channel.categoryId === selectedCategory.id);
@@ -7578,9 +7591,16 @@ function renderVideoLibrarySection(page) {
     section.append(warning);
   }
 
+  const selectedIsCinety = state.categories.some((category) => category.id === state.categoryId && category.sourceType === 'cinety');
+  if (selectedIsCinety && state.cinetySyncAt) {
+    const syncNote = document.createElement('p'); syncNote.className = 'video-library-cinety-meta';
+    syncNote.textContent = `SOOP 시네티 공개 작품 목록 · 최근 동기화 ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(state.cinetySyncAt)}`;
+    section.append(syncNote);
+  }
+
   if (state.items.length || state.searchQuery) {
     const search = document.createElement('input'); search.type = 'search'; search.className = 'video-library-search';
-    search.placeholder = '채널 전체 영상에서 검색'; search.setAttribute('aria-label', '채널 전체 영상 검색');
+    search.placeholder = '즐겨찾기 작품·영상 검색'; search.setAttribute('aria-label', '즐겨찾기 작품과 영상 검색');
     search.value = state.searchQuery;
     search.addEventListener('input', () => {
       state.searchQuery = search.value.trim() ? search.value : '';
@@ -7613,7 +7633,9 @@ function renderVideoLibrarySection(page) {
 
   if (!state.hasMore && state.loaded && !state.items.length && !state.searchMode) {
     const empty = document.createElement('p'); empty.className = 'video-library-state';
-    empty.textContent = state.isInitialImporting
+    empty.textContent = selectedIsCinety && state.cinetySyncError
+      ? '시네티 작품 목록을 불러오지 못했어요. 새로고침해 주세요.'
+      : state.isInitialImporting
       ? '첫 영상을 가져오고 있어요. 잠시 후 목록에 표시됩니다.'
       : state.isSyncing
         ? '채널 영상을 가져오고 있어요. 새로고침하면 추가된 영상을 확인할 수 있습니다.'
@@ -7640,15 +7662,18 @@ function renderVideoLibraryItems(page, section, state) {
     const queryLength = Array.from(state.searchQuery.normalize('NFC').trim()).length;
     if (state.searchMode && state.searchLoading) {
       const pending = document.createElement('p'); pending.className = 'video-library-empty-filter video-library-state';
-      pending.textContent = '채널의 전체 영상에서 검색하고 있어요.';
+      pending.textContent = '모든 즐겨찾기 작품과 영상에서 검색하고 있어요.';
       section.append(pending);
     } else if (state.searchMode && queryLength < 2) {
       const hint = document.createElement('p'); hint.className = 'video-library-empty-filter video-library-state';
-      hint.textContent = '두 글자 이상 입력하면 채널 전체 영상에서 검색해요.';
+      hint.textContent = '두 글자 이상 입력하면 전체 즐겨찾기에서 검색해요.';
       section.append(hint);
     } else if (state.searchMode) {
       const empty = document.createElement('p'); empty.className = 'video-library-empty-filter video-library-state';
-      empty.textContent = state.error ? '검색하지 못했어요. 잠시 후 다시 시도해 주세요.' : '채널 전체 영상에서 검색 결과가 없어요.';
+      empty.textContent = state.error ? '검색하지 못했어요. 잠시 후 다시 시도해 주세요.'
+        : state.cinetySyncError && (!state.items.length)
+          ? '일부 작품 목록을 가져오지 못했어요. 새로고침해 주세요.'
+          : '즐겨찾기에서 검색 결과가 없어요.';
       section.append(empty);
     }
     return;
@@ -7656,12 +7681,20 @@ function renderVideoLibraryItems(page, section, state) {
   const grid = document.createElement('div'); grid.className = 'video-library-grid';
   items.forEach((item) => {
     const card = document.createElement('article'); card.className = 'video-library-card';
-    const play = document.createElement('button'); play.type = 'button'; play.className = 'video-library-play';
-    play.setAttribute('aria-label', `${item.title} 재생`);
-    play.addEventListener('click', () => {
-      if (item.platform === 'youtube') openYouTubePlayer({ id: item.videoId, title: item.title });
-      else openVodPlayer({ id: item.videoId, title: item.title });
-    });
+    const isCinety = item.sourceType === 'cinety';
+    const play = document.createElement(isCinety && !item.isUnavailable ? 'a' : 'button');
+    play.className = 'video-library-play';
+    if (isCinety && !item.isUnavailable) {
+      play.href = item.url; play.target = '_blank'; play.rel = 'noopener noreferrer';
+      play.setAttribute('aria-label', `${item.title} 시네티에서 보기 (새 탭)`);
+    } else {
+      if (play instanceof HTMLButtonElement) { play.type = 'button'; play.disabled = isCinety && item.isUnavailable; }
+      play.setAttribute('aria-label', isCinety ? `${item.title} 서비스 종료` : `${item.title} 재생`);
+      if (!isCinety) play.addEventListener('click', () => {
+        if (item.platform === 'youtube') openYouTubePlayer({ id: item.videoId, title: item.title });
+        else openVodPlayer({ id: item.videoId, title: item.title });
+      });
+    }
     const frame = document.createElement('span'); frame.className = 'video-library-thumbnail-frame';
     const thumbnailUrl = item.thumbnailUrl || (item.platform === 'youtube'
       ? `https://i.ytimg.com/vi/${encodeURIComponent(item.videoId)}/mqdefault.jpg` : '');
@@ -7671,17 +7704,21 @@ function renderVideoLibraryItems(page, section, state) {
       image.addEventListener('error', () => { image.remove(); frame.classList.add('is-missing'); }, { once: true });
       frame.append(image);
     } else frame.classList.add('is-missing');
-    const icon = document.createElement('span'); icon.className = 'video-library-play-icon'; icon.textContent = '▶';
+    const icon = document.createElement('span'); icon.className = 'video-library-play-icon';
+    icon.textContent = isCinety ? (item.isUnavailable ? '종료' : '↗') : '▶';
     frame.append(icon); play.append(frame);
     const body = document.createElement('div'); body.className = 'video-library-card-body';
     const source = document.createElement('span'); source.className = 'video-library-source';
-    source.textContent = item.sourceType === 'channel' ? `${item.channelTitle || 'YouTube 채널'} · YouTube` : item.platform === 'youtube' ? 'YouTube' : 'SOOP';
+    source.textContent = isCinety ? item.categoryName || 'SOOP 시네티'
+      : item.sourceType === 'channel' ? `${item.channelTitle || 'YouTube 채널'} · YouTube`
+        : item.platform === 'youtube' ? 'YouTube' : 'SOOP';
     const name = document.createElement('h3'); name.textContent = item.title || '제목 없음';
     const meta = document.createElement('small');
     const published = Date.parse(item.publishedAt || '');
-    meta.textContent = Number.isFinite(published)
-      ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }).format(published)
-      : '날짜 정보 없음';
+    meta.textContent = isCinety ? (item.isUnavailable ? '서비스 종료 작품' : 'SOOP 시네티에서 작품 보기 ↗')
+      : Number.isFinite(published)
+        ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }).format(published)
+        : '날짜 정보 없음';
     body.append(source, name, meta); card.append(play, body);
     if (state.isAdmin && item.sourceType === 'manual') {
       const actions = document.createElement('div'); actions.className = 'video-library-card-actions';
@@ -7754,6 +7791,8 @@ async function loadVideoLibrary(page, options = {}) {
     state.isAdmin = result.isAdmin === true;
     state.isInitialImporting = result.isInitialImporting === true;
     state.isSyncing = result.isSyncing === true;
+    state.cinetySyncAt = Math.max(0, Number(result.cinetySyncAt) || 0);
+    state.cinetySyncError = typeof result.cinetySyncError === 'string' ? result.cinetySyncError : '';
     state.channels = Array.isArray(result.channels) ? result.channels : [];
     const incoming = Array.isArray(result.items) ? result.items : [];
     if (append) {
@@ -7824,9 +7863,9 @@ async function runVideoLibraryMutation(page, action, payload, successMessage) {
   }
 }
 
-async function reorderVideoLibraryCategory(page, from, to) {
+async function reorderVideoLibraryCategory(page, categories, from, to) {
   const state = videoLibraryStateFor(page.streamer.id);
-  const order = state.categories.map((category) => category.id);
+  const order = categories.map((category) => category.id);
   if (to < 0 || to >= order.length || from < 0 || from >= order.length) return;
   [order[from], order[to]] = [order[to], order[from]];
   await runVideoLibraryMutation(page, 'category-order', { order }, '카테고리 순서를 바꿨어요.');

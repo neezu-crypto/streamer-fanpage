@@ -2,9 +2,85 @@
 
 const VIDEO_LIBRARY_CATEGORY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VIDEO_LIBRARY_CHANNEL_ID_PATTERN = /^UC[A-Za-z0-9_-]{20,30}$/i;
-const VIDEO_LIBRARY_ITEM_ID_PATTERN = /^(?:youtube_[A-Za-z0-9_-]{11}|soop_\d{1,20})$/;
+const VIDEO_LIBRARY_ITEM_ID_PATTERN = /^(?:youtube_[A-Za-z0-9_-]{11}|soop_\d{1,20}|cinety_(?:39|41|43)_\d{1,20})$/;
 const VIDEO_LIBRARY_TITLE_MAX_LENGTH = 120;
 const VIDEO_LIBRARY_SYNC_STALE_MS = 3 * 60 * 1000;
+const CINETY_CATEGORY_DEFINITIONS = Object.freeze([
+  Object.freeze({ id: 'cinety-43', categoryNo: 43, name: '시네티 · 애니메이션' }),
+  Object.freeze({ id: 'cinety-39', categoryNo: 39, name: '시네티 · 영화' }),
+  Object.freeze({ id: 'cinety-41', categoryNo: 41, name: '시네티 · 드라마' }),
+]);
+const CINETY_CATEGORY_ID_PATTERN = /^cinety-(?:39|41|43)$/;
+
+function isCinetyCategoryId(value) {
+  return CINETY_CATEGORY_ID_PATTERN.test(String(value || ''));
+}
+
+function normalizeCinetyCategory(id, value = {}) {
+  const definition = CINETY_CATEGORY_DEFINITIONS.find((category) => category.id === String(id || ''));
+  if (!definition) return null;
+  const categoryValue = value && typeof value === 'object' ? value : {};
+  return {
+    ...definition,
+    sourceType: 'cinety',
+    itemCount: Math.max(0, Math.floor(Number(categoryValue.itemCount) || 0)),
+    fetchedAt: Math.max(0, Number(categoryValue.fetchedAt) || 0),
+  };
+}
+
+function normalizeCinetyTitleTranslation(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return typeof value.ko_KR === 'string' ? value.ko_KR.trim() : '';
+  }
+  if (typeof value !== 'string' || !value.trim()) return '';
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed.ko_KR === 'string' ? parsed.ko_KR.trim() : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function normalizeCinetyCatalogItem(categoryId, value, index = 0) {
+  const category = CINETY_CATEGORY_DEFINITIONS.find((item) => item.id === String(categoryId || ''));
+  if (!category || !value || typeof value !== 'object') return null;
+  const contentNo = String(value.contentNo || value.content_no || value.videoId || '').trim();
+  if (!/^\d{1,20}$/.test(contentNo)) return null;
+  const originalTitle = typeof value.originalTitle === 'string' ? value.originalTitle.trim()
+    : typeof value.title === 'string' ? value.title.trim() : '';
+  const translatedTitle = normalizeCinetyTitleTranslation(value.translation_title);
+  const title = (translatedTitle || (typeof value.title === 'string' ? value.title.trim() : originalTitle))
+    .normalize('NFC').replace(/\s+/g, ' ').slice(0, VIDEO_LIBRARY_TITLE_MAX_LENGTH);
+  if (!title) return null;
+  let thumbnailUrl = typeof value.thumbnailUrl === 'string' ? value.thumbnailUrl.trim()
+    : typeof value.thumb_pc_url === 'string' ? value.thumb_pc_url.trim() : '';
+  if (thumbnailUrl.startsWith('//')) thumbnailUrl = `https:${thumbnailUrl}`;
+  try {
+    const parsed = new URL(thumbnailUrl);
+    if (parsed.protocol !== 'https:' || !/(^|\.)sooplive\.com$/i.test(parsed.hostname)
+      || parsed.username || parsed.password) thumbnailUrl = '';
+    else thumbnailUrl = parsed.href;
+  } catch (_) {
+    thumbnailUrl = '';
+  }
+  const sortAt = Math.max(0, Number(value.sortAt) || Number(contentNo) || 0);
+  return {
+    id: `cinety_${category.categoryNo}_${contentNo}`,
+    contentNo,
+    videoId: contentNo,
+    platform: 'cinety',
+    title,
+    originalTitle: (originalTitle || title).normalize('NFC').slice(0, VIDEO_LIBRARY_TITLE_MAX_LENGTH),
+    thumbnailUrl,
+    publishedAt: '',
+    sortAt: sortAt || Math.max(0, 1_000_000_000_000 - Math.max(0, Number(index) || 0)),
+    categoryId: category.id,
+    categoryName: category.name,
+    sourceType: 'cinety',
+    isUnavailable: String(value.isUnavailable ?? value.is_short ?? '') === '2'
+      || value.isUnavailable === true,
+  };
+}
 
 function normalizeVideoLibraryCategory(id, value) {
   if (!VIDEO_LIBRARY_CATEGORY_ID_PATTERN.test(String(id || '')) || !value || typeof value !== 'object') return null;
@@ -25,14 +101,17 @@ function normalizeVideoLibraryItem(id, value, source = {}) {
   const videoId = String(value.videoId || '');
   if (platform === 'youtube' && !/^[A-Za-z0-9_-]{11}$/.test(videoId)) return null;
   if (platform === 'soop' && !/^\d{1,20}$/.test(videoId)) return null;
-  if (!['youtube', 'soop'].includes(platform)) return null;
+  if (platform === 'cinety' && (!/^\d{1,20}$/.test(videoId)
+    || !new RegExp(`^cinety_(?:39|41|43)_${videoId}$`).test(String(id || '')))) return null;
+  if (!['youtube', 'soop', 'cinety'].includes(platform)) return null;
   const title = typeof value.title === 'string' ? value.title.normalize('NFC').trim().slice(0, VIDEO_LIBRARY_TITLE_MAX_LENGTH) : '';
   const publishedAt = typeof value.publishedAt === 'string' ? value.publishedAt.slice(0, 32) : '';
   const parsedPublishedAt = Date.parse(publishedAt);
   const sortAt = Number(value.sortAt) || (Number.isFinite(parsedPublishedAt) ? parsedPublishedAt : Number(value.createdAt) || 0);
   const url = platform === 'youtube'
     ? `https://www.youtube.com/watch?v=${videoId}`
-    : `https://vod.sooplive.co.kr/player/${videoId}`;
+    : platform === 'soop' ? `https://vod.sooplive.co.kr/player/${videoId}`
+      : `https://cinety.sooplive.com/content/detail/${videoId}`;
   return {
     id,
     videoId,
@@ -43,7 +122,12 @@ function normalizeVideoLibraryItem(id, value, source = {}) {
     sortAt,
     url,
     categoryId: String(source.categoryId || value.categoryId || ''),
-    sourceType: source.sourceType === 'channel' ? 'channel' : 'manual',
+    categoryName: source.sourceType === 'cinety' ? String(source.categoryName || value.categoryName || '') : '',
+    originalTitle: platform === 'cinety'
+      ? (typeof value.originalTitle === 'string' ? value.originalTitle.slice(0, VIDEO_LIBRARY_TITLE_MAX_LENGTH) : '') : '',
+    isUnavailable: platform === 'cinety' && value.isUnavailable === true,
+    sourceType: source.sourceType === 'channel' ? 'channel'
+      : source.sourceType === 'cinety' || platform === 'cinety' ? 'cinety' : 'manual',
     channelId: source.sourceType === 'channel' ? String(source.channelId || '') : '',
     channelTitle: source.sourceType === 'channel' ? String(source.channelTitle || '') : '',
   };
@@ -142,7 +226,7 @@ function normalizeVideoLibrarySearchQuery(value) {
 function matchesVideoLibrarySearch(item, query) {
   const normalizedQuery = normalizeVideoLibrarySearchQuery(query);
   if (!normalizedQuery || !item || typeof item !== 'object') return false;
-  const searchable = [item.title, item.channelTitle, item.platform, item.videoId]
+  const searchable = [item.title, item.originalTitle, item.categoryName, item.channelTitle, item.platform, item.videoId]
     .filter((value) => typeof value === 'string')
     .join(' ')
     .normalize('NFC')
@@ -151,6 +235,8 @@ function matchesVideoLibrarySearch(item, query) {
 }
 
 module.exports = {
+  CINETY_CATEGORY_DEFINITIONS,
+  CINETY_CATEGORY_ID_PATTERN,
   VIDEO_LIBRARY_CATEGORY_ID_PATTERN,
   VIDEO_LIBRARY_CHANNEL_ID_PATTERN,
   VIDEO_LIBRARY_ITEM_ID_PATTERN,
@@ -159,8 +245,12 @@ module.exports = {
   hasInitialVideoLibraryImport,
   hasVideoLibrarySyncInProgress,
   isInitialVideoLibraryImport,
+  isBeforeVideoLibraryCursor,
   isStaleVideoLibrarySync,
   normalizeVideoLibraryCategory,
+  normalizeCinetyCategory,
+  normalizeCinetyCatalogItem,
+  isCinetyCategoryId,
   normalizeVideoLibraryCursor,
   normalizeVideoLibraryItem,
   normalizeVideoLibrarySearchQuery,
