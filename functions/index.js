@@ -4,6 +4,7 @@ const { resolveTemplate, mayUseTemplate } = require('./weekly-schedule-template'
 
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase, getDatabaseWithUrl, ServerValue } = require('firebase-admin/database');
+const { isSuppressedSoopSearchQuery, isSuppressedSoopSearchResult } = require('./soopSearchSuppression');
 const { getFunctions: getAdminFunctions } = require('firebase-admin/functions');
 const { getStorage } = require('firebase-admin/storage');
 const { HttpsError, onCall, onRequest } = require('firebase-functions/v2/https');
@@ -759,7 +760,9 @@ async function searchSoopStreamers(query, { sortByFavorites = false } = {}) {
   const sortOrder = sortByFavorites ? 'favorite_cnt' : 'score';
   const cacheKey = normalizedQuery + ':' + sortOrder;
   const cached = soopStreamerSearchCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.streamers;
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.streamers.filter((streamer) => !isSuppressedSoopSearchResult(streamer));
+  }
 
   try {
     const url = new URL(SOOP_STREAMER_SEARCH_API);
@@ -794,7 +797,7 @@ async function searchSoopStreamers(query, { sortByFavorites = false } = {}) {
       if (!nickname || !nickname.toLocaleLowerCase().includes(normalizedQuery)
         && !soopId.toLocaleLowerCase().includes(normalizedQuery)) return null;
       const streamer = publicStreamer(soopId, { nickname, soopId });
-      if (!streamer) return null;
+      if (!streamer || isSuppressedSoopSearchResult(streamer)) return null;
       const rawFavoriteCount = String((row && row.favorite_cnt) ?? '').replaceAll(',', '').trim();
       const favoriteCount = /^\d+$/.test(rawFavoriteCount) ? Number(rawFavoriteCount) : null;
       return { ...streamer, favoriteCount };
@@ -5095,6 +5098,9 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     if (!query) return { streamers: [] };
     const tier = await resolveViewerStatsTier(uid, request.auth);
     await enforceViewerStatsRateLimit(uid, action, { tier });
+    if (isSuppressedSoopSearchQuery(query)) {
+      return { streamers: [], hasMore: false, favoritesSorted: !sortByFavorites };
+    }
     const [verifiedSnapshot, namesSnapshot, soopResults] = await Promise.all([
       viewerStatsRef('streamerVerifications').get(),
       viewerStatsRef('streamerNames').get(),
@@ -5142,6 +5148,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
       ]))
       : byId;
     const sortedStreamers = [...resultById.values()]
+      .filter((streamer) => !isSuppressedSoopSearchResult(streamer))
       .sort((a, b) => {
         if (sortByFavorites) {
           const favoriteDifference = (Number.isFinite(b.favoriteCount) ? b.favoriteCount : -1)
