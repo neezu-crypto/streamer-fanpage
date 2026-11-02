@@ -7458,7 +7458,7 @@ function renderVideoLibrarySection(page) {
   heading.append(copy, headingActions); section.append(heading);
 
   const description = document.createElement('p'); description.className = 'video-library-description';
-  description.textContent = '스트리머가 즐겨보는 영상과 SOOP 시네티의 애니메이션·영화·드라마 작품을 모았습니다.';
+  description.textContent = '스트리머가 즐겨찾는 영상과 게임을 모았습니다.';
   section.append(description);
 
   const categoryBar = document.createElement('div'); categoryBar.className = 'video-library-categories';
