@@ -45,7 +45,7 @@ async function startAdminPage() {
   if (appStartPromise) return appStartPromise;
 
   appStartPromise = (async () => {
-    await import('./app.js?v=20261102-admin-advanced-schedule-template-v1');
+    await import('./app.js?v=20261103-favorites-description-v1');
     await import('https://neezu-crypto.github.io/streamer-game-series-shop/game-series-emotes.js?game=streamerFanPage&v=20261028-emote-modal-bottom-right');
     appStarted = true;
   })();
