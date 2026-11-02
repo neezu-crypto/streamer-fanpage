@@ -209,6 +209,8 @@ const VIEWER_FIRST_ANALYSIS_TUTORIAL_KEY = 'streamerFanPage.viewerStats.firstAna
 const VIEWER_ANALYZE_BUTTON_LABEL = '클릭해서 분석 시작';
 try { window.localStorage.removeItem('streamerFanPage.viewerStats.recentStreamers.v1'); } catch (_) {}
 const SOOP_ID_PATTERN = /^[a-z0-9]{2,20}$/i;
+const SUPPRESSED_SOOP_SEARCH_IDS = new Set(['naaary']);
+const SUPPRESSED_SOOP_SEARCH_NICKNAMES = new Set(['나리$']);
 const VIEWER_PEAK_PERIODS = [
   { days: 7, label: '최근 7일' },
   { days: 30, label: '최근 30일' },
@@ -229,6 +231,33 @@ let vodSortMode = 'date-desc';
 let vodSearchKeyword = '';
 let vodListRequestToken = 0;
 let authReady = null;
+
+function normalizeSoopSearchIdentity(value) {
+  return String(value || '').trim().normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase();
+}
+
+function isSuppressedSoopSearchQuery(value) {
+  const normalized = normalizeSoopSearchIdentity(value);
+  return SUPPRESSED_SOOP_SEARCH_IDS.has(normalized)
+    || SUPPRESSED_SOOP_SEARCH_NICKNAMES.has(normalized);
+}
+
+function isSuppressedSoopSearchResult(streamer) {
+  const soopId = normalizeSoopSearchIdentity(streamer && (streamer.soopId || streamer.id));
+  const nickname = normalizeSoopSearchIdentity(streamer && streamer.nickname);
+  return SUPPRESSED_SOOP_SEARCH_IDS.has(soopId)
+    || SUPPRESSED_SOOP_SEARCH_NICKNAMES.has(nickname);
+}
+
+function filterVisibleSoopSearchResults(streamers) {
+  return (Array.isArray(streamers) ? streamers : []).filter((streamer) => !isSuppressedSoopSearchResult(streamer));
+}
+
+function isSuppressedSoopSearchInput(value) {
+  const parsedId = parseSoopId(value);
+  return isSuppressedSoopSearchQuery(value)
+    || Boolean(parsedId && SUPPRESSED_SOOP_SEARCH_IDS.has(normalizeSoopSearchIdentity(parsedId)));
+}
 let nextPage = 1;
 let hasMoreVods = false;
 let vodTotal = 0;
@@ -604,7 +633,8 @@ function setComparisonPickerStatus(index, message, isError = false) {
 function renderComparisonSearchResults(index, streamers) {
   const results = $('viewerComparisonSearchResults' + index);
   results.replaceChildren();
-  streamers.forEach((streamer, streamerIndex) => {
+  const visibleStreamers = filterVisibleSoopSearchResults(streamers);
+  visibleStreamers.forEach((streamer, streamerIndex) => {
     const button = document.createElement('button');
     button.className = 'viewer-comparison-search-result';
     button.type = 'button';
@@ -634,7 +664,7 @@ function renderComparisonSearchResults(index, streamers) {
     button.append(avatar, copy, select);
     results.append(button);
   });
-  results._streamers = streamers;
+  results._streamers = visibleStreamers;
 }
 
 function renderComparisonSelection() {
@@ -687,6 +717,12 @@ function invalidateComparisonResult() {
 
 function selectComparisonStreamer(index, streamer) {
   const soopId = String(streamer && streamer.soopId || '').trim().toLowerCase();
+  if (isSuppressedSoopSearchResult(streamer)) {
+    $('viewerComparisonSearchResults' + index)._streamers = [];
+    $('viewerComparisonSearchResults' + index).replaceChildren();
+    setComparisonPickerStatus(index, '검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.', true);
+    return;
+  }
   if (!SOOP_ID_PATTERN.test(soopId)) {
     setComparisonPickerStatus(index, 'SOOP ID를 확인하지 못했어요. 다른 검색어를 입력해 주세요.', true);
     return;
@@ -727,6 +763,12 @@ async function searchComparisonStreamer(index, query) {
   }
   const requestId = ++comparisonSearchRequestSequence[index];
   const button = $('viewerComparisonSearchButton' + index);
+  if (isSuppressedSoopSearchInput(cleanQuery)) {
+    button.disabled = false;
+    renderComparisonSearchResults(index, []);
+    setComparisonPickerStatus(index, '검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.', true);
+    return;
+  }
   const idFromInput = parseSoopId(cleanQuery);
   const searchQuery = idFromInput || cleanQuery;
   button.disabled = true;
@@ -736,7 +778,7 @@ async function searchComparisonStreamer(index, query) {
     await getAuthReady();
     const response = await callViewerStats({ action: 'search', query: searchQuery, sortByFavorites: true });
     if (requestId !== comparisonSearchRequestSequence[index]) return;
-    const candidates = Array.isArray(response.data && response.data.streamers) ? response.data.streamers.slice() : [];
+    const candidates = filterVisibleSoopSearchResults(response.data && response.data.streamers);
     const isStationUrl = /^https?:\/\//i.test(cleanQuery) && Boolean(idFromInput);
     if (idFromInput && !candidates.some((item) => String(item.soopId).toLowerCase() === idFromInput)
       && (isStationUrl || candidates.length === 0)) {
@@ -861,7 +903,8 @@ function renderKeywordComparisonSelection() {
 function renderKeywordComparisonSearchResults(index, streamers) {
   const results = $('viewerKeywordSearchResults' + index);
   results.replaceChildren();
-  streamers.forEach((streamer, streamerIndex) => {
+  const visibleStreamers = filterVisibleSoopSearchResults(streamers);
+  visibleStreamers.forEach((streamer, streamerIndex) => {
     const button = document.createElement('button');
     button.className = 'viewer-comparison-search-result';
     button.type = 'button';
@@ -890,11 +933,17 @@ function renderKeywordComparisonSearchResults(index, streamers) {
     button.append(avatar, copy, select);
     results.append(button);
   });
-  results._streamers = streamers;
+  results._streamers = visibleStreamers;
 }
 
 function selectKeywordComparisonStreamer(index, streamer) {
   const soopId = String(streamer && streamer.soopId || '').trim().toLowerCase();
+  if (isSuppressedSoopSearchResult(streamer)) {
+    $('viewerKeywordSearchResults' + index)._streamers = [];
+    $('viewerKeywordSearchResults' + index).replaceChildren();
+    setKeywordPickerStatus(index, '검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.', true);
+    return;
+  }
   if (!SOOP_ID_PATTERN.test(soopId)) {
     setKeywordPickerStatus(index, 'SOOP ID를 확인하지 못했어요. 다른 검색어를 입력해 주세요.', true);
     return;
@@ -939,6 +988,14 @@ async function searchKeywordComparisonStreamer(index, query) {
   }
   const requestId = ++keywordComparisonSearchRequestSequence[index];
   const button = $('viewerKeywordSearchButton' + index);
+  if (isSuppressedSoopSearchInput(cleanQuery)) {
+    button.dataset.searching = 'false';
+    button.disabled = false;
+    renderKeywordComparisonSearchResults(index, []);
+    setKeywordPickerStatus(index, '검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.', true);
+    renderKeywordComparisonSelection();
+    return;
+  }
   const idFromInput = parseSoopId(cleanQuery);
   const searchQuery = idFromInput || cleanQuery;
   button.dataset.searching = 'true';
@@ -949,7 +1006,7 @@ async function searchKeywordComparisonStreamer(index, query) {
     await getAuthReady();
     const response = await callViewerStats({ action: 'search', query: searchQuery, sortByFavorites: true });
     if (requestId !== keywordComparisonSearchRequestSequence[index]) return;
-    const candidates = Array.isArray(response.data && response.data.streamers) ? response.data.streamers.slice() : [];
+    const candidates = filterVisibleSoopSearchResults(response.data && response.data.streamers);
     const isStationUrl = /^https?:\/\//i.test(cleanQuery) && Boolean(idFromInput);
     if (idFromInput && !candidates.some((item) => String(item.soopId).toLowerCase() === idFromInput)
       && (isStationUrl || candidates.length === 0)) {
@@ -1073,7 +1130,8 @@ function setSearchProgress(message = '', requestId = searchRequestId) {
 function renderSearchResults(streamers) {
   const results = $('viewerSearchResults');
   results.replaceChildren();
-  streamers.forEach((streamer, index) => {
+  const visibleStreamers = filterVisibleSoopSearchResults(streamers);
+  visibleStreamers.forEach((streamer, index) => {
     const button = document.createElement('button');
     button.className = 'viewer-search-result';
     button.type = 'button';
@@ -1098,8 +1156,8 @@ function renderSearchResults(streamers) {
     button.append(avatar, copy, arrow);
     results.append(button);
   });
-  results.dataset.count = String(streamers.length);
-  results._streamers = streamers;
+  results.dataset.count = String(visibleStreamers.length);
+  results._streamers = visibleStreamers;
 }
 
 function readStaticVodStatsIndex(streamerId) {
@@ -2989,6 +3047,20 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
 }
 
 async function selectStreamer(streamer) {
+  if (isSuppressedSoopSearchResult(streamer)) {
+    searchRequestId += 1;
+    activeLoadToken += 1;
+    vodListRequestToken += 1;
+    periodScanToken += 1;
+    selectedStreamer = null;
+    $('viewerResults').classList.add('hidden');
+    $('viewerEmpty').classList.remove('hidden');
+    renderSearchResults([]);
+    setSearchHint('검색 결과가 없어요. 다른 이름을 입력하거나 SOOP 방송국 아이디·주소를 사용해 주세요.', true);
+    setSearchProgress('');
+    $('viewerSearchButton').disabled = false;
+    return;
+  }
   activeLoadToken += 1;
   const loadToken = activeLoadToken;
   vodListRequestToken += 1;
@@ -3044,6 +3116,16 @@ async function runSearch(query, options = {}) {
     return;
   }
   const requestId = ++searchRequestId;
+  const requestedExactSoopId = parseSoopId(options.exactSoopId || '');
+  if (isSuppressedSoopSearchInput(cleanQuery) || isSuppressedSoopSearchInput(requestedExactSoopId)) {
+    renderSearchResults([]);
+    $('viewerResults').classList.add('hidden');
+    $('viewerEmpty').classList.remove('hidden');
+    $('viewerSearchButton').disabled = false;
+    setSearchProgress('', requestId);
+    setSearchHint('검색 결과가 없어요. 다른 이름을 입력하거나 SOOP 방송국 아이디·주소를 사용해 주세요.', true);
+    return;
+  }
   const idFromInput = parseSoopId(cleanQuery);
   const searchQuery = idFromInput || cleanQuery;
   setSearchHint('스트리머를 찾고 있어요…');
@@ -3057,9 +3139,8 @@ async function runSearch(query, options = {}) {
     const response = await callViewerStats({ action: 'search', query: searchQuery });
     if (requestId !== searchRequestId) return;
     setSearchProgress('검색 결과를 정리하고 있어요…', requestId);
-    const streamers = Array.isArray(response.data && response.data.streamers) ? response.data.streamers : [];
-    const candidates = streamers.slice();
-    const exactSoopId = parseSoopId(options.exactSoopId || '');
+    const candidates = filterVisibleSoopSearchResults(response.data && response.data.streamers);
+    const exactSoopId = requestedExactSoopId;
     if (exactSoopId) {
       const exactStreamer = candidates.find((item) => String(item.soopId || '').toLowerCase() === exactSoopId)
         || streamerForId(exactSoopId);
@@ -3113,7 +3194,7 @@ $('viewerSearchResults').addEventListener('click', (event) => {
   if (!button) return;
   const streamers = $('viewerSearchResults')._streamers || [];
   const streamer = streamers[Number(button.dataset.streamerIndex)];
-  if (!streamer) return;
+  if (!streamer || isSuppressedSoopSearchResult(streamer)) return;
   const requestId = ++searchRequestId;
   $('viewerSearchButton').disabled = true;
   setSearchProgress('스트리머를 선택했어요. 다시보기 목록을 불러오고 있어요…', requestId);
