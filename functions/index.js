@@ -4421,6 +4421,13 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
   };
 });
 
+// Fanpage maintenance gate: disclose only whether the authenticated UID is an
+// administrator, without loading public profiles or private admin data.
+exports.streamerFanPageMaintenanceAccess = onCall({ maxInstances: 10 }, async (request) => {
+  const uid = requireAuth(request);
+  return { isAdmin: await isAdminUid(uid) };
+});
+
 exports.streamerFanPageRoulette = onCall({ maxInstances: 20 }, async (request) => {
   requireAuth(request);
   const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
