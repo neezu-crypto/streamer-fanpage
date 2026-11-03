@@ -32,6 +32,8 @@
 .profile-editable::after{content:'✎';position:absolute;opacity:0;color:var(--pink);font-size:13px;transition:opacity .15s;pointer-events:none}
 .profile-editable:hover::after,.profile-editable:focus-visible::after{opacity:.9}
 @media(hover:none){.profile-editable::after{opacity:.55}}
+.profile-verification-prompt::after{display:grid;width:21px;height:21px;place-items:center;border:1px solid color-mix(in srgb,var(--pink) 55%,transparent);border-radius:50%;background:color-mix(in srgb,var(--pink) 13%,transparent);color:var(--pink);font-size:12px;opacity:.92}
+.profile-verification-prompt:hover::after,.profile-verification-prompt:focus-visible::after{opacity:1;transform:translateY(-1px)}
 .profile-editable:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
 .profile-fact.profile-editable{width:100%;padding:0;border:0;cursor:pointer}
 .profile-fact.profile-editable strong{padding-right:38px}
