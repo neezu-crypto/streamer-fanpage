@@ -1520,6 +1520,9 @@ function renderUpboSection(page) {
   if (state.canManage) {
     const addItem = upboButton('+ 신청 항목 추가', 'button-primary upbo-add-topic', () => openUpboItemEditor(page));
     addItem.disabled = state.saving; actions.append(addItem);
+  } else {
+    const editPrompt = createStreamerEditVerificationPrompt(page, '업보 항목 관리');
+    if (editPrompt) actions.append(editPrompt);
   }
   heading.append(copy, actions); section.append(heading);
 
@@ -2622,6 +2625,26 @@ function attachProfileQuickEdit(target, page, field) {
   });
 }
 
+function shouldShowStreamerVerificationPrompt(page) {
+  return !!page && !page.isOwner && !hasRecognizedFanpageAccount();
+}
+
+function createStreamerEditVerificationPrompt(page, itemLabel) {
+  if (!shouldShowStreamerVerificationPrompt(page)) return null;
+  const label = String(itemLabel || '이 항목').trim() || '이 항목';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button streamer-edit-verification-prompt';
+  button.setAttribute('aria-label', `${label} 수정: 스트리머 인증하기`);
+  button.title = `${label}을(를) 수정하려면 스트리머 인증이 필요해요.`;
+  button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    showFanPageModal($('streamerVerifyDialog'));
+  });
+  return button;
+}
+
 function openProfileQuickEdit(page, field, target) {
   const definition = PROFILE_QUICK_EDIT_FIELDS[field];
   if (!page.isOwner || !definition || !target.isConnected) return;
@@ -2835,6 +2858,10 @@ function renderRollingPaperSection(page) {
     });
     actions.append(composeToggle);
   }
+  const topicManagementPrompt = createStreamerEditVerificationPrompt(
+    page, activeTopic ? `${activeTopic.title} 롤링페이퍼 주제` : '롤링페이퍼 주제 관리',
+  );
+  if (topicManagementPrompt) actions.append(topicManagementPrompt);
   if (activeTopic && activeTopic.id !== 'general' && page.isOwner && state.canManageTopics) {
     const deleteTopic = document.createElement('button'); deleteTopic.type = 'button';
     deleteTopic.className = 'button rolling-paper-topic-delete'; deleteTopic.textContent = '주제 삭제';
@@ -2885,6 +2912,8 @@ function renderRollingPaperSection(page) {
         });
         cardActions.append(composeToggle);
       }
+      const topicEditPrompt = createStreamerEditVerificationPrompt(page, `${topic.title} 롤링페이퍼 주제`);
+      if (topicEditPrompt) cardActions.append(topicEditPrompt);
       if (topic.id !== 'general' && page.isOwner && state.canManageTopics) {
         const deleteTopic = document.createElement('button'); deleteTopic.type = 'button';
         deleteTopic.className = 'button rolling-paper-topic-delete'; deleteTopic.textContent = '주제 삭제';
@@ -2998,6 +3027,8 @@ function renderRollingPaperSection(page) {
         remove.textContent = '삭제'; remove.setAttribute('aria-label', '롤링페이퍼 메시지 삭제');
         remove.addEventListener('click', () => deleteRollingPaperEntry(page, activeTopic.id, entry, remove)); itemHeading.append(remove);
       }
+      const entryEditPrompt = createStreamerEditVerificationPrompt(page, '응원 메시지');
+      if (entryEditPrompt) itemHeading.append(entryEditPrompt);
       if (entry.galleryImage?.url) {
         const galleryImage = document.createElement('img'); galleryImage.className = 'rolling-paper-entry-image';
         galleryImage.src = entry.galleryImage.url; galleryImage.alt = '스트리머 갤러리에서 선택한 이미지';
@@ -3062,6 +3093,8 @@ function renderRollingPaperStickerBoard(page, state) {
   const count = document.createElement('span');
   count.textContent = state.stickersLoading && !state.stickersLoaded ? '불러오는 중' : `${state.stickers.length}개`;
   summary.append(title, count); toolbar.append(summary);
+  const stickerEditPrompt = createStreamerEditVerificationPrompt(page, '응원 스티커 위치');
+  if (stickerEditPrompt) toolbar.append(stickerEditPrompt);
   const hidden = rollingPaperStickersAreHidden(streamerId);
   const storedHiddenStickerIds = rollingPaperHiddenStickerIds(streamerId);
   const availableStickerIds = new Set(state.stickers.map((sticker) => sticker.id));
@@ -3675,6 +3708,10 @@ function renderCompetitionHistorySection(page) {
   }
   headingActions.append(count);
   if (add) headingActions.append(add);
+  else {
+    const addPrompt = createStreamerEditVerificationPrompt(page, '대회 이력');
+    if (addPrompt) headingActions.append(addPrompt);
+  }
   heading.append(headingCopy, headingActions);
 
   const list = document.createElement('div'); list.className = 'competition-history-list';
@@ -3740,6 +3777,9 @@ function renderCompetitionHistorySection(page) {
           }
         });
         actions.append(edit, remove); footer.append(actions);
+      } else {
+        const editPrompt = createStreamerEditVerificationPrompt(page, `${entry.eventName} 대회 이력`);
+        if (editPrompt) footer.append(editPrompt);
       }
       if (footer.childElementCount) item.append(footer);
       list.append(item);
@@ -4115,7 +4155,10 @@ function renderTamagotchiApplication(page, section) {
     const empty = document.createElement('div'); empty.className = 'tamagotchi-empty-state';
     const symbol = document.createElement('span'); symbol.className = 'tamagotchi-placeholder-symbol'; symbol.setAttribute('aria-hidden', 'true'); symbol.textContent = '✦';
     const message = document.createElement('p'); message.textContent = '아직 다마고치가 없어요. 스트리머가 디자인과 상호작용을 신청하면 이곳에서 만날 수 있어요.';
-    empty.append(symbol, message); content.append(empty); return;
+    empty.append(symbol, message);
+    const applicationPrompt = createStreamerEditVerificationPrompt(page, '다마고치 디자인 신청');
+    if (applicationPrompt) empty.append(applicationPrompt);
+    content.append(empty); return;
   }
 
   if (application?.status === 'pending') {
@@ -4293,6 +4336,9 @@ function renderFanPage(page, options = {}) {
     const edit = document.createElement('button'); edit.id = 'profileSettingsButton'; edit.type = 'button'; edit.className = 'button'; edit.textContent = '⚙ 설정';
     edit.addEventListener('click', () => showFanPageModal($('profileSettingsDialog')));
     actions.append(edit);
+  } else {
+    const editPrompt = createStreamerEditVerificationPrompt(page, '팬페이지 설정');
+    if (editPrompt) actions.append(editPrompt);
   }
   section.append(label, identity, facts);
   if (about) section.append(about);
@@ -5542,6 +5588,8 @@ function renderRouletteSection(page) {
     controls.append(openLink, refreshButton);
   }
   if (editor && editor.toggleButton) controls.append(editor.toggleButton);
+  const editPrompt = createStreamerEditVerificationPrompt(page, '룰렛 확률 링크');
+  if (editPrompt) controls.append(editPrompt);
   heading.append(copy, controls);
 
   if (!rouletteUrl) {
@@ -6120,6 +6168,9 @@ function renderVodSection(page) {
       }
     });
     actions.append(refresh);
+  } else {
+    const refreshPrompt = createStreamerEditVerificationPrompt(page, '방송 다시보기 목록');
+    if (refreshPrompt) actions.append(refreshPrompt);
   }
   actions.append(analytics);
   heading.append(actions);
@@ -6221,6 +6272,8 @@ function renderYouTubeSection(page) {
     actions.append(channel);
   }
   if (editor && editor.toggleButton) actions.append(editor.toggleButton);
+  const channelEditPrompt = createStreamerEditVerificationPrompt(page, 'YouTube 채널');
+  if (channelEditPrompt) actions.append(channelEditPrompt);
   if (page.isOwner && channelUrl) {
     const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'button youtube-refresh-button';
     refresh.dataset.youtubeFocus = 'refresh';
@@ -6313,7 +6366,10 @@ function renderSongbookSection(page) {
   const title = document.createElement('h2'); title.textContent = '노래책';
   const count = document.createElement('span'); count.className = 'songbook-count';
   count.textContent = `${entries.length.toLocaleString('ko-KR')}곡`;
-  copy.append(eyebrow, title, count); heading.append(copy); section.append(heading);
+  copy.append(eyebrow, title, count); heading.append(copy);
+  const songbookEditPrompt = createStreamerEditVerificationPrompt(page, '노래책');
+  if (songbookEditPrompt) heading.append(songbookEditPrompt);
+  section.append(heading);
 
   const description = document.createElement('p'); description.className = 'songbook-description';
   description.textContent = '스트리머가 부를 수 있는 노래를 모아뒀어요. 곡을 누르면 팬페이지 안에서 재생됩니다.';
@@ -6377,6 +6433,9 @@ function renderSongbookSection(page) {
       remove.textContent = '삭제'; remove.setAttribute('aria-label', `${entry.title || '노래'} 삭제`);
       remove.addEventListener('click', () => deleteSongbookEntry(page, entry.id, remove));
       row.append(remove);
+    } else {
+      const editPrompt = createStreamerEditVerificationPrompt(page, `${entry.title || '노래'} 노래책 항목`);
+      if (editPrompt) row.append(editPrompt);
     }
     list.append(row);
   });
@@ -6613,7 +6672,10 @@ function renderPlayedGamesSection(page) {
   const title = document.createElement('h2'); title.textContent = '플레이한 게임';
   const count = document.createElement('span'); count.className = 'played-games-count';
   count.textContent = `${games.length.toLocaleString('ko-KR')}개`;
-  copy.append(eyebrow, title, count); heading.append(copy); section.append(heading);
+  copy.append(eyebrow, title, count); heading.append(copy);
+  const gamesEditPrompt = createStreamerEditVerificationPrompt(page, '플레이한 게임 목록');
+  if (gamesEditPrompt) heading.append(gamesEditPrompt);
+  section.append(heading);
 
   const description = document.createElement('p'); description.className = 'played-games-description';
   description.textContent = '함께 플레이한 게임과 다시보기를 모아뒀어요.';
@@ -6711,6 +6773,9 @@ function renderPlayedGamesSection(page) {
       removeGame.setAttribute('aria-label', `${game.name || '게임'} 삭제`);
       removeGame.addEventListener('click', () => deletePlayedGame(page, appId, removeGame));
       top.append(removeGame);
+    } else {
+      const editPrompt = createStreamerEditVerificationPrompt(page, `${game.name || '게임'} 항목`);
+      if (editPrompt) top.append(editPrompt);
     }
     card.append(top);
 
@@ -7034,7 +7099,10 @@ function renderMemoriesSection(page) {
   const title = document.createElement('h2'); title.textContent = '기억의 순간';
   const count = document.createElement('span'); count.className = 'memory-moments-count';
   count.textContent = `${memories.length.toLocaleString('ko-KR')}개`;
-  copy.append(eyebrow, title, count); heading.append(copy); section.append(heading);
+  copy.append(eyebrow, title, count); heading.append(copy);
+  const memoriesEditPrompt = createStreamerEditVerificationPrompt(page, '기억의 순간 목록');
+  if (memoriesEditPrompt) heading.append(memoriesEditPrompt);
+  section.append(heading);
 
   const description = document.createElement('p'); description.className = 'memory-moments-description';
   description.textContent = '100일, 200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아뒀어요.';
@@ -7134,6 +7202,9 @@ function renderMemoriesSection(page) {
       remove.setAttribute('aria-label', `${memory.title || '기억의 순간'} 삭제`);
       remove.addEventListener('click', () => deleteMemoryMoment(page, memory, remove));
       actions.append(remove);
+    } else {
+      const editPrompt = createStreamerEditVerificationPrompt(page, `${memory.title || '기억의 순간'} 항목`);
+      if (editPrompt) actions.append(editPrompt);
     }
     card.append(thumbnailFrame, detail, actions); list.append(card);
   });
@@ -7913,6 +7984,8 @@ function renderOgqSection(page, paired = false) {
     value: String(profile.ogqEmoticonUrl || ''),
   }) : null;
   if (editor && editor.toggleButton) actions.append(editor.toggleButton);
+  const editPrompt = createStreamerEditVerificationPrompt(page, 'OGQ 이모티콘 링크');
+  if (editPrompt) actions.append(editPrompt);
   heading.append(copy, actions); section.append(heading);
 
   if (!ogqUrl || !emoticonId) {
@@ -8020,6 +8093,8 @@ function renderCafeSection(page) {
     actions.append(more);
   }
   if (editor && editor.toggleButton) actions.append(editor.toggleButton);
+  const editPrompt = createStreamerEditVerificationPrompt(page, '네이버 카페 주소');
+  if (editPrompt) actions.append(editPrompt);
   heading.append(copy, actions); section.append(heading);
 
   if (!cafeUrl) {
@@ -8664,12 +8739,20 @@ function renderCalendarSection(page) {
   }
   section._drawWeeklyBoard = drawBoard;
   const edit = canManage ? document.createElement('button') : null;
+  let editPrompt = null;
   if (edit) {
     edit.type = 'button'; edit.className = 'weekly-schedule-board-edit';
     edit.setAttribute('aria-label', '방송표 편집'); edit.title = '방송표 편집';
     edit.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
     edit.addEventListener('click', (event) => { event.stopPropagation(); if (!mobileScheduleMedia.matches) openWeeklyScheduleDialog(page); });
     imageFrame.append(edit);
+  } else {
+    editPrompt = createStreamerEditVerificationPrompt(page, '주간 방송표');
+    if (editPrompt) {
+      editPrompt.classList.add('weekly-schedule-board-edit');
+      editPrompt.setAttribute('aria-label', '주간 방송표 수정: 스트리머 인증하기');
+      imageFrame.append(editPrompt);
+    }
   }
   const openSchedule = () => {
     if (canManage && !mobileScheduleMedia.matches) openWeeklyScheduleDialog(page);
@@ -8684,6 +8767,7 @@ function renderCalendarSection(page) {
     imageFrame.tabIndex = 0; imageFrame.setAttribute('role', 'group');
     imageFrame.setAttribute('aria-label', `주간 방송표. 클릭하거나 Enter를 눌러 ${canManage && !mobileScheduleMedia.matches ? '편집' : '크게 보기'}할 수 있습니다. 양쪽 화살표로 주차를 이동합니다.`);
     if (edit) edit.hidden = mobileScheduleMedia.matches;
+    if (editPrompt) editPrompt.hidden = mobileScheduleMedia.matches;
   };
   syncScheduleActivation();
   if (typeof mobileScheduleMedia.addEventListener === 'function') mobileScheduleMedia.addEventListener('change', syncScheduleActivation);
