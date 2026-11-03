@@ -2,7 +2,7 @@
 
 const VIDEO_LIBRARY_CATEGORY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VIDEO_LIBRARY_CHANNEL_ID_PATTERN = /^UC[A-Za-z0-9_-]{20,30}$/i;
-const VIDEO_LIBRARY_ITEM_ID_PATTERN = /^(?:youtube_[A-Za-z0-9_-]{11}|soop_\d{1,20}|cinety_(?:39|41|43)_\d{1,20})$/;
+const VIDEO_LIBRARY_ITEM_ID_PATTERN = /^(?:youtube_[A-Za-z0-9_-]{11}|soop_\d{1,20}|cinety_(?:39|41|43)_\d{1,20}|flashgame_[a-f0-9]{64})$/i;
 const VIDEO_LIBRARY_TITLE_MAX_LENGTH = 120;
 const VIDEO_LIBRARY_SYNC_STALE_MS = 3 * 60 * 1000;
 const CINETY_CATEGORY_DEFINITIONS = Object.freeze([
@@ -103,15 +103,18 @@ function normalizeVideoLibraryItem(id, value, source = {}) {
   if (platform === 'soop' && !/^\d{1,20}$/.test(videoId)) return null;
   if (platform === 'cinety' && (!/^\d{1,20}$/.test(videoId)
     || !new RegExp(`^cinety_(?:39|41|43)_${videoId}$`).test(String(id || '')))) return null;
-  if (!['youtube', 'soop', 'cinety'].includes(platform)) return null;
+  if (platform === 'flashgame' && !/^flashgame_[a-f0-9]{64}$/i.test(String(id || ''))) return null;
+  if (!['youtube', 'soop', 'cinety', 'flashgame'].includes(platform)) return null;
   const title = typeof value.title === 'string' ? value.title.normalize('NFC').trim().slice(0, VIDEO_LIBRARY_TITLE_MAX_LENGTH) : '';
   const publishedAt = typeof value.publishedAt === 'string' ? value.publishedAt.slice(0, 32) : '';
   const parsedPublishedAt = Date.parse(publishedAt);
   const sortAt = Number(value.sortAt) || (Number.isFinite(parsedPublishedAt) ? parsedPublishedAt : Number(value.createdAt) || 0);
+  const storedUrl = typeof value.url === 'string' ? value.url.trim() : '';
   const url = platform === 'youtube'
     ? `https://www.youtube.com/watch?v=${videoId}`
     : platform === 'soop' ? `https://vod.sooplive.co.kr/player/${videoId}`
-      : `https://cinety.sooplive.com/content/detail/${videoId}`;
+      : platform === 'cinety' ? `https://cinety.sooplive.com/content/detail/${videoId}` : storedUrl;
+  if (platform === 'flashgame' && !/^https:\/\/[^\s]+$/i.test(url)) return null;
   return {
     id,
     videoId,
@@ -226,7 +229,7 @@ function normalizeVideoLibrarySearchQuery(value) {
 function matchesVideoLibrarySearch(item, query) {
   const normalizedQuery = normalizeVideoLibrarySearchQuery(query);
   if (!normalizedQuery || !item || typeof item !== 'object') return false;
-  const searchable = [item.title, item.originalTitle, item.categoryName, item.channelTitle, item.platform, item.videoId]
+  const searchable = [item.title, item.originalTitle, item.categoryName, item.channelTitle, item.platform, item.videoId, item.url]
     .filter((value) => typeof value === 'string')
     .join(' ')
     .normalize('NFC')
