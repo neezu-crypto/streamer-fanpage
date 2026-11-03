@@ -1763,6 +1763,25 @@ body.fanpage-layout-three-active .footer-feedback-link { border-bottom-color: #2
 #fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-option { border-color: var(--doodle-ink); background: var(--doodle-paper-soft); }
 #fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-option:has(input:checked) { border-color: var(--doodle-accent); background: #fff1e6; }
 
+/* Layout 3 dialogs are mounted at body level, outside #fanPageView. */
+body.fanpage-layout-three-active .account-dialog.profile-layout-dialog {
+  border: 2px solid var(--doodle-ink, #2f2a2c);
+  border-radius: 20px;
+  background: var(--doodle-paper, #fffdf8);
+  color: var(--doodle-ink, #2f2a2c);
+  box-shadow: 6px 7px 0 var(--doodle-shadow, #2f2a2c32);
+}
+body.fanpage-layout-three-active .account-dialog.profile-layout-dialog::backdrop { background: #2f2a2c66; backdrop-filter: blur(4px); }
+body.fanpage-layout-three-active .profile-layout-dialog .profile-editor-heading h2,
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-choice legend,
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-option-copy strong { color: var(--doodle-ink, #2f2a2c); }
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-dialog-intro,
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-option-copy small,
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-status { color: var(--doodle-muted, #665d5b); }
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-choice,
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-option { border-color: var(--doodle-ink, #2f2a2c); background: var(--doodle-paper-soft, #fff8ed); }
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-option:has(input:checked) { border-color: var(--doodle-accent, #e87564); background: #fff1e6; }
+
 @media (max-width: 720px) {
   #fanPageView.fanpage-layout-3 { padding: 20px 0 34px; }
   #fanPageView.fanpage-layout-3 .fanpage-kawaii-hero { min-height: 330px; border-radius: 18px; }
