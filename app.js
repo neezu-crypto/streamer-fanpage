@@ -1401,6 +1401,7 @@ function upboStateFor(streamerId) {
       boardLoaded: false, loadingBoard: false, loadingMoreRecords: false, loadingMorePending: false,
       submitting: false, items: [], pending: [], records: [],
       requestDraft: { nickname: '', lines: [], activeLineId: '' },
+      activeTab: 'request',
       pendingHasMore: false, pendingNextCursor: '', recordsHasMore: false, recordsNextCursor: '',
       boardRequestId: 0,
     });
@@ -1537,9 +1538,33 @@ function renderUpboSection(page) {
   if (state.error) {
     const error = document.createElement('p'); error.className = 'upbo-status is-error'; error.textContent = state.error; section.append(error);
   }
-  section.append(renderUpboRequestForm(page, state));
-  if (state.canManage) section.append(renderUpboItemManager(page, state), renderUpboPendingQueue(page, state));
-  section.append(renderUpboRecords(page, state));
+  const tabs = [
+    { id: 'request', label: '업보 신청' },
+    ...(state.canManage ? [
+      { id: 'items', label: '신청 가능한 항목' },
+      { id: 'pending', label: '팬 신청 검토' },
+    ] : []),
+    { id: 'records', label: '등록된 업보 기록' },
+  ];
+  if (!tabs.some((tab) => tab.id === state.activeTab)) state.activeTab = 'request';
+  const tablist = document.createElement('div'); tablist.className = 'upbo-subtabs';
+  tablist.setAttribute('role', 'tablist'); tablist.setAttribute('aria-label', '업보 정리 하위 메뉴');
+  tabs.forEach((tab) => {
+    const button = upboButton(tab.label, `upbo-subtab${state.activeTab === tab.id ? ' is-active' : ''}`, () => {
+      if (state.activeTab === tab.id) return;
+      state.activeTab = tab.id;
+      refreshUpboSection(page.streamer.id);
+    });
+    button.id = `upbo-tab-${tab.id}`; button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', String(state.activeTab === tab.id));
+    button.setAttribute('aria-controls', `upbo-panel-${tab.id}`);
+    tablist.append(button);
+  });
+  section.append(tablist);
+  if (state.activeTab === 'request') section.append(renderUpboRequestForm(page, state));
+  if (state.activeTab === 'items' && state.canManage) section.append(renderUpboItemManager(page, state));
+  if (state.activeTab === 'pending' && state.canManage) section.append(renderUpboPendingQueue(page, state));
+  if (state.activeTab === 'records') section.append(renderUpboRecords(page, state));
   return section;
 }
 
@@ -1552,6 +1577,7 @@ function formatUpboDateTime(timestamp) {
 
 function renderUpboRequestForm(page, state) {
   const panel = document.createElement('section'); panel.className = 'upbo-subsection upbo-request-panel';
+  panel.id = 'upbo-panel-request'; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', 'upbo-tab-request');
   const heading = document.createElement('div'); heading.className = 'upbo-subsection-heading';
   const title = document.createElement('h4'); title.textContent = '업보 항목 신청';
   heading.append(title); panel.append(heading);
@@ -1785,6 +1811,7 @@ function renderUpboRequestForm(page, state) {
 
 function renderUpboItemManager(page, state) {
   const panel = document.createElement('section'); panel.className = 'upbo-subsection upbo-item-manager';
+  panel.id = 'upbo-panel-items'; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', 'upbo-tab-items');
   const heading = document.createElement('div'); heading.className = 'upbo-subsection-heading upbo-manager-heading';
   const actions = document.createElement('div'); actions.className = 'upbo-manager-actions';
   const addItem = upboButton('+ 항목 추가', 'button-primary upbo-small-button upbo-add-item-inline', () => openUpboItemEditor(page));
@@ -1889,6 +1916,7 @@ function bindUpboPreviewZoom(image, getUrl, getTitle) {
 
 function renderUpboPendingQueue(page, state) {
   const panel = document.createElement('section'); panel.className = 'upbo-subsection upbo-pending-panel';
+  panel.id = 'upbo-panel-pending'; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', 'upbo-tab-pending');
   const heading = document.createElement('div'); heading.className = 'upbo-subsection-heading';
   const title = document.createElement('h4'); title.textContent = '팬 신청 검토';
   const count = document.createElement('span'); count.className = 'upbo-viewer-total'; count.textContent = `${state.pending.length}${state.pendingHasMore ? '+' : ''}건 대기 중`;
@@ -1926,6 +1954,7 @@ function renderUpboPendingQueue(page, state) {
 
 function renderUpboRecords(page, state) {
   const panel = document.createElement('section'); panel.className = 'upbo-subsection upbo-records-panel';
+  panel.id = 'upbo-panel-records'; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', 'upbo-tab-records');
   const heading = document.createElement('div'); heading.className = 'upbo-subsection-heading';
   const title = document.createElement('h4'); title.textContent = '등록된 업보 기록';
   const count = document.createElement('span'); count.className = 'upbo-viewer-total'; count.textContent = `${state.records.length}${state.recordsHasMore ? '+' : ''}건`;
