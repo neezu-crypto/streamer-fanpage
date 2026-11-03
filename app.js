@@ -4302,6 +4302,10 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     const previousProfile = { ...(targetPage.profile || {}) };
     targetPage.profile = { ...previousProfile, layoutDesign: selectedLayout };
     status.textContent = '미리보기를 적용했어요. 닫기 버튼을 누르면 저장됩니다.';
+    // Re-rendering removes the dialog from the document. Close it first so the
+    // preserved instance can be attached and opened again without an
+    // InvalidStateError from showModal() on an already-open, detached dialog.
+    if (dialog.open) dialog.close();
     renderFanPage(targetPage, {
       preservedLayoutDesignDialog: dialog,
       reopenLayoutDesignDialog: true,
