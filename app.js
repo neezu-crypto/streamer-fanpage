@@ -7589,7 +7589,11 @@ function renderVideoLibrarySection(page) {
         event.preventDefault();
         const name = nameInput.value.trim();
         if (!name || state.saving) return;
-        runVideoLibraryMutation(page, 'category-rename', { categoryId: selectedCategory.id, name }, '카테고리 이름을 바꿨어요.');
+        runVideoLibraryMutation(page, 'category-rename', {
+          categoryId: selectedCategory.id,
+          previousName: selectedCategory.name,
+          name,
+        }, '카테고리 이름을 바꿨어요.');
       });
       const deleteNote = document.createElement('p'); deleteNote.className = 'video-library-category-delete-note';
       deleteNote.textContent = '영상이나 YouTube 채널이 연결된 카테고리는 삭제할 수 없어요.';
@@ -7929,8 +7933,11 @@ async function runVideoLibraryMutation(page, action, payload, successMessage) {
   state.saving = true; state.error = '';
   refreshVideoLibrarySection(page.streamer.id);
   try {
-    await callVideoLibrary({ action, ...payload });
+    const result = (await callVideoLibrary({ action, ...payload })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
+    if (action === 'category-rename' && result?.categoryId && state.categoryId === payload.categoryId) {
+      state.categoryId = result.categoryId;
+    }
     if (action === 'category-delete' && state.categoryId === payload.categoryId) state.categoryId = '';
     state.loaded = false; state.editingId = ''; state.editingCategoryId = '';
     showToast(successMessage);
