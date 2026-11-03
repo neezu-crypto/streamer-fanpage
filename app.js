@@ -251,7 +251,7 @@ function getUiSoundTarget(target) {
 function isModalOpenTrigger(button) {
   const directTriggers = [
     '#profileSettingsButton', '#openAdminStats', '#openLoginOptions', '#openDesignFeedback',
-    '#openStreamerVerification', '.search-empty-verify', '.fan-quick-sound-settings',
+    '#openStreamerVerification', '.search-empty-verify', '.profile-verification-prompt', '.fan-quick-sound-settings',
     '.upbo-add-topic', '.upbo-add-item-inline', '.competition-history-add',
     '.calendar-add-button', '.vod-card', '.upbo-image-zoomable',
   ].join(',');
@@ -2600,16 +2600,26 @@ function setProfileQuickEditText(target, page, field) {
     valueElement.textContent = value || (field === 'intro' ? '소개 문구를 추가해 보세요.' : '미등록');
   }
   const fieldLabel = PROFILE_QUICK_EDIT_FIELDS[field].label;
-  target.setAttribute('aria-label', `${fieldLabel}: ${value || '미등록'}. 클릭하여 수정`);
+  target.setAttribute('aria-label', page.isOwner
+    ? `${fieldLabel}: ${value || '미등록'}. 클릭하여 수정`
+    : `${fieldLabel}: ${value || '미등록'}. 스트리머 인증 후 수정할 수 있어요. 클릭하여 인증하기`);
 }
 
 function attachProfileQuickEdit(target, page, field) {
-  if (!page.isOwner) return;
+  const canRequestVerification = !page.isOwner && !hasRecognizedFanpageAccount();
+  if (!page.isOwner && !canRequestVerification) return;
   target.type = 'button';
   target.classList.add('profile-editable');
-  target.title = '클릭하여 수정';
+  if (canRequestVerification) target.classList.add('profile-verification-prompt');
+  target.title = page.isOwner ? '클릭하여 수정' : '스트리머 인증 후 수정할 수 있어요. 클릭하여 인증 신청';
   setProfileQuickEditText(target, page, field);
-  target.addEventListener('click', () => openProfileQuickEdit(page, field, target));
+  target.addEventListener('click', () => {
+    if (!page.isOwner) {
+      if (!hasRecognizedFanpageAccount()) showFanPageModal($('streamerVerifyDialog'));
+      return;
+    }
+    openProfileQuickEdit(page, field, target);
+  });
 }
 
 function openProfileQuickEdit(page, field, target) {
@@ -4204,6 +4214,7 @@ function renderFanPage(page, options = {}) {
   back.className = 'back-link';
   back.innerHTML = '<span aria-hidden="true">←</span> 스트리머 검색으로';
   const profile = page.profile || {};
+  const canShowProfileQuickEdit = page.isOwner || !hasRecognizedFanpageAccount();
   const section = document.createElement('section');
   section.className = 'profile-board';
   section.id = 'profileBoard';
@@ -4237,15 +4248,15 @@ function renderFanPage(page, options = {}) {
     ['major', '전공', profile.major], ['debutDate', '데뷔', profile.debutDate],
   ];
   factRows.forEach(([field, labelText, value]) => {
-    const row = document.createElement(page.isOwner ? 'button' : 'div'); row.className = 'profile-fact';
+    const row = document.createElement(canShowProfileQuickEdit ? 'button' : 'div'); row.className = 'profile-fact';
     const term = document.createElement('span'); term.textContent = labelText;
     const description = document.createElement('strong'); description.className = 'profile-field-value'; description.textContent = value || '미등록';
     row.append(term, description); attachProfileQuickEdit(row, page, field); facts.append(row);
   });
 
   let about = null;
-  if (page.intro || page.isOwner) {
-    about = document.createElement(page.isOwner ? 'button' : 'div'); about.className = 'profile-about';
+  if (page.intro || canShowProfileQuickEdit) {
+    about = document.createElement(canShowProfileQuickEdit ? 'button' : 'div'); about.className = 'profile-about';
     const aboutLabel = document.createElement('strong'); aboutLabel.textContent = 'ABOUT';
     const aboutText = document.createElement('span'); aboutText.className = 'profile-field-value'; aboutText.textContent = page.intro || '소개 문구를 추가해 보세요.';
     about.append(aboutLabel, aboutText);
@@ -4258,7 +4269,7 @@ function renderFanPage(page, options = {}) {
     ['contents', '콘텐츠', Array.isArray(profile.contents) ? profile.contents.join(' · ') : ''], ['scheduleText', '방송 시간', profile.scheduleText],
   ];
   detailRows.forEach(([field, labelText, value]) => {
-    const item = document.createElement(page.isOwner ? 'button' : 'div'); item.className = 'profile-detail';
+    const item = document.createElement(canShowProfileQuickEdit ? 'button' : 'div'); item.className = 'profile-detail';
     const term = document.createElement('span'); term.className = 'profile-detail-label'; term.textContent = labelText;
     const description = document.createElement('span'); description.className = 'profile-detail-value profile-field-value'; description.textContent = value || '미등록';
     item.append(term, description); attachProfileQuickEdit(item, page, field); details.append(item);
