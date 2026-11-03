@@ -6959,8 +6959,8 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     const occupiedChannel = Object.values(channelsSnap.val() || {}).some((channel) => channel && channel.categoryId === id);
     if (indexSnap.exists() || occupiedChannel) throw new HttpsError('failed-precondition', '영상이나 YouTube 채널이 연결된 카테고리는 비울 때까지 삭제할 수 없습니다.');
     const updates = {};
-    updates[`${VIDEO_LIBRARY_ROOT}/categories/${id}`] = null;
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${id}`] = null;
+    updates[`categories/${id}`] = null;
+    updates[`indexes/categories/${id}`] = null;
     await root.update(updates);
     return { deleted: true };
   }
@@ -7006,8 +7006,8 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     if (!saved.committed) throw new HttpsError('already-exists', '이미 직접 등록된 영상이에요.');
     const updates = {};
     const sortKey = videoLibrarySortKey(record.sortAt, itemId);
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${sortKey}`] = { itemId, sortAt: record.sortAt };
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${sortKey}`] = { itemId, sortAt: record.sortAt };
+    updates[`indexes/all/${sortKey}`] = { itemId, sortAt: record.sortAt };
+    updates[`indexes/categories/${categoryId}/${sortKey}`] = { itemId, sortAt: record.sortAt };
     await root.update(updates);
     return { saved: true, itemId };
   }
@@ -7039,8 +7039,8 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     if (!saved.committed) throw new HttpsError('already-exists', '이미 즐겨찾기에 추가된 플래시게임이에요.');
     const updates = {};
     const sortKey = videoLibrarySortKey(record.sortAt, itemId);
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${sortKey}`] = { itemId, sortAt: record.sortAt };
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${sortKey}`] = { itemId, sortAt: record.sortAt };
+    updates[`indexes/all/${sortKey}`] = { itemId, sortAt: record.sortAt };
+    updates[`indexes/categories/${categoryId}/${sortKey}`] = { itemId, sortAt: record.sortAt };
     await root.update(updates);
     return { saved: true, itemId, title, thumbnailUrl: record.thumbnailUrl };
   }
@@ -7064,8 +7064,8 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     if (oldCategoryId !== categoryId) {
       const updates = {};
       const sortKey = videoLibrarySortKey(result.snapshot.val().sortAt, id);
-      updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${oldCategoryId}/${sortKey}`] = null;
-      updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${sortKey}`] = { itemId: id, sortAt: result.snapshot.val().sortAt };
+      updates[`indexes/categories/${oldCategoryId}/${sortKey}`] = null;
+      updates[`indexes/categories/${categoryId}/${sortKey}`] = { itemId: id, sortAt: result.snapshot.val().sortAt };
       await root.update(updates);
     }
     return { saved: true };
@@ -7080,9 +7080,9 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     if (!entry) throw new HttpsError('not-found', '직접 등록한 영상을 찾을 수 없습니다.');
     const updates = {};
     const sortKey = videoLibrarySortKey(entry.sortAt, id);
-    updates[`${VIDEO_LIBRARY_ROOT}/manualVideos/${id}`] = null;
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${sortKey}`] = null;
-    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${entry.categoryId}/${sortKey}`] = null;
+    updates[`manualVideos/${id}`] = null;
+    updates[`indexes/all/${sortKey}`] = null;
+    updates[`indexes/categories/${entry.categoryId}/${sortKey}`] = null;
     await root.update(updates);
     return { deleted: true };
   }
