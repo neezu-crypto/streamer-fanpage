@@ -6272,6 +6272,15 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
     const hasYouTubeUrl = Object.prototype.hasOwnProperty.call(profile, 'youtubeChannelUrl');
     const hasCompetitionHistory = Object.prototype.hasOwnProperty.call(profile, 'competitionHistory');
     const previousProfile = (await pageRef(targetStreamer.streamer.id).child('profile').get()).val() || {};
+    const previousLayoutDesign = [1, 2, 3].includes(Number(previousProfile.layoutDesign))
+      ? Number(previousProfile.layoutDesign)
+      : 1;
+    const requestedLayoutDesign = Object.prototype.hasOwnProperty.call(profile, 'layoutDesign')
+      ? Number(profile.layoutDesign)
+      : previousLayoutDesign;
+    if (!isAdmin && requestedLayoutDesign === 3 && previousLayoutDesign !== 3) {
+      throw new HttpsError('permission-denied', '디자인 3은 관리자만 사용할 수 있습니다.');
+    }
     const previousRouletteUrl = parseWeFlabRouletteUrl(previousProfile.rouletteUrl) || '';
     let rouletteUrl = profile.rouletteUrl.trim();
     if (rouletteUrl) {

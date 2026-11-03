@@ -4287,6 +4287,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   const initialLayout = [1, 2, 3].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
+  const canUseLayoutThree = isAdminUser === true;
   let draftLayout = initialLayout;
   let saving = false;
 
@@ -4355,11 +4356,12 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     void saveLayoutAndClose();
   });
 
-  [
+  const layoutOptionsData = [
     [1, '디자인 1 · 파스텔 만화풍', '포근한 파스텔 컬러와 캐릭터가 있는 디자인'],
     [2, '디자인 2 · 기존 팬페이지', '차분한 어두운 톤의 기존 팬페이지 디자인'],
     [3, '디자인 3 · 손그림 스티커북', '단색 종이 바탕과 굵은 손그림 테두리'],
-  ].forEach(([value, titleText, descriptionText]) => {
+  ].filter(([value]) => canUseLayoutThree || value !== 3 || initialLayout === 3);
+  layoutOptionsData.forEach(([value, titleText, descriptionText]) => {
     const option = document.createElement('label');
     option.className = 'profile-layout-option';
     const radio = document.createElement('input');
@@ -4377,10 +4379,20 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     optionTitle.textContent = titleText;
     const optionDescription = document.createElement('small');
     optionDescription.textContent = descriptionText;
+    if (value === 3 && !canUseLayoutThree) {
+      radio.disabled = true;
+      option.title = '디자인 3은 관리자 전용입니다.';
+      optionDescription.textContent = '관리자 전용 · 현재 적용 중인 디자인';
+    }
     copy.append(optionTitle, optionDescription);
     option.append(radio, copy);
     layoutOptions.append(option);
   });
+  if (!canUseLayoutThree) {
+    status.textContent = initialLayout === 3
+      ? '현재 디자인 3은 관리자 전용입니다. 다른 디자인으로 변경할 수 있어요.'
+      : '디자인 3은 관리자 전용이며 관리자 계정에서만 선택할 수 있어요.';
+  }
   layoutChoice.append(layoutLegend, layoutOptions);
   card.append(headingRow, intro, layoutChoice, status);
   dialog.append(card);
