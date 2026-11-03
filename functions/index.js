@@ -6844,12 +6844,10 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
       && item && String(item.name || '').trim().toLocaleLowerCase('ko') === name.toLocaleLowerCase('ko'))) {
       throw new HttpsError('already-exists', '같은 이름의 카테고리가 이미 있어요.');
     }
-    const categoryRef = categoriesRef.child(targetId);
-    const result = await categoryRef.transaction((current) => {
-      if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
-      return { ...current, name, updatedAt: now };
-    });
-    if (!result.committed) throw new HttpsError('not-found', '카테고리를 찾을 수 없습니다.');
+    // 이미 존재 여부를 읽어 확인했으므로 이름과 갱신 시각만 부분 업데이트한다.
+    // 상위 categories를 통째로 transaction하면 전용 DB에서 자식 레코드가 있어도
+    // 재시도 중 빈 스냅샷으로 판정되어 저장이 취소될 수 있었다.
+    await categoriesRef.child(targetId).update({ name, updatedAt: now });
     return { saved: true, categoryId: targetId };
   }
 
