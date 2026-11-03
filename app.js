@@ -7569,11 +7569,9 @@ function renderVideoLibrarySection(page) {
 
   const heading = document.createElement('div'); heading.className = 'video-library-heading';
   const copy = document.createElement('div');
-  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'FAVORITES';
-  const title = document.createElement('h2'); title.textContent = '즐겨찾기';
   const count = document.createElement('span'); count.className = 'video-library-count';
   count.textContent = `${state.items.length.toLocaleString('ko-KR')}개 표시`;
-  copy.append(eyebrow, title, count);
+  copy.append(count);
   const headingActions = document.createElement('div'); headingActions.className = 'video-library-heading-actions';
   if (state.isAdmin) {
     const add = document.createElement('button'); add.type = 'button'; add.className = 'button button-primary video-library-add-open';
@@ -7595,10 +7593,6 @@ function renderVideoLibrarySection(page) {
     headingActions.append(cinetyRefresh);
   }
   heading.append(copy, headingActions); section.append(heading);
-
-  const description = document.createElement('p'); description.className = 'video-library-description';
-  description.textContent = '스트리머가 즐겨찾는 영상과 게임을 모았습니다.';
-  section.append(description);
 
   const categoryBar = document.createElement('div'); categoryBar.className = 'video-library-categories';
   categoryBar.setAttribute('aria-label', '영상 카테고리');
