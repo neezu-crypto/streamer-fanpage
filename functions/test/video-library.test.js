@@ -93,6 +93,24 @@ test('manual and channel videos normalize to safe platform links and metadata', 
   assert.equal(normalizeVideoLibraryItem('youtube_invalid', { platform: 'youtube', videoId: 'invalid' }), null);
 });
 
+test('flash game links normalize as external cards with stored HTTPS URLs', () => {
+  const itemId = `flashgame_${'a'.repeat(64)}`;
+  const game = normalizeVideoLibraryItem(itemId, {
+    platform: 'flashgame',
+    title: '사과게임 플러스',
+    url: 'https://apple.oshizi.com/ko/',
+    thumbnailUrl: 'https://apple.oshizi.com/og-image.png',
+    createdAt: 100,
+  }, { sourceType: 'manual', categoryId });
+  assert.equal(game.platform, 'flashgame');
+  assert.equal(game.url, 'https://apple.oshizi.com/ko/');
+  assert.equal(game.title, '사과게임 플러스');
+  assert.equal(game.categoryId, categoryId);
+  assert.equal(normalizeVideoLibraryItem('flashgame_bad', {
+    platform: 'flashgame', title: 'bad', url: 'https://example.com/game',
+  }), null);
+});
+
 test('video library pagination sorts newest first, deduplicates sources, and advances a stable cursor', () => {
   const manual = [
     { id: 'youtube_abcdefghijk', sortAt: 300, sourceType: 'manual', title: '수정 제목' },

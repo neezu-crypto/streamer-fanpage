@@ -7361,6 +7361,7 @@ function openVideoLibraryAddDialog(page) {
     description.textContent = mode === 'choose' ? '무엇을 추가할까요?' : ({
       category: '새 하위 카테고리를 만들어요.',
       video: 'YouTube 또는 SOOP 다시보기 링크를 등록해요.',
+      flashgame: '플래시게임 페이지 링크를 등록하면 제목과 썸네일을 자동으로 가져와요.',
       channel: 'YouTube 채널의 공개 영상을 모두 가져와요.',
     }[mode] || '즐겨찾기에 항목을 추가해요.');
     headingCopy.append(eyebrow, title, description);
@@ -7398,6 +7399,7 @@ function openVideoLibraryAddDialog(page) {
       };
       addOption('category', '▦', '카테고리', '영상을 주제별로 나눌 새 카테고리');
       addOption('video', '▶', '영상', editableCategories.length ? 'YouTube 또는 SOOP 다시보기 링크' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
+      addOption('flashgame', '✦', '플래시게임', editableCategories.length ? '게임 페이지 제목과 썸네일을 자동으로 등록' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
       if (state.isAdmin) addOption('channel', '▣', 'YouTube 채널', editableCategories.length ? '채널의 전체 공개 영상 가져오기' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
       card.append(options);
       if (!editableCategories.length) {
@@ -7438,6 +7440,32 @@ function openVideoLibraryAddDialog(page) {
         event.preventDefault();
         if (!form.reportValidity() || state.saving) return;
         void submitVideoLibraryAdd(page, dialog, 'video-add', { categoryId: category.value, url: url.value.trim() }, '영상을 추가했어요. 이 창에서 계속 등록할 수 있어요.', 'video');
+      });
+      card.append(form);
+      if (!state.saving) url.focus({ preventScroll: true });
+    } else if (mode === 'flashgame') {
+      const form = document.createElement('form'); form.className = 'video-library-add-dialog-form';
+      const categoryLabel = document.createElement('label'); categoryLabel.className = 'video-library-add-dialog-field'; categoryLabel.textContent = '카테고리';
+      const category = videoLibraryCategorySelect(editableCategories, editableCategories.some((item) => item.id === state.categoryId)
+        ? state.categoryId : editableCategories[0]?.id || '', '추가할 플래시게임 카테고리');
+      categoryLabel.append(category);
+      const urlLabel = document.createElement('label'); urlLabel.className = 'video-library-add-dialog-field'; urlLabel.textContent = '플래시게임 페이지 링크';
+      const url = document.createElement('input'); url.type = 'url'; url.required = true; url.maxLength = 500;
+      url.placeholder = 'https://apple.oshizi.com/ko/'; url.setAttribute('aria-label', '등록할 플래시게임 페이지 링크'); urlLabel.append(url);
+      const titleLabel = document.createElement('label'); titleLabel.className = 'video-library-add-dialog-field'; titleLabel.textContent = '제목 (자동 수집 실패 시 선택 입력)';
+      const title = document.createElement('input'); title.type = 'text'; title.maxLength = 120;
+      title.placeholder = '페이지 제목을 직접 입력할 수 있어요'; title.setAttribute('aria-label', '플래시게임 제목'); titleLabel.append(title);
+      const note = document.createElement('p'); note.className = 'video-library-add-dialog-hint';
+      note.textContent = '지원 페이지: Oshizi, 플래시게임몰, 와플래시 게임 아카이브. 공개 페이지의 제목과 대표 이미지를 자동으로 표시합니다.';
+      const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
+      submit.disabled = state.saving; submit.textContent = state.saving ? '정보 확인 중…' : '플래시게임 추가';
+      form.append(categoryLabel, urlLabel, titleLabel, note, submit);
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!form.reportValidity() || state.saving) return;
+        void submitVideoLibraryAdd(page, dialog, 'flashgame-add', {
+          categoryId: category.value, url: url.value.trim(), title: title.value.trim(),
+        }, '플래시게임을 추가했어요. 이 창에서 계속 등록할 수 있어요.', 'flashgame');
       });
       card.append(form);
       if (!state.saving) url.focus({ preventScroll: true });
@@ -7768,11 +7796,12 @@ function renderVideoLibraryItems(page, section, state) {
   items.forEach((item) => {
     const card = document.createElement('article'); card.className = 'video-library-card';
     const isCinety = item.sourceType === 'cinety';
-    const play = document.createElement(isCinety && !item.isUnavailable ? 'a' : 'button');
+    const isFlashGame = item.platform === 'flashgame';
+    const play = document.createElement((isCinety && !item.isUnavailable) || isFlashGame ? 'a' : 'button');
     play.className = 'video-library-play';
-    if (isCinety && !item.isUnavailable) {
+    if ((isCinety && !item.isUnavailable) || isFlashGame) {
       play.href = item.url; play.target = '_blank'; play.rel = 'noopener noreferrer';
-      play.setAttribute('aria-label', `${item.title} 시네티에서 보기 (새 탭)`);
+      play.setAttribute('aria-label', `${item.title} ${isFlashGame ? '게임 페이지' : '시네티'}에서 보기 (새 탭)`);
     } else {
       if (play instanceof HTMLButtonElement) { play.type = 'button'; play.disabled = isCinety && item.isUnavailable; }
       play.setAttribute('aria-label', isCinety ? `${item.title} 서비스 종료` : `${item.title} 재생`);
@@ -7791,17 +7820,19 @@ function renderVideoLibraryItems(page, section, state) {
       frame.append(image);
     } else frame.classList.add('is-missing');
     const icon = document.createElement('span'); icon.className = 'video-library-play-icon';
-    icon.textContent = isCinety ? (item.isUnavailable ? '종료' : '↗') : '▶';
+    icon.textContent = isFlashGame ? '↗' : isCinety ? (item.isUnavailable ? '종료' : '↗') : '▶';
     frame.append(icon); play.append(frame);
     const body = document.createElement('div'); body.className = 'video-library-card-body';
     const source = document.createElement('span'); source.className = 'video-library-source';
-    source.textContent = isCinety ? item.categoryName || 'SOOP 시네티'
+    source.textContent = isFlashGame ? '플래시게임'
+      : isCinety ? item.categoryName || 'SOOP 시네티'
       : item.sourceType === 'channel' ? `${item.channelTitle || 'YouTube 채널'} · YouTube`
         : item.platform === 'youtube' ? 'YouTube' : 'SOOP';
     const name = document.createElement('h3'); name.textContent = item.title || '제목 없음';
     const meta = document.createElement('small');
     const published = Date.parse(item.publishedAt || '');
-    meta.textContent = isCinety ? (item.isUnavailable ? '서비스 종료 작품' : 'SOOP 시네티에서 작품 보기 ↗')
+    meta.textContent = isFlashGame ? '게임 페이지에서 플레이 ↗'
+      : isCinety ? (item.isUnavailable ? '서비스 종료 작품' : 'SOOP 시네티에서 작품 보기 ↗')
       : Number.isFinite(published)
         ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }).format(published)
         : '날짜 정보 없음';

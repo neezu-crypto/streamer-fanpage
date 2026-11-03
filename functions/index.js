@@ -166,6 +166,20 @@ const VIDEO_LIBRARY_MAX_CHANNELS = 100;
 const VIDEO_LIBRARY_CHANNEL_PAGE_SIZE = 50;
 const VIDEO_LIBRARY_SYNC_BATCH_SIZE = 50;
 const VIDEO_LIBRARY_CATEGORY_NAME_MAX_LENGTH = 32;
+const FLASH_GAME_ALLOWED_HOSTS = new Set([
+  'apple.oshizi.com', 'color-tiles.oshizi.com',
+  'flashgamemall.com', 'www.flashgamemall.com',
+  'vidkidz.tistory.com',
+]);
+const FLASH_GAME_FALLBACK_TITLES = new Map([
+  ['https://apple.oshizi.com/ko/', '사과게임 플러스 - 혼자 하기·멀티플레이'],
+  ['https://color-tiles.oshizi.com/ko/', '컬러타일 플러스 - 멀티 컬러타일'],
+  ['https://flashgamemall.com/%ED%99%A9%EC%83%88%EC%98%A4%EB%9E%98%EA%B1%B7%EA%B8%B0-%EA%B2%8C%EC%9E%84%ED%95%98%EA%B8%B0/', '황새오래걷기 게임하기 Walk the Stork (멀리걷기)'],
+  ['https://vidkidz.tistory.com/99', '내일은 격파왕 - 추억의 한게임플래시'],
+  ['https://vidkidz.tistory.com/36', '슈의 라면가게 - 슈게임'],
+  ['https://vidkidz.tistory.com/87', '파워에로우 (Power Arrow) - 추억의 한게임플래시'],
+  ['https://vidkidz.tistory.com/1617', '장미와 동백 (Rose and Camellia) - 뺨때리기 게임'],
+]);
 const CINETY_CATALOG_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
 const CINETY_CATALOG_LOCK_STALE_MS = 10 * 60 * 1000;
 const CINETY_CATALOG_MANUAL_REFRESH_COOLDOWN_MS = 60 * 1000;
@@ -3270,6 +3284,76 @@ function parseFanPageMemoryVideoUrl(value) {
   const youtubeVideo = parseYouTubeVideoUrl(value);
   if (youtubeVideo) return { platform: 'youtube', videoId: youtubeVideo.id, url: youtubeVideo.url };
   return null;
+}
+
+function parseFlashGameUrl(value) {
+  const normalized = cleanHttpsUrl(value);
+  if (!normalized) return null;
+  try {
+    const parsed = new URL(normalized);
+    if (!FLASH_GAME_ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) return null;
+    return { url: parsed.href };
+  } catch (_) {
+    return null;
+  }
+}
+
+function decodeFlashGameHtml(value) {
+  return String(value || '')
+    .replace(/&#(\d+);/g, (_, code) => {
+      const number = Number(code);
+      return Number.isSafeInteger(number) && number <= 0x10ffff ? String.fromCodePoint(number) : _;
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+      const number = Number.parseInt(code, 16);
+      return Number.isSafeInteger(number) && number <= 0x10ffff ? String.fromCodePoint(number) : _;
+    })
+    .replace(/&quot;/gi, '"').replace(/&apos;|&#39;/gi, "'")
+    .replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function readFlashGameMetaTag(tag) {
+  const attributes = {};
+  for (const match of String(tag || '').matchAll(/([:\w-]+)\s*=\s*(["'])([\s\S]*?)\2/g)) {
+    attributes[String(match[1]).toLowerCase()] = decodeFlashGameHtml(match[3]);
+  }
+  return attributes;
+}
+
+function extractFlashGameMetadata(html, url) {
+  const meta = {};
+  for (const match of String(html || '').matchAll(/<meta\b[^>]*>/gi)) {
+    const attributes = readFlashGameMetaTag(match[0]);
+    const key = String(attributes.property || attributes.name || '').toLowerCase();
+    if (key && !meta[key] && attributes.content) meta[key] = attributes.content;
+  }
+  const titleMatch = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(String(html || ''));
+  const title = meta['og:title'] || meta['twitter:title'] || (titleMatch ? decodeFlashGameHtml(titleMatch[1]) : '');
+  const rawImage = meta['og:image'] || meta['twitter:image'] || '';
+  let thumbnailUrl = '';
+  if (rawImage) {
+    try { thumbnailUrl = cleanHttpsImageUrl(new URL(rawImage, url).href); } catch (_) { thumbnailUrl = ''; }
+  }
+  return { title: normalizeVideoLibraryTitle(title), thumbnailUrl };
+}
+
+async function fetchFlashGameMetadata(url) {
+  const fallbackTitle = FLASH_GAME_FALLBACK_TITLES.get(url) || '';
+  try {
+    const response = await fetch(url, {
+      redirect: 'follow',
+      headers: { accept: 'text/html,application/xhtml+xml', 'user-agent': 'Mozilla/5.0 (compatible; StreamerFanPage/1.0)' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return { title: fallbackTitle, thumbnailUrl: '' };
+    const html = (await response.text()).slice(0, 700_000);
+    const metadata = extractFlashGameMetadata(html, url);
+    return { title: metadata.title || fallbackTitle, thumbnailUrl: metadata.thumbnailUrl };
+  } catch (error) {
+    console.warn(`Could not load flash game metadata for ${url}:`, error.message || error);
+    return { title: fallbackTitle, thumbnailUrl: '' };
+  }
 }
 
 function normalizeFanPageMemoryThumbnailUrl(value, video) {
@@ -6926,6 +7010,39 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${sortKey}`] = { itemId, sortAt: record.sortAt };
     await root.update(updates);
     return { saved: true, itemId };
+  }
+
+  if (action === 'flashgame-add') {
+    const categoryId = validateVideoLibraryCategoryId(data.categoryId);
+    if (!(await categoriesRef.child(categoryId).get()).exists()) throw new HttpsError('not-found', '선택한 카테고리를 찾을 수 없습니다.');
+    const flashGame = parseFlashGameUrl(data.url);
+    if (!flashGame) {
+      throw new HttpsError('invalid-argument', '지원하는 플래시게임 페이지의 HTTPS 링크를 입력해 주세요.');
+    }
+    const metadata = await fetchFlashGameMetadata(flashGame.url);
+    const title = normalizeVideoLibraryTitle(data.title) || metadata.title;
+    if (!title || Array.from(title).length > VIDEO_LIBRARY_TITLE_MAX_LENGTH) {
+      throw new HttpsError('failed-precondition', '플래시게임 페이지의 제목을 가져오지 못했어요. 제목을 직접 입력해 다시 시도해 주세요.');
+    }
+    const itemId = `flashgame_${createHash('sha256').update(flashGame.url).digest('hex')}`;
+    const manualRef = videoLibraryManualVideoRef(itemId);
+    const manualCount = await videoLibraryRef('manualVideos').get();
+    if (manualCount.numChildren() >= VIDEO_LIBRARY_MAX_MANUAL_ITEMS) {
+      throw new HttpsError('resource-exhausted', '개별 등록 영상이 너무 많아요. 정리한 뒤 다시 추가해 주세요.');
+    }
+    const record = {
+      platform: 'flashgame', videoId: '', title,
+      thumbnailUrl: metadata.thumbnailUrl || '', publishedAt: '', sortAt: now,
+      categoryId, url: flashGame.url, createdAt: now, updatedAt: now, createdBy: uid,
+    };
+    const saved = await manualRef.transaction((current) => current ? undefined : record);
+    if (!saved.committed) throw new HttpsError('already-exists', '이미 즐겨찾기에 추가된 플래시게임이에요.');
+    const updates = {};
+    const sortKey = videoLibrarySortKey(record.sortAt, itemId);
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/all/${sortKey}`] = { itemId, sortAt: record.sortAt };
+    updates[`${VIDEO_LIBRARY_ROOT}/indexes/categories/${categoryId}/${sortKey}`] = { itemId, sortAt: record.sortAt };
+    await root.update(updates);
+    return { saved: true, itemId, title, thumbnailUrl: record.thumbnailUrl };
   }
 
   if (action === 'video-update') {
