@@ -1375,11 +1375,15 @@ function setVisibleView(page) {
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
-  const usesKawaiiLayout = !!page && page.profile?.layoutDesign !== 2;
+  const pageLayoutDesign = page && [1, 2, 3].includes(Number(page.profile?.layoutDesign))
+    ? Number(page.profile.layoutDesign)
+    : DEFAULT_FANPAGE_LAYOUT;
+  const usesKawaiiLayout = !!page && (pageLayoutDesign === 1 || pageLayoutDesign === 3);
   const usesKawaiiHome = !page;
   $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
   $('mainContent').classList.toggle('has-fanpage-home-kawaii', usesKawaiiHome);
-  document.body.classList.toggle('fanpage-layout-one-active', usesKawaiiLayout);
+  document.body.classList.toggle('fanpage-layout-one-active', !!page && pageLayoutDesign === 1);
+  document.body.classList.toggle('fanpage-layout-three-active', !!page && pageLayoutDesign === 3);
   document.body.classList.toggle('fanpage-home-kawaii-active', usesKawaiiHome);
   document.body.classList.toggle('fanpage-theme-sora-active', !!page && String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   $('homeView').classList.toggle('hidden', !!page);
@@ -4282,7 +4286,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   status.className = 'profile-layout-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  const initialLayout = activeLayout === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
+  const initialLayout = [1, 2, 3].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
   let draftLayout = initialLayout;
   let saving = false;
 
@@ -4293,7 +4297,9 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     if (saving) return;
     const targetPage = currentPage;
     if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
-    const previousLayout = targetPage.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
+    const previousLayout = [1, 2, 3].includes(Number(targetPage.profile?.layoutDesign))
+      ? Number(targetPage.profile.layoutDesign)
+      : DEFAULT_FANPAGE_LAYOUT;
     draftLayout = selectedLayout;
     if (selectedLayout === previousLayout) {
       status.textContent = '현재 디자인입니다. 다른 디자인을 선택하면 미리볼 수 있어요.';
@@ -4352,6 +4358,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   [
     [1, '디자인 1 · 파스텔 만화풍', '포근한 파스텔 컬러와 캐릭터가 있는 디자인'],
     [2, '디자인 2 · 기존 팬페이지', '차분한 어두운 톤의 기존 팬페이지 디자인'],
+    [3, '디자인 3 · 손그림 스티커북', '단색 종이 바탕과 굵은 손그림 테두리'],
   ].forEach(([value, titleText, descriptionText]) => {
     const option = document.createElement('label');
     option.className = 'profile-layout-option';
@@ -4400,16 +4407,19 @@ function renderFanPage(page, options = {}) {
   const previousTabStreamerId = view.dataset.fanpageTabStreamerId || '';
   const preferredTab = previousTabStreamerId === streamerIdForTabs ? view.dataset.fanpageActiveTab : 'home';
   view.dataset.fanpageTabStreamerId = streamerIdForTabs;
-  view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2');
+  view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2', 'fanpage-layout-3');
   view.classList.remove('has-account-top-banner');
   document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-account-banner-hidden');
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active');
-  const layoutDesign = page.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
-  const usesKawaiiLayout = layoutDesign === 1;
+  const layoutDesign = [1, 2, 3].includes(Number(page.profile?.layoutDesign))
+    ? Number(page.profile.layoutDesign)
+    : DEFAULT_FANPAGE_LAYOUT;
+  const usesKawaiiLayout = layoutDesign === 1 || layoutDesign === 3;
   $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
   $('mainContent').classList.remove('has-fanpage-home-kawaii');
-  document.body.classList.toggle('fanpage-layout-one-active', usesKawaiiLayout);
+  document.body.classList.toggle('fanpage-layout-one-active', layoutDesign === 1);
+  document.body.classList.toggle('fanpage-layout-three-active', layoutDesign === 3);
   document.body.classList.toggle('fanpage-theme-sora-active', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   document.body.classList.remove('fanpage-home-kawaii-active');
   view.classList.add(`fanpage-layout-${layoutDesign}`);
@@ -4533,7 +4543,7 @@ function renderFanPage(page, options = {}) {
       document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
-  if (layoutDesign === 1) view.append(renderKawaiiWelcome(page, navigateToFanPageSection));
+  if (usesKawaiiLayout) view.append(renderKawaiiWelcome(page, navigateToFanPageSection));
   view.append(section);
   let fanCharacterCard = null;
   if (String(page.streamer.id || '').toLowerCase() === 'yuhatty') {
@@ -4655,8 +4665,8 @@ function renderFanPage(page, options = {}) {
     panel.append(heading, grid);
     return panel;
   }
-  const homePanel = createFanPageTabPanel(tabDefinitions[0], layoutDesign === 1 ? [] : [liveSection, calendarSection, vodSection]);
-  if (layoutDesign === 1) {
+  const homePanel = createFanPageTabPanel(tabDefinitions[0], usesKawaiiLayout ? [] : [liveSection, calendarSection, vodSection]);
+  if (usesKawaiiLayout) {
     const homeColumns = document.createElement('div');
     homeColumns.className = 'fanpage-home-columns';
     const mainColumn = document.createElement('div');
@@ -4670,10 +4680,10 @@ function renderFanPage(page, options = {}) {
   }
   const tabPanels = new Map([
     ['home', homePanel],
-    ['activity', createFanPageTabPanel(tabDefinitions[1], layoutDesign === 1
+    ['activity', createFanPageTabPanel(tabDefinitions[1], usesKawaiiLayout
       ? [featuredPair, createFanPageColumnStacks('fanpage-activity-columns', [upboSection, messengerSection], [rouletteSection]), gallerySection, fanCharacterCard ? null : ogqSection]
       : [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, fanCharacterCard ? null : ogqSection])],
-    ['content', createFanPageTabPanel(tabDefinitions[2], layoutDesign === 1
+    ['content', createFanPageTabPanel(tabDefinitions[2], usesKawaiiLayout
       ? [
         createFanPageColumnStacks('fanpage-content-columns fanpage-content-overview-columns', [youtubeSection], [songbookSection, cafeSection]),
         createFanPageColumnStacks('fanpage-content-columns fanpage-game-history-columns', [playedGamesSection], [competitionHistorySection]),
@@ -5544,7 +5554,7 @@ function profileForLinkSave(source, field, value) {
     contents: Array.isArray(profile.contents) ? profile.contents.filter((item) => typeof item === 'string').slice(0, 8) : [],
     scheduleText: String(profile.scheduleText || ''), rouletteUrl: String(profile.rouletteUrl || ''),
     ogqEmoticonUrl: String(profile.ogqEmoticonUrl || ''),
-    layoutDesign: profile.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT,
+    layoutDesign: [1, 2, 3].includes(Number(profile.layoutDesign)) ? Number(profile.layoutDesign) : DEFAULT_FANPAGE_LAYOUT,
     topBannerImageUrls: Array.isArray(profile.topBannerImageUrls) ? profile.topBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerImageUrls: Array.isArray(profile.bottomBannerImageUrls) ? profile.bottomBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerLayout: profile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked',

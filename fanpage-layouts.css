@@ -1597,3 +1597,177 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
 #fanPageView.fanpage-layout-1 .rolling-paper-sticker-context-action:focus-visible{background:#edf2ff}
 #fanPageView.fanpage-layout-1 .rolling-paper-sticker-context-action.is-primary{background:#edf2ff;color:#4c659d}
 @media(prefers-reduced-motion:reduce){#fanPageView.fanpage-layout-1 .fan-quick-sticker-button{transition-duration:.01ms}}
+
+/* Layout 3: a monochrome hand-drawn stickerbook. The illustration asset frames
+   the page while live data, controls and accessibility remain HTML/CSS. */
+body.fanpage-layout-three-active {
+  color-scheme: light;
+  color: #2f2a2c;
+  background-color: #fff8ec;
+  background-image: url("assets/fanpage-doodle/paper-doodles.png");
+  background-position: top center;
+  background-repeat: repeat-y;
+  background-size: 100% auto;
+}
+body.fanpage-layout-three-active .topbar {
+  border-bottom-color: #2f2a2c;
+  background: #fffaf0ee;
+  color: #2f2a2c;
+  box-shadow: 0 4px 0 #2f2a2c22;
+}
+body.fanpage-layout-three-active .brand,
+body.fanpage-layout-three-active .brand strong,
+body.fanpage-layout-three-active .topbar-caption,
+body.fanpage-layout-three-active .account-status { color: #2f2a2c; }
+body.fanpage-layout-three-active .brand small { color: #e87564; }
+body.fanpage-layout-three-active .brand-symbol { color: #e87564; filter: none; }
+body.fanpage-layout-three-active .auth-button { border: 2px solid #2f2a2c; background: #fffdf8; color: #2f2a2c; box-shadow: 2px 3px 0 #2f2a2c33; }
+body.fanpage-layout-three-active .auth-button:hover { border-color: #e87564; background: #fff1e6; }
+body.fanpage-layout-three-active .footer { border-top-color: #2f2a2c; color: #665d5b; }
+body.fanpage-layout-three-active .footer-policy-links a,
+body.fanpage-layout-three-active .footer-feedback-link { border-bottom-color: #2f2a2c; }
+
+#fanPageView.fanpage-layout-3 {
+  --doodle-ink: #2f2a2c;
+  --doodle-muted: #665d5b;
+  --doodle-line: #2f2a2c;
+  --doodle-paper: #fffdf8;
+  --doodle-paper-soft: #fff8ed;
+  --doodle-accent: #e87564;
+  --doodle-accent-deep: #bd5149;
+  --doodle-shadow: #2f2a2c32;
+  width: 100%;
+  padding: 28px 0 52px;
+  color: var(--doodle-ink);
+  background: transparent;
+}
+#fanPageView.fanpage-layout-3 .back-link { color: var(--doodle-muted); }
+#fanPageView.fanpage-layout-3 .back-link:hover { color: var(--doodle-accent-deep); }
+#fanPageView.fanpage-layout-3 :is(.profile-board, .fanpage-tab-nav, .fanpage-tab-panel, .content-card,
+  .live-section, .messenger-link-section, .fan-character-ogq-pair, .fan-quick-panel) {
+  border: 2px solid var(--doodle-ink);
+  border-radius: 22px;
+  background: var(--doodle-paper);
+  box-shadow: 4px 5px 0 var(--doodle-shadow);
+  color: var(--doodle-ink);
+}
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-hero {
+  min-height: 300px;
+  border: 2px solid var(--doodle-ink);
+  border-radius: 22px;
+  background: var(--doodle-paper);
+  box-shadow: 4px 5px 0 var(--doodle-shadow);
+}
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-hero::before,
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-hero::after { display: none; }
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-eyebrow,
+#fanPageView.fanpage-layout-3 .eyebrow { color: var(--doodle-accent-deep); }
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-copy h1,
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-copy h1 span { color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-description { color: var(--doodle-muted); }
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-mascot-halo { border-color: var(--doodle-ink); background: #fff3e0; }
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-sparkles { color: var(--doodle-accent); text-shadow: 1px 1px 0 #2f2a2c66; }
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-actions .button { min-height: 42px; border: 2px solid var(--doodle-ink); border-radius: 12px; background: var(--doodle-paper); color: var(--doodle-ink); box-shadow: 3px 4px 0 var(--doodle-shadow); }
+#fanPageView.fanpage-layout-3 .fanpage-kawaii-actions .button-primary { border-color: var(--doodle-ink); background: var(--doodle-accent); color: #fffdf8; }
+
+#fanPageView.fanpage-layout-3 .profile-board {
+  grid-template-columns: minmax(260px, .9fr) minmax(340px, 1.1fr);
+  gap: 21px 34px;
+  margin: 0 0 24px;
+  padding: 58px clamp(22px, 4vw, 48px) 26px;
+  border-color: var(--doodle-ink);
+  background: var(--doodle-paper);
+}
+#fanPageView.fanpage-layout-3 .profile-tab { border: 2px solid var(--doodle-ink); background: #ffd8c7; color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .profile-avatar { border: 3px solid var(--doodle-ink); box-shadow: 4px 5px 0 var(--doodle-shadow); background: #fff3e0; }
+#fanPageView.fanpage-layout-3 .profile-name,
+#fanPageView.fanpage-layout-3 .profile-handle,
+#fanPageView.fanpage-layout-3 .profile-about,
+#fanPageView.fanpage-layout-3 .profile-detail-value,
+#fanPageView.fanpage-layout-3 .profile-fact,
+#fanPageView.fanpage-layout-3 .profile-stock-card { color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .profile-fact { border: 2px solid var(--doodle-ink); background: var(--doodle-paper); box-shadow: 3px 4px 0 var(--doodle-shadow); }
+#fanPageView.fanpage-layout-3 .profile-fact span { background: #ffd8c7; color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .profile-fact:nth-child(2) span { background: #dceaff; }
+#fanPageView.fanpage-layout-3 .profile-fact:nth-child(3) span { background: #e8e0ff; }
+#fanPageView.fanpage-layout-3 .profile-fact:nth-child(4) span { background: #d9f0df; }
+#fanPageView.fanpage-layout-3 .profile-about strong,
+#fanPageView.fanpage-layout-3 .profile-detail-label,
+#fanPageView.fanpage-layout-3 .profile-stock-eyebrow { color: var(--doodle-accent-deep); }
+#fanPageView.fanpage-layout-3 .profile-details { border-top-color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .profile-editable:hover { background: #fff1e6; }
+#fanPageView.fanpage-layout-3 .profile-stock-card { border: 2px solid var(--doodle-ink); background: #fff1e6; box-shadow: 3px 4px 0 var(--doodle-shadow); }
+#fanPageView.fanpage-layout-3 .profile-actions .button,
+#fanPageView.fanpage-layout-3 .button {
+  border: 2px solid var(--doodle-ink);
+  border-radius: 12px;
+  background: var(--doodle-paper);
+  color: var(--doodle-ink);
+  box-shadow: 3px 4px 0 var(--doodle-shadow);
+}
+#fanPageView.fanpage-layout-3 .profile-actions .button:hover,
+#fanPageView.fanpage-layout-3 .button:hover { border-color: var(--doodle-accent); background: #fff1e6; transform: translateY(-1px); }
+#fanPageView.fanpage-layout-3 .profile-actions .button-primary,
+#fanPageView.fanpage-layout-3 .button-primary { border-color: var(--doodle-ink); background: var(--doodle-accent); color: #fffdf8; }
+#fanPageView.fanpage-layout-3 :is(input, textarea, select) { border: 2px solid var(--doodle-ink); background: var(--doodle-paper); color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 :is(input, textarea, select):focus { border-color: var(--doodle-accent); box-shadow: 0 0 0 3px #e8756430; }
+#fanPageView.fanpage-layout-3 :is(input, textarea, select)::placeholder { color: #8a7d77; }
+
+#fanPageView.fanpage-layout-3 .fanpage-tab-nav { gap: 4px; padding: 8px; background: #fffaf0; }
+#fanPageView.fanpage-layout-3 .fanpage-tab-button { border: 2px solid transparent; border-radius: 11px; color: var(--doodle-muted); }
+#fanPageView.fanpage-layout-3 .fanpage-tab-button:hover,
+#fanPageView.fanpage-layout-3 .fanpage-tab-button[aria-selected="true"] { border-color: var(--doodle-ink); background: #ffd8c7; color: var(--doodle-ink); box-shadow: 2px 3px 0 var(--doodle-shadow); }
+#fanPageView.fanpage-layout-3 .fanpage-tab-panel { padding: 24px; }
+#fanPageView.fanpage-layout-3 .fanpage-tab-panel-heading h2,
+#fanPageView.fanpage-layout-3 .fanpage-tab-panel-heading > p:last-child { color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .fanpage-tab-panel-heading > p:last-child { color: var(--doodle-muted); }
+#fanPageView.fanpage-layout-3 .fanpage-tab-panel-grid { gap: 20px; }
+#fanPageView.fanpage-layout-3 .fanpage-home-columns,
+#fanPageView.fanpage-layout-3 .fanpage-tab-columns { gap: 20px; }
+#fanPageView.fanpage-layout-3 :is(.content-card, .live-section, .messenger-link-section, .fan-character-ogq-pair) { border-color: var(--doodle-ink); background: var(--doodle-paper); box-shadow: 3px 4px 0 var(--doodle-shadow); }
+#fanPageView.fanpage-layout-3 :is(.content-card, .live-section, .messenger-link-section) :is(h2, h3, h4, h5, strong) { color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 :is(.content-card, .live-section, .messenger-link-section) :is(p, small, .section-note, .vod-count, .vod-refresh-status, .songbook-description, .played-games-description, .calendar-owner-hint, .fan-gallery-subtitle, .fan-gallery-count) { color: var(--doodle-muted); }
+#fanPageView.fanpage-layout-3 :is(.vod-card, .fan-gallery-card, .songbook-row, .played-game-card, .competition-history-item, .memory-moment-card, .video-library-card, .rolling-paper-topic-card, .tamagotchi-card) { border: 2px solid var(--doodle-ink); border-radius: 16px; background: var(--doodle-paper); color: var(--doodle-ink); box-shadow: 3px 4px 0 var(--doodle-shadow); }
+#fanPageView.fanpage-layout-3 :is(.vod-card, .fan-gallery-card, .songbook-row, .played-game-card, .competition-history-item, .memory-moment-card, .video-library-card, .rolling-paper-topic-card, .tamagotchi-card):hover { border-color: var(--doodle-accent); background: #fff1e6; }
+#fanPageView.fanpage-layout-3 :is(.vod-thumbnail-frame, .fan-gallery-thumb-frame, .songbook-thumbnail-frame, .played-game-thumbnail-frame, .memory-moment-thumbnail-frame) { border-bottom: 2px solid var(--doodle-ink); background: #f3e6d7; }
+#fanPageView.fanpage-layout-3 :is(.vod-title, .fan-gallery-card-details, .songbook-entry-details strong, .played-game-details strong, .memory-moment-title, .video-library-card-title) { color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 :is(.vod-metadata, .fan-gallery-date, .fan-gallery-stats, .songbook-entry-details > span, .played-game-details > span, .memory-moment-date) { color: var(--doodle-muted); }
+#fanPageView.fanpage-layout-3 :is(.vod-empty-state, .songbook-empty-state, .played-games-empty-state, .youtube-empty-state, .vod-empty-state, .fan-gallery-status, .memory-moments-empty) { border: 2px dashed var(--doodle-ink); background: #fff8ed; color: var(--doodle-muted); }
+#fanPageView.fanpage-layout-3 :is(.calendar-grid, .calendar-weekday, .calendar-day, .calendar-day-detail, .cafe-post-list, .cafe-post-row, .upbo-choice-item, .upbo-cart-item, .upbo-item-row, .upbo-pending-row, .upbo-record-row, .roulette-group, .roulette-item) { border-color: var(--doodle-ink); background: var(--doodle-paper); color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 :is(.calendar-weekday, .calendar-event-chip, .roulette-group-heading, .upbo-topic-heading) { background: #ffd8c7; color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 :is(.calendar-day.is-today, .calendar-day.is-selected, .fan-gallery-tabs button.is-active, .fanpage-tab-button[aria-selected="true"]) { border-color: var(--doodle-ink); background: var(--doodle-accent); color: #fffdf8; }
+#fanPageView.fanpage-layout-3 .fan-quick-panel { background: #fffaf0; color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .fan-quick-toggle,
+#fanPageView.fanpage-layout-3 .fan-quick-close,
+#fanPageView.fanpage-layout-3 .fan-quick-link,
+#fanPageView.fanpage-layout-3 .fan-quick-sticker-button,
+#fanPageView.fanpage-layout-3 .fan-quick-sticker-menu,
+#fanPageView.fanpage-layout-3 .fan-quick-sticker-action,
+#fanPageView.fanpage-layout-3 .fan-quick-sticker-choice { border-color: var(--doodle-ink); background: var(--doodle-paper); color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .fan-quick-link:hover,
+#fanPageView.fanpage-layout-3 .fan-quick-link.is-active,
+#fanPageView.fanpage-layout-3 .fan-quick-sticker-action:hover,
+#fanPageView.fanpage-layout-3 .fan-quick-sticker-choice:hover { border-color: var(--doodle-accent); background: #fff1e6; }
+#fanPageView.fanpage-layout-3 :is(#vodPlayerDialog, #youtubePlayerDialog, .account-dialog, .video-library-add-dialog, .rolling-paper-message-dialog) { border: 2px solid var(--doodle-ink); border-radius: 20px; background: var(--doodle-paper); color: var(--doodle-ink); box-shadow: 6px 7px 0 var(--doodle-shadow); }
+#fanPageView.fanpage-layout-3 :is(#vodPlayerDialog, #youtubePlayerDialog, .account-dialog, .video-library-add-dialog, .rolling-paper-message-dialog)::backdrop { background: #2f2a2c66; backdrop-filter: blur(4px); }
+#fanPageView.fanpage-layout-3 .profile-layout-option:has(input:checked) { border-color: var(--doodle-accent); background: #fff1e6; }
+
+@media (max-width: 720px) {
+  #fanPageView.fanpage-layout-3 { padding: 20px 0 34px; }
+  #fanPageView.fanpage-layout-3 .fanpage-kawaii-hero { min-height: 330px; border-radius: 18px; }
+  #fanPageView.fanpage-layout-3 .profile-board { grid-template-columns: 1fr; gap: 16px; padding: 56px 16px 18px; border-radius: 18px; }
+  #fanPageView.fanpage-layout-3 .profile-name { font-size: 34px; }
+  #fanPageView.fanpage-layout-3 .content-card { padding: 18px 14px; border-radius: 17px; }
+  #fanPageView.fanpage-layout-3 .fanpage-tab-panel { padding: 18px 14px; }
+  #fanPageView.fanpage-layout-3 .fanpage-tab-nav { overflow-x: auto; justify-content: flex-start; }
+  #fanPageView.fanpage-layout-3 .fanpage-tab-button { flex: 0 0 auto; min-height: 42px; padding-inline: 13px; }
+  #fanPageView.fanpage-layout-3 :is(.vod-grid, .fan-gallery-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  #fanPageView.fanpage-layout-3 :is(.fanpage-tab-columns, .fanpage-home-columns) { grid-template-columns: 1fr; }
+}
+@media (max-width: 420px) {
+  #fanPageView.fanpage-layout-3 :is(.vod-grid, .fan-gallery-grid) { grid-template-columns: 1fr; }
+  #fanPageView.fanpage-layout-3 .fanpage-tab-panel-heading h2 { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #fanPageView.fanpage-layout-3 * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
