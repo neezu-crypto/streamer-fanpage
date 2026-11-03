@@ -34,6 +34,15 @@
 @media(hover:none){.profile-editable::after{opacity:.55}}
 .profile-verification-prompt::after{display:grid;width:21px;height:21px;place-items:center;border:1px solid color-mix(in srgb,var(--pink) 55%,transparent);border-radius:50%;background:color-mix(in srgb,var(--pink) 13%,transparent);color:var(--pink);font-size:12px;opacity:.92}
 .profile-verification-prompt:hover::after,.profile-verification-prompt:focus-visible::after{opacity:1;transform:translateY(-1px)}
+.streamer-edit-verification-prompt{position:relative;z-index:2;display:inline-grid;place-items:center;flex:0 0 40px;width:40px;height:40px;min-width:40px;min-height:40px;padding:0;border:1px solid color-mix(in srgb,var(--pink) 60%,transparent);border-radius:50%;background:linear-gradient(145deg,#fffafd,#ffeaf1);color:color-mix(in srgb,var(--pink) 72%,#5c4054);box-shadow:0 3px 0 color-mix(in srgb,var(--pink) 20%,#d9cbd5);cursor:pointer;transition:transform .15s ease,background .15s ease,box-shadow .15s ease}
+.streamer-edit-verification-prompt svg{display:block;width:17px;height:17px}
+.streamer-edit-verification-prompt:hover{background:#fde5ed;transform:translateY(-1px)}
+.streamer-edit-verification-prompt:active{transform:translateY(1px);box-shadow:0 1px 0 color-mix(in srgb,var(--pink) 20%,#d9cbd5)}
+.streamer-edit-verification-prompt:focus-visible{outline:3px solid color-mix(in srgb,var(--pink) 72%,white);outline-offset:3px}
+.streamer-edit-verification-prompt[hidden]{display:none!important}
+.memory-moment-actions .streamer-edit-verification-prompt{flex:0 0 40px;padding:0}
+.youtube-heading-actions .streamer-edit-verification-prompt{flex:0 0 40px}
+.upbo-heading-actions .streamer-edit-verification-prompt{flex:0 0 40px;padding:0}
 .profile-editable:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
 .profile-fact.profile-editable{width:100%;padding:0;border:0;cursor:pointer}
 .profile-fact.profile-editable strong{padding-right:38px}
@@ -1857,3 +1866,4 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 .weekly-schedule-view-heading .profile-settings-close{width:59px;min-width:59px;height:59px;min-height:59px;padding:0;border:0;background:transparent url("assets/fanpage-kawaii/cat-paw-close.svg") center/contain no-repeat;color:#70465e;box-shadow:none;font-size:19px;line-height:1}
 @media(min-width:721px){.weekly-schedule-view-dialog.weekly-schedule-view-public .weekly-schedule-view-details-title,.weekly-schedule-view-dialog.weekly-schedule-view-public .weekly-schedule-view-details{display:none}}
 @media(max-width:700px){.weekly-schedule-view-frame{width:100%;max-width:100%}}
+@media(max-width:720px){.streamer-edit-verification-prompt{flex-basis:42px;width:42px;height:42px;min-width:42px;min-height:42px}.memory-moment-actions .streamer-edit-verification-prompt{flex-basis:42px}.youtube-heading-actions .streamer-edit-verification-prompt,.upbo-heading-actions .streamer-edit-verification-prompt{flex-basis:42px}}
