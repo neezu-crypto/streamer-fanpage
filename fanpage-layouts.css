@@ -503,7 +503,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
 #fanPageView.fanpage-layout-1 .upbo-cart-item-toggle,
 #fanPageView.fanpage-layout-1 .upbo-cart-quantity-label,
 #fanPageView.fanpage-layout-1 .upbo-item-batch-name,
-#fanPageView.fanpage-layout-1 .upbo-topic-tab { color: #51465d; }
+#fanPageView.fanpage-layout-1 :is(.upbo-topic-tab, .upbo-subtab) { color: #51465d; }
 #fanPageView.fanpage-layout-1 :is(.upbo-choice-item, .upbo-cart-item, .upbo-item-row, .upbo-pending-row, .upbo-record-row, .upbo-item-batch-row) { border-color: #e8deea; background: #fffafd; color: #51465d; }
 #fanPageView.fanpage-layout-1 .upbo-choice-item:hover,
 #fanPageView.fanpage-layout-1 .upbo-choice-item.is-selected,
@@ -1130,7 +1130,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :i
   transform: translateY(-2px);
   box-shadow: 0 5px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), 0 8px 12px #75608018, inset 0 2px 0 #fff;
 }
-body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab) {
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab, .upbo-subtab) {
   border-radius: 999px;
   box-shadow: 0 3px 0 #e5dce9, inset 0 2px 0 #fff;
   transition: transform .2s cubic-bezier(.2, 1.7, .45, 1), box-shadow .2s ease, background .2s ease, border-color .2s ease;
@@ -1146,11 +1146,11 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.content-card, 
   background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-lilac), white 42%), var(--jelly-lilac) 100%);
   color: var(--jelly-lilac-ink);
 }
-body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab) {
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab, .upbo-subtab) {
   border-radius: 999px;
   box-shadow: 0 3px 0 #e5dce9, inset 0 2px 0 #fff;
 }
-body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-button.is-active, .fan-gallery-tabs button.is-active, .upbo-topic-tab.is-active) {
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-button.is-active, .fan-gallery-tabs button.is-active, .upbo-topic-tab.is-active, .upbo-subtab.is-active) {
   border-color: color-mix(in srgb, var(--jelly-accent-deep), white 30%);
   background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-accent), white 32%), var(--jelly-accent));
   color: var(--jelly-accent-ink);
@@ -1172,11 +1172,11 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-nav-b
   transform: translateY(2px) scale(.96);
   box-shadow: 0 1px 0 color-mix(in srgb, var(--jelly-cream-deep), white 28%), inset 0 2px 4px #77628512;
 }
-body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab):active {
+body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 :is(.calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab, .upbo-subtab):active {
   transform: translateY(2px) scale(.97);
   box-shadow: 0 1px 0 #e5dce9, inset 0 2px 4px #77628512;
 }
-body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-mode-button.is-active, .fan-gallery-tabs button.is-active, .upbo-topic-tab.is-active) {
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :is(.calendar-mode-button.is-active, .fan-gallery-tabs button.is-active, .upbo-topic-tab.is-active, .upbo-subtab.is-active) {
   border-color: color-mix(in srgb, var(--jelly-accent-deep), white 30%);
   background: linear-gradient(180deg, color-mix(in srgb, var(--jelly-accent), white 32%), var(--jelly-accent));
   color: var(--jelly-accent-ink);
@@ -1352,7 +1352,7 @@ body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .profile-inline-edi
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close { width: 56px; min-width: 56px; height: 56px; min-height: 56px; }
 }
 @media(prefers-reduced-motion:reduce) {
-  body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) :is(.button, .auth-button, .profile-settings-close, .calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close, .calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab) { transition-duration: .01ms; }
+  body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) :is(.button, .auth-button, .profile-settings-close, .calendar-nav-button, .calendar-today-button, .calendar-refresh-button, .live-refresh-button, .youtube-refresh-button, .fan-quick-toggle, .fan-quick-close, .calendar-mode-button, .fan-gallery-tabs button, .upbo-topic-tab, .upbo-subtab) { transition-duration: .01ms; }
 }
 
 @media (max-width: 560px) {
