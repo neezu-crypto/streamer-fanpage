@@ -4222,7 +4222,7 @@ function normalizePage(streamer, value) {
     youtubeChannelUrl: parseYouTubeChannelUrl(sourceProfile.youtubeChannelUrl)?.url || '',
     cafeUrl: parseNaverCafeUrl(sourceProfile.cafeUrl)?.url || '',
     ogqEmoticonUrl: parseOgqEmoticonUrl(sourceProfile.ogqEmoticonUrl)?.url || '',
-    layoutDesign: sourceProfile.layoutDesign === 2 ? 2 : 1,
+    layoutDesign: [1, 2, 3].includes(Number(sourceProfile.layoutDesign)) ? Number(sourceProfile.layoutDesign) : 1,
     topBannerImageUrls: normalizeBannerImageUrls(sourceProfile.topBannerImageUrls),
     bottomBannerImageUrls: normalizeBannerImageUrls(sourceProfile.bottomBannerImageUrls),
     bottomBannerLayout: sourceProfile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked',
@@ -6251,7 +6251,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       || (Object.prototype.hasOwnProperty.call(profile, 'youtubeChannelUrl') && typeof profile.youtubeChannelUrl !== 'string')
       || (Object.prototype.hasOwnProperty.call(profile, 'cafeUrl') && typeof profile.cafeUrl !== 'string')
       || (Object.prototype.hasOwnProperty.call(profile, 'ogqEmoticonUrl') && typeof profile.ogqEmoticonUrl !== 'string')
-      || (Object.prototype.hasOwnProperty.call(profile, 'layoutDesign') && ![1, 2].includes(profile.layoutDesign))
+      || (Object.prototype.hasOwnProperty.call(profile, 'layoutDesign') && ![1, 2, 3].includes(profile.layoutDesign))
       || (Object.prototype.hasOwnProperty.call(profile, 'bottomBannerLayout') && !['stacked', 'grid-2x3'].includes(profile.bottomBannerLayout))
       || (Object.prototype.hasOwnProperty.call(profile, 'topBannerImageUrls') && (!Array.isArray(profile.topBannerImageUrls)
         || profile.topBannerImageUrls.length > MAX_BANNER_IMAGE_ITEMS
@@ -6336,7 +6336,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
       ogqEmoticonUrl: ogqEmoticon ? ogqEmoticon.url : '',
       layoutDesign: Object.prototype.hasOwnProperty.call(profile, 'layoutDesign')
         ? profile.layoutDesign
-        : (previousProfile.layoutDesign === 2 ? 2 : 1),
+        : ([1, 2, 3].includes(Number(previousProfile.layoutDesign)) ? Number(previousProfile.layoutDesign) : 1),
       topBannerImageUrls: cleanBannerImageUrls(topBannerImageUrlsInput),
       bottomBannerImageUrls: cleanBannerImageUrls(bottomBannerImageUrlsInput),
       bottomBannerLayout: Object.prototype.hasOwnProperty.call(profile, 'bottomBannerLayout')
