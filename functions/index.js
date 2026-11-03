@@ -6828,31 +6828,29 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
     if (!VIDEO_LIBRARY_CATEGORY_ID_PATTERN.test(id) || !name || Array.from(name).length > VIDEO_LIBRARY_CATEGORY_NAME_MAX_LENGTH) {
       throw new HttpsError('invalid-argument', '카테고리 이름을 확인해 주세요.');
     }
-    let failure = '';
-    let savedCategoryId = '';
-    const result = await categoriesRef.transaction((current) => {
-      const entries = current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {};
-      // 화면에 남아 있던 이전 식별자가 서버의 최신 카테고리 목록과 어긋날 수 있어,
-      // 요청 당시의 이름으로 한 번만 보정한다. 같은 이름은 생성 단계에서 막으므로
-      // 다른 카테고리를 잘못 수정하지 않는다.
-      let targetId = id;
-      if (!entries[targetId] && previousName) {
-        const matched = Object.entries(entries).find(([, item]) => item
-          && String(item.name || '').trim().toLocaleLowerCase('ko') === previousName.toLocaleLowerCase('ko'));
-        targetId = matched ? matched[0] : '';
-      }
-      if (!targetId || !entries[targetId]) { failure = 'missing'; return undefined; }
-      if (Object.entries(entries).some(([otherId, item]) => otherId !== targetId
-        && item && String(item.name || '').trim().toLocaleLowerCase('ko') === name.toLocaleLowerCase('ko'))) {
-        failure = 'duplicate'; return undefined;
-      }
-      entries[targetId] = { ...entries[targetId], name, updatedAt: now };
-      savedCategoryId = targetId;
-      return entries;
+    // 목록을 먼저 읽어 현재 전용 DB의 식별자를 확정한다. 이전 화면이 공용 DB 시절의
+    // 식별자를 들고 있더라도, 고유한 이전 이름으로 현재 카테고리를 한 번 보정한다.
+    const categoriesSnapshot = await categoriesRef.get();
+    const entries = categoriesSnapshot.val() && typeof categoriesSnapshot.val() === 'object'
+      && !Array.isArray(categoriesSnapshot.val()) ? categoriesSnapshot.val() : {};
+    let targetId = id;
+    if (!entries[targetId] && previousName) {
+      const matched = Object.entries(entries).find(([, item]) => item
+        && String(item.name || '').trim().toLocaleLowerCase('ko') === previousName.toLocaleLowerCase('ko'));
+      targetId = matched ? matched[0] : '';
+    }
+    if (!targetId || !entries[targetId]) throw new HttpsError('not-found', '카테고리를 찾을 수 없습니다.');
+    if (Object.entries(entries).some(([otherId, item]) => otherId !== targetId
+      && item && String(item.name || '').trim().toLocaleLowerCase('ko') === name.toLocaleLowerCase('ko'))) {
+      throw new HttpsError('already-exists', '같은 이름의 카테고리가 이미 있어요.');
+    }
+    const categoryRef = categoriesRef.child(targetId);
+    const result = await categoryRef.transaction((current) => {
+      if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
+      return { ...current, name, updatedAt: now };
     });
-    if (!result.committed) throw new HttpsError(failure === 'missing' ? 'not-found' : 'already-exists',
-      failure === 'missing' ? '카테고리를 찾을 수 없습니다.' : '같은 이름의 카테고리가 이미 있어요.');
-    return { saved: true, categoryId: savedCategoryId || id };
+    if (!result.committed) throw new HttpsError('not-found', '카테고리를 찾을 수 없습니다.');
+    return { saved: true, categoryId: targetId };
   }
 
   if (action === 'category-order') {
