@@ -1751,6 +1751,17 @@ body.fanpage-layout-three-active .footer-feedback-link { border-bottom-color: #2
 #fanPageView.fanpage-layout-3 :is(#vodPlayerDialog, #youtubePlayerDialog, .account-dialog, .video-library-add-dialog, .rolling-paper-message-dialog) { border: 2px solid var(--doodle-ink); border-radius: 20px; background: var(--doodle-paper); color: var(--doodle-ink); box-shadow: 6px 7px 0 var(--doodle-shadow); }
 #fanPageView.fanpage-layout-3 :is(#vodPlayerDialog, #youtubePlayerDialog, .account-dialog, .video-library-add-dialog, .rolling-paper-message-dialog)::backdrop { background: #2f2a2c66; backdrop-filter: blur(4px); }
 #fanPageView.fanpage-layout-3 .profile-layout-option:has(input:checked) { border-color: var(--doodle-accent); background: #fff1e6; }
+#fanPageView.fanpage-layout-3 .profile-layout-dialog,
+#fanPageView.fanpage-layout-3 .profile-layout-dialog-card { color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-editor-heading h2,
+#fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-choice legend,
+#fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-option-copy strong { color: var(--doodle-ink); }
+#fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-dialog-intro,
+#fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-option-copy small,
+#fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-status { color: var(--doodle-muted); }
+#fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-choice,
+#fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-option { border-color: var(--doodle-ink); background: var(--doodle-paper-soft); }
+#fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-option:has(input:checked) { border-color: var(--doodle-accent); background: #fff1e6; }
 
 @media (max-width: 720px) {
   #fanPageView.fanpage-layout-3 { padding: 20px 0 34px; }
