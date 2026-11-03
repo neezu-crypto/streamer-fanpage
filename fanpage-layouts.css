@@ -1781,6 +1781,24 @@ body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-status {
 body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-choice,
 body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-option { border-color: var(--doodle-ink, #2f2a2c); background: var(--doodle-paper-soft, #fff8ed); }
 body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-option:has(input:checked) { border-color: var(--doodle-accent, #e87564); background: #fff1e6; }
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-option:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: .68;
+}
+body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-option:has(input:disabled) small::after {
+  content: ' · 관리자 전용';
+  color: var(--doodle-accent, #e87564);
+  font-weight: 700;
+}
+.profile-layout-dialog .profile-layout-option:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: .68;
+}
+.profile-layout-dialog .profile-layout-option:has(input:disabled) small::after {
+  content: ' · 관리자 전용';
+  color: #bf5d7e;
+  font-weight: 700;
+}
 
 @media (max-width: 720px) {
   #fanPageView.fanpage-layout-3 { padding: 20px 0 34px; }
