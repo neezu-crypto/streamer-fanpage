@@ -4946,8 +4946,7 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
     const [viewerAdmin, verifiedViewer] = await Promise.all([
       uid ? isAdminUid(uid) : false, uid ? findVerifiedByUid(uid) : null,
     ]);
-    const canUseStarlight = viewerAdmin;
-    const canCopyWeeklyScheduleHtml = viewerAdmin || verifiedViewer?.streamer.id === target.streamer.id;
+    const canUseStarlight = viewerAdmin || verifiedViewer?.streamer.id === target.streamer.id;
     const targetSnapshot = await scheduleRef.get();
     if (isEmbed && !targetSnapshot.exists()) throw new HttpsError('not-found', '저장된 주간 일정표가 없습니다.');
     let record = targetSnapshot.val() || {};
@@ -5015,7 +5014,6 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
       templateId: record.templateId === 'starlight' ? 'starlight' : 'default',
       animationEnabled: record.animationEnabled !== false,
       canUseStarlight,
-      canCopyWeeklyScheduleHtml,
       updatedAt: carriedForwardFrom ? 0 : (Number(record.updatedAt) || 0),
       carriedForwardFrom,
     };
@@ -5034,8 +5032,8 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
   if (!templateId) {
     throw new HttpsError('invalid-argument', '방송표 템플릿을 확인해 주세요.');
   }
-  if (!mayUseTemplate(templateId, { isAdmin })) {
-    throw new HttpsError('permission-denied', '고급 템플릿은 관리자만 적용하고 수정할 수 있습니다.');
+  if (!mayUseTemplate(templateId, { isAdmin, isVerifiedStreamer: Boolean(verified) })) {
+    throw new HttpsError('permission-denied', '고급 템플릿은 인증 스트리머와 관리자만 적용하고 수정할 수 있습니다.');
   }
   const entries = normalizeWeeklyScheduleEntries(data.entries);
   const footerText = typeof data.footerText === 'string'

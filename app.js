@@ -8595,7 +8595,6 @@ async function loadWeeklySchedulePageData(page, weekStart, board, options = {}) 
     state.footerText = typeof saved.data.footerText === 'string' ? saved.data.footerText.slice(0, 48) : '';
     state.templateId = saved.data.templateId === 'starlight' ? 'starlight' : 'default';
     state.canUseStarlight = saved.data.canUseStarlight === true;
-    state.canCopyWeeklyScheduleHtml = saved.data.canCopyWeeklyScheduleHtml === true;
     state.animationEnabled = saved.data.animationEnabled !== false;
     state.avatarImageId = savedAvatarId;
     state.updatedAt = Number(saved.data.updatedAt) || 0;
@@ -9025,7 +9024,6 @@ function weeklyScheduleGraphicStateFor(streamerId) {
       footerText: '',
       templateId: 'default',
       canUseStarlight: false,
-      canCopyWeeklyScheduleHtml: false,
       animationEnabled: true,
       selectedImage: null,
       avatarImageId: '',
@@ -9227,14 +9225,11 @@ function renderWeeklyScheduleDialog(page) {
   previewFrame.append(previewCanvas, previousWeek, nextWeek, dayGrid, avatarHitArea, footerTextInput);
 
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
-  const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요. SOOP용 HTML은 해당 팬페이지의 인증 스트리머만 복사할 수 있어요.';
+  const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요.';
   const footerTextWarning = document.createElement('small'); footerTextWarning.className = 'weekly-schedule-footer-text-warning'; footerTextWarning.setAttribute('role', 'status'); footerTextWarning.hidden = true;
   const footerActions = document.createElement('div'); footerActions.className = 'profile-editor-footer-actions';
   const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
-  const copyEmbed = document.createElement('button'); copyEmbed.type = 'button'; copyEmbed.className = 'button'; copyEmbed.textContent = 'SOOP용 HTML 복사';
-  copyEmbed.title = 'SOOP 방송국 HTML 코드 복사';
-  copyEmbed.setAttribute('aria-label', 'SOOP 방송국 HTML 코드 복사');
-  footerActions.append(download, copyEmbed); footer.append(saveHint, footerTextWarning, footerActions);
+  footerActions.append(download); footer.append(saveHint, footerTextWarning, footerActions);
   dayHeading.hidden = true; previewHeading.hidden = true;
   form.append(meta, templateControls, previewFrame, linkedEventsToggle, linkedEventsPanel, footer);
   card.append(header, form); dialog.append(card, imageTools);
@@ -9490,11 +9485,10 @@ function renderWeeklyScheduleDialog(page) {
     const locked = state.templateId === 'starlight' && !state.canUseStarlight;
     templateSelect.value = state.templateId; syncMotionToggle();
     templateSelect.options[1].disabled = !state.canUseStarlight && !locked;
-    templateHint.textContent = locked ? '고급 템플릿은 관리자 전용입니다. 기본 템플릿을 선택하면 일정을 수정할 수 있어요.' : (!state.canUseStarlight ? '고급 템플릿은 관리자만 선택할 수 있어요.' : '');
+    templateHint.textContent = locked ? '고급 템플릿은 인증 스트리머와 관리자만 사용할 수 있어요. 기본 템플릿을 선택하면 일정을 수정할 수 있어요.' : (!state.canUseStarlight ? '고급 템플릿은 인증 스트리머와 관리자만 선택할 수 있어요.' : '');
     footerTextInput.disabled = locked; avatarHitArea.disabled = locked; download.disabled = locked;
     chooseImage.disabled = locked; uploadImage.disabled = locked;
     clearImage.disabled = locked || !(state.selectedImage || state.savedAvatar); uploadSubmit.disabled = locked;
-    copyEmbed.disabled = !state.canCopyWeeklyScheduleHtml || state.loading || state.weekNavigationBusy;
     previewFrame.classList.toggle('weekly-template-locked', locked);
     weekInput.value = state.weekStart;
     graphicTitle.value = weeklyScheduleWeekTitle(page.streamer.nickname, state.weekStart);
@@ -9600,23 +9594,6 @@ function renderWeeklyScheduleDialog(page) {
     return state.savePromise;
   }
 
-  copyEmbed.addEventListener('click', async () => {
-    if (!state.canCopyWeeklyScheduleHtml) { showToast('SOOP용 HTML 코드는 해당 팬페이지의 인증 스트리머만 사용할 수 있어요.'); return; }
-    copyEmbed.disabled = true;
-    try {
-      if (state.weekNavigationBusy || state.loading) throw new Error('일정을 불러온 뒤 다시 시도해 주세요.');
-      if (!state.updatedAt && !state.dirty) state.dirty = true;
-      if (!await saveCurrentWeek()) throw new Error('저장 오류를 먼저 해결해 주세요.');
-      const url = new URL('./weekly-schedule-embed.html', import.meta.url);
-      url.searchParams.set('streamer', page.streamer.id);
-      url.searchParams.set('week', state.weekStart);
-      const code = `<iframe src="${url.href.replace(/&/g, '&amp;')}" title="주간 방송 일정표" width="100%" height="600" style="width:100%;aspect-ratio:1672 / 941;border:0;" loading="lazy"></iframe>`;
-      await navigator.clipboard.writeText(code);
-      showToast('SOOP용 HTML을 복사했어요.');
-    } catch (error) { showToast(error.message || 'HTML을 복사하지 못했어요.'); }
-    finally { copyEmbed.disabled = !state.canCopyWeeklyScheduleHtml || state.loading || state.weekNavigationBusy; }
-  });
-
   function markWeeklyDirty() {
     state.dirty = true; state.localRevision = (state.localRevision || 0) + 1;
     try { state.entries = collectWeeklyEntries(); }
@@ -9649,7 +9626,6 @@ function renderWeeklyScheduleDialog(page) {
     const setNavigationBusy = (busy) => {
       const locked = state.templateId === 'starlight' && !state.canUseStarlight;
       previousWeek.disabled = busy; nextWeek.disabled = busy;
-      copyEmbed.disabled = busy || !state.canCopyWeeklyScheduleHtml;
       footerTextInput.disabled = busy || locked; avatarHitArea.disabled = busy || locked; download.disabled = busy || locked;
       chooseImage.disabled = busy || locked; uploadImage.disabled = busy || locked;
       clearImage.disabled = busy || locked || !(state.selectedImage || state.savedAvatar);
