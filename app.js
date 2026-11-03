@@ -4267,12 +4267,11 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   close.className = 'button profile-settings-close layout-design-dialog-close';
   close.setAttribute('aria-label', '페이지 디자인 닫기');
   close.textContent = '×';
-  close.addEventListener('click', () => dialog.close());
   headingRow.append(headingCopy, close);
 
   const intro = document.createElement('p');
   intro.className = 'profile-layout-dialog-intro';
-  intro.textContent = '디자인을 선택하면 팬페이지에 즉시 적용되고 자동으로 저장돼요.';
+  intro.textContent = '디자인을 선택하면 화면에 먼저 적용돼요. 닫기 버튼을 누르면 저장됩니다.';
   const layoutChoice = document.createElement('fieldset');
   layoutChoice.className = 'profile-layout-choice';
   const layoutLegend = document.createElement('legend');
@@ -4283,41 +4282,68 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   status.className = 'profile-layout-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  let applying = false;
+  const initialLayout = activeLayout === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
+  let draftLayout = initialLayout;
+  let saving = false;
 
   const setDisabled = (disabled) => {
     layoutOptions.querySelectorAll('input').forEach((input) => { input.disabled = disabled; });
   };
-  const applyLayout = async (selectedLayout) => {
-    if (applying) return;
+  const applyLayoutPreview = (selectedLayout) => {
+    if (saving) return;
     const targetPage = currentPage;
     if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
     const previousLayout = targetPage.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
-    if (selectedLayout === previousLayout) return;
-    applying = true;
-    setDisabled(true);
-    status.textContent = '선택한 디자인을 적용하고 있어요.';
+    draftLayout = selectedLayout;
+    if (selectedLayout === previousLayout) {
+      status.textContent = '현재 디자인입니다. 다른 디자인을 선택하면 미리볼 수 있어요.';
+      return;
+    }
     const previousProfile = { ...(targetPage.profile || {}) };
     targetPage.profile = { ...previousProfile, layoutDesign: selectedLayout };
-    dialog.close();
-    renderFanPage(targetPage);
+    status.textContent = '미리보기를 적용했어요. 닫기 버튼을 누르면 저장됩니다.';
+    renderFanPage(targetPage, {
+      preservedLayoutDesignDialog: dialog,
+      reopenLayoutDesignDialog: true,
+    });
+  };
+  const saveLayoutAndClose = async () => {
+    if (saving) return;
+    const targetPage = currentPage;
+    if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
+    if (draftLayout === initialLayout) {
+      dialog.close();
+      return;
+    }
+    saving = true;
+    setDisabled(true);
+    close.disabled = true;
+    status.textContent = '선택한 디자인을 저장하고 있어요.';
+    const previousProfile = { ...(targetPage.profile || {}), layoutDesign: initialLayout };
     try {
       const result = await callSave({
         streamerId: targetPage.streamer.id,
-        profile: profileForLinkSave(previousProfile, 'layoutDesign', selectedLayout),
+        profile: profileForLinkSave(previousProfile, 'layoutDesign', draftLayout),
       });
       if (currentPage?.streamer.id !== targetPage.streamer.id) return;
       currentPage.profile = result.data.page.profile;
-      showToast('페이지 디자인을 적용하고 저장했어요.');
+      dialog.close();
+      showToast('페이지 디자인을 저장했어요.');
     } catch (error) {
       if (currentPage?.streamer.id !== targetPage.streamer.id) return;
-      currentPage.profile = { ...(currentPage.profile || {}), layoutDesign: previousLayout };
+      currentPage.profile = { ...(currentPage.profile || {}), layoutDesign: initialLayout };
       renderFanPage(currentPage);
       showToast(error.message || '페이지 디자인을 저장하지 못했어요.');
     } finally {
-      applying = false;
+      saving = false;
+      if (close.isConnected) close.disabled = false;
     }
   };
+  close.addEventListener('click', () => void saveLayoutAndClose());
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    void saveLayoutAndClose();
+  });
 
   [
     [1, '디자인 1 · 파스텔 만화풍', '포근한 파스텔 컬러와 캐릭터가 있는 디자인'],
@@ -4332,7 +4358,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     radio.checked = activeLayout === value;
     radio.setAttribute('aria-label', titleText);
     radio.addEventListener('change', () => {
-      if (radio.checked) void applyLayout(Number(radio.value));
+      if (radio.checked) applyLayoutPreview(Number(radio.value));
     });
     const copy = document.createElement('span');
     copy.className = 'profile-layout-option-copy';
@@ -4723,7 +4749,10 @@ function renderFanPage(page, options = {}) {
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
 
-  if (page.isOwner) {
+  if (page.isOwner && options.preservedLayoutDesignDialog) {
+    view.append(options.preservedLayoutDesignDialog);
+    if (options.reopenLayoutDesignDialog) options.preservedLayoutDesignDialog.showModal();
+  } else if (page.isOwner) {
     view.append(renderFanPageLayoutDesignDialog(page, layoutDesign));
   }
   if (page.isOwner && options.preservedSettingsDialog) {
