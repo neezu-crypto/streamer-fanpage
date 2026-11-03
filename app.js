@@ -174,7 +174,7 @@ function showFanPageModal(dialog) {
   const isTouchLayout = window.matchMedia('(hover: none), (pointer: coarse)').matches;
   if (isTouchLayout) {
     const initialFocus = dialog.querySelector(
-      '.profile-settings-close, .video-library-add-dialog-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
+      '.profile-settings-close, .layout-design-dialog-close, .video-library-add-dialog-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
     ) || dialog;
     if (initialFocus === dialog) dialog.tabIndex = -1;
     initialFocus.setAttribute('autofocus', '');
@@ -182,7 +182,7 @@ function showFanPageModal(dialog) {
   dialog.showModal();
   if (isTouchLayout) {
     const initialFocus = dialog.querySelector(
-      '.profile-settings-close, .video-library-add-dialog-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
+      '.profile-settings-close, .layout-design-dialog-close, .video-library-add-dialog-close, #closeLoginChoices, #closeStreamerVerification, #cancelAccountSwitch, #closeLoginAssistTab',
     ) || dialog;
     initialFocus.focus({ preventScroll: true });
   }
@@ -250,7 +250,7 @@ function getUiSoundTarget(target) {
 }
 function isModalOpenTrigger(button) {
   const directTriggers = [
-    '#profileSettingsButton', '#openAdminStats', '#openLoginOptions', '#openDesignFeedback',
+    '#profileSettingsButton', '#profileDesignButton', '#layoutDesignButton', '#openAdminStats', '#openLoginOptions', '#openDesignFeedback',
     '#openStreamerVerification', '.search-empty-verify', '.profile-verification-prompt', '.fan-quick-sound-settings',
     '.upbo-add-topic', '.upbo-add-item-inline', '.competition-history-add',
     '.calendar-add-button', '.vod-card', '.upbo-image-zoomable',
@@ -4246,6 +4246,110 @@ function renderTamagotchiSection(page) {
   return section;
 }
 
+function renderFanPageLayoutDesignDialog(page, activeLayout) {
+  const dialog = document.createElement('dialog');
+  dialog.id = 'layoutDesignDialog';
+  dialog.className = 'account-dialog profile-layout-dialog';
+
+  const card = document.createElement('div');
+  card.className = 'account-dialog-card profile-layout-dialog-card';
+  const headingRow = document.createElement('div');
+  headingRow.className = 'profile-editor-heading';
+  const headingCopy = document.createElement('div');
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'eyebrow';
+  eyebrow.textContent = 'PAGE DESIGN';
+  const heading = document.createElement('h2');
+  heading.textContent = '페이지 디자인';
+  headingCopy.append(eyebrow, heading);
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'button profile-settings-close layout-design-dialog-close';
+  close.setAttribute('aria-label', '페이지 디자인 닫기');
+  close.textContent = '×';
+  close.addEventListener('click', () => dialog.close());
+  headingRow.append(headingCopy, close);
+
+  const intro = document.createElement('p');
+  intro.className = 'profile-layout-dialog-intro';
+  intro.textContent = '디자인을 선택하면 팬페이지에 즉시 적용되고 자동으로 저장돼요.';
+  const layoutChoice = document.createElement('fieldset');
+  layoutChoice.className = 'profile-layout-choice';
+  const layoutLegend = document.createElement('legend');
+  layoutLegend.textContent = '페이지 레이아웃';
+  const layoutOptions = document.createElement('div');
+  layoutOptions.className = 'profile-layout-options';
+  const status = document.createElement('p');
+  status.className = 'profile-layout-status';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  let applying = false;
+
+  const setDisabled = (disabled) => {
+    layoutOptions.querySelectorAll('input').forEach((input) => { input.disabled = disabled; });
+  };
+  const applyLayout = async (selectedLayout) => {
+    if (applying) return;
+    const targetPage = currentPage;
+    if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
+    const previousLayout = targetPage.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
+    if (selectedLayout === previousLayout) return;
+    applying = true;
+    setDisabled(true);
+    status.textContent = '선택한 디자인을 적용하고 있어요.';
+    const previousProfile = { ...(targetPage.profile || {}) };
+    targetPage.profile = { ...previousProfile, layoutDesign: selectedLayout };
+    dialog.close();
+    renderFanPage(targetPage);
+    try {
+      const result = await callSave({
+        streamerId: targetPage.streamer.id,
+        profile: profileForLinkSave(previousProfile, 'layoutDesign', selectedLayout),
+      });
+      if (currentPage?.streamer.id !== targetPage.streamer.id) return;
+      currentPage.profile = result.data.page.profile;
+      showToast('페이지 디자인을 적용하고 저장했어요.');
+    } catch (error) {
+      if (currentPage?.streamer.id !== targetPage.streamer.id) return;
+      currentPage.profile = { ...(currentPage.profile || {}), layoutDesign: previousLayout };
+      renderFanPage(currentPage);
+      showToast(error.message || '페이지 디자인을 저장하지 못했어요.');
+    } finally {
+      applying = false;
+    }
+  };
+
+  [
+    [1, '디자인 1 · 파스텔 만화풍', '포근한 파스텔 컬러와 캐릭터가 있는 디자인'],
+    [2, '디자인 2 · 기존 팬페이지', '차분한 어두운 톤의 기존 팬페이지 디자인'],
+  ].forEach(([value, titleText, descriptionText]) => {
+    const option = document.createElement('label');
+    option.className = 'profile-layout-option';
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'layoutDesignChoice';
+    radio.value = String(value);
+    radio.checked = activeLayout === value;
+    radio.setAttribute('aria-label', titleText);
+    radio.addEventListener('change', () => {
+      if (radio.checked) void applyLayout(Number(radio.value));
+    });
+    const copy = document.createElement('span');
+    copy.className = 'profile-layout-option-copy';
+    const optionTitle = document.createElement('strong');
+    optionTitle.textContent = titleText;
+    const optionDescription = document.createElement('small');
+    optionDescription.textContent = descriptionText;
+    copy.append(optionTitle, optionDescription);
+    option.append(radio, copy);
+    layoutOptions.append(option);
+  });
+  layoutChoice.append(layoutLegend, layoutOptions);
+  card.append(headingRow, intro, layoutChoice, status);
+  dialog.append(card);
+  return dialog;
+}
+
 function renderFanPage(page, options = {}) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
@@ -4362,6 +4466,13 @@ function renderFanPage(page, options = {}) {
     actions.append(roulette);
   }
   if (page.isOwner) {
+    const design = document.createElement('button');
+    design.id = 'profileDesignButton';
+    design.type = 'button';
+    design.className = 'button';
+    design.textContent = '🎨 디자인';
+    design.addEventListener('click', () => showFanPageModal($('layoutDesignDialog')));
+    actions.append(design);
     const edit = document.createElement('button'); edit.id = 'profileSettingsButton'; edit.type = 'button'; edit.className = 'button'; edit.textContent = '⚙ 설정';
     edit.addEventListener('click', () => showFanPageModal($('profileSettingsDialog')));
     actions.append(edit);
@@ -4612,67 +4723,21 @@ function renderFanPage(page, options = {}) {
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
 
+  if (page.isOwner) {
+    view.append(renderFanPageLayoutDesignDialog(page, layoutDesign));
+  }
   if (page.isOwner && options.preservedSettingsDialog) {
     view.append(options.preservedSettingsDialog);
     if (options.reopenSettingsDialog) options.preservedSettingsDialog.showModal();
   } else if (page.isOwner) {
     const editorDialog = document.createElement('dialog');
     editorDialog.id = 'profileSettingsDialog'; editorDialog.className = 'account-dialog profile-settings-dialog';
-    const committedLayoutDesign = layoutDesign;
-    let layoutPreviewChanged = false;
-    let ignoredPreviewCloseEvents = 0;
-    let profileSettingsSaved = false;
-    editorDialog.addEventListener('close', () => {
-      if (ignoredPreviewCloseEvents > 0) {
-        ignoredPreviewCloseEvents -= 1;
-        return;
-      }
-      if (profileSettingsSaved || !layoutPreviewChanged) return;
-      currentPage.profile = { ...(currentPage.profile || {}), layoutDesign: committedLayoutDesign };
-      layoutPreviewChanged = false;
-      renderFanPage(currentPage);
-    });
     const editor = document.createElement('div'); editor.className = 'account-dialog-card profile-editor';
     const headingRow = document.createElement('div'); headingRow.className = 'profile-editor-heading';
     const heading = document.createElement('h2'); heading.textContent = '팬페이지 설정';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close'; close.setAttribute('aria-label', '설정 닫기'); close.textContent = '×';
     close.addEventListener('click', () => editorDialog.close());
     headingRow.append(heading, close); editor.append(headingRow);
-    const layoutChoice = document.createElement('fieldset'); layoutChoice.className = 'profile-layout-choice';
-    const layoutLegend = document.createElement('legend'); layoutLegend.textContent = '페이지 레이아웃';
-    const layoutOptions = document.createElement('div'); layoutOptions.className = 'profile-layout-options';
-    [
-      [1, '디자인 1 · 파스텔 만화풍', '포근한 파스텔 컬러와 캐릭터가 있는 새 기본 디자인'],
-      [2, '디자인 2 · 기존 팬페이지', '현재 사용하던 어두운 톤의 팬페이지 레이아웃'],
-    ].forEach(([value, titleText, descriptionText]) => {
-      const option = document.createElement('label'); option.className = 'profile-layout-option';
-      const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'layoutDesign'; radio.value = String(value);
-      radio.checked = layoutDesign === value;
-      radio.addEventListener('change', () => {
-        if (!radio.checked) return;
-        const selectedLayout = Number(radio.value);
-        const activeLayout = currentPage.profile?.layoutDesign === 2 ? 2 : DEFAULT_FANPAGE_LAYOUT;
-        if (selectedLayout === activeLayout) return;
-        currentPage.profile = { ...(currentPage.profile || {}), layoutDesign: selectedLayout };
-        layoutPreviewChanged = selectedLayout !== committedLayoutDesign;
-        const dialogScrollTop = editorDialog.scrollTop;
-        if (editorDialog.open) {
-          ignoredPreviewCloseEvents += 1;
-          editorDialog.close();
-        }
-        renderFanPage(currentPage, {
-          preservedSettingsDialog: editorDialog,
-          reopenSettingsDialog: true,
-        });
-        editorDialog.scrollTop = dialogScrollTop;
-        radio.focus({ preventScroll: true });
-      });
-      const copy = document.createElement('span'); copy.className = 'profile-layout-option-copy';
-      const optionTitle = document.createElement('strong'); optionTitle.textContent = titleText;
-      const optionDescription = document.createElement('small'); optionDescription.textContent = descriptionText;
-      copy.append(optionTitle, optionDescription); option.append(radio, copy); layoutOptions.append(option);
-    });
-    layoutChoice.append(layoutLegend, layoutOptions); editor.append(layoutChoice);
     const fields = [
       ['birthday', '생일', 20], ['mbti', 'MBTI', 8], ['major', '전공', 50], ['debutDate', '데뷔일', 20],
       ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160],
@@ -4766,7 +4831,6 @@ function renderFanPage(page, options = {}) {
             contents: value('contents').split(',').map((item) => item.trim()).filter(Boolean),
             scheduleText: value('scheduleText'), rouletteUrl: value('rouletteUrl'),
             youtubeChannelUrl: value('youtubeChannelUrl'), cafeUrl: value('cafeUrl'), ogqEmoticonUrl: value('ogqEmoticonUrl'),
-            layoutDesign: Number(editor.querySelector('input[name="layoutDesign"]:checked')?.value || DEFAULT_FANPAGE_LAYOUT),
             topBannerImageUrls, bottomBannerImageUrls,
             bottomBannerLayout: bottomBannerLayout.value === 'grid-2x3' ? 'grid-2x3' : 'stacked',
             competitionHistory: Array.isArray(currentPage.profile?.competitionHistory) ? currentPage.profile.competitionHistory : [],
@@ -4774,8 +4838,6 @@ function renderFanPage(page, options = {}) {
         });
         currentPage.intro = result.data.page.intro;
         currentPage.profile = result.data.page.profile;
-        profileSettingsSaved = true;
-        layoutPreviewChanged = false;
         youtubeStates.delete(currentPage.streamer.id);
         cafeStates.delete(currentPage.streamer.id);
         rouletteStates.delete(currentPage.streamer.id);
