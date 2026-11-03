@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#151320">
   <meta name="description" content="좋아하는 스트리머의 공식 팬페이지를 만나보세요.">
   <link rel="icon" type="image/png" sizes="48x48" href="assets/fanpage-kawaii/fanpage-favicon-48.png?v=20261029-brand-logo">
@@ -24,7 +23,7 @@
   <meta name="twitter:title" content="스트리머 팬페이지 | STREAMER SERIES">
   <meta name="twitter:description" content="좋아하는 스트리머의 공식 팬페이지를 만나보세요.">
   <meta name="twitter:image" content="https://neezu-crypto.github.io/streamer-fanpage/assets/fanpage-kawaii/fanpage-brand-logo.png?v=20261029-brand-logo">
-  <title>스트리머 팬페이지 | 서비스 점검 중</title>
+  <title>스트리머 팬페이지</title>
   <script src="input-privacy.js?v=20261016-input-privacy"></script>
   <link rel="preload" as="image" href="assets/fanpage-kawaii/cat-paw-close.svg" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/GowunDodum-Regular.woff2?v=20261024-korean-fonts" as="font" type="font/woff2" crossorigin>
@@ -33,29 +32,6 @@
   <link rel="stylesheet" href="fanpage-layouts.css?v=20261101-upbo-scroll-headings-v1">
 </head>
 <body>
-  <style>
-    #maintenanceGate[hidden]{display:none!important}
-    #maintenanceGate{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:24px;background:#101522;color:#f4f6ff;font:16px/1.7 system-ui,sans-serif}
-    .maintenance-gate-card{width:min(100%,560px);padding:40px 28px;border:1px solid #38435a;border-radius:20px;background:#1a2232;text-align:center;box-shadow:0 24px 80px #0008}
-    .maintenance-gate-icon{font-size:40px}
-    .maintenance-gate-card h1{font-size:clamp(24px,5vw,32px);line-height:1.3}
-    .maintenance-gate-card p{color:#d3dbea}
-    #maintenanceGateStatus{min-height:1.7em;color:#b8c9e4}
-    #maintenanceAdminLogin{min-height:44px;padding:0 20px;border:0;border-radius:10px;background:#8bb9ff;color:#101522;font:inherit;font-weight:700;cursor:pointer}
-    #maintenanceAdminLogin:disabled{opacity:.65;cursor:wait}
-    .maintenance-gate-card a{display:inline-block;margin-top:18px;color:#a8caff}
-  </style>
-  <section id="maintenanceGate" role="dialog" aria-modal="true" aria-labelledby="maintenanceGateTitle">
-    <div class="maintenance-gate-card">
-      <div class="maintenance-gate-icon" aria-hidden="true">🛠️</div>
-      <h1 id="maintenanceGateTitle">서비스 점검 중입니다</h1>
-      <p>스트리머 팬페이지 서비스가 현재 점검 중입니다.</p>
-      <p>점검 기간에는 일반 이용이 제한됩니다. 관리자는 Google 계정으로 로그인해 정상 이용할 수 있습니다.</p>
-      <p id="maintenanceGateStatus" role="status" aria-live="polite">관리자 권한을 확인하고 있습니다.</p>
-      <button id="maintenanceAdminLogin" type="button">관리자 로그인</button>
-      <br><a href="https://www.sooplive.com/station/skftodwocks2" rel="noopener noreferrer">개발자 방송국에서 공지 확인하기</a>
-    </div>
-  </section>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
     <div class="startup-card">
       <div class="startup-copy">
@@ -73,7 +49,7 @@
     </div>
   </div>
 
-  <div class="site-shell" id="siteShell" aria-hidden="true" inert>
+  <div class="site-shell" id="siteShell" aria-hidden="true">
     <div class="devbar" id="devbar">
       <span class="devbar-brand">STREAMER SERIES</span>
       <nav class="devbar-links" id="devbarLinks" aria-label="자매 서비스">
@@ -318,6 +294,7 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="maintenance-gate.js?v=20261103-admin-only-access-v1"></script>
+  <script type="module" src="app.js?v=20261102-admin-advanced-schedule-template-v1"></script>
+  <script type="module" src="https://neezu-crypto.github.io/streamer-game-series-shop/game-series-emotes.js?game=streamerFanPage&amp;v=20261028-emote-modal-bottom-right"></script>
 </body>
 </html>
