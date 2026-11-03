@@ -6822,25 +6822,37 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
   }
 
   if (action === 'category-rename') {
-    const id = String(data.categoryId || '');
+    const id = String(data.categoryId || '').trim();
+    const previousName = normalizeVideoLibraryTitle(data.previousName);
     const name = normalizeVideoLibraryTitle(data.name);
     if (!VIDEO_LIBRARY_CATEGORY_ID_PATTERN.test(id) || !name || Array.from(name).length > VIDEO_LIBRARY_CATEGORY_NAME_MAX_LENGTH) {
       throw new HttpsError('invalid-argument', '카테고리 이름을 확인해 주세요.');
     }
     let failure = '';
+    let savedCategoryId = '';
     const result = await categoriesRef.transaction((current) => {
       const entries = current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {};
-      if (!entries[id]) { failure = 'missing'; return undefined; }
-      if (Object.entries(entries).some(([otherId, item]) => otherId !== id
+      // 화면에 남아 있던 이전 식별자가 서버의 최신 카테고리 목록과 어긋날 수 있어,
+      // 요청 당시의 이름으로 한 번만 보정한다. 같은 이름은 생성 단계에서 막으므로
+      // 다른 카테고리를 잘못 수정하지 않는다.
+      let targetId = id;
+      if (!entries[targetId] && previousName) {
+        const matched = Object.entries(entries).find(([, item]) => item
+          && String(item.name || '').trim().toLocaleLowerCase('ko') === previousName.toLocaleLowerCase('ko'));
+        targetId = matched ? matched[0] : '';
+      }
+      if (!targetId || !entries[targetId]) { failure = 'missing'; return undefined; }
+      if (Object.entries(entries).some(([otherId, item]) => otherId !== targetId
         && item && String(item.name || '').trim().toLocaleLowerCase('ko') === name.toLocaleLowerCase('ko'))) {
         failure = 'duplicate'; return undefined;
       }
-      entries[id] = { ...entries[id], name, updatedAt: now };
+      entries[targetId] = { ...entries[targetId], name, updatedAt: now };
+      savedCategoryId = targetId;
       return entries;
     });
     if (!result.committed) throw new HttpsError(failure === 'missing' ? 'not-found' : 'already-exists',
       failure === 'missing' ? '카테고리를 찾을 수 없습니다.' : '같은 이름의 카테고리가 이미 있어요.');
-    return { saved: true };
+    return { saved: true, categoryId: savedCategoryId || id };
   }
 
   if (action === 'category-order') {
