@@ -1411,6 +1411,103 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
   }
 }
 
+/* Layout 3 mobile action rail: use dedicated hand-drawn illustrations for
+   the three always-available controls. The semantic labels remain in the
+   buttons so screen readers and touch/keyboard activation keep working. */
+@media (max-width: 720px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote {
+    right: calc(8px + env(safe-area-inset-right));
+    gap: 7px;
+    transform: translateY(-50%);
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-mobile-actions {
+    align-items: flex-end;
+    gap: 7px;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-fullscreen,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 #game-series-emote-launcher.fanpage-emote-mobile-attached {
+    width: 108px !important;
+    height: 48px !important;
+    min-width: 108px !important;
+    min-height: 48px !important;
+    flex: 0 0 48px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background-color: transparent !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 100% 100% !important;
+    box-shadow: none !important;
+    color: var(--doodle-ink) !important;
+    filter: drop-shadow(2px 3px 0 #2f2a2c38);
+    transform: rotate(-1deg);
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle {
+    display: grid !important;
+    background-image: url('assets/fanpage-doodle/mobile-action-quick.png') !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-fullscreen {
+    display: grid !important;
+    background-image: url('assets/fanpage-doodle/mobile-action-fullscreen.png') !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle svg,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-fullscreen svg {
+    display: none !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle::after,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-fullscreen::after {
+    display: block;
+    color: var(--doodle-ink);
+    font: 700 11px/1 var(--font);
+    text-shadow: 0 1px 0 #fffdf8;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle::after { content: '빠른 이동'; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-fullscreen::after { content: '전체 화면'; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 #game-series-emote-launcher.fanpage-emote-mobile-attached {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    margin: 0 !important;
+    background-image: url('assets/fanpage-doodle/mobile-action-emote.png') !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 #game-series-emote-launcher.fanpage-emote-mobile-attached #game-series-emote-button {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--doodle-ink) !important;
+    box-shadow: none !important;
+    font: 700 11px/1 var(--font) !important;
+    text-shadow: 0 1px 0 #fffdf8;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 #game-series-emote-launcher.fanpage-emote-mobile-attached #game-series-emote-button::before {
+    content: none !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-toggle, .fan-quick-fullscreen, #game-series-emote-launcher.fanpage-emote-mobile-attached):hover,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-toggle, .fan-quick-fullscreen, #game-series-emote-launcher.fanpage-emote-mobile-attached):focus-within {
+    filter: drop-shadow(2px 4px 0 #2f2a2c48) brightness(1.04);
+    transform: translateY(-1px) rotate(1deg);
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-toggle, .fan-quick-fullscreen, #game-series-emote-launcher.fanpage-emote-mobile-attached):active {
+    filter: drop-shadow(1px 1px 0 #2f2a2c45);
+    transform: translateY(2px) rotate(-1deg);
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-button {
+    width: 48px;
+    height: 48px;
+    border: 2px solid var(--doodle-ink);
+    border-radius: 13px;
+    background: var(--doodle-paper);
+    color: var(--doodle-accent-deep);
+    box-shadow: 2px 3px 0 var(--doodle-shadow);
+  }
+}
+
 /* The legacy design-3 rules carry a body-level selector, so repeat the
    selected-tab reset at that specificity to guarantee the old ribbon cannot
    leak through as a second fragment. */
