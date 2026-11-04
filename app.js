@@ -4976,7 +4976,7 @@ function createFanPageQuickRemote(view) {
     });
   if (!sections.length) return null;
 
-  const remote = document.createElement('aside'); remote.className = 'fan-quick-remote';
+  const remote = document.createElement('aside'); remote.className = 'fan-quick-remote fan-quick-mobile-illustrated';
   remote.setAttribute('aria-label', '팬페이지 빠른 이동 리모콘');
   const toggle = document.createElement('button'); toggle.type = 'button';
   toggle.className = 'fan-quick-toggle'; toggle.setAttribute('aria-label', '빠른 이동 리모콘 열기');
