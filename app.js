@@ -5207,6 +5207,7 @@ function createFanPageQuickRemote(view) {
   const navButtons = sections.map((section, index) => {
     const button = document.createElement('button'); button.type = 'button'; button.className = 'fan-quick-link';
     const number = document.createElement('span'); number.className = 'fan-quick-number';
+    number.setAttribute('aria-hidden', 'true');
     number.textContent = String(index + 1).padStart(2, '0');
     const label = document.createElement('span'); label.className = 'fan-quick-label'; label.textContent = section.label;
     button.append(number, label);

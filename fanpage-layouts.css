@@ -1475,6 +1475,15 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
   }
 }
 
+/* Design 3 quick navigation is label-first: hide the decorative section
+   numbers so the hand-drawn tickets read cleanly at every desktop width. */
+#fanPageView.fanpage-layout-3 .fan-quick-link {
+  gap: 0 !important;
+}
+#fanPageView.fanpage-layout-3 .fan-quick-number {
+  display: none !important;
+}
+
 /* Layout 3 desktop quick navigation: the legacy desktop rail was compressed
    to 112–124px, while the newer sound/close artwork keeps two 40px controls
    in its header.  That left the ticket labels without usable inline space.
@@ -4010,6 +4019,21 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
   z-index: 1 !important;
   color: #fffdf8 !important;
   text-shadow: 0 1px 0 #2f2a2c55 !important;
+}
+
+/* Keep the sound artwork as the complete button surface during interaction.
+   The generic design-3 button hover rule uses a background shorthand, which
+   can otherwise clear the illustration as soon as the pointer enters it. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings:focus-visible,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings:active:not(:disabled) {
+  background-color: transparent !important;
+  background-image: url('assets/fanpage-doodle/quick-sound-illustration.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 100% 100% !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 @media (max-width: 720px) {
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button {
