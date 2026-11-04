@@ -4639,7 +4639,10 @@ function renderFanPage(page, options = {}) {
     button.setAttribute('aria-controls', `fanpagePanel-${tab.key}`);
     button.setAttribute('aria-selected', 'false');
     button.tabIndex = -1;
-    button.textContent = tab.label;
+    const label = document.createElement('span');
+    label.className = 'fanpage-tab-label';
+    label.textContent = tab.label;
+    button.append(label);
     button.addEventListener('click', () => selectFanPageTab(tab.key));
     button.addEventListener('keydown', (event) => {
       const currentIndex = tabDefinitions.findIndex((item) => item.key === tab.key);
