@@ -2058,6 +2058,79 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   color: #fffdf8;
 }
 
+/* Positional controls keep their own geometry. The illustrated button rule
+   above is intentionally broad, so restore controls that are anchored to a
+   canvas, card corner, or sticker layer instead of letting them enter normal
+   document flow. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.weekly-schedule-board-edit, .weekly-schedule-stage-previous, .weekly-schedule-stage-next,
+      .weekly-schedule-avatar-hit-area, .rolling-paper-sticker-remove) {
+  position: absolute;
+  isolation: auto;
+  transform: none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.weekly-schedule-board-edit, .weekly-schedule-stage-previous, .weekly-schedule-stage-next,
+      .weekly-schedule-avatar-hit-area, .rolling-paper-sticker-remove)::before {
+  content: none;
+  display: none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-board-edit {
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 50%;
+  opacity: 1;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.weekly-schedule-stage-previous, .weekly-schedule-stage-next) {
+  top: 5.92cqw;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  width: clamp(36px, 3.1cqw, 52px);
+  height: auto;
+  min-width: 36px;
+  min-height: 36px;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 50%;
+  font: 800 clamp(20px, 1.4cqw, 24px)/1 'Jua', 'Gowun Dodum', sans-serif !important;
+  transform: translate(-50%, -50%);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-stage-previous { left: 43.18cqw; }
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-stage-next { left: 90.61cqw; }
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-avatar-hit-area {
+  z-index: 3;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: .7cqw;
+  background: transparent;
+  box-shadow: none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-sticker-remove {
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  min-width: 21px;
+  min-height: 21px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 15px;
+  line-height: 1;
+}
+
 /* Every modal uses the same paper, tape and sketched frame, including nested
    gallery/schedule dialogs that are opened from another modal. */
 body.fanpage-layout-three-active :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog) {
