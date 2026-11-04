@@ -672,6 +672,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
   #fanPageView.fanpage-layout-1 .fan-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .profile-layout-options { grid-template-columns: 1fr; }
 }
+
 @media (max-width: 420px) {
   body.fanpage-home-kawaii-active .hero-copy { min-height: 350px; padding-inline: 14px; }
   body.fanpage-home-kawaii-active .hero-copy h1 { font-size: 35px; }
@@ -1461,6 +1462,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
     transform: translateY(2px) rotate(-1deg) !important;
   }
 }
+
 @media (max-width: 720px) {
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button {
     height: 44px !important;
@@ -1471,6 +1473,61 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
     height: 48px !important;
     min-height: 48px !important;
   }
+}
+
+/* Dedicated square artwork for the quick-remote sound and close controls.
+   These controls intentionally use the illustration as their complete
+   surface (rather than stretching the older wide paper SVG), while the
+   native button keeps the accessible name and keyboard/touch behavior. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close) {
+  display: grid !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  flex: 0 0 40px !important;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 100% 100% !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
+  transform: rotate(-1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings {
+  background-image: url('assets/fanpage-doodle/quick-sound-illustration.png') !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-close {
+  background-image: url('assets/fanpage-doodle/quick-close-illustration.png') !important;
+  transform: rotate(1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close) svg {
+  display: none !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close):hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close):focus-visible {
+  border: 0 !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  filter: drop-shadow(3px 4px 0 #2f2a2c48) brightness(1.04) !important;
+  transform: translateY(-1px) rotate(1.5deg) scale(1.04) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close):active:not(:disabled) {
+  filter: drop-shadow(1px 1px 0 #2f2a2c45) !important;
+  transform: translateY(2px) rotate(-1deg) scale(.98) !important;
 }
 
 /* Final precedence: prevent generic layout-three controls from covering the
