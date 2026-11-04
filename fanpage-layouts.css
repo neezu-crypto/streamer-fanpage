@@ -4053,6 +4053,15 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-label 
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
+
+/* Make the two welcome actions visibly larger than their labels so the
+   illustrated paper/ribbon artwork reads as the primary control surface. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-kawaii-actions > .button {
+  min-height: 54px !important;
+  padding: 0 24px !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+}
 @media (max-width: 720px) {
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button {
     height: 44px !important;
@@ -4062,5 +4071,10 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-label 
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button[aria-selected='true'] {
     height: 48px !important;
     min-height: 48px !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-kawaii-actions > .button {
+    min-height: 48px !important;
+    padding-inline: 18px !important;
+    font-size: 11px !important;
   }
 }
