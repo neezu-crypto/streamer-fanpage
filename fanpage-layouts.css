@@ -3076,3 +3076,114 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   font-weight: 800;
   letter-spacing: .01em;
 }
+
+/* Fallback scope for hash remounts: some browsers repaint the page before the
+   body layout flag is restored. Keep the high-contrast semantic controls
+   readable from the view's own layout class as well. */
+#fanPageView.fanpage-layout-3 .video-library-category {
+  min-height: 36px;
+  padding: 8px 16px;
+  border: 2px solid var(--doodle-ink, #2f2a2c) !important;
+  border-radius: 999px !important;
+  background: var(--doodle-paper, #fffdf8) !important;
+  background-image: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 2px 3px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  filter: none !important;
+  transform: none !important;
+}
+#fanPageView.fanpage-layout-3 .video-library-category:hover,
+#fanPageView.fanpage-layout-3 .video-library-category:focus-visible {
+  border-color: var(--doodle-accent, #e87564) !important;
+  background: #fff1e6 !important;
+  transform: translateY(-1px) !important;
+}
+#fanPageView.fanpage-layout-3 .video-library-category.is-active {
+  border-color: var(--doodle-accent, #e87564) !important;
+  background: #ffd8c7 !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+}
+#fanPageView.fanpage-layout-3 .profile-actions > .button {
+  min-height: 42px;
+  padding: 10px 15px;
+  border: 2px solid var(--doodle-ink, #2f2a2c) !important;
+  border-radius: 12px !important;
+  background: var(--doodle-paper, #fffdf8) !important;
+  background-image: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 3px 4px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  filter: none !important;
+  transform: none !important;
+}
+#fanPageView.fanpage-layout-3 .profile-actions > .button:hover,
+#fanPageView.fanpage-layout-3 .profile-actions > .button:focus-visible {
+  border-color: var(--doodle-accent, #e87564) !important;
+  background: #fff1e6 !important;
+  transform: translateY(-1px) !important;
+}
+#fanPageView.fanpage-layout-3 .profile-actions > .button.button-primary {
+  border-color: var(--doodle-accent-deep, #bd5149) !important;
+  background: var(--doodle-accent, #e87564) !important;
+  color: #fffdf8 !important;
+}
+#fanPageView.fanpage-layout-3 .fan-quick-sound-settings {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 2px solid var(--doodle-ink, #2f2a2c) !important;
+  border-radius: 9px !important;
+  background: var(--doodle-paper, #fffdf8) !important;
+  background-image: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 2px 3px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  filter: none !important;
+  transform: none !important;
+}
+#fanPageView.fanpage-layout-3 .fan-quick-sound-settings svg {
+  display: block !important;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+#fanPageView.fanpage-layout-3 .profile-stock-attendance {
+  min-width: 0;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 2px solid var(--doodle-ink, #2f2a2c) !important;
+  border-radius: 14px !important;
+  background: var(--doodle-paper, #fffdf8) !important;
+  background-image: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 3px 4px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  filter: none !important;
+  transform: none !important;
+}
+#fanPageView.fanpage-layout-3 .profile-stock-attendance-gift,
+#fanPageView.fanpage-layout-3 .profile-stock-attendance-arrow {
+  display: inline-flex !important;
+  align-items: center;
+}
+#fanPageView.fanpage-layout-3 .profile-stock-attendance-copy {
+  color: var(--doodle-ink, #2f2a2c) !important;
+  font-weight: 700;
+}
+#fanPageView.fanpage-layout-3 .profile-identity .verified-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border: 2px solid #2f7a4a !important;
+  border-radius: 999px;
+  background: #d8f3df !important;
+  color: #245a38 !important;
+  box-shadow: 2px 3px 0 #2f7a4a55;
+  font-size: 11px;
+  font-weight: 800;
+}
