@@ -4054,6 +4054,95 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-label 
   white-space: nowrap !important;
 }
 
+/* Sound settings remains a conventional dialog outside of design 3, but in
+   the sketchbook layout its actions are full illustrated paper surfaces.
+   Keep both bottom actions on the same 132×40 footprint: their artwork is
+   intentionally larger than the compact label while their text stays clear. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-close {
+  display: grid !important;
+  place-items: center !important;
+  width: 54px !important;
+  min-width: 54px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url('assets/fanpage-doodle/button-cancel.svg') center / contain no-repeat !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
+  transform: rotate(1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-close:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-close:focus-visible {
+  filter: drop-shadow(2px 4px 0 #2f2a2c48) brightness(1.04) !important;
+  transform: translateY(-1px) rotate(-1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-close:active {
+  filter: drop-shadow(1px 1px 0 #2f2a2c45) !important;
+  transform: translateY(2px) rotate(1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, 132px) !important;
+  justify-content: center !important;
+  gap: 12px !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-actions .fan-sound-action {
+  display: grid !important;
+  place-items: center !important;
+  width: 132px !important;
+  min-width: 132px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 14px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 100% 100% !important;
+  box-shadow: none !important;
+  color: #2f2a2c !important;
+  font: 700 12px/1.2 var(--font) !important;
+  filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
+  transform: rotate(-1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-actions .fan-sound-reset {
+  background-image: url('assets/fanpage-doodle/button-paper.svg') !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-actions .fan-sound-done {
+  background-image: url('assets/fanpage-doodle/button-ribbon.svg') !important;
+  color: #fffdf8 !important;
+  text-shadow: 0 1px 0 #2f2a2c55 !important;
+  transform: rotate(1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-actions .fan-sound-action:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-actions .fan-sound-action:focus-visible {
+  filter: drop-shadow(2px 4px 0 #2f2a2c48) brightness(1.04) !important;
+  transform: translateY(-1px) rotate(1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-actions .fan-sound-action:active {
+  filter: drop-shadow(1px 1px 0 #2f2a2c45) !important;
+  transform: translateY(2px) rotate(-1deg) !important;
+}
+@media (max-width: 360px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-actions .fan-sound-action {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding-inline: 7px !important;
+    font-size: 11px !important;
+  }
+}
+
 /* Make the two welcome actions visibly larger than their labels so the
    illustrated paper/ribbon artwork reads as the primary control surface. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-kawaii-actions > .button {

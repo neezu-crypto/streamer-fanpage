@@ -5168,8 +5168,8 @@ function createFanPageQuickRemote(view) {
   const soundCard = document.createElement('section'); soundCard.className = 'account-dialog-card fan-sound-settings-card';
   const soundHeading = document.createElement('div'); soundHeading.className = 'fan-sound-settings-heading';
   const soundTitle = document.createElement('h2'); soundTitle.id = 'fanSoundSettingsTitle'; soundTitle.textContent = '효과음 설정';
-  const soundClose = document.createElement('button'); soundClose.type = 'button'; soundClose.className = 'button profile-settings-close';
-  soundClose.setAttribute('aria-label', '효과음 설정 닫기'); soundClose.textContent = '×';
+  const soundClose = document.createElement('button'); soundClose.type = 'button'; soundClose.className = 'button profile-settings-close fan-sound-settings-close';
+  soundClose.setAttribute('aria-label', '효과음 설정 닫기'); soundClose.title = '효과음 설정 닫기'; soundClose.textContent = '×';
   soundClose.addEventListener('click', () => soundDialog.close());
   soundHeading.append(soundTitle, soundClose);
   const soundDescription = document.createElement('p'); soundDescription.className = 'fan-sound-settings-description';
@@ -5191,12 +5191,12 @@ function createFanPageQuickRemote(view) {
   });
   soundVolumeRow.append(soundVolumeLabel, soundVolumeValue);
   const soundActions = document.createElement('div'); soundActions.className = 'fan-sound-settings-actions';
-  const soundReset = document.createElement('button'); soundReset.type = 'button'; soundReset.className = 'button'; soundReset.textContent = '기본값 20%';
+  const soundReset = document.createElement('button'); soundReset.type = 'button'; soundReset.className = 'button fan-sound-action fan-sound-reset'; soundReset.textContent = '기본값 20%';
   soundReset.addEventListener('click', () => {
     soundVolume.value = String(setButtonClickVolume(DEFAULT_BUTTON_CLICK_VOLUME));
     soundVolumeValue.textContent = `${buttonClickVolume}%`;
   });
-  const soundDone = document.createElement('button'); soundDone.type = 'button'; soundDone.className = 'button button-primary'; soundDone.textContent = '완료';
+  const soundDone = document.createElement('button'); soundDone.type = 'button'; soundDone.className = 'button button-primary fan-sound-action fan-sound-done'; soundDone.textContent = '완료';
   soundDone.addEventListener('click', () => soundDialog.close());
   soundActions.append(soundReset, soundDone);
   soundCard.append(soundHeading, soundDescription, soundVolumeRow, soundVolume, soundActions);
