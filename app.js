@@ -4938,7 +4938,7 @@ function createFanPageQuickRemote(view) {
     ['live-section', '방송 상태'], ['vod-section', '다시보기'],
     ['youtube-section', 'YouTube'], ['songbook-section', '노래책'], ['played-games-section', '플레이한 게임'],
     ['ogq-section', 'OGQ 이모티콘'], ['cafe-section', '네이버 카페'],
-    ['calendar-section', '방송 일정'], ['fan-gallery-section', '팬 갤러리'],
+    ['calendar-section', '주간일정표'], ['weekly-schedule-board', '주간일정표'], ['fan-gallery-section', '팬 갤러리'],
     ['video-library-section', '즐겨찾기'],
     ['fan-banner-bottom', '하단 배너'],
   ];
