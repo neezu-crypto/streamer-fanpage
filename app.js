@@ -4973,6 +4973,7 @@ function createFanPageQuickRemote(view) {
   remote.setAttribute('aria-label', '팬페이지 빠른 이동 리모콘');
   const toggle = document.createElement('button'); toggle.type = 'button';
   toggle.className = 'fan-quick-toggle'; toggle.setAttribute('aria-label', '빠른 이동 리모콘 열기');
+  toggle.title = '빠른 이동';
   toggle.setAttribute('aria-expanded', 'false');
   toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h9M5 17h14"/><circle cx="17" cy="12" r="2"/></svg>';
   const mobileActions = document.createElement('div'); mobileActions.className = 'fan-quick-mobile-actions';
