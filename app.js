@@ -5271,9 +5271,15 @@ function createFanPageQuickRemote(view) {
     if (isDesktop()) {
       if (launcher.parentElement !== remote) remote.insertBefore(launcher, panel);
       launcher.classList.add('fanpage-emote-remote-attached');
+      launcher.classList.remove('fanpage-emote-mobile-attached');
     } else {
-      if (launcher.parentElement !== document.body) document.body.append(launcher);
+      // Keep the emotion button in the same mobile action rail as quick-move
+      // and fullscreen. This prevents three separate fixed layers from
+      // drifting apart on narrow screens and gives touch users one predictable
+      // vertical target column.
+      if (launcher.parentElement !== mobileActions) mobileActions.insertBefore(launcher, mobileActions.firstChild);
       launcher.classList.remove('fanpage-emote-remote-attached');
+      launcher.classList.add('fanpage-emote-mobile-attached');
     }
   }
   function positionRemote(left, top) {
@@ -5468,9 +5474,10 @@ function createFanPageQuickRemote(view) {
     header.removeEventListener('lostpointercapture', finishRemoteDrag);
     if (emoteLauncherObserver) emoteLauncherObserver.disconnect();
     const emoteLauncher = document.getElementById('game-series-emote-launcher');
-    if (emoteLauncher && emoteLauncher.parentElement === remote) {
+    if (emoteLauncher && (emoteLauncher.parentElement === remote || emoteLauncher.parentElement === mobileActions)) {
       document.body.append(emoteLauncher);
       emoteLauncher.classList.remove('fanpage-emote-remote-attached');
+      emoteLauncher.classList.remove('fanpage-emote-mobile-attached');
     }
     if (view._selectFanPageTab) delete view._selectFanPageTab;
     if (view._syncRollingPaperStickerQuickTools) delete view._syncRollingPaperStickerQuickTools;
