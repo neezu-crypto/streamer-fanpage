@@ -5020,6 +5020,7 @@ function createFanPageQuickRemote(view) {
     const addAction = (label, handler, primary = false, disabled = false) => {
       const action = document.createElement('button'); action.type = 'button';
       action.className = `fan-quick-sticker-action${primary ? ' is-primary' : ''}`;
+      if (/취소/.test(label)) action.classList.add('fan-quick-sticker-action-cancel');
       action.textContent = label; action.disabled = disabled || stickerState.savingSticker;
       action.addEventListener('click', handler); stickerMenu.append(action); return action;
     };
