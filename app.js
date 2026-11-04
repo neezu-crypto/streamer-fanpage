@@ -4322,7 +4322,12 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     if (saving) return;
     const targetPage = currentPage;
     if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
-    if (draftLayout === initialLayout) {
+    const requestedLayout = Number(draftLayout);
+    if (![1, 2, 3].includes(requestedLayout)) {
+      showToast('페이지 디자인 선택을 확인해 주세요.');
+      return;
+    }
+    if (requestedLayout === initialLayout) {
       dialog.close();
       return;
     }
@@ -4334,10 +4339,17 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     try {
       const result = await callSave({
         streamerId: targetPage.streamer.id,
-        profile: profileForLinkSave(previousProfile, 'layoutDesign', draftLayout),
+        profile: profileForLinkSave(previousProfile, 'layoutDesign', requestedLayout),
       });
       if (currentPage?.streamer.id !== targetPage.streamer.id) return;
-      currentPage.profile = result.data.page.profile;
+      const savedLayout = Number(result?.data?.page?.profile?.layoutDesign);
+      if (savedLayout !== requestedLayout) {
+        throw new Error('저장 결과에서 선택한 디자인을 확인하지 못했어요. 다시 시도해 주세요.');
+      }
+      // Keep the locally rendered page in sync with the server-normalized
+      // response. This prevents a refresh/render race from putting the old
+      // layout back on screen after a successful save.
+      currentPage.profile = { ...(result.data.page.profile || {}), layoutDesign: requestedLayout };
       dialog.close();
       showToast('페이지 디자인을 저장했어요.');
     } catch (error) {
