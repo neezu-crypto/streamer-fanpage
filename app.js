@@ -4352,6 +4352,13 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       // layout back on screen after a successful save.
       currentPage.profile = { ...(result.data.page.profile || {}), layoutDesign: requestedLayout };
       dialog.close();
+      // Previewing keeps this dialog instance alive across full page renders
+      // so its unsaved selection is not lost. Once the server accepts that
+      // selection, however, the old closure still has the former
+      // `initialLayout` and may also retain its temporary disabled controls.
+      // Replace it with a new instance based on the saved profile before the
+      // user opens the design dialog again.
+      renderFanPage(currentPage);
       showToast('페이지 디자인을 저장했어요.');
     } catch (error) {
       if (currentPage?.streamer.id !== targetPage.streamer.id) return;
