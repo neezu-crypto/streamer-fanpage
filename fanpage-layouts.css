@@ -2282,3 +2282,177 @@ body.fanpage-layout-three-active :is(dialog.account-dialog, #vodPlayerDialog, #y
 @media (prefers-reduced-motion: reduce) {
   #fanPageView.fanpage-layout-3 * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Design 3 illustrated controls: the control surface itself is the drawing.
+   Keep the label as real HTML text, but replace the old tiny sprite-in-button
+   treatment with full paper, ribbon, and ticket silhouettes. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card),
+      .auth-button) {
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: url('assets/fanpage-doodle/button-paper.svg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  color: var(--doodle-ink, #2f2a2c);
+  box-shadow: none;
+  filter: drop-shadow(3px 4px 0 var(--doodle-shadow, #2f2a2c32));
+  transform: rotate(-.35deg);
+  transition: transform .16s ease, filter .16s ease;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card),
+      .auth-button)::before,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card),
+      .auth-button)::after {
+  content: none;
+  display: none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card),
+      .auth-button).button-primary {
+  background-image: url('assets/fanpage-doodle/button-ribbon.svg');
+  color: #fffdf8;
+  filter: drop-shadow(3px 4px 0 #2f2a2c55);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card),
+      .auth-button):hover:not(:disabled) {
+  border-color: transparent;
+  background-color: transparent;
+  filter: brightness(1.035) drop-shadow(4px 5px 0 var(--doodle-shadow, #2f2a2c32));
+  transform: translateY(-1px) rotate(.35deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card),
+      .auth-button):active:not(:disabled) {
+  filter: brightness(.98) drop-shadow(1px 2px 0 #2f2a2c55);
+  transform: translateY(2px) rotate(-.35deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card),
+      .auth-button):focus-visible {
+  outline: 3px solid var(--doodle-accent, #e87564);
+  outline-offset: 3px;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card),
+      .auth-button):disabled {
+  filter: grayscale(.35) opacity(.52);
+}
+
+/* Tabs and compact category controls are paper tickets, not icon buttons. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fanpage-tab-button, .fan-quick-link, .fan-gallery-tabs button, [role='tab'],
+      .video-library-category, .upbo-topic-tab, .upbo-subtab) {
+  background-image: url('assets/fanpage-doodle/button-ticket.svg');
+  background-size: 100% 100%;
+  background-color: transparent;
+  border: 0;
+  filter: drop-shadow(2px 3px 0 var(--doodle-shadow, #2f2a2c32));
+  transform: rotate(.25deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fanpage-tab-button, .fan-quick-link, .fan-gallery-tabs button, [role='tab'],
+      .video-library-category, .upbo-topic-tab, .upbo-subtab):nth-child(even) {
+  transform: rotate(-.35deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fanpage-tab-button[aria-selected='true'], .fan-quick-link.is-active,
+      .fan-gallery-tabs button.is-active, [role='tab'][aria-selected='true'],
+      .video-library-category.is-active, .upbo-topic-tab.is-active, .upbo-subtab.is-active) {
+  background-image: url('assets/fanpage-doodle/button-ribbon.svg');
+  color: #fffdf8;
+  filter: drop-shadow(2px 3px 0 #2f2a2c55);
+  transform: rotate(-.2deg);
+}
+
+/* The edit controls anchored over an illustration still use a complete paper
+   button, while preserving their absolute geometry. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.weekly-schedule-board-edit, .weekly-schedule-stage-previous, .weekly-schedule-stage-next,
+      .rolling-paper-sticker-remove) {
+  background-image: url('assets/fanpage-doodle/button-paper.svg');
+  background-size: 100% 100%;
+  background-color: transparent;
+  border: 0;
+  filter: drop-shadow(2px 3px 0 var(--doodle-shadow, #2f2a2c32));
+}
+
+/* Body-level dialogs are mounted outside #fanPageView. */
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog)
+  :is(.button, button) {
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: url('assets/fanpage-doodle/button-paper.svg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  color: var(--doodle-ink, #2f2a2c);
+  box-shadow: none;
+  filter: drop-shadow(2px 3px 0 var(--doodle-shadow, #2f2a2c32));
+  transform: rotate(-.3deg);
+  transition: transform .16s ease, filter .16s ease;
+}
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog)
+  :is(.button, button)::before,
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog)
+  :is(.button, button)::after {
+  content: none;
+  display: none;
+}
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog)
+  :is(.button, button).button-primary {
+  background-image: url('assets/fanpage-doodle/button-ribbon.svg');
+  color: #fffdf8;
+}
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog)
+  :is(.button, button):hover:not(:disabled) {
+  filter: brightness(1.035) drop-shadow(3px 4px 0 var(--doodle-shadow, #2f2a2c32));
+  transform: translateY(-1px) rotate(.3deg);
+}
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog)
+  :is(.button, button):active:not(:disabled) {
+  filter: brightness(.98) drop-shadow(1px 2px 0 #2f2a2c55);
+  transform: translateY(2px) rotate(-.3deg);
+}
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog)
+  :is(.button, button):focus-visible {
+  outline: 3px solid var(--doodle-accent, #e87564);
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card), .auth-button) {
+    min-height: 44px;
+    padding-inline: 13px;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fanpage-tab-button, .fan-quick-link, .fan-gallery-tabs button, [role='tab'], .video-library-category, .upbo-topic-tab, .upbo-subtab) {
+    min-height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(button, .auth-button),
+  body.fanpage-layout-three-active
+    :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog)
+    :is(.button, button) {
+    transition-duration: .01ms;
+  }
+}
