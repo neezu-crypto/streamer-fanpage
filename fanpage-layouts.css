@@ -3187,3 +3187,15 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   font-size: 11px;
   font-weight: 800;
 }
+
+/* Remove the stationery pseudo-sprite from the controls that the readability
+   pass intentionally keeps plain. */
+#fanPageView.fanpage-layout-3 .video-library-category::before,
+#fanPageView.fanpage-layout-3 .profile-actions > .button::before,
+#fanPageView.fanpage-layout-3 .profile-stock-attendance::before {
+  content: none !important;
+  display: none !important;
+}
+#fanPageView.fanpage-layout-3 .video-library-category {
+  border-style: solid !important;
+}
