@@ -1870,16 +1870,17 @@ body.fanpage-layout-three-active .account-dialog.profile-layout-dialog::before {
   content: '';
   position: absolute;
   top: -16px;
-  left: 22%;
-  width: 150px;
-  height: 34px;
+  right: 14%;
+  left: auto;
+  width: 118px;
+  height: 28px;
   background-image: url('assets/fanpage-doodle/ui-stationery-doodles.png');
   background-repeat: no-repeat;
-  background-size: auto 3em;
+  background-size: auto 2.45em;
   background-position: center center;
   opacity: .95;
   pointer-events: none;
-  transform: rotate(-2deg);
+  transform: rotate(3deg);
 }
 body.fanpage-layout-three-active .profile-layout-dialog-card {
   position: relative;
@@ -1890,29 +1891,23 @@ body.fanpage-layout-three-active .profile-layout-dialog-card {
 body.fanpage-layout-three-active .profile-layout-dialog-card::after {
   content: '';
   position: absolute;
-  right: 17px;
-  top: 15px;
-  width: 36px;
-  height: 36px;
+  right: 14px;
+  top: 12px;
+  width: 30px;
+  height: 30px;
   background-image: url('assets/fanpage-doodle/ui-stationery-doodles.png');
   background-repeat: no-repeat;
-  background-size: auto 2.25em;
+  background-size: auto 1.95em;
   background-position: right center;
   pointer-events: none;
-  transform: rotate(8deg);
+  transform: rotate(10deg);
 }
 body.fanpage-layout-three-active .profile-layout-dialog .profile-editor-heading {
   position: relative;
   padding: 5px 54px 8px 3px;
 }
 body.fanpage-layout-three-active .profile-layout-dialog .profile-editor-heading::after {
-  content: '✎';
-  position: absolute;
-  left: 2px;
-  bottom: -10px;
-  color: var(--doodle-accent-deep);
-  font-size: 17px;
-  transform: rotate(-16deg);
+  content: none;
 }
 body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-choice {
   border-style: dashed;
@@ -2056,6 +2051,59 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   border-style: solid;
   background: var(--doodle-accent, #e87564);
   color: #fffdf8;
+}
+
+/* Profile fields are semantic content rows, not stationery controls. The
+   broad illustrated-button rule above must not wrap their labels in a second
+   border or place a doodle sprite over the text. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-about,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-detail {
+  position: relative;
+  isolation: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-fact {
+  position: relative;
+  isolation: auto;
+  min-height: 54px;
+  border: 2px solid var(--doodle-ink, #2f2a2c);
+  border-radius: 99px;
+  background: var(--doodle-paper, #fffdf8);
+  box-shadow: 3px 4px 0 var(--doodle-shadow, #2f2a2c32);
+  transform: none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-about, .profile-detail, .profile-fact)::before {
+  content: none;
+  display: none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-about, .profile-detail, .profile-fact):hover {
+  transform: none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-about.profile-editable:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-detail.profile-editable:hover {
+  background: #fff1e6;
+}
+
+/* The canvas already contains the footer ribbon text. The duplicate HTML
+   caption must not grow the desktop frame or push controls into a blank strip. */
+@media (min-width: 721px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-board-frame {
+    aspect-ratio: 1672 / 941;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-board-canvas {
+    width: 100%;
+    height: 100%;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-date-caption {
+    display: none;
+  }
 }
 
 /* Positional controls keep their own geometry. The illustrated button rule
