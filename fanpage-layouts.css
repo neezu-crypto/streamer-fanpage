@@ -2456,3 +2456,180 @@ body.fanpage-layout-three-active
     transition-duration: .01ms;
   }
 }
+
+/* Design 3 final component guardrails.
+   Illustrated controls must not turn semantic profile rows or card geometry
+   into buttons. Compact actions use a dedicated mini stationery surface so
+   their labels remain readable instead of being squeezed into a wide ribbon. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-fact, .profile-detail, .profile-about, .profile-editable) {
+  background-image: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-fact, .profile-detail, .profile-about, .profile-editable)::before,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-fact, .profile-detail, .profile-about, .profile-editable)::after {
+  content: none !important;
+  display: none !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-fact {
+  grid-template-columns: minmax(112px, .55fr) minmax(0, 1fr);
+  min-height: 54px;
+  overflow: hidden;
+  border: 2px solid var(--doodle-ink, #2f2a2c);
+  border-radius: 99px;
+  background: var(--doodle-paper, #fffdf8) !important;
+  box-shadow: 3px 4px 0 var(--doodle-shadow, #2f2a2c32);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-fact > span,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-fact > strong {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-fact > strong {
+  padding-inline: 14px;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-detail {
+  grid-template-columns: minmax(88px, .65fr) minmax(0, 1fr);
+  min-height: 44px;
+  align-items: center;
+  padding: 0 18px;
+  border: 2px solid var(--doodle-ink, #2f2a2c);
+  border-radius: 14px;
+  background: var(--doodle-paper, #fffdf8) !important;
+  box-shadow: 3px 4px 0 var(--doodle-shadow, #2f2a2c32);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-detail-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(a.button,
+      .rolling-paper-topic-card-actions .button,
+      .rolling-paper-heading-actions .button,
+      .rolling-paper-sticker-action,
+      .memory-moment-actions .button,
+      .competition-history-item-actions .button,
+      .upbo-small-button,
+      .upbo-more-button,
+      .video-library-heading-actions .button,
+      .video-library-category-edit-toggle,
+      .video-library-refresh,
+      .video-library-cinety-refresh,
+      .songbook-row .button,
+      .played-game-card .button,
+      .calendar-section .button) {
+  min-height: 36px;
+  min-width: 72px;
+  padding: 7px 15px;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: url('assets/fanpage-doodle/button-mini.svg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  box-shadow: none;
+  color: var(--doodle-ink, #2f2a2c);
+  filter: drop-shadow(2px 3px 0 var(--doodle-shadow, #2f2a2c32));
+  transform: rotate(-.25deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(a.button,
+      .rolling-paper-topic-card-actions .button,
+      .rolling-paper-heading-actions .button,
+      .rolling-paper-sticker-action,
+      .memory-moment-actions .button,
+      .competition-history-item-actions .button,
+      .upbo-small-button,
+      .upbo-more-button,
+      .video-library-heading-actions .button,
+      .video-library-category-edit-toggle,
+      .video-library-refresh,
+      .video-library-cinety-refresh,
+      .songbook-row .button,
+      .played-game-card .button,
+      .calendar-section .button).button-primary {
+  background-image: url('assets/fanpage-doodle/button-ribbon.svg');
+  color: #fffdf8;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(a.button,
+      .rolling-paper-topic-card-actions .button,
+      .rolling-paper-heading-actions .button,
+      .rolling-paper-sticker-action,
+      .memory-moment-actions .button,
+      .competition-history-item-actions .button,
+      .upbo-small-button,
+      .upbo-more-button,
+      .video-library-heading-actions .button,
+      .video-library-category-edit-toggle,
+      .video-library-refresh,
+      .video-library-cinety-refresh,
+      .songbook-row .button,
+      .played-game-card .button,
+      .calendar-section .button):hover:not(:disabled) {
+  background-color: transparent;
+  filter: brightness(1.04) drop-shadow(3px 4px 0 var(--doodle-shadow, #2f2a2c32));
+  transform: translateY(-1px) rotate(.25deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .layout-design-dialog-close,
+      .weekly-schedule-board-edit, .weekly-schedule-stage-previous,
+      .weekly-schedule-stage-next, .rolling-paper-sticker-remove) {
+  background-image: url('assets/fanpage-doodle/button-mini.svg');
+  background-color: transparent;
+  background-size: 100% 100%;
+}
+
+/* Keep tab navigation and anchored sections clear of the sticky tab bar. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-panel-grid > *,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-section,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .content-card {
+  scroll-margin-top: 108px;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-section {
+  min-width: 0;
+  overflow: visible;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-topic-grid,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-list {
+  min-width: 0;
+  justify-items: center;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-topic-card,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-entry {
+  box-sizing: border-box;
+  max-width: min(480px, 100%);
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-fact {
+    grid-template-columns: minmax(94px, 105px) minmax(0, 1fr);
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-detail {
+    grid-template-columns: 1fr;
+    gap: 2px;
+    min-height: 52px;
+    padding: 7px 14px;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(a.button, .rolling-paper-topic-card-actions .button, .rolling-paper-heading-actions .button,
+        .rolling-paper-sticker-action, .memory-moment-actions .button, .upbo-small-button) {
+    min-height: 40px;
+    min-width: 80px;
+    padding-inline: 14px;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-topic-card,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-entry {
+    width: min(100%, 480px);
+  }
+}
