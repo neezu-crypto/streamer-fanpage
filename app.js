@@ -4968,7 +4968,8 @@ function createFanPageQuickRemote(view) {
   const sections = candidates
     .filter((element) => element.tagName !== 'DIALOG' && !element.classList.contains('back-link'))
     .map((element, index) => {
-      const label = sectionLabels.find(([className]) => element.classList.contains(className))?.[1]
+      const label = index === 0 ? '메인'
+        : sectionLabels.find(([className]) => element.classList.contains(className))?.[1]
         || element.querySelector('h1, h2, h3')?.textContent.trim().replace(/\s+/g, ' ').slice(0, 18)
         || `영역 ${index + 1}`;
       if (!element.id) element.id = `fanpage-quick-section-${index + 1}`;
