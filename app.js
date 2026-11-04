@@ -4976,7 +4976,7 @@ function createFanPageQuickRemote(view) {
     });
   if (!sections.length) return null;
 
-  const remote = document.createElement('aside'); remote.className = 'fan-quick-remote fan-quick-mobile-illustrated';
+  const remote = document.createElement('aside'); remote.className = 'fan-quick-remote';
   remote.setAttribute('aria-label', '팬페이지 빠른 이동 리모콘');
   const toggle = document.createElement('button'); toggle.type = 'button';
   toggle.className = 'fan-quick-toggle'; toggle.setAttribute('aria-label', '빠른 이동 리모콘 열기');
@@ -5231,6 +5231,59 @@ function createFanPageQuickRemote(view) {
   toggle.setAttribute('aria-controls', panel.id);
   mobileActions.append(stickerControl, toggle, fullscreenButton);
   remote.append(mobileActions, panel); view.append(remote, soundDialog);
+
+  // The design-3 paper-button stylesheet is intentionally broad.  The mobile
+  // utility rail sits outside the normal card tree, so a later shorthand
+  // background reset can otherwise erase its PNG art while leaving a clickable
+  // (but invisible) 58px button behind.  Apply the three art assets on the
+  // generated controls themselves as the final state for this one layout.
+  const mobileIllustratedActions = [
+    [toggle, 'assets/fanpage-doodle/mobile-action-quick.png'],
+    [fullscreenButton, 'assets/fanpage-doodle/mobile-action-fullscreen.png'],
+    [stickerButton, 'assets/fanpage-doodle/mobile-action-emote.png'],
+  ];
+  const mobileIllustratedInlineProperties = [
+    'display', 'visibility', 'opacity', 'width', 'height', 'min-width', 'min-height',
+    'flex', 'place-items', 'padding', 'border', 'border-radius', 'background-color',
+    'background-image', 'background-repeat', 'background-position', 'background-size',
+    'box-shadow', 'filter', 'color', 'font-size', 'line-height',
+  ];
+  const syncMobileIllustratedActions = () => {
+    const enabled = window.matchMedia('(max-width: 720px)').matches
+      && document.body.classList.contains('fanpage-layout-three-active')
+      && view.classList.contains('fanpage-layout-3');
+    remote.classList.toggle('fan-quick-mobile-illustrated', enabled);
+    if (!enabled) {
+      mobileIllustratedActions.forEach(([control]) => {
+        mobileIllustratedInlineProperties.forEach((property) => control.style.removeProperty(property));
+      });
+      return;
+    }
+    mobileIllustratedActions.forEach(([control, asset]) => {
+      control.style.setProperty('display', 'grid', 'important');
+      control.style.setProperty('visibility', 'visible', 'important');
+      control.style.setProperty('opacity', '1', 'important');
+      control.style.setProperty('width', '58px', 'important');
+      control.style.setProperty('height', '58px', 'important');
+      control.style.setProperty('min-width', '58px', 'important');
+      control.style.setProperty('min-height', '58px', 'important');
+      control.style.setProperty('flex', '0 0 58px', 'important');
+      control.style.setProperty('place-items', 'center', 'important');
+      control.style.setProperty('padding', '0', 'important');
+      control.style.setProperty('border', '0', 'important');
+      control.style.setProperty('border-radius', '0', 'important');
+      control.style.setProperty('background-color', 'transparent', 'important');
+      control.style.setProperty('background-image', `url("${asset}")`, 'important');
+      control.style.setProperty('background-repeat', 'no-repeat', 'important');
+      control.style.setProperty('background-position', 'center', 'important');
+      control.style.setProperty('background-size', '100% 100%', 'important');
+      control.style.setProperty('box-shadow', 'none', 'important');
+      control.style.setProperty('filter', 'drop-shadow(2px 3px 0 #2f2a2c38)', 'important');
+      control.style.setProperty('color', 'transparent', 'important');
+      control.style.setProperty('font-size', '0', 'important');
+      control.style.setProperty('line-height', '0', 'important');
+    });
+  };
   view._syncRollingPaperStickerQuickTools = syncStickerTools;
   syncStickerTools();
 
@@ -5377,6 +5430,7 @@ function createFanPageQuickRemote(view) {
     if (desktop) panel.hidden = false;
     else panel.hidden = !expanded;
     syncEmoteLauncherPosition();
+    syncMobileIllustratedActions();
     if (!remoteDrag) restoreDesktopPosition();
     scheduleUpdate();
   }
