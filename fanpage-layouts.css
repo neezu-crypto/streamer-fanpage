@@ -1475,6 +1475,59 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
   }
 }
 
+/* Layout 3 desktop quick navigation: the legacy desktop rail was compressed
+   to 112–124px, while the newer sound/close artwork keeps two 40px controls
+   in its header.  That left the ticket labels without usable inline space.
+   Give the remote a readable rail width and scale its navigation type from
+   the former 10px desktop baseline to 12px (about 20%). */
+@media (min-width: 1500px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote {
+    left: max(8px, calc((100vw - 1220px) / 2 - 206px)) !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-panel {
+    width: 190px !important;
+    max-height: min(70dvh, 680px) !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-header {
+    gap: 8px !important;
+    padding: 10px 11px !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-header strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-body {
+    grid-template-columns: minmax(0, 1fr) 16px !important;
+    gap: 6px !important;
+    padding: 8px 9px 10px !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-links {
+    gap: 4px !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-link {
+    gap: 7px !important;
+    min-height: 34px !important;
+    padding: 5px 7px !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-number {
+    width: 18px !important;
+    flex-basis: 18px !important;
+    font-size: 10px !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-label {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+}
+@media (min-width: 1660px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-label {
+    font-size: 12px !important;
+  }
+}
+
 /* Dedicated square artwork for the quick-remote sound and close controls.
    These controls intentionally use the illustration as their complete
    surface (rather than stretching the older wide paper SVG), while the
