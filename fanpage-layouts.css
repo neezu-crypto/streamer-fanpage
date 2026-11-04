@@ -4035,6 +4035,24 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-
   border: 0 !important;
   box-shadow: none !important;
 }
+
+/* Center every quick-navigation label inside its ticket.  The number span
+   is intentionally hidden in design 3, so the label must occupy the full
+   ticket width instead of retaining the legacy left-aligned flex layout. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-link {
+  justify-content: center !important;
+  text-align: center !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-label {
+  display: block !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-align: center !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
 @media (max-width: 720px) {
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button {
     height: 44px !important;
