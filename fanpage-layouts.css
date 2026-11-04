@@ -2420,6 +2420,96 @@ body.fanpage-layout-three-active :is(dialog.account-dialog, #vodPlayerDialog, #y
   body.fanpage-layout-three-active :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog) button { transition-duration: .01ms; }
 }
 
+/* Layout 3 dedicated illustrated controls. The paper artwork is the button
+   surface itself; the HTML label stays selectable and accessible above it. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-action-cancel {
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  background: url('assets/fanpage-doodle/button-cancel.svg') center / 100% 100% no-repeat;
+  box-shadow: none;
+  color: var(--doodle-ink, #2f2a2c);
+  transform: rotate(-.5deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-action-cancel::before { content: none; }
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-action-cancel:hover:not(:disabled),
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-action-cancel:focus-visible {
+  border: 0;
+  background-color: transparent;
+  background-image: url('assets/fanpage-doodle/button-cancel.svg');
+  box-shadow: none;
+  transform: rotate(.5deg) translateY(-1px) scale(1.02);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-action-cancel:active:not(:disabled) {
+  transform: rotate(-.5deg) translateY(2px) scale(.99);
+}
+
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings {
+  width: 48px;
+  height: 42px;
+  min-width: 48px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  background: url('assets/fanpage-doodle/button-sound.svg') center / 100% 100% no-repeat;
+  box-shadow: none;
+  color: var(--doodle-ink, #2f2a2c);
+  transform: rotate(1deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings svg { display: none; }
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings:focus-visible {
+  border: 0;
+  background-color: transparent;
+  background-image: url('assets/fanpage-doodle/button-sound.svg');
+  box-shadow: none;
+  transform: rotate(-1deg) translateY(-1px) scale(1.04);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings:active:not(:disabled) {
+  transform: rotate(1deg) translateY(2px) scale(.98);
+}
+
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-attendance {
+  position: relative;
+  min-width: 206px;
+  min-height: 76px;
+  padding: 13px 18px 13px 54px;
+  border: 0;
+  border-radius: 0;
+  background: url('assets/fanpage-doodle/button-attendance.svg') center / 100% 100% no-repeat;
+  box-shadow: none;
+  color: var(--doodle-ink, #2f2a2c);
+  transform: rotate(-.4deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-attendance-gift,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-attendance-arrow { display: none; }
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-attendance-copy {
+  position: relative;
+  z-index: 1;
+  color: var(--doodle-ink, #2f2a2c);
+  font-weight: 700;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-attendance:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-attendance:focus-visible {
+  border: 0;
+  background-color: transparent;
+  background-image: url('assets/fanpage-doodle/button-attendance.svg');
+  box-shadow: none;
+  color: var(--doodle-ink, #2f2a2c);
+  transform: rotate(.4deg) translateY(-1px) scale(1.02);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-attendance:active {
+  transform: rotate(-.4deg) translateY(2px) scale(.99);
+}
+
+@media (max-width: 720px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-attendance {
+    min-width: 0;
+    width: 100%;
+    min-height: 72px;
+  }
+}
+
 @media (max-width: 720px) {
   #fanPageView.fanpage-layout-3 { padding: 20px 0 34px; }
   #fanPageView.fanpage-layout-3 .fanpage-kawaii-hero { min-height: 330px; border-radius: 18px; }
