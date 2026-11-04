@@ -1399,6 +1399,68 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
   color: #fffdf8 !important;
   text-shadow: 0 1px 0 #2f2a2c55 !important;
 }
+
+/* This must be the last action-rail declaration.  Generic layout-three
+   button decoration appears earlier in this file and otherwise paints a
+   pale rectangle over the square action artwork on phones. */
+@media (max-width: 720px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-mobile-actions {
+    overflow: visible !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote { z-index: 60 !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen) {
+    position: relative !important;
+    display: grid !important;
+    width: 58px !important;
+    height: 58px !important;
+    min-width: 58px !important;
+    min-height: 58px !important;
+    flex: 0 0 58px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background-color: transparent !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 100% 100% !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
+    color: transparent !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    transform: rotate(-1deg) !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen)::before,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen)::after {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-button { background-image: url('assets/fanpage-doodle/mobile-action-emote.png') !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle { background-image: url('assets/fanpage-doodle/mobile-action-quick.png') !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-fullscreen { background-image: url('assets/fanpage-doodle/mobile-action-fullscreen.png') !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen) svg { display: none !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):hover,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):focus-visible {
+    filter: drop-shadow(2px 4px 0 #2f2a2c48) brightness(1.04) !important;
+    transform: translateY(-1px) rotate(1deg) !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):active {
+    filter: drop-shadow(1px 1px 0 #2f2a2c45) !important;
+    transform: translateY(2px) rotate(-1deg) !important;
+  }
+}
 @media (max-width: 720px) {
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button {
     height: 44px !important;
@@ -1408,6 +1470,108 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button[aria-selected='true'] {
     height: 48px !important;
     min-height: 48px !important;
+  }
+}
+
+/* Final precedence: prevent generic layout-three controls from covering the
+   three phone action illustrations with their paper background/pseudo art. */
+@media (max-width: 720px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-mobile-actions { overflow: visible !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote { z-index: 60 !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen) {
+    position: relative !important; display: grid !important; width: 58px !important; height: 58px !important;
+    min-width: 58px !important; min-height: 58px !important; flex: 0 0 58px !important; padding: 0 !important;
+    overflow: visible !important; border: 0 !important; border-radius: 0 !important; background-color: transparent !important;
+    background-repeat: no-repeat !important; background-position: center !important; background-size: 100% 100% !important;
+    box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    filter: drop-shadow(2px 3px 0 #2f2a2c38) !important; color: transparent !important; font-size: 0 !important;
+    line-height: 0 !important; transform: rotate(-1deg) !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen)::before,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen)::after { content: none !important; display: none !important; background: none !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-button { background-image: url('assets/fanpage-doodle/mobile-action-emote.png') !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle { background-image: url('assets/fanpage-doodle/mobile-action-quick.png') !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-fullscreen { background-image: url('assets/fanpage-doodle/mobile-action-fullscreen.png') !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen) svg { display: none !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):hover,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):focus-visible { filter: drop-shadow(2px 4px 0 #2f2a2c48) brightness(1.04) !important; transform: translateY(-1px) rotate(1deg) !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):active { filter: drop-shadow(1px 1px 0 #2f2a2c45) !important; transform: translateY(2px) rotate(-1deg) !important; }
+}
+
+/* Final mobile action rail contract.
+   This intentionally lives after the broad layout-3 button decoration rules.
+   Those generic rules add a paper gradient and a pseudo element to every
+   button; if they win in the cascade, the three square action illustrations
+   are covered by a pale rectangle on mobile. */
+@media (max-width: 720px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote {
+    z-index: 60 !important;
+    overflow: visible !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-mobile-actions {
+    align-items: flex-end !important;
+    gap: 7px !important;
+    overflow: visible !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen) {
+    position: relative !important;
+    display: grid !important;
+    width: 58px !important;
+    height: 58px !important;
+    min-width: 58px !important;
+    min-height: 58px !important;
+    flex: 0 0 58px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background-color: transparent !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 100% 100% !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
+    color: transparent !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    transform: rotate(-1deg) !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen)::before,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen)::after {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-button {
+    background-image: url('assets/fanpage-doodle/mobile-action-emote.png') !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle {
+    background-image: url('assets/fanpage-doodle/mobile-action-quick.png') !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-fullscreen {
+    background-image: url('assets/fanpage-doodle/mobile-action-fullscreen.png') !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen) svg {
+    display: none !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):hover,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):focus-visible {
+    filter: drop-shadow(2px 4px 0 #2f2a2c48) brightness(1.04) !important;
+    transform: translateY(-1px) rotate(1deg) !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):active {
+    filter: drop-shadow(1px 1px 0 #2f2a2c45) !important;
+    transform: translateY(2px) rotate(-1deg) !important;
   }
 }
 
@@ -3592,6 +3756,33 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   #fanPageView.fanpage-layout-3 .fanpage-tab-button .fanpage-tab-label {
     font-size: 13px !important;
   }
+}
+
+/* Final mobile action precedence.  It sits after the generic layout-three
+   button rules so the paper gradient and pseudo doodles cannot cover the
+   mobile action artwork. */
+@media (max-width: 720px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-mobile-actions { overflow: visible !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote { z-index: 60 !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen) {
+    position: relative !important; display: grid !important; width: 58px !important; height: 58px !important;
+    min-width: 58px !important; min-height: 58px !important; flex: 0 0 58px !important; padding: 0 !important;
+    overflow: visible !important; border: 0 !important; border-radius: 0 !important; background-color: transparent !important;
+    background-repeat: no-repeat !important; background-position: center !important; background-size: 100% 100% !important;
+    box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    filter: drop-shadow(2px 3px 0 #2f2a2c38) !important; color: transparent !important; font-size: 0 !important;
+    line-height: 0 !important; transform: rotate(-1deg) !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen)::before,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen)::after { content: none !important; display: none !important; background: none !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-button { background-image: url('assets/fanpage-doodle/mobile-action-emote.png') !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle { background-image: url('assets/fanpage-doodle/mobile-action-quick.png') !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-fullscreen { background-image: url('assets/fanpage-doodle/mobile-action-fullscreen.png') !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen) svg { display: none !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):hover,
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):focus-visible { filter: drop-shadow(2px 4px 0 #2f2a2c48) brightness(1.04) !important; transform: translateY(-1px) rotate(1deg) !important; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.fan-quick-sticker-button, .fan-quick-toggle, .fan-quick-fullscreen):active { filter: drop-shadow(1px 1px 0 #2f2a2c45) !important; transform: translateY(2px) rotate(-1deg) !important; }
 }
 
 /* Final tab artwork contract. Keep this after every legacy design-3 rule so
