@@ -2808,3 +2808,22 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-en
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-entry-polaroid {
   background: transparent url('assets/fanpage-doodle/rolling-message-polaroid.png') center / 100% 100% no-repeat !important;
 }
+
+/* The rolling-paper panel can be rendered outside the tab view container
+   during hash navigation. Keep the illustration attached to the page-level
+   layout flag as well, so it is not lost when the panel is re-mounted. */
+body.fanpage-layout-three-active .rolling-paper-topic-card {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent url('assets/fanpage-doodle/rolling-topic-card.png') center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+}
+body.fanpage-layout-three-active .rolling-paper-entry {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent url('assets/fanpage-doodle/rolling-message-card.png') center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+}
+body.fanpage-layout-three-active .rolling-paper-entry-polaroid {
+  background: transparent url('assets/fanpage-doodle/rolling-message-polaroid.png') center / 100% 100% no-repeat !important;
+}
