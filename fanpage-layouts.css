@@ -3199,3 +3199,43 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
 #fanPageView.fanpage-layout-3 .video-library-category {
   border-style: solid !important;
 }
+
+/* Main tab navigation: keep inactive tabs calm and text-first; only the
+   selected tab receives the hand-drawn ribbon artwork. */
+#fanPageView.fanpage-layout-3 .fanpage-tab-button {
+  min-height: 42px;
+  padding: 9px 18px;
+  border: 2px solid transparent !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+#fanPageView.fanpage-layout-3 .fanpage-tab-button::before,
+#fanPageView.fanpage-layout-3 .fanpage-tab-button::after {
+  content: none !important;
+  display: none !important;
+}
+#fanPageView.fanpage-layout-3 .fanpage-tab-button:hover,
+#fanPageView.fanpage-layout-3 .fanpage-tab-button:focus-visible {
+  border-color: var(--doodle-accent, #e87564) !important;
+  background: #fff1e6 !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 2px 3px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  transform: translateY(-1px) !important;
+}
+#fanPageView.fanpage-layout-3 .fanpage-tab-button[aria-selected='true'] {
+  min-height: 46px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-image: url('assets/fanpage-doodle/button-ribbon.svg') !important;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  color: #fffdf8 !important;
+  filter: drop-shadow(2px 3px 0 #2f2a2c55) !important;
+  transform: rotate(-.2deg) !important;
+}
