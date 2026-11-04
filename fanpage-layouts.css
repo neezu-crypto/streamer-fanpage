@@ -3844,6 +3844,71 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
 
 /* Final tab artwork contract. Keep this after every legacy design-3 rule so
    only one complete selected-tab ribbon can render. */
+
+/* Final quick-remote precedence: restore the dedicated square artwork after
+   all layout-three fallback scopes, and expose hover/focus tooltips. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close) {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  flex: 0 0 40px !important;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 100% 100% !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
+  transform: rotate(-1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings {
+  background-image: url('assets/fanpage-doodle/quick-sound-illustration.png') !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-close {
+  background-image: url('assets/fanpage-doodle/quick-close-illustration.png') !important;
+  transform: rotate(1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close) svg { display: none !important; }
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close)[data-tooltip]::after {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 8px);
+  right: 0;
+  width: max-content;
+  max-width: 180px;
+  padding: 6px 9px;
+  border: 1px solid #2f2a2c;
+  border-radius: 7px;
+  background: #2f2a2c;
+  color: #fffdf8;
+  content: attr(data-tooltip);
+  font: 11px/1.3 var(--font);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity .15s ease, transform .15s ease;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close)[data-tooltip]:hover::after,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.fan-quick-sound-settings, .fan-quick-close)[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button,
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button:hover,
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button:focus-visible,

@@ -4992,6 +4992,7 @@ function createFanPageQuickRemote(view) {
   soundSettingsButton.className = 'fan-quick-sound-settings';
   soundSettingsButton.setAttribute('aria-label', '효과음 볼륨 설정');
   soundSettingsButton.title = '효과음 볼륨 설정';
+  soundSettingsButton.dataset.tooltip = '효과음 볼륨 설정';
   soundSettingsButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4Z"/><path d="M16 9a5 5 0 0 1 0 6M18.5 6.5a9 9 0 0 1 0 11"/></svg>';
   const fullscreenButton = document.createElement('button'); fullscreenButton.type = 'button';
   fullscreenButton.className = 'fan-quick-fullscreen';
@@ -5158,7 +5159,8 @@ function createFanPageQuickRemote(view) {
   document.addEventListener('pointerdown', onStickerToolsOutsidePointer);
   document.addEventListener('keydown', onStickerToolsKeydown);
   const close = document.createElement('button'); close.type = 'button'; close.className = 'fan-quick-close';
-  close.setAttribute('aria-label', '빠른 이동 리모콘 닫기'); close.textContent = '×';
+  close.setAttribute('aria-label', '빠른 이동 리모콘 닫기'); close.title = '빠른 이동 리모콘 닫기';
+  close.dataset.tooltip = '빠른 이동 리모콘 닫기'; close.textContent = '×';
   header.append(title, soundSettingsButton, close);
   const soundDialog = document.createElement('dialog');
   soundDialog.className = 'account-dialog fan-sound-settings-dialog';
