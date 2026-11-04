@@ -1358,6 +1358,15 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
   .fan-quick-scrubber{min-height:180px}
   .fan-quick-scroll-thumb{left:calc(50% - 6px);width:12px;height:32px}
 }
+
+/* On phones the labelled emotion action lives independently from the
+   square quick-move/fullscreen rail.  This preserves a generous touch target
+   and keeps “감정표현” on one horizontal line. */
+@media(max-width:720px){
+  #fanPageView>#game-series-emote-launcher.fanpage-emote-mobile-floating{position:fixed!important;right:calc(12px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));z-index:52;width:auto;max-width:calc(100vw - 24px);margin:0}
+  #fanPageView>#game-series-emote-launcher.fanpage-emote-mobile-floating #game-series-emote-button{display:inline-flex!important;align-items:center;justify-content:center;gap:7px;min-width:124px;min-height:46px;padding:0 16px;white-space:nowrap;font-size:14px;line-height:1.1}
+  #fanPageView>#game-series-emote-launcher.fanpage-emote-mobile-floating #game-series-emote-button::before{margin:0!important}
+}
 @media(min-width:1660px){
   .fan-quick-remote{right:auto;left:max(10px,calc((100vw - 1220px)/2 - 140px));top:50%;transform:translateY(-50%)}
   .fan-quick-toggle{display:none}
