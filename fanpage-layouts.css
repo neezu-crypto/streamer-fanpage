@@ -2917,3 +2917,162 @@ body.fanpage-layout-three-active .rolling-paper-entry {
 body.fanpage-layout-three-active .rolling-paper-entry-polaroid {
   background: transparent url('assets/fanpage-doodle/rolling-message-polaroid.png') center / 100% 100% no-repeat !important;
 }
+
+/* Layout 3 readability pass: semantic controls take priority over the
+   stationery artwork.  Category pills, profile actions, and the sound
+   control are intentionally plain so their labels and affordances remain
+   immediately legible. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .video-library-category {
+  min-height: 36px;
+  padding: 8px 16px;
+  border: 2px solid var(--doodle-ink, #2f2a2c) !important;
+  border-radius: 999px !important;
+  background: var(--doodle-paper, #fffdf8) !important;
+  background-image: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 2px 3px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  filter: none !important;
+  transform: none !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .video-library-category:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .video-library-category:focus-visible {
+  border-color: var(--doodle-accent, #e87564) !important;
+  background: #fff1e6 !important;
+  transform: translateY(-1px) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .video-library-category.is-active {
+  border-color: var(--doodle-accent, #e87564) !important;
+  background: #ffd8c7 !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 2px 3px 0 #2f2a2c45 !important;
+}
+
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-actions .button {
+  min-height: 42px;
+  padding: 10px 15px;
+  border: 2px solid var(--doodle-ink, #2f2a2c) !important;
+  border-radius: 12px !important;
+  background: var(--doodle-paper, #fffdf8) !important;
+  background-image: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 3px 4px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  filter: none !important;
+  transform: none !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-actions .button:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-actions .button:focus-visible {
+  border-color: var(--doodle-accent, #e87564) !important;
+  background: #fff1e6 !important;
+  transform: translateY(-1px) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-actions .button.button-primary {
+  border-color: var(--doodle-accent-deep, #bd5149) !important;
+  background: var(--doodle-accent, #e87564) !important;
+  color: #fffdf8 !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-actions .button:active {
+  transform: translateY(2px) !important;
+  box-shadow: 1px 2px 0 var(--doodle-shadow, #2f2a2c32) !important;
+}
+
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .fan-quick-sound-settings {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 2px solid var(--doodle-ink, #2f2a2c) !important;
+  border-radius: 9px !important;
+  background: var(--doodle-paper, #fffdf8) !important;
+  background-image: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 2px 3px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  filter: none !important;
+  transform: none !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .fan-quick-sound-settings svg {
+  display: block !important;
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .fan-quick-sound-settings:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .fan-quick-sound-settings:focus-visible {
+  border-color: var(--doodle-accent, #e87564) !important;
+  background: #fff1e6 !important;
+  transform: translateY(-1px) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .fan-quick-sound-settings:active {
+  transform: translateY(2px) !important;
+  box-shadow: 1px 2px 0 var(--doodle-shadow, #2f2a2c32) !important;
+}
+
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-stock-attendance {
+  min-width: 0;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 2px solid var(--doodle-ink, #2f2a2c) !important;
+  border-radius: 14px !important;
+  background: var(--doodle-paper, #fffdf8) !important;
+  background-image: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  box-shadow: 3px 4px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  filter: none !important;
+  transform: none !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-stock-attendance-gift,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-stock-attendance-arrow {
+  display: inline-flex !important;
+  align-items: center;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-stock-attendance-copy {
+  color: var(--doodle-ink, #2f2a2c) !important;
+  font-weight: 700;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-stock-attendance:hover,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-stock-attendance:focus-visible {
+  border-color: var(--doodle-accent, #e87564) !important;
+  background: #fff1e6 !important;
+  transform: translateY(-1px) !important;
+}
+
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  .profile-identity .verified-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border: 2px solid #2f7a4a !important;
+  border-radius: 999px;
+  background: #d8f3df !important;
+  color: #245a38 !important;
+  box-shadow: 2px 3px 0 #2f7a4a55;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
