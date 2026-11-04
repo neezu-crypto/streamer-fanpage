@@ -3063,9 +3063,10 @@ function renderRollingPaperSection(page) {
       const entryEditPrompt = createStreamerEditVerificationPrompt(page, '응원 메시지');
       if (entryEditPrompt) itemHeading.append(entryEditPrompt);
       if (entry.galleryImage?.url) {
+        const galleryFrame = document.createElement('div'); galleryFrame.className = 'rolling-paper-entry-polaroid';
         const galleryImage = document.createElement('img'); galleryImage.className = 'rolling-paper-entry-image';
         galleryImage.src = entry.galleryImage.url; galleryImage.alt = '스트리머 갤러리에서 선택한 이미지';
-        galleryImage.loading = 'lazy'; item.append(galleryImage);
+        galleryImage.loading = 'lazy'; galleryFrame.append(galleryImage); item.append(galleryFrame);
       }
       item.append(itemHeading);
       if (entry.content) {
