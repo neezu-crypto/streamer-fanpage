@@ -3302,7 +3302,14 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
 #fanPageView.fanpage-layout-3 .fanpage-tab-button[aria-selected='true'] {
   min-height: 52px !important;
   height: 52px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  background-size: auto !important;
+  background-repeat: no-repeat !important;
   color: #fffdf8 !important;
+  box-shadow: none !important;
   filter: none !important;
 }
 #fanPageView.fanpage-layout-3 .fanpage-tab-button[aria-selected='true']::before {
