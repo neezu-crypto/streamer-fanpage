@@ -38,7 +38,6 @@ const VIEWER_STATS_RATE_LIMITS = Object.freeze({
 
 function viewerStatsTier(auth, access = {}) {
   if (access.isAdmin === true) return 'admin';
-  if (access.isSubscribed === true) return 'subscriber';
   if (access.isProtectedAccount === true) return 'account';
   const signInProvider = auth && auth.token && auth.token.firebase
     ? String(auth.token.firebase.sign_in_provider || '')
