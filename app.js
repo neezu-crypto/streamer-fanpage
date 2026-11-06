@@ -2779,12 +2779,23 @@ function renderKawaiiWelcome(page, onSectionNavigate = (sectionId) => {
   const mascotWrap = document.createElement('div'); mascotWrap.className = 'fanpage-kawaii-mascot-wrap';
   const halo = document.createElement('span'); halo.className = 'fanpage-kawaii-mascot-halo'; halo.setAttribute('aria-hidden', 'true');
   const mascot = document.createElement('button'); mascot.type = 'button'; mascot.className = 'fanpage-kawaii-mascot';
-  mascot.setAttribute('aria-label', '달토끼 캐릭터 표정 바꾸기'); mascot.setAttribute('aria-pressed', 'false');
+  const usesDoodleMascot = document.body.classList.contains('fanpage-layout-three-active');
+  mascot.classList.toggle('fanpage-doodle-mascot', usesDoodleMascot);
+  mascot.setAttribute('aria-label', usesDoodleMascot ? '스케치북 요정 반응 보기' : '달토끼 캐릭터 표정 바꾸기');
+  mascot.setAttribute('aria-pressed', 'false');
   const idle = document.createElement('img'); idle.className = 'fanpage-kawaii-mascot-idle';
-  idle.src = 'assets/fanpage-kawaii/moon-bunny-idle.png'; idle.alt = '별 머리핀을 한 작은 크림색 달토끼';
+  idle.src = usesDoodleMascot
+    ? 'assets/fanpage-doodle/design3-sketchbook-sprite.png'
+    : 'assets/fanpage-kawaii/moon-bunny-idle.png';
+  idle.alt = usesDoodleMascot
+    ? '별을 든 작은 스케치북 요정'
+    : '별 머리핀을 한 작은 크림색 달토끼';
   idle.loading = 'lazy'; idle.decoding = 'async';
   const wink = document.createElement('img'); wink.className = 'fanpage-kawaii-mascot-wink';
-  wink.src = 'assets/fanpage-kawaii/moon-bunny-wink.png'; wink.alt = ''; wink.setAttribute('aria-hidden', 'true');
+  wink.src = usesDoodleMascot
+    ? 'assets/fanpage-doodle/design3-sketchbook-sprite.png'
+    : 'assets/fanpage-kawaii/moon-bunny-wink.png';
+  wink.alt = ''; wink.setAttribute('aria-hidden', 'true');
   wink.loading = 'lazy'; wink.decoding = 'async';
   mascot.append(idle, wink);
   const setMascotMood = (isWinking) => {
@@ -2801,7 +2812,17 @@ function renderKawaiiWelcome(page, onSectionNavigate = (sectionId) => {
   });
   mascotWrap.append(halo, mascot);
   const sparkles = document.createElement('span'); sparkles.className = 'fanpage-kawaii-sparkles';
-  sparkles.setAttribute('aria-hidden', 'true'); sparkles.textContent = '✦  ✧  ♡';
+  sparkles.setAttribute('aria-hidden', 'true');
+  if (usesDoodleMascot) {
+    sparkles.classList.add('fanpage-doodle-floating-doodles');
+    const doodleImage = document.createElement('img');
+    doodleImage.src = 'assets/fanpage-doodle/design3-hero-floating-doodles.png';
+    doodleImage.alt = '';
+    doodleImage.decoding = 'async';
+    sparkles.append(doodleImage);
+  } else {
+    sparkles.textContent = '✦  ✧  ♡';
+  }
   hero.append(copy, mascotWrap, sparkles);
   return hero;
 }
@@ -4813,9 +4834,11 @@ function renderFanPage(page, options = {}) {
     const editor = document.createElement('div'); editor.className = 'account-dialog-card profile-editor';
     const headingRow = document.createElement('div'); headingRow.className = 'profile-editor-heading';
     const heading = document.createElement('h2'); heading.textContent = '팬페이지 설정';
-    const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close'; close.setAttribute('aria-label', '설정 닫기'); close.textContent = '×';
-    close.addEventListener('click', () => editorDialog.close());
-    headingRow.append(heading, close); editor.append(headingRow);
+    const headingActions = document.createElement('div'); headingActions.className = 'profile-editor-heading-actions';
+    const headingCancel = document.createElement('button'); headingCancel.type = 'button'; headingCancel.className = 'button'; headingCancel.textContent = '취소';
+    const headingSave = document.createElement('button'); headingSave.type = 'button'; headingSave.className = 'button button-primary'; headingSave.textContent = '프로필 저장';
+    headingCancel.addEventListener('click', () => editorDialog.close());
+    headingActions.append(headingCancel, headingSave); headingRow.append(heading, headingActions); editor.append(headingRow);
     const fields = [
       ['birthday', '생일', 20], ['mbti', 'MBTI', 8], ['major', '전공', 50], ['debutDate', '데뷔일', 20],
       ['fanNickname', '팬닉', 30], ['fandomName', '팬덤명', 30], ['contents', '콘텐츠 (쉼표로 구분)', 160],
@@ -4890,11 +4913,15 @@ function renderFanPage(page, options = {}) {
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
     cancel.addEventListener('click', () => editorDialog.close());
     const save = document.createElement('button'); save.type = 'button'; save.className = 'button button-primary profile-editor-save'; save.textContent = '프로필 저장';
+    headingSave.addEventListener('click', () => save.click());
     save.addEventListener('click', async () => {
       save.disabled = true;
+      headingSave.disabled = true;
+      headingCancel.disabled = true;
       save.classList.add('is-loading');
       save.setAttribute('aria-busy', 'true');
       save.textContent = '저장 중…';
+      headingSave.textContent = '저장 중…';
       try {
         const value = (key) => inputMap[key].value.trim();
         const readBannerUrls = (editor) => [...new Set(editor.values().map(normalizeBannerImageUrl).filter(Boolean))];
@@ -4930,6 +4957,11 @@ function renderFanPage(page, options = {}) {
           save.removeAttribute('aria-busy');
           save.textContent = '프로필 저장';
         }
+        if (headingSave.isConnected) {
+          headingSave.disabled = false;
+          headingSave.textContent = '프로필 저장';
+        }
+        if (headingCancel.isConnected) headingCancel.disabled = false;
       }
     });
     footerActions.append(cancel, save);
@@ -6279,7 +6311,11 @@ function renderLiveSection(page) {
     info.append(message, note); offline.append(mark, info);
     const station = document.createElement('a'); station.className = 'button live-station-link';
     station.dataset.liveFocus = 'station';
-    station.href = page.streamer.soopUrl; station.target = '_blank'; station.rel = 'noopener noreferrer'; station.textContent = 'SOOP 방송국 보기 ↗';
+    station.href = page.streamer.soopUrl; station.target = '_blank'; station.rel = 'noopener noreferrer';
+    station.append(document.createTextNode('SOOP 방송국 보기'));
+    const stationIcon = document.createElement('span'); stationIcon.className = 'live-station-link-icon';
+    stationIcon.setAttribute('aria-hidden', 'true'); stationIcon.textContent = '↗';
+    station.append(stationIcon);
     offline.append(station); content.append(offline);
     if (state.error) {
       const warning = document.createElement('p'); warning.className = 'live-stale-note';
