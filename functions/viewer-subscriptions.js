@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
-const { getDatabase } = require('firebase-admin/database');
+const { getDatabase, getDatabaseWithUrl } = require('firebase-admin/database');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const {
   canAccessViewerSubscriberFeatures,
@@ -13,6 +13,7 @@ const REQUESTS_PATH = 'streamerFanPageViewerSubscriptionRequests';
 const PENDING_PATH = 'streamerFanPageViewerSubscriptionPending';
 const SIGNALS_PATH = 'streamerFanPageAdminSubscriptionSignals';
 const SOOP_CLAIMS_PATH = 'streamerFanPageViewerSubscriptionSoopIds';
+const FANPAGE_DATABASE_URL = 'https://streamer-fanpage-rtdb.firebaseio.com';
 const LEGACY_SUBSCRIPTION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const VERIFICATION_CODE_TTL_MS = 30 * 60 * 1000;
 const VERIFICATION_CODE_COOLDOWN_MS = 60 * 1000;
@@ -23,6 +24,13 @@ const VERIFICATION_CODE_RE = /^[A-F0-9]{10}$/;
 
 let lookupSoopNickname = async () => '';
 let lookupSoopNicknames = async () => new Map();
+
+// Account and administrator identity are shared across all services, while the
+// subscription entitlement and its review queue belong to the fanpage DB.
+// Keeping these handles separate prevents a new approval from being written to
+// the legacy default RTDB after the fanpage client has moved to its own DB.
+const sharedDb = () => getDatabase();
+const fanpageDb = () => getDatabaseWithUrl(FANPAGE_DATABASE_URL);
 
 function configureSoopNicknameLookups(singleLookup, batchLookup) {
   if (typeof singleLookup === 'function') lookupSoopNickname = singleLookup;
@@ -37,12 +45,12 @@ function requireAuth(request) {
 }
 
 async function isAdmin(uid) {
-  const snapshot = await getDatabase().ref(`adminCenter/adminUids/${uid}`).get();
+  const snapshot = await sharedDb().ref(`adminCenter/adminUids/${uid}`).get();
   return snapshot.val() === true;
 }
 
 async function accountAccess(uid) {
-  const db = getDatabase();
+  const db = sharedDb();
   const [userSnapshot, admin] = await Promise.all([
     db.ref(`users/${uid}`).get(),
     isAdmin(uid),
@@ -139,7 +147,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
   const uid = requireAuth(request);
   const data = request.data || {};
   const action = String(data.action || 'status');
-  const db = getDatabase();
+  const db = fanpageDb();
   const subscriptionRef = db.ref(`${SUBSCRIPTIONS_PATH}/${uid}`);
 
   if (action === 'status') {
@@ -355,7 +363,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
 
 exports.streamerFanPageAdminViewerSubscriptionRequests = onCall({ maxInstances: 10 }, async (request) => {
   const adminUid = await requireAdmin(request);
-  const db = getDatabase();
+  const db = fanpageDb();
   const data = request.data || {};
   const action = String(data.action || 'list');
 
