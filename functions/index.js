@@ -338,7 +338,6 @@ const VIEWER_STATS_SHARED_ROOTS = new Set([
   'users',
   'streamerVerifications',
   'streamerNames',
-  'streamerFanPageViewerSubscriptions',
   'verifiedStreamerVisits',
   'verifiedStreamerVisitDedup',
 ]);
