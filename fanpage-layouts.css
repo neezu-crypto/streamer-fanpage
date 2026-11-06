@@ -2406,6 +2406,26 @@ body.fanpage-layout-three-active .footer-feedback-link { border-bottom-color: #2
 #fanPageView.fanpage-layout-3 .fanpage-kawaii-copy h1 span { color: var(--doodle-ink); }
 #fanPageView.fanpage-layout-3 .fanpage-kawaii-description { color: var(--doodle-muted); }
 #fanPageView.fanpage-layout-3 .fanpage-kawaii-mascot-halo { border-color: var(--doodle-ink); background: #fff3e0; }
+#fanPageView.fanpage-layout-3 .fanpage-doodle-mascot {
+  filter: drop-shadow(5px 7px 0 #2f2a2c24);
+}
+#fanPageView.fanpage-layout-3 .fanpage-doodle-mascot img {
+  transform-origin: center bottom;
+}
+#fanPageView.fanpage-layout-3 .fanpage-doodle-mascot.is-winking .fanpage-kawaii-mascot-wink {
+  transform: translateY(-4px) rotate(2deg) scale(1.025);
+}
+#fanPageView.fanpage-layout-3 .fanpage-doodle-floating-doodles {
+  width: clamp(92px, 13vw, 168px);
+  font-size: 0;
+  letter-spacing: 0;
+  text-shadow: none;
+}
+#fanPageView.fanpage-layout-3 .fanpage-doodle-floating-doodles img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
 #fanPageView.fanpage-layout-3 .fanpage-kawaii-sparkles { color: var(--doodle-accent); text-shadow: 1px 1px 0 #2f2a2c66; }
 #fanPageView.fanpage-layout-3 .fanpage-kawaii-actions .button { min-height: 42px; border: 2px solid var(--doodle-ink); border-radius: 12px; background: var(--doodle-paper); color: var(--doodle-ink); box-shadow: 3px 4px 0 var(--doodle-shadow); }
 #fanPageView.fanpage-layout-3 .fanpage-kawaii-actions .button-primary { border-color: var(--doodle-ink); background: var(--doodle-accent); color: #fffdf8; }
@@ -2418,7 +2438,20 @@ body.fanpage-layout-three-active .footer-feedback-link { border-bottom-color: #2
   border-color: var(--doodle-ink);
   background: var(--doodle-paper);
 }
-#fanPageView.fanpage-layout-3 .profile-tab { border: 2px solid var(--doodle-ink); background: #ffd8c7; color: var(--doodle-ink); }
+/* Make the PROFILE tab part of the paper card's top-left corner instead of
+   placing a separate rounded card slightly inside its border. */
+#fanPageView.fanpage-layout-3 .profile-tab {
+  top: -2px;
+  left: -2px;
+  padding: 13px 24px 14px;
+  border: 2px solid var(--doodle-ink);
+  border-top: 0;
+  border-left: 0;
+  border-radius: 0 0 20px 0;
+  background: #ffd8c7;
+  color: var(--doodle-ink);
+  line-height: 1;
+}
 #fanPageView.fanpage-layout-3 .profile-avatar { border: 3px solid var(--doodle-ink); box-shadow: 4px 5px 0 var(--doodle-shadow); background: #fff3e0; }
 #fanPageView.fanpage-layout-3 .profile-name,
 #fanPageView.fanpage-layout-3 .profile-handle,
@@ -2464,6 +2497,22 @@ body.fanpage-layout-three-active .footer-feedback-link { border-bottom-color: #2
 #fanPageView.fanpage-layout-3 .fanpage-tab-panel-grid { gap: 20px; }
 #fanPageView.fanpage-layout-3 .fanpage-home-columns,
 #fanPageView.fanpage-layout-3 .fanpage-tab-columns { gap: 20px; }
+/* Home uses nested columns. Give both stacks an explicit grid gap so adjacent
+   outlined cards never visually merge when their margins collapse. */
+#fanPageView.fanpage-layout-3 .fanpage-home-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+#fanPageView.fanpage-layout-3 :is(.fanpage-home-main-column, .fanpage-home-side-column) {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  min-width: 0;
+}
+#fanPageView.fanpage-layout-3 .fanpage-home-columns :is(.live-section, .vod-section, .calendar-section, .affiliate-promo-card) {
+  margin-top: 0;
+}
 #fanPageView.fanpage-layout-3 :is(.content-card, .live-section, .messenger-link-section, .fan-character-ogq-pair) { border-color: var(--doodle-ink); background: var(--doodle-paper); box-shadow: 3px 4px 0 var(--doodle-shadow); }
 #fanPageView.fanpage-layout-3 :is(.content-card, .live-section, .messenger-link-section) :is(h2, h3, h4, h5, strong) { color: var(--doodle-ink); }
 #fanPageView.fanpage-layout-3 :is(.content-card, .live-section, .messenger-link-section) :is(p, small, .section-note, .vod-count, .vod-refresh-status, .songbook-description, .played-games-description, .calendar-owner-hint, .fan-gallery-subtitle, .fan-gallery-count) { color: var(--doodle-muted); }
@@ -3775,9 +3824,50 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
    pass intentionally keeps plain. */
 #fanPageView.fanpage-layout-3 .video-library-category::before,
 #fanPageView.fanpage-layout-3 .profile-actions > .button::before,
-#fanPageView.fanpage-layout-3 .profile-stock-attendance::before {
+#fanPageView.fanpage-layout-3 .profile-stock-attendance::before,
+#fanPageView.fanpage-layout-3 .live-station-link::before {
   content: none !important;
   display: none !important;
+}
+#fanPageView.fanpage-layout-3 .live-station-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+#fanPageView.fanpage-layout-3 .live-station-link-icon {
+  display: inline-block;
+  color: var(--doodle-accent-deep, #b5483f);
+  font-family: var(--display, inherit);
+  /* Keep the external-link illustration clearly larger than the label. */
+  font-size: 2em;
+  font-weight: 800;
+  line-height: .8;
+  transform: rotate(-8deg) translateY(-1px);
+}
+/* Replay actions use a readable, deliberately oversized stationery mark rather
+   than the tiny generic decoration applied to compact controls. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.vod-refresh-button, .vod-analytics-button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.vod-refresh-button, .vod-analytics-button)::before {
+  position: relative !important;
+  z-index: 0 !important;
+  inset: auto !important;
+  display: inline-block !important;
+  width: 2em !important;
+  height: 2em !important;
+  flex: 0 0 2em !important;
+  background-size: auto 3.45em !important;
+  opacity: 1;
+  transform: rotate(-7deg);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .vod-refresh-button::before {
+  background-position: center center;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .vod-analytics-button::before {
+  background-position: left center;
 }
 #fanPageView.fanpage-layout-3 .video-library-category {
   border-style: solid !important;
@@ -4373,7 +4463,14 @@ body.fanpage-layout-three-active dialog.profile-settings-dialog {
   overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;
   touch-action:pan-y;
-  scrollbar-gutter:stable;
+  /* Preserve the rounded paper edge while keeping wheel/touch scrolling. */
+  scrollbar-width:none;
+  scrollbar-gutter:auto;
+}
+body.fanpage-layout-three-active dialog.profile-settings-dialog::-webkit-scrollbar {
+  display:none;
+  width:0;
+  height:0;
 }
 body.fanpage-layout-three-active dialog.profile-settings-dialog .profile-editor {
   min-height:min-content;
@@ -4382,4 +4479,112 @@ body.fanpage-layout-three-active dialog.profile-settings-dialog .profile-editor 
   body.fanpage-layout-three-active dialog.profile-settings-dialog {
     max-height:calc(100dvh - 20px) !important;
   }
+}
+
+/* Profile inline edits are compact form controls, not illustrated action
+   stickers. Keep the editing state calm and legible inside the paper board. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor {
+  grid-column:1 / -1;
+  grid-template-columns:minmax(0, 1fr) auto;
+  align-items:center;
+  gap:10px 12px;
+  padding:12px;
+  border:2px dashed #d8b8aa;
+  border-radius:16px;
+  background:linear-gradient(135deg, #fffaf2, #fff2e9);
+  box-shadow:2px 3px 0 #2f2a2c1f;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor :is(input, textarea) {
+  width:100%;
+  min-width:0;
+  min-height:44px;
+  padding:10px 12px;
+  border:2px solid var(--doodle-ink, #2f2a2c);
+  border-radius:10px;
+  background:#fffdf8;
+  color:var(--doodle-ink, #2f2a2c);
+  box-shadow:inset 0 1px 0 #fff;
+  font:14px/1.55 var(--font);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor textarea {
+  min-height:92px;
+  resize:vertical;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor :is(input, textarea):focus {
+  border-color:var(--doodle-accent, #e87564);
+  outline:0;
+  box-shadow:0 0 0 3px #e8756430;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions {
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions .button {
+  min-width:56px;
+  min-height:38px;
+  padding:8px 12px;
+  border:2px solid var(--doodle-ink, #2f2a2c);
+  border-radius:9px;
+  background:#fffdf8;
+  background-image:none;
+  box-shadow:2px 3px 0 var(--doodle-shadow, #2f2a2c32);
+  color:var(--doodle-ink, #2f2a2c);
+  filter:none;
+  transform:none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions .button::before,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions .button::after {
+  content:none;
+  display:none;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions .button.button-primary {
+  background:var(--doodle-accent, #e87564);
+  color:#fffdf8;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions .button:hover:not(:disabled),
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions .button:focus-visible {
+  border-color:var(--doodle-accent, #e87564);
+  background:#fff1e6;
+  box-shadow:3px 4px 0 var(--doodle-shadow, #2f2a2c32);
+  color:var(--doodle-ink, #2f2a2c);
+  transform:translateY(-1px);
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions .button.button-primary:hover:not(:disabled),
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions .button.button-primary:focus-visible {
+  background:#d95f50;
+  color:#fffdf8;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-status {
+  grid-column:1 / -1;
+  color:#aa4b3f;
+  font-size:12px;
+  line-height:1.5;
+}
+@media (max-width:640px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor {
+    grid-template-columns:1fr;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-inline-editor-actions {
+    grid-column:1;
+    justify-content:flex-end;
+  }
+}
+
+/* Settings labels are primary form information. Do not inherit the pale
+   placeholder tone used for secondary notes in the paper-style dialog. */
+body.fanpage-layout-three-active .profile-settings-dialog .profile-editor-field,
+body.fanpage-layout-three-active .profile-settings-dialog .banner-settings-heading strong {
+  color:var(--doodle-ink, #2f2a2c) !important;
+  font-weight:700;
+}
+body.fanpage-layout-three-active .profile-settings-dialog .profile-editor-field > label,
+body.fanpage-layout-three-active .profile-settings-dialog .profile-editor-field > strong,
+body.fanpage-layout-three-active .profile-settings-dialog .banner-settings-heading {
+  color:var(--doodle-ink, #2f2a2c) !important;
+}
+body.fanpage-layout-three-active .profile-settings-dialog .profile-editor-hint {
+  color:#665d5b !important;
+  font-weight:500;
 }
