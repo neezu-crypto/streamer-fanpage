@@ -5158,10 +5158,7 @@ function createFanPageQuickRemote(view) {
   };
   document.addEventListener('pointerdown', onStickerToolsOutsidePointer);
   document.addEventListener('keydown', onStickerToolsKeydown);
-  const close = document.createElement('button'); close.type = 'button'; close.className = 'fan-quick-close';
-  close.setAttribute('aria-label', '빠른 이동 리모콘 닫기'); close.title = '빠른 이동 리모콘 닫기';
-  close.dataset.tooltip = '빠른 이동 리모콘 닫기'; close.textContent = '×';
-  header.append(title, soundSettingsButton, close);
+  header.append(title, soundSettingsButton);
   const soundDialog = document.createElement('dialog');
   soundDialog.className = 'account-dialog fan-sound-settings-dialog';
   soundDialog.setAttribute('aria-labelledby', 'fanSoundSettingsTitle');
@@ -5169,7 +5166,8 @@ function createFanPageQuickRemote(view) {
   const soundHeading = document.createElement('div'); soundHeading.className = 'fan-sound-settings-heading';
   const soundTitle = document.createElement('h2'); soundTitle.id = 'fanSoundSettingsTitle'; soundTitle.textContent = '효과음 설정';
   const soundClose = document.createElement('button'); soundClose.type = 'button'; soundClose.className = 'button profile-settings-close fan-sound-settings-close';
-  soundClose.setAttribute('aria-label', '효과음 설정 닫기'); soundClose.title = '효과음 설정 닫기'; soundClose.textContent = '×';
+  soundClose.setAttribute('aria-label', '효과음 설정 닫기'); soundClose.title = '효과음 설정 닫기';
+  soundClose.dataset.tooltip = '효과음 설정 닫기'; soundClose.textContent = '×';
   soundClose.addEventListener('click', () => soundDialog.close());
   soundHeading.append(soundTitle, soundClose);
   const soundDescription = document.createElement('p'); soundDescription.className = 'fan-sound-settings-description';
@@ -5504,7 +5502,6 @@ function createFanPageQuickRemote(view) {
   document.addEventListener('fullscreenchange', syncFullscreenButton);
   document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
   syncFullscreenButton();
-  close.addEventListener('click', () => setExpanded(false));
   header.addEventListener('pointerdown', startRemoteDrag);
   header.addEventListener('pointermove', moveRemoteDrag);
   header.addEventListener('pointerup', finishRemoteDrag);
@@ -9370,13 +9367,13 @@ function renderWeeklyScheduleDialog(page) {
   const imageHeading = document.createElement('div'); imageHeading.className = 'weekly-schedule-image-heading';
   const imageLabel = document.createElement('strong'); imageLabel.textContent = '갤러리 이미지';
   const imageNote = document.createElement('small'); imageNote.textContent = '갤러리에서 선택하거나, 템플릿의 사진 칸에 파일을 끌어 놓으면 갤러리에 등록하고 바로 적용해요.';
-  imageHeading.append(imageLabel, imageNote);
+  const closeImageTools = document.createElement('button'); closeImageTools.type = 'button'; closeImageTools.className = 'button profile-settings-close weekly-schedule-image-tools-close'; closeImageTools.setAttribute('aria-label', '갤러리 이미지 창 닫기'); closeImageTools.textContent = '×';
+  imageHeading.append(imageLabel, imageNote, closeImageTools);
   const imageActions = document.createElement('div'); imageActions.className = 'weekly-schedule-image-actions';
   const chooseImage = document.createElement('button'); chooseImage.type = 'button'; chooseImage.className = 'button'; chooseImage.textContent = '갤러리에서 선택';
   const uploadImage = document.createElement('button'); uploadImage.type = 'button'; uploadImage.className = 'button'; uploadImage.textContent = '새 이미지 등록';
   const clearImage = document.createElement('button'); clearImage.type = 'button'; clearImage.className = 'button weekly-schedule-clear-image'; clearImage.textContent = '선택 이미지 제거';
-  const closeImageTools = document.createElement('button'); closeImageTools.type = 'button'; closeImageTools.className = 'button'; closeImageTools.textContent = '닫기';
-  imageActions.append(chooseImage, uploadImage, clearImage, closeImageTools);
+  imageActions.append(chooseImage, uploadImage, clearImage);
   const selectedImageNote = document.createElement('p'); selectedImageNote.className = 'weekly-schedule-selected-image'; selectedImageNote.textContent = '왼쪽 사진 영역을 눌러 선택해 주세요.';
 
   const galleryPanel = document.createElement('div'); galleryPanel.className = 'weekly-schedule-gallery-picker'; galleryPanel.hidden = true;

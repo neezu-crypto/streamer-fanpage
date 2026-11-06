@@ -1475,6 +1475,71 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
   }
 }
 
+/* Design 3 uses one square, hand-drawn X asset for every dialog-dismissal
+   control. Keep the native button and accessible label; only its surface is
+   illustrated. This final rule overrides older circular and paper variants. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close),
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close) {
+  display: grid !important;
+  place-items: center !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  flex: 0 0 42px !important;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent url('assets/fanpage-doodle/quick-close-illustration.png') center / 100% 100% no-repeat !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
+  transform: rotate(1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close)::before,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close)::after,
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close)::before,
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close)::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):hover:not(:disabled),
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):focus-visible,
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):hover:not(:disabled),
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):focus-visible {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  filter: drop-shadow(3px 4px 0 #2f2a2c48) brightness(1.05) !important;
+  transform: translateY(-1px) rotate(1.5deg) scale(1.04) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):active:not(:disabled),
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):active:not(:disabled) {
+  filter: drop-shadow(1px 1px 0 #2f2a2c45) !important;
+  transform: translateY(2px) rotate(-1deg) scale(.98) !important;
+}
+
 /* Design 3 quick navigation is label-first: hide the decorative section
    numbers so the hand-drawn tickets read cleanly at every desktop width. */
 #fanPageView.fanpage-layout-3 .fan-quick-link {
@@ -1542,7 +1607,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
    surface (rather than stretching the older wide paper SVG), while the
    native button keeps the accessible name and keyboard/touch behavior. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
-  :is(.fan-quick-sound-settings, .fan-quick-close) {
+  .fan-quick-sound-settings {
   display: grid !important;
   place-items: center !important;
   width: 40px !important;
@@ -3937,14 +4002,10 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sound-settings {
   background-image: url('assets/fanpage-doodle/quick-sound-illustration.png') !important;
 }
-body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-close {
-  background-image: url('assets/fanpage-doodle/quick-close-illustration.png') !important;
-  transform: rotate(1deg) !important;
-}
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
-  :is(.fan-quick-sound-settings, .fan-quick-close) svg { display: none !important; }
+  .fan-quick-sound-settings svg { display: none !important; }
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
-  :is(.fan-quick-sound-settings, .fan-quick-close)[data-tooltip]::after {
+  .fan-quick-sound-settings[data-tooltip]::after {
   position: absolute;
   z-index: 5;
   top: calc(100% + 8px);
@@ -3965,9 +4026,9 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   transition: opacity .15s ease, transform .15s ease;
 }
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
-  :is(.fan-quick-sound-settings, .fan-quick-close)[data-tooltip]:hover::after,
+  .fan-quick-sound-settings[data-tooltip]:hover::after,
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
-  :is(.fan-quick-sound-settings, .fan-quick-close)[data-tooltip]:focus-visible::after {
+  .fan-quick-sound-settings[data-tooltip]:focus-visible::after {
   opacity: 1;
   transform: translateY(0);
 }
@@ -4061,14 +4122,14 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-label 
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settings-close {
   display: grid !important;
   place-items: center !important;
-  width: 54px !important;
-  min-width: 54px !important;
-  height: 34px !important;
-  min-height: 34px !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
   padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
-  background: url('assets/fanpage-doodle/button-cancel.svg') center / contain no-repeat !important;
+  background: url('assets/fanpage-doodle/quick-close-illustration.png') center / 100% 100% no-repeat !important;
   box-shadow: none !important;
   color: transparent !important;
   font-size: 0 !important;
@@ -4165,5 +4226,160 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-kawaii-a
     min-height: 48px !important;
     padding-inline: 18px !important;
     font-size: 11px !important;
+  }
+}
+
+/* Final Design 3 precedence: every modal's dismiss control is the same
+   square, hand-drawn X illustration—not a browser-style circle or paper strip. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close),
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close) {
+  display:grid !important;
+  place-items:center !important;
+  width:42px !important;
+  min-width:42px !important;
+  height:42px !important;
+  min-height:42px !important;
+  flex:0 0 42px !important;
+  aspect-ratio:1 / 1 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent url('assets/fanpage-doodle/quick-close-illustration.png') center / 100% 100% no-repeat !important;
+  box-shadow:none !important;
+  color:transparent !important;
+  font-size:0 !important;
+  line-height:0 !important;
+  filter:drop-shadow(2px 3px 0 #2f2a2c38) !important;
+  transform:rotate(1deg) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close)::before,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close)::after,
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close)::before,
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close)::after {
+  content:none !important;
+  display:none !important;
+  background:none !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):hover:not(:disabled),
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):focus-visible,
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):hover:not(:disabled),
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):focus-visible {
+  background-color:transparent !important;
+  box-shadow:none !important;
+  filter:drop-shadow(3px 4px 0 #2f2a2c48) brightness(1.05) !important;
+  transform:translateY(-1px) rotate(1.5deg) scale(1.04) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):active:not(:disabled),
+body.fanpage-layout-three-active
+  :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog)
+  :is(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):active:not(:disabled) {
+  filter:drop-shadow(1px 1px 0 #2f2a2c45) !important;
+  transform:translateY(2px) rotate(-1deg) scale(.98) !important;
+}
+
+/* The emotion pop-up is mounted beside the fan-page root, so it needs the
+   same terminal rule separately from the dialogs above. */
+body.fanpage-layout-three-active .gs-emote-close {
+  display:grid !important;
+  place-items:center !important;
+  width:42px !important;
+  min-width:42px !important;
+  height:42px !important;
+  min-height:42px !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent url('assets/fanpage-doodle/quick-close-illustration.png') center / 100% 100% no-repeat !important;
+  box-shadow:none !important;
+  color:transparent !important;
+  font-size:0 !important;
+  line-height:0 !important;
+  filter:drop-shadow(2px 3px 0 #2f2a2c38) !important;
+  transform:rotate(1deg) !important;
+}
+body.fanpage-layout-three-active .gs-emote-close::before,
+body.fanpage-layout-three-active .gs-emote-close::after {
+  content:none !important;
+  display:none !important;
+  background:none !important;
+}
+body.fanpage-layout-three-active .gs-emote-close:hover,
+body.fanpage-layout-three-active .gs-emote-close:focus-visible {
+  filter:drop-shadow(3px 4px 0 #2f2a2c48) brightness(1.05) !important;
+  transform:translateY(-1px) rotate(1.5deg) scale(1.04) !important;
+}
+
+/* Keep the gallery picker’s close illustration at the title area's upper
+   right, instead of leaving it among the gallery action buttons. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-image-heading {
+  display:grid !important;
+  grid-template-columns:minmax(0, 1fr) auto !important;
+  align-items:start !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-image-heading strong,
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-image-heading small {
+  grid-column:1 !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-image-tools-close {
+  grid-column:2 !important;
+  grid-row:1 / span 2 !important;
+  align-self:start !important;
+}
+
+/* The live preview previously inherited its dark legacy card surface on the
+   right. Give both halves an explicit paper treatment in Design 3. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .live-preview-card {
+  border:2px solid var(--doodle-ink) !important;
+  border-radius:16px !important;
+  background:var(--doodle-paper-soft) !important;
+  box-shadow:3px 4px 0 var(--doodle-shadow) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .live-preview-details {
+  background:linear-gradient(145deg, #fffdf8, #fff5e9) !important;
+  color:var(--doodle-ink) !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .live-broadcast-title {
+  color:var(--doodle-ink) !important;
+  font-weight:700 !important;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .live-viewer-count {
+  color:var(--doodle-muted) !important;
+}
+
+/* Long profile forms must scroll inside the modal—not behind the dialog.
+   Explicit overflow settings keep this reliable in Chromium/Whale and on
+   touch devices while preserving the hand-drawn dialog frame. */
+body.fanpage-layout-three-active dialog.profile-settings-dialog {
+  box-sizing:border-box !important;
+  max-height:calc(100dvh - 32px) !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  scrollbar-gutter:stable;
+}
+body.fanpage-layout-three-active dialog.profile-settings-dialog .profile-editor {
+  min-height:min-content;
+}
+@media (max-width:720px) {
+  body.fanpage-layout-three-active dialog.profile-settings-dialog {
+    max-height:calc(100dvh - 20px) !important;
   }
 }

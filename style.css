@@ -1035,7 +1035,7 @@ dialog.account-dialog.weekly-schedule-image-tools:not([open]){display:none}
 .cafe-more-link{flex:none;color:#aaa3b0;font-size:11px;text-decoration:none}
 .cafe-more-link:hover{color:var(--pink)}
 .cafe-post-list{margin-top:8px;border-top:1px solid #ffffff30}
-.cafe-post-row{display:grid;grid-template-columns:minmax(0,1fr) 120px 110px 42px;align-items:center;gap:14px;min-height:43px;padding:9px 5px;border-bottom:1px solid #ffffff12;color:#e6e1e8;text-decoration:none;font-size:12px}
+.cafe-post-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(54px,72px) 78px 22px;align-items:center;gap:8px;min-height:43px;padding:9px 5px;border-bottom:1px solid #ffffff12;color:#e6e1e8;text-decoration:none;font-size:12px}
 .cafe-post-row:hover{background:#ffffff07;color:#fff}
 .cafe-post-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cafe-post-title:before{content:'▪';display:inline-block;margin-right:9px;color:#bdb5c1}
@@ -1317,7 +1317,6 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .fan-quick-fullscreen svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.7}
 .fan-quick-fullscreen:hover{border-color:#f58cac70;background:#f58cac12}
 .fan-quick-fullscreen:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
-.fan-quick-close{display:grid;width:30px;height:30px;place-items:center;border:1px solid #ffffff20;border-radius:9px;background:#ffffff08;color:var(--text);font-size:19px;line-height:1}
 .fan-quick-body{display:grid;min-height:0;grid-template-columns:minmax(0,1fr) 20px;gap:9px;padding:8px 9px 10px}
 .fan-quick-links{display:grid;align-content:start;gap:3px;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:2px;scrollbar-width:thin;scrollbar-color:#ffffff35 transparent}
 .fan-quick-link{display:flex;align-items:center;gap:8px;min-width:0;min-height:32px;padding:5px 7px;border:1px solid transparent;border-radius:8px;background:transparent;color:#c7c0cf;text-align:left;transition:background .15s,border-color .15s,color .15s}
@@ -1328,7 +1327,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .fan-quick-scrubber{position:relative;align-self:stretch;min-height:120px;touch-action:none;cursor:ns-resize;user-select:none;-webkit-user-select:none;outline:none}
 .fan-quick-scroll-rail{position:absolute;top:4px;bottom:4px;left:50%;width:4px;transform:translateX(-50%);border-radius:99px;background:#ffffff17}
 .fan-quick-scroll-thumb{position:absolute;top:4px;left:calc(50% - 7px);width:14px;height:38px;transform:translateY(0);border:1px solid #ffffff52;border-radius:99px;background:var(--pink);box-shadow:0 0 14px color-mix(in srgb,var(--pink),transparent 60%);will-change:transform}
-.fan-quick-scrubber:focus-visible .fan-quick-scroll-thumb,.fan-quick-toggle:focus-visible,.fan-quick-close:focus-visible,.fan-quick-link:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
+.fan-quick-scrubber:focus-visible .fan-quick-scroll-thumb,.fan-quick-toggle:focus-visible,.fan-quick-link:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
 .fan-sound-settings-dialog{width:min(390px,calc(100% - 32px))}
 .fan-sound-settings-card{padding:24px}
 .fan-sound-settings-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px}
@@ -1349,7 +1348,6 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
   .fan-quick-remote{right:auto;left:max(8px,calc((100vw - 1220px)/2 - 128px));top:50%;transform:translateY(-50%)}
   .fan-quick-toggle{display:none}
   .fan-quick-panel{width:112px;max-height:70dvh}
-  .fan-quick-close{display:none}
   .fan-quick-body{grid-template-columns:minmax(0,1fr) 14px;gap:3px;padding:7px 6px 8px}
   .fan-quick-links{gap:2px}
   .fan-quick-link{gap:4px;min-height:29px;padding:4px 3px}
@@ -1373,7 +1371,6 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
   .fan-quick-panel{width:124px;max-height:70dvh}
   .fan-quick-header{padding:9px 10px}
   .fan-quick-header strong{font-size:13px}
-  .fan-quick-close{display:none}
   .fan-quick-body{grid-template-columns:minmax(0,1fr) 16px;gap:4px;padding:7px 7px 8px}
   .fan-quick-links{gap:2px}
   .fan-quick-link{gap:5px;min-height:30px;padding:4px 5px}
