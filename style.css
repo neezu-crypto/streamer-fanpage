@@ -441,6 +441,7 @@
 @media(max-width:720px){.played-games-heading h2{font-size:21px}.played-games-add-form,.played-games-opgg-form,.played-games-opgg-form:not(.has-region-selector){grid-template-columns:1fr}.played-games-add-form .button{width:100%}.played-games-type-select{max-width:none}.played-games-grid{grid-template-columns:1fr 1fr;gap:8px}.played-game-card{padding:8px}.played-game-details strong{font-size:13px}.played-game-vod-form{grid-template-columns:1fr}.played-game-vod-form .button{width:100%}.played-game-opgg-account{grid-template-columns:1fr}.played-game-opgg-link{grid-column:auto;grid-row:auto;width:100%;text-align:center}.played-game-opgg-editor{grid-template-columns:1fr}}
 @media(max-width:420px){.played-games-grid{grid-template-columns:1fr}.played-game-vod-form{grid-template-columns:minmax(0,1fr) auto}.played-game-vod-form .button{width:auto}}
 .calendar-section{margin-top:18px}
+#fanPageView #profileBoard[hidden]{display:none!important}
 .calendar-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
 .calendar-heading .eyebrow{margin:0 0 5px;font-size:9px}
 .calendar-heading h2{margin:0;font:23px var(--display)}
@@ -1430,6 +1431,7 @@ body.fanpage-bottom-banner-active #fanPageView{height:auto;min-height:0;flex:0 0
 .competition-history-form-footer{align-items:center;margin-top:0}
 .competition-history-form-footer small{color:#928a9a;font-size:10px}
 .memory-moments-section{margin-top:0}
+.comment-up-section{min-width:0}.comment-up-form{display:flex;gap:8px;flex-wrap:wrap}.comment-up-form input{flex:1 1 240px;min-width:0;padding:12px;border:1px solid #cbbdcc;border-radius:10px;background:#fff;color:#302735}.comment-up-list{display:grid;gap:12px;margin-top:14px}.comment-up-card{min-width:0;padding:14px;border:1px solid #d9cad6;border-radius:14px}.comment-up-card a{display:inline-block;margin:0 10px 8px 0;overflow-wrap:anywhere}.comment-up-card p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
 .memory-moments-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 .memory-moments-heading .eyebrow{margin:0 0 5px;font-size:9px}
 .memory-moments-heading h2{display:inline-block;margin:0;font:23px var(--display)}
