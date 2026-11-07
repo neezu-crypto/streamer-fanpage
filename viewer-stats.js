@@ -24,7 +24,6 @@ const database = getDatabase(app);
 const functions = getFunctions(app, 'us-central1');
 const callViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats');
 const callViewerStatsVisit = httpsCallable(functions, 'streamerFanPageViewerStatsVisit');
-const callViewerSubscription = httpsCallable(functions, 'streamerFanPageViewerSubscription');
 const callSponsorAds = httpsCallable(functions, 'streamerFanPageViewerSponsors');
 const callAdminSponsorAds = httpsCallable(functions, 'streamerFanPageAdminSponsorAds');
 const callSponsorLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
@@ -415,9 +414,7 @@ function formatSubscriptionDate(value) {
 }
 
 function canViewSubscriberFeatures() {
-  return subscriptionState.loaded && (subscriptionState.isAdmin || (
-    subscriptionState.subscribed && subscriptionState.subscriberFeaturesAdminOnly !== true
-  ));
+  return subscriptionState.loaded && subscriptionState.isAdmin;
 }
 
 function renderSubscriptionControls() {
@@ -428,7 +425,7 @@ function renderSubscriptionControls() {
   $('viewerKeywordComparisonPanel').hidden = !canViewFeatures;
   $('viewerPeriodScanButton').textContent = canViewFeatures
     ? '최근 1년 분석'
-    : state.loaded && state.subscriberFeaturesAdminOnly !== true ? '구독 전용 분석' : '관리자 전용 분석';
+    : '관리자 전용 분석';
 }
 
 function scheduleSubscriptionStatusRefresh() {
@@ -453,7 +450,7 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
   const token = ++subscriptionRefreshToken;
   try {
     await getAuthReady();
-    const response = await callViewerSubscription({ action: 'status' });
+    const response = await callViewerStats({ action: 'access' });
     if (token !== subscriptionRefreshToken) return;
     const previousFeatureAccess = canViewSubscriberFeatures();
     const data = response.data || {};
@@ -502,79 +499,12 @@ async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywor
       setKeywordComparisonStatus('키워드 고점 비교는 현재 점검 중이며 관리자만 이용할 수 있습니다.');
       renderKeywordComparisonSelection();
     }
-    if ($('viewerSubscriptionDialog').open) renderSubscriptionDialogStatus();
     if (resumeComparison) resumePendingComparisonIfReady();
     if (resumeKeywordComparison) resumePendingKeywordComparisonIfReady();
     return true;
   } catch (error) {
     if (token !== subscriptionRefreshToken) return;
-    if ($('viewerSubscriptionDialog').open) {
-      renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '구독 상태를 확인하지 못했어요.'));
-    }
     return false;
-  }
-}
-
-function renderSubscriptionDialogStatus(message = '') {
-  const status = $('viewerSubscriptionDialogStatus');
-  const submit = $('viewerSubscriptionSubmit');
-  const cancel = $('viewerSubscriptionCancel');
-  const loginNote = $('viewerSubscriptionLoginNote');
-  const offer = $('viewerSubscriptionOffer');
-  const purchaseInfo = $('viewerSubscriptionPurchaseInfo');
-  const hasPending = subscriptionState.pending && subscriptionState.pendingRequestId;
-  const isCodeRequest = hasPending && subscriptionState.pendingVerificationMethod === 'subscriber-comment-code';
-  const isProcessing = isCodeRequest && subscriptionState.pendingRequestStatus === 'processing' &&
-    !subscriptionState.pendingCanRenewCode;
-  const codeStep = $('viewerSubscriptionCodeStep');
-  const keywordComparisonContext = !!pendingKeywordComparisonRequest;
-  const comparisonContext = !!pendingComparisonRequest || keywordComparisonContext;
-  offer.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.subscribed || !!hasPending);
-  $('viewerSubscriptionDialogTitle').textContent = comparisonContext
-    ? keywordComparisonContext ? '키워드 비교 결과 확인' : '비교 결과 확인'
-    : '통합 구독 인증';
-  $('viewerSubscriptionDialog').querySelector('.eyebrow').textContent = comparisonContext ? 'RESULT ACCESS' : 'STREAMER SERIES MEMBERSHIP';
-  purchaseInfo.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
-  codeStep.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !isCodeRequest || isProcessing);
-  loginNote.classList.toggle('hidden', subscriptionState.isAdmin || subscriptionState.accountProtected);
-  submit.classList.toggle('hidden', subscriptionState.isAdmin || !subscriptionState.accountProtected || !!hasPending);
-  cancel.classList.toggle('hidden', subscriptionState.isAdmin || !hasPending || isProcessing);
-  $('viewerSubscriptionSoopId').required = !hasPending;
-  $('viewerSubscriptionCode').textContent = subscriptionVerificationCode || '코드를 다시 발급해 주세요';
-  $('viewerSubscriptionRenewCode').classList.toggle('hidden', !isCodeRequest || !subscriptionState.pendingCanRenewCode);
-  $('viewerSubscriptionCopyCode').classList.toggle('hidden', !subscriptionVerificationCode || !isCodeRequest || isProcessing);
-  submit.textContent = '인증 코드 발급';
-  if (subscriptionState.isAdmin) {
-    status.textContent = '관리자 권한으로 기간별 최고 순간과 스트리머 비교를 포함한 모든 분석 기능을 이용할 수 있어요.';
-  } else if (message) {
-    status.textContent = message;
-  } else if (!subscriptionState.accountProtected) {
-    status.textContent = comparisonContext
-      ? '선택한 비교 조건은 유지됩니다. Google·Kakao 로그인 또는 스트리머 인증 후 구독을 신청할 수 있어요.'
-      : '익명 계정은 구독 권한을 구매할 수 없어요. Google·Kakao 로그인 또는 스트리머 인증 후 이용해 주세요.';
-  } else if (hasPending) {
-    if (isCodeRequest) {
-      if (isProcessing) {
-        status.textContent = '관리자가 구독 인증 신청을 확인 중이에요. 처리가 끝나면 신청 상태가 자동으로 갱신됩니다.';
-      } else {
-        const expired = subscriptionState.pendingCodeExpiresAt > 0 && subscriptionState.pendingCodeExpiresAt <= Date.now();
-        const expires = subscriptionState.pendingCodeExpiresAt ? formatSubscriptionDate(subscriptionState.pendingCodeExpiresAt) : '';
-        status.textContent = expired
-          ? '신청은 유지 중이지만 인증 코드가 만료됐어요. 새 코드를 발급해 구독자 전용 게시글 댓글을 수정해 주세요.'
-          : `${subscriptionState.pendingSoopId} 방송국 인증 신청은 유지 중이에요. 탭을 닫아도 사라지지 않으니 발급된 코드를 구독자 전용 인증 게시글 댓글에 남겨 주세요${expires ? ` (코드 만료: ${expires})` : ''}.`;
-        $('viewerSubscriptionCodeHelp').textContent = '신청은 로그인한 계정에 저장되어 탭을 닫아도 유지됩니다. 코드는 한 번만 사용할 수 있고 30분 후 만료돼요. 다시 접속했을 때 코드가 보이지 않거나 만료됐다면 새 코드를 발급해 댓글을 수정해 주세요.';
-      }
-    } else {
-      status.textContent = '이전 별풍선 방식 신청이 관리자 확인 대기 중입니다. 관리자가 기존 신청을 검토합니다.';
-    }
-  } else if (subscriptionState.subscribed) {
-    status.textContent = formatSubscriptionDate(subscriptionState.expiresAt) + '까지 스트리머 시리즈 통합 구독 중이에요.';
-  } else {
-    status.textContent = comparisonContext
-      ? keywordComparisonContext
-        ? '본인 SOOP 아이디로 인증 코드를 신청하고 게시글 댓글로 인증해 주세요. 관리자가 확인해 승인하면 키워드 고점 비교 결과가 열립니다.'
-        : '본인 SOOP 아이디로 인증 코드를 신청하고 게시글 댓글로 인증해 주세요. 관리자가 확인해 승인하면 비교 결과가 열립니다.'
-      : '본인 SOOP 아이디로 인증 코드를 신청한 뒤 구독자 전용 인증 게시글 댓글로 남겨 주세요. 관리자가 댓글 작성자와 구독 상태를 확인합니다.';
   }
 }
 
@@ -589,12 +519,6 @@ function showViewerModal(dialog) {
   }
   dialog.showModal();
   if (initialFocus) initialFocus.focus({ preventScroll: true });
-}
-
-function openSubscriptionDialog() {
-  renderSubscriptionDialogStatus();
-  const dialog = $('viewerSubscriptionDialog');
-  showViewerModal(dialog);
 }
 
 function formatVodDate(value) {
@@ -697,7 +621,7 @@ function renderComparisonSelection() {
   $('viewerComparisonRun').textContent = comparisonRunning
     ? '비교 결과 불러오는 중…'
     : comparisonGateWaiting
-      ? '로그인·구독 확인 후 자동 진행'
+      ? '관리자 권한 확인 후 진행'
       : '비교 결과 확인';
   $('viewerComparisonStatus').textContent = comparisonStatusMessage;
   $('viewerComparisonStatus').classList.toggle('is-error', comparisonStatusIsError);
@@ -891,7 +815,7 @@ function renderKeywordComparisonSelection() {
   $('viewerKeywordComparisonRun').textContent = keywordComparisonRunning
     ? '고점 분석 중…'
     : keywordComparisonGateWaiting
-      ? '로그인·구독 확인 후 자동 진행'
+      ? '관리자 권한 확인 후 진행'
       : '고점 비교';
   $('viewerKeywordComparisonStatus').textContent = keywordComparisonStatusMessage;
   $('viewerKeywordComparisonStatus').classList.toggle('is-error', keywordComparisonStatusIsError);
@@ -2111,7 +2035,6 @@ async function loadComparisonResults(request) {
   comparisonGateWaiting = false;
   setComparisonStatus('선택한 날짜의 두 스트리머 다시보기와 프리미엄 통계를 확인하고 있어요. 혼잡하면 집계 시간이 길어질 수 있습니다.');
   renderComparisonSelection();
-  if ($('viewerSubscriptionDialog').open) $('viewerSubscriptionDialog').close();
   const results = $('viewerComparisonResults');
   results.replaceChildren();
   const loading = document.createElement('p');
@@ -2200,7 +2123,7 @@ async function runComparison() {
   renderComparisonSelection();
   try {
     await getAuthReady();
-    const response = await callViewerSubscription({ action: 'periodAccess' });
+    const response = await callViewerStats({ action: 'adminAccess' });
     if (!isCurrentComparisonRequest(request)) return;
     const access = response.data || {};
     subscriptionState.isAdmin = access.isAdmin === true;
@@ -2229,7 +2152,7 @@ async function runComparison() {
       pendingComparisonRequest = null;
       comparisonRunning = false;
       comparisonGateWaiting = false;
-      setComparisonStatus('로그인·구독 상태를 확인하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.', true);
+      setComparisonStatus('관리자 권한을 확인하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.', true);
       renderComparisonSelection();
       return;
     }
@@ -2478,7 +2401,6 @@ async function loadKeywordComparisonResults(request) {
   keywordComparisonGateWaiting = false;
   setKeywordComparisonStatus('각 스트리머의 최신 키워드 다시보기에서 고점 통계를 확인하고 있어요.');
   renderKeywordComparisonSelection();
-  if ($('viewerSubscriptionDialog').open) $('viewerSubscriptionDialog').close();
   const results = $('viewerKeywordComparisonResults');
   results.replaceChildren();
   const loading = document.createElement('p');
@@ -2511,8 +2433,8 @@ async function loadKeywordComparisonResults(request) {
       }
       pendingKeywordComparisonRequest = null;
       keywordComparisonGateWaiting = false;
-      showKeywordComparisonError(new Error('서버에서 구독 권한을 확인하지 못했어요. 상태를 새로고침한 뒤 다시 시도해 주세요.'));
-      setKeywordComparisonStatus('구독 권한 확인에 실패했어요. 잠시 후 다시 시도해 주세요.', true);
+      showKeywordComparisonError(new Error('서버에서 관리자 권한을 확인하지 못했어요. 상태를 새로고침한 뒤 다시 시도해 주세요.'));
+      setKeywordComparisonStatus('관리자 권한 확인에 실패했어요. 잠시 후 다시 시도해 주세요.', true);
       return;
     }
     pendingKeywordComparisonRequest = null;
@@ -2572,7 +2494,7 @@ async function runKeywordComparison() {
   renderKeywordComparisonSelection();
   try {
     await getAuthReady();
-    const response = await callViewerSubscription({ action: 'periodAccess' });
+    const response = await callViewerStats({ action: 'adminAccess' });
     if (!isCurrentKeywordComparisonRequest(request)) return;
     const access = response.data || {};
     subscriptionState.isAdmin = access.isAdmin === true;
@@ -2591,7 +2513,7 @@ async function runKeywordComparison() {
       pendingKeywordComparisonRequest = null;
       keywordComparisonRunning = false;
       keywordComparisonGateWaiting = false;
-      setKeywordComparisonStatus(viewerStatsErrorMessage(error, '구독 권한을 확인하지 못했어요. 다시 시도해 주세요.'), true);
+      setKeywordComparisonStatus(viewerStatsErrorMessage(error, '관리자 권한을 확인하지 못했어요. 다시 시도해 주세요.'), true);
       renderKeywordComparisonSelection();
       return;
     }
@@ -2601,7 +2523,7 @@ async function runKeywordComparison() {
       pendingKeywordComparisonRequest = null;
       keywordComparisonRunning = false;
       keywordComparisonGateWaiting = false;
-      setKeywordComparisonStatus('로그인·구독 상태를 확인하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.', true);
+      setKeywordComparisonStatus('관리자 권한을 확인하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.', true);
       renderKeywordComparisonSelection();
       return;
     }
@@ -2765,7 +2687,7 @@ function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !canView
       const vodCount = Number(vodCounts.get(period.days)) || 0;
       empty.textContent = isScanning
         ? '분석 중…'
-        : isLocked ? '구독 후 확인 가능'
+        : isLocked ? '관리자 전용'
         : !vodCounts.has(period.days) ? '분석 전'
           : vodCount > 0 ? '통계 확인 가능한 순간 없음' : '기간 내 다시보기 없음';
       card.append(empty);
@@ -2853,7 +2775,7 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
   const streamerId = selectedStreamer.soopId;
   const loadToken = activeLoadToken;
   try {
-    const access = await callViewerSubscription({ action: 'periodAccess' });
+    const access = await callViewerStats({ action: 'adminAccess' });
     if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
     subscriptionState.isAdmin = access.data && access.data.isAdmin === true;
     subscriptionState.subscriberFeaturesAdminOnly = !access.data || access.data.subscriberFeaturesAdminOnly !== false;
@@ -3079,12 +3001,12 @@ async function selectStreamer(streamer) {
   $('viewerPeriodScanButton').disabled = false;
   $('viewerPeriodScanButton').textContent = canViewSubscriberFeatures()
     ? '최근 1년 분석'
-    : subscriptionState.loaded && subscriptionState.subscriberFeaturesAdminOnly !== true ? '구독 전용 분석' : '관리자 전용 분석';
+    : '관리자 전용 분석';
   $('viewerPeriodStatus').textContent = canViewSubscriberFeatures()
     ? '최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 순간을 찾습니다.'
     : subscriptionState.subscriberFeaturesAdminOnly
       ? '기간별 최고 시청 순간은 현재 관리자만 이용할 수 있습니다.'
-      : '기간별 최고 시청 순간은 구독 계정에서 이용할 수 있습니다.';
+      : '기간별 최고 시청 순간은 관리자만 이용할 수 있습니다.';
   $('viewerPeriodStatus').classList.remove('is-error');
   renderPeriodPeakCards(new Map(), new Map(), false);
   $('viewerResults').classList.remove('hidden');
@@ -3373,116 +3295,6 @@ renderKeywordComparisonSelection();
 
 $('viewerPeriodScanButton').addEventListener('click', () => {
   runPeriodPeakScan({ forceRefresh: $('viewerPeriodScanButton').dataset.hasResult === 'true' });
-});
-
-$('viewerSubscriptionLoginCheck').addEventListener('click', async (event) => {
-  const button = event.currentTarget;
-  button.disabled = true;
-  button.textContent = '로그인 상태 확인 중…';
-  const refreshed = await refreshSubscriptionStatus();
-  if (!refreshed) renderSubscriptionDialogStatus('로그인 정보를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
-  button.disabled = false;
-  button.textContent = '로그인 상태 확인';
-  renderSubscriptionDialogStatus();
-});
-$('viewerSubscriptionClose').addEventListener('click', () => $('viewerSubscriptionDialog').close());
-$('viewerSubscriptionCloseBottom').addEventListener('click', () => $('viewerSubscriptionDialog').close());
-$('viewerSubscriptionForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (subscriptionState.isAdmin) {
-    renderSubscriptionDialogStatus();
-    return;
-  }
-  if (!subscriptionState.accountProtected) {
-    renderSubscriptionDialogStatus('로그인 후 구독 신청을 할 수 있어요. 새 탭에서 로그인한 뒤 상태를 새로고침해 주세요.');
-    return;
-  }
-  const soopId = $('viewerSubscriptionSoopId').value.trim().toLowerCase();
-  if (!soopId || !$('viewerSubscriptionSoopId').reportValidity()) return;
-  const submit = $('viewerSubscriptionSubmit');
-  submit.disabled = true;
-  renderSubscriptionDialogStatus('신청을 등록하고 있어요.');
-  try {
-    const response = await callViewerSubscription({ action: 'request', soopId });
-    const result = response.data || {};
-    subscriptionVerificationCode = result.action === 'pending' ? String(result.code || '') : '';
-    await refreshSubscriptionStatus();
-    renderSubscriptionDialogStatus(result.action === 'already-pending'
-      ? '이미 대기 중인 신청이 있어요. 새 코드가 필요하면 아래 버튼으로 발급해 주세요.'
-      : '인증 코드를 발급했어요. 구독자 전용 인증 게시글에 댓글로 남겨 주세요.');
-    if (result.action === 'pending' || result.action === 'already-pending') $('viewerSubscriptionSoopId').value = '';
-  } catch (error) {
-    renderSubscriptionDialogStatus(viewerStatsErrorMessage(error, '구독 신청을 접수하지 못했어요.'));
-  } finally {
-    submit.disabled = false;
-    renderSubscriptionDialogStatus();
-  }
-});
-
-$('viewerSubscriptionCopyCode').addEventListener('click', async (event) => {
-  const button = event.currentTarget;
-  if (!subscriptionVerificationCode) return;
-  button.disabled = true;
-  try {
-    await navigator.clipboard.writeText(subscriptionVerificationCode);
-    renderSubscriptionDialogStatus('인증 코드를 복사했어요. 구독자 전용 게시글 댓글에 붙여 넣어 주세요.');
-  } catch (error) {
-    renderSubscriptionDialogStatus('코드를 복사하지 못했어요. 코드를 길게 눌러 직접 복사해 주세요.');
-  } finally {
-    button.disabled = false;
-  }
-});
-
-$('viewerSubscriptionRenewCode').addEventListener('click', async (event) => {
-  const button = event.currentTarget;
-  if (!subscriptionState.pendingRequestId || subscriptionState.pendingVerificationMethod !== 'subscriber-comment-code') return;
-  const requestId = subscriptionState.pendingRequestId;
-  button.disabled = true;
-  button.textContent = '새 코드 발급 중…';
-  try {
-    const response = await callViewerSubscription({ action: 'renewCode', requestId });
-    const result = response.data || {};
-    subscriptionVerificationCode = String(result.code || '');
-    await refreshSubscriptionStatus();
-    renderSubscriptionDialogStatus('새 인증 코드를 발급했어요. 이전 코드는 사용할 수 없으니 새 코드로 댓글을 수정해 주세요.');
-  } catch (error) {
-    const message = viewerStatsErrorMessage(error, '새 코드를 발급하지 못했어요.');
-    await refreshSubscriptionStatus({ resumeComparison: false, resumeKeywordComparison: false });
-    if (subscriptionState.pending && subscriptionState.pendingRequestId === requestId) {
-      renderSubscriptionDialogStatus(message);
-    } else {
-      renderSubscriptionDialogStatus();
-    }
-  } finally {
-    button.disabled = false;
-    button.textContent = '새 코드 발급';
-  }
-});
-
-$('viewerSubscriptionCancel').addEventListener('click', async () => {
-  const cancelMessage = '구독 인증 신청과 발급 코드를 취소할까요?';
-  if (!subscriptionState.pendingRequestId || !confirm(cancelMessage)) return;
-  const cancel = $('viewerSubscriptionCancel');
-  const requestId = subscriptionState.pendingRequestId;
-  cancel.disabled = true;
-  cancel.textContent = '취소 중…';
-  try {
-    await callViewerSubscription({ action: 'cancel', requestId });
-    subscriptionVerificationCode = '';
-    await refreshSubscriptionStatus();
-    renderSubscriptionDialogStatus('인증 신청을 취소했어요.');
-  } catch (error) {
-    const message = viewerStatsErrorMessage(error, '신청을 취소하지 못했어요.');
-    await refreshSubscriptionStatus({ resumeComparison: false, resumeKeywordComparison: false });
-    if (subscriptionState.pending && subscriptionState.pendingRequestId === requestId) {
-      renderSubscriptionDialogStatus(message);
-    } else {
-      renderSubscriptionDialogStatus();
-    }
-  } finally {
-    cancel.disabled = false;
-    cancel.textContent = '대기 신청 취소';
-  }
 });
 
 function setSponsorHint(id, message, isError = false) {
@@ -3930,11 +3742,7 @@ $('sponsorRequestSoopId').addEventListener('input', () => {
       sponsorRequestRecord = { ...(sponsorRequestRecord || {}), ...profile, profileVerified: true };
       $('sponsorRequestProfileImage').src = profile.avatarUrl;
       $('sponsorRequestProfileImage').alt = `${profile.nickname} 프로필 이미지`;
-      $('sponsorRequestProfileStatus').textContent = `${profile.nickname} · @${profile.soopId}`;
-      if (!$('sponsorRequestNickname').value.trim() || $('sponsorRequestNickname').dataset.autoFilled === 'true') {
-        $('sponsorRequestNickname').value = profile.nickname;
-        $('sponsorRequestNickname').dataset.autoFilled = 'true';
-      }
+      $('sponsorRequestProfileStatus').textContent = `${$('sponsorRequestNickname').value.trim() || '닉네임 입력'} · @${profile.soopId}`;
       $('sponsorRequestSubmit').disabled = false;
       $('sponsorRequestSubmit').textContent = '통합 캐시로 홍보하기';
     } catch (error) {
@@ -3944,6 +3752,12 @@ $('sponsorRequestSoopId').addEventListener('input', () => {
       $('sponsorSoopIdMessage').classList.add('is-error');
     }
   }, 450);
+});
+$('sponsorRequestNickname').addEventListener('input', () => {
+  if (sponsorRequestRecord && sponsorRequestRecord.profileVerified) {
+    const nickname = $('sponsorRequestNickname').value.trim() || '닉네임 입력';
+    $('sponsorRequestProfileStatus').textContent = `${nickname} · @${sponsorRequestRecord.soopId}`;
+  }
 });
 $('sponsorRequestDays').addEventListener('input', updateSponsorPrice);
 $('sponsorRequestClose').addEventListener('click', closeSponsorDialog);

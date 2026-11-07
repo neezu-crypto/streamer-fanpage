@@ -384,7 +384,7 @@ const streamerFanPageViewerSponsors = onCall({ maxInstances: 20, enforceAppCheck
   if (submittedNickname && FORBIDDEN_TEXT_RE.test(submittedNickname)) {
     throw new HttpsError('invalid-argument', '스트리머 닉네임을 확인해 주세요.');
   }
-  const nickname = profile.nickname === soopId && submittedNickname ? submittedNickname : profile.nickname;
+  const nickname = submittedNickname || profile.nickname;
   const cashAmount = days * CASH_PER_DAY;
   const paymentFingerprint = fingerprint({ soopId, rail, days, cashAmount });
   const expiresAt = now + days * DAY_MS;
