@@ -169,7 +169,7 @@ async function resolveProfile(soopId) {
     throw new HttpsError('unavailable', 'SOOP 검색을 이용할 수 없습니다. 잠시 후 다시 시도해 주세요.');
   }
   if (!nickname || nickname.length > 40 || FORBIDDEN_TEXT_RE.test(nickname)) {
-    throw new HttpsError('not-found', 'SOOP에서 해당 아이디의 닉네임을 찾을 수 없습니다.');
+    throw new HttpsError('not-found', '스트리머의 SOOP ID를 확인해주세요');
   }
   if (!await hasPromotionEligibility(soopId, nickname)) {
     throw new HttpsError('failed-precondition', '인증·상장 또는 승인된 스트리머 홍보 이력을 찾을 수 없습니다.');
