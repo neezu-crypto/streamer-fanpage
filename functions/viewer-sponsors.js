@@ -10,6 +10,7 @@ const ROOT = 'streamerFanPageViewerSponsors';
 const CAMPAIGNS_PATH = `${ROOT}/campaigns`;
 const CLAIMS_PATH = `${ROOT}/claimsBySoopId`;
 const RESULTS_PATH = `${ROOT}/paymentResults`;
+const OPERATIONS_PATH = `${ROOT}/paymentOperations`;
 const LIMITS_PATH = `${ROOT}/limits`;
 const LEGACY_ADS_PATH = 'streamerFanPageSponsorAds';
 const LEGACY_CLAIMS_PATH = 'streamerFanPageSponsorPlacementClaims';
@@ -69,7 +70,7 @@ async function hasPromotionEligibility(soopId, nickname) {
       .map((path) => queryHistory(shared, path, 'streamerId', ['approved'])),
     queryHistory(life, 'lifeGame/sponsorRequests', 'soopId', ['approved']),
     queryHistory(fanpageDb(), 'streamerFanPageSponsorRequests', 'soopId', ['approved'], false),
-    queryHistory(fanpageDb(), CAMPAIGNS_PATH, 'soopId', ['active'], false),
+    queryHistory(fanpageDb(), CAMPAIGNS_PATH, 'soopId', ['active', 'ended'], false),
   ];
   const results = await Promise.allSettled(checks);
   if (results.some((result) => result.status === 'fulfilled' && result.value)) return true;
@@ -239,12 +240,24 @@ async function releasePlacement(db, soopId, requestId) {
   }, undefined, false);
 }
 
+async function withFreshValue(ref, work) {
+  let listener;
+  await new Promise((resolve, reject) => {
+    listener = () => resolve();
+    ref.on('value', listener, (error) => { ref.off('value', listener); reject(error); });
+  });
+  try { return await work(); } finally { ref.off('value', listener); }
+}
+
 async function debitCash({ uid, requestId, cashAmount, paymentFingerprint, now }) {
   const accountRef = sharedDb().ref(`${WALLET_ROOT}/accounts/${uid}`);
   let insufficient = false;
   let conflict = false;
   let previous = null;
-  const transaction = await accountRef.transaction((current) => {
+  const transaction = await withFreshValue(accountRef, () => accountRef.transaction((current) => {
+    insufficient = false;
+    conflict = false;
+    previous = null;
     const account = current && typeof current === 'object' ? current : {};
     const purchases = account[WALLET_PURCHASES_KEY] && typeof account[WALLET_PURCHASES_KEY] === 'object'
       ? account[WALLET_PURCHASES_KEY] : {};
@@ -273,8 +286,9 @@ async function debitCash({ uid, requestId, cashAmount, paymentFingerprint, now }
         },
       },
     };
-  }, undefined, false);
+  }, undefined, false));
   if (conflict) throw new HttpsError('already-exists', '같은 결제 번호가 다른 내용에 사용됐습니다. 다시 시도해 주세요.');
+  if (previous && (previous.status !== 'charged' || previous.adminRefund)) throw new HttpsError('failed-precondition', '이미 환불 처리된 결제 요청입니다.');
   if (insufficient) throw new HttpsError('failed-precondition', `통합 캐시가 부족합니다. 필요 ${cashAmount}캐시입니다.`);
   if (!transaction.committed && !previous) throw new HttpsError('aborted', '통합 캐시 차감에 실패했습니다. 다시 시도해 주세요.');
   const account = transaction.snapshot.val() || {};
@@ -283,24 +297,27 @@ async function debitCash({ uid, requestId, cashAmount, paymentFingerprint, now }
 
 async function writeDebitLedger({ uid, requestId, cashAmount, now }) {
   const ledgerRef = sharedDb().ref(`${WALLET_ROOT}/ledger/${uid}/${requestId}_${WALLET_LEDGER_KIND}`);
-  const result = await ledgerRef.transaction((current) => current || {
+  const result = await withFreshValue(ledgerRef, () => ledgerRef.transaction((current) => current ? (current.requestId === requestId && current.type === WALLET_LEDGER_KIND && Number(current.balanceDelta) === -cashAmount ? current : undefined) : {
     requestId,
     type: WALLET_LEDGER_KIND,
     balanceDelta: -cashAmount,
     createdAt: now,
-  }, undefined, false);
-  if (!result.committed && !result.snapshot.val()) throw new HttpsError('aborted', '결제 원장 기록에 실패했습니다.');
+  }, undefined, false));
+  if (!result.committed) throw new HttpsError('aborted', '결제 원장 기록을 대조하지 못했습니다.');
 }
 
 async function refundCash({ uid, requestId, cashAmount, now, reason }) {
   const accountRef = sharedDb().ref(`${WALLET_ROOT}/accounts/${uid}`);
   let result = null;
-  const transaction = await accountRef.transaction((current) => {
+  const transaction = await withFreshValue(accountRef, () => accountRef.transaction((current) => {
+    result = null;
     const account = current && typeof current === 'object' ? current : {};
     const purchases = account[WALLET_PURCHASES_KEY] && typeof account[WALLET_PURCHASES_KEY] === 'object'
       ? account[WALLET_PURCHASES_KEY] : {};
     const purchase = purchases[requestId];
     if (!purchase) return;
+    if (purchase.adminRefund) return;
+    if (Number(purchase.cashAmount) !== cashAmount || !['charged', 'refunded'].includes(purchase.status)) return;
     if (purchase.status === 'refunded') {
       result = { refunded: true, alreadyRefunded: true };
       return account;
@@ -314,15 +331,17 @@ async function refundCash({ uid, requestId, cashAmount, now, reason }) {
         [requestId]: { ...purchase, status: 'refunded', refundedAt: now, refundReason: reason },
       },
     };
-  }, undefined, false);
+  }, undefined, false));
   if (!result && !transaction.committed) throw new HttpsError('aborted', '자동 환불을 완료하지 못했습니다. 관리자에게 문의해 주세요.');
-  await sharedDb().ref(`${WALLET_ROOT}/ledger/${uid}/${requestId}_${WALLET_LEDGER_KIND}_refund`).transaction((current) => current || {
+  const ledgerRef = sharedDb().ref(`${WALLET_ROOT}/ledger/${uid}/${requestId}_${WALLET_LEDGER_KIND}_refund`);
+  const ledger = await withFreshValue(ledgerRef, () => ledgerRef.transaction((current) => current ? (current.requestId === requestId && current.type === `${WALLET_LEDGER_KIND}_refund` && Number(current.balanceDelta) === cashAmount ? current : undefined) : {
     requestId,
     type: `${WALLET_LEDGER_KIND}_refund`,
     balanceDelta: cashAmount,
     reason,
     createdAt: now,
-  }, undefined, false);
+  }, undefined, false));
+  if (!ledger.committed) throw new HttpsError('aborted', '환불 원장을 대조하지 못했습니다. 관리자에게 문의해 주세요.');
   return result || { refunded: true, alreadyRefunded: true };
 }
 
@@ -394,6 +413,31 @@ const streamerFanPageViewerSponsors = onCall({ maxInstances: 20, enforceAppCheck
     return { cashPerDay: CASH_PER_DAY, maxDays: MAX_DAYS, ...(await getCashStatus(uid)) };
   }
 
+  if (action === 'payment-status') {
+    const requestId = validateRequestId(data.requestId);
+    const [resultSnapshot, accountSnapshot, campaignSnapshot, operationSnapshot] = await Promise.all([
+      db.ref(`${RESULTS_PATH}/${requestId}`).get(),
+      sharedDb().ref(`${WALLET_ROOT}/accounts/${uid}/${WALLET_PURCHASES_KEY}/${requestId}`).get(),
+      db.ref(`${CAMPAIGNS_PATH}/${requestId}`).get(),
+      db.ref(`${OPERATIONS_PATH}/${requestId}`).get(),
+    ]);
+    const result = resultSnapshot.val();
+    const purchase = accountSnapshot.val();
+    const campaign = campaignSnapshot.val();
+    const operation = operationSnapshot.val();
+    if (operation && operation.requesterUid !== uid) throw new HttpsError('permission-denied', '다른 사용자의 결제 요청입니다.');
+    if (result && result.requesterUid !== uid) throw new HttpsError('permission-denied', '다른 사용자의 결제 요청입니다.');
+    if (result?.status === 'activated') return { status: 'activated', nickname: result.nickname, soopId: result.soopId, days: result.days, cashAmount: result.cashAmount, expiresAt: result.expiresAt, remainingCash: (await getCashStatus(uid)).balanceCash };
+    if (result?.status === 'refund-pending') return { status: 'refund-pending' };
+    if (result?.status === 'refunded') return { status: 'refunded' };
+    if (operation?.status === 'failed-no-charge' && !purchase) return { status: 'failed-no-charge' };
+    if (purchase?.status === 'charged' && !purchase.adminRefund && campaign?.status === 'active' && campaign.requesterUidHash === createHash('sha256').update(uid).digest('hex')) {
+      const claim = (await db.ref(`${CLAIMS_PATH}/${campaign.soopId}`).get()).val();
+      if (claim?.status === 'active' && claim.campaignId === requestId) return { status: 'activated', nickname: campaign.nickname, soopId: campaign.soopId, days: campaign.days, cashAmount: campaign.cashCost, expiresAt: campaign.expiresAt, remainingCash: (await getCashStatus(uid)).balanceCash };
+    }
+    return { status: purchase || operation ? 'pending' : 'unknown' };
+  }
+
   if (action !== 'purchase') throw new HttpsError('invalid-argument', '홍보 요청을 확인해 주세요.');
   const requestId = validateRequestId(data.requestId);
   const soopId = normalizeSoopId(data.soopId);
@@ -410,6 +454,7 @@ const streamerFanPageViewerSponsors = onCall({ maxInstances: 20, enforceAppCheck
     if (priorResult.requesterUid !== uid) throw new HttpsError('permission-denied', '다른 사용자의 결제 요청입니다.');
     if (priorResult.status === 'activated') return priorResult;
     if (priorResult.status === 'refunded') throw new HttpsError('aborted', '이전 요청은 자동 환불되었습니다. 다시 결제해 주세요.');
+    if (priorResult.status === 'refund-pending') throw new HttpsError('failed-precondition', '이전 요청의 환불을 확인 중입니다. 관리자에게 문의해 주세요.');
   }
 
   const limit = await db.ref(`${LIMITS_PATH}/${uid}`).transaction((current) => {
@@ -440,11 +485,17 @@ const streamerFanPageViewerSponsors = onCall({ maxInstances: 20, enforceAppCheck
     createdAt: now,
   };
 
-  const legacy = await legacyCapacity(db, now);
-  await reservePlacement({ db, soopId, rail, requestId, now, legacy });
+  const operationRef = db.ref(`${OPERATIONS_PATH}/${requestId}`);
+  const operation = await withFreshValue(operationRef, () => operationRef.transaction((current) => {
+    if (current) return;
+    return { requesterUid: uid, soopId, rail, days, cashAmount, status: 'processing', createdAt: now, leaseUntil: now + 15 * 60 * 1000 };
+  }, undefined, false));
+  if (!operation.committed) throw new HttpsError('already-exists', '이미 처리 중인 결제 요청입니다. 결과를 확인해 주세요.');
   let charged = false;
   let campaignActivated = false;
   try {
+    const legacy = await legacyCapacity(db, now);
+    await reservePlacement({ db, soopId, rail, requestId, now, legacy });
     const debit = await debitCash({ uid, requestId, cashAmount, paymentFingerprint, now });
     charged = true;
     await writeDebitLedger({ uid, requestId, cashAmount, now });
@@ -466,6 +517,7 @@ const streamerFanPageViewerSponsors = onCall({ maxInstances: 20, enforceAppCheck
     };
     try {
       await db.ref(`${RESULTS_PATH}/${requestId}`).set(result);
+      await operationRef.update({ status: 'activated', updatedAt: Date.now() });
     } catch (resultError) {
       console.error('오늘의 후원 스트리머 결제 결과 저장 실패', { requestId, resultError });
     }
@@ -480,8 +532,10 @@ const streamerFanPageViewerSponsors = onCall({ maxInstances: 20, enforceAppCheck
         }, undefined, false);
         await refundCash({ uid, requestId, cashAmount, now: Date.now(), reason: '고점체크 홍보 활성화 실패 자동 환불' });
         await db.ref(`${RESULTS_PATH}/${requestId}`).set({ status: 'refunded', requesterUid: uid, cashAmount, failureCode: String(error && error.code || 'activation-failed'), updatedAt: Date.now() });
+        await operationRef.update({ status: 'refunded', updatedAt: Date.now() });
       } catch (refundError) {
         await db.ref(`${RESULTS_PATH}/${requestId}`).set({ status: 'refund-pending', requesterUid: uid, cashAmount, failureCode: String(error && error.code || 'activation-failed'), refundFailure: String(refundError && refundError.code || 'unknown'), updatedAt: Date.now() });
+        await operationRef.update({ status: 'refund-pending', updatedAt: Date.now() }).catch(() => null);
         throw new HttpsError('internal', '홍보 활성화에 실패했고 자동 환불을 확인하지 못했습니다. 관리자에게 문의해 주세요.');
       }
     }
@@ -490,8 +544,52 @@ const streamerFanPageViewerSponsors = onCall({ maxInstances: 20, enforceAppCheck
   }
 });
 
+// 호출 중단 또는 네트워크 장애 후에는 충분한 대기 시간을 둔 다음 실제 원장과
+// 캠페인을 대조한다. 불일치는 자동으로 돈을 움직이지 않고 관리자 검토로 넘긴다.
+async function reconcileViewerSponsorPayments() {
+  const db = fanpageDb();
+  const now = Date.now();
+  const snapshot = await db.ref(OPERATIONS_PATH).get();
+  let checked = 0;
+  for (const [requestId, operation] of Object.entries(snapshot.val() || {})) {
+    if (checked >= 100 || !operation || operation.status !== 'processing' || Number(operation.leaseUntil) > now) continue;
+    checked++;
+    const operationRef = db.ref(`${OPERATIONS_PATH}/${requestId}`);
+    try {
+      const [resultSnap, purchaseSnap, campaignSnap] = await Promise.all([
+        db.ref(`${RESULTS_PATH}/${requestId}`).get(),
+        sharedDb().ref(`${WALLET_ROOT}/accounts/${operation.requesterUid}/${WALLET_PURCHASES_KEY}/${requestId}`).get(),
+        db.ref(`${CAMPAIGNS_PATH}/${requestId}`).get(),
+      ]);
+      const result = resultSnap.val(), purchase = purchaseSnap.val(), campaign = campaignSnap.val();
+      if (result?.status === 'activated' || result?.status === 'refunded' || result?.status === 'refund-pending') {
+        await operationRef.update({ status: result.status, updatedAt: now });
+        continue;
+      }
+      if (!purchase) {
+        await releasePlacement(db, operation.soopId, requestId);
+        await operationRef.update({ status: 'failed-no-charge', updatedAt: now });
+        continue;
+      }
+      const claim = (await db.ref(`${CLAIMS_PATH}/${operation.soopId}`).get()).val();
+      const ownerHash = createHash('sha256').update(operation.requesterUid).digest('hex');
+      if (purchase.status === 'charged' && campaign?.status === 'active' && campaign.requesterUidHash === ownerHash && claim?.status === 'active' && claim.campaignId === requestId) {
+        await db.ref(`${RESULTS_PATH}/${requestId}`).set({ status: 'activated', requesterUid: operation.requesterUid, campaignId: requestId, nickname: campaign.nickname, soopId: campaign.soopId, rail: campaign.rail, days: campaign.days, cashAmount: campaign.cashCost, startsAt: campaign.startsAt, expiresAt: campaign.expiresAt, updatedAt: now });
+        await operationRef.update({ status: 'activated', updatedAt: now });
+      } else {
+        await db.ref(`${RESULTS_PATH}/${requestId}`).set({ status: 'refund-pending', requesterUid: operation.requesterUid, cashAmount: operation.cashAmount, failureCode: 'interrupted-payment', refundFailure: campaign ? 'campaign-review-required' : 'manual-retry-required', updatedAt: now });
+        await operationRef.update({ status: 'refund-pending', updatedAt: now });
+      }
+    } catch (error) {
+      console.error('홍보 결제 대조 실패', { requestId, error });
+    }
+  }
+  return { checked };
+}
+
 module.exports = {
   streamerFanPageViewerSponsors,
+  reconcileViewerSponsorPayments,
   CASH_PER_DAY,
   MAX_DAYS,
   WALLET_PURCHASES_KEY,
