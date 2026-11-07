@@ -501,28 +501,21 @@ async function resolveViewerStatsBaseTier(uid, auth) {
 }
 
 async function resolveViewerStatsTier(uid, auth) {
-  const [baseTier, subscriptionSnapshot, isAdmin] = await Promise.all([
+  const [baseTier, isAdmin] = await Promise.all([
     resolveViewerStatsBaseTier(uid, auth),
-    viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
     isAdminUid(uid),
   ]);
-  const subscription = subscriptionSnapshot.val() || {};
   return viewerStatsTier(auth, {
     isAdmin,
-    isSubscribed: (Number(subscription.expiresAt) || 0) > Date.now(),
     isProtectedAccount: baseTier === 'account',
   });
 }
 
 async function resolveViewerSubscriberFeatureAccess(uid) {
-  const [subscriptionSnapshot, isAdmin] = await Promise.all([
-    viewerStatsRef(`streamerFanPageViewerSubscriptions/${uid}`).get(),
-    isAdminUid(uid),
-  ]);
-  const subscription = subscriptionSnapshot.val() || {};
+  const isAdmin = await isAdminUid(uid);
   return {
     isAdmin,
-    isSubscribed: (Number(subscription.expiresAt) || 0) > Date.now(),
+    isSubscribed: false,
   };
 }
 
@@ -5180,6 +5173,11 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
   const uid = requireAuth(request);
   const data = request.data || {};
   const action = String(data.action || '');
+  if (action === 'access' || action === 'adminAccess') {
+    const isAdmin = await isAdminUid(uid);
+    if (action === 'adminAccess' && !isAdmin) throw new HttpsError('permission-denied', '관리자만 이용할 수 있습니다.');
+    return { isAdmin, subscriberFeaturesAdminOnly: true };
+  }
   return runViewerStatsTelemetry({
     uidKey: viewerStatsUidKey(uid),
     action,
