@@ -4697,3 +4697,25 @@ body.fanpage-layout-three-active .profile-settings-dialog .profile-editor-hint {
 #fanPageView.fanpage-layout-2 :is(.weekly-schedule-board-edit,.weekly-schedule-stage-previous,.weekly-schedule-stage-next):hover{background:#4a3c50;color:#fff}
 #fanPageView.fanpage-layout-2 .weekly-template-controls select{background:#292531;border-color:#5a5263;color:#f8f4fa}
 #fanPageView.fanpage-layout-2 .weekly-schedule-editor-title{color:#f5eef5}
+
+/* Keep schedule navigation anchored to the illustrated title. */
+body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-schedule-stage-next) {
+  position:absolute !important; z-index:8; display:grid; place-items:center;
+  width:40px !important; height:40px !important; min-width:40px !important; min-height:40px !important; padding:0 !important;
+  border:2px solid #fff !important; border-radius:50% !important;
+  background:linear-gradient(145deg,#fffafd,#f9dbe5) !important; color:#a54265 !important;
+  box-shadow:0 3px 0 #df9ab0 !important; filter:none !important; transform:translate(-50%,-50%) !important;
+}
+body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-schedule-stage-next):hover {
+  background:linear-gradient(145deg,#fff,#f6ccda) !important; filter:none !important; transform:translate(-50%,calc(-50% - 2px)) !important;
+}
+body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-schedule-stage-next):active {
+  transform:translate(-50%,calc(-50% + 1px)) !important;
+}
+@media(max-width:720px) {
+  body #fanPageView.fanpage-layout-3 .live-station-link {
+    width:220px !important; min-width:220px !important; max-width:100%; min-height:66px !important;
+    padding:15px 30px !important; box-sizing:border-box; white-space:nowrap;
+    background:transparent url('assets/fanpage-doodle/button-paper.svg') center / 100% 100% no-repeat !important;
+  }
+}

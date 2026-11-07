@@ -33,10 +33,10 @@ test('anonymous auth is classified as the lowest-priority tier', () => {
   assert.equal(viewerStatsTier({ token: { firebase: { sign_in_provider: 'anonymous' } } }), 'anonymous');
 });
 
-test('linked accounts, subscribers, and admins receive progressively higher tiers', () => {
+test('linked accounts and subscribers share the account tier while admins retain the highest tier', () => {
   const account = { token: { firebase: { sign_in_provider: 'google.com' } } };
   assert.equal(viewerStatsTier(account), 'account');
-  assert.equal(viewerStatsTier(account, { isSubscribed: true }), 'subscriber');
+  assert.equal(viewerStatsTier(account, { isSubscribed: true }), 'account');
   assert.equal(viewerStatsTier(account, { isAdmin: true, isSubscribed: true }), 'admin');
   assert.equal(viewerStatsTier(
     { token: { firebase: { sign_in_provider: 'anonymous' } } },

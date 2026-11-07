@@ -35,4 +35,29 @@ async function fetchComments(target, streamerId, fetchImpl = fetch) {
   throw new Error('댓글이 너무 많아 전체 순위를 계산하지 못했어요.');
 }
 
-module.exports = { parsePostUrl, fetchComments };
+async function lookupPost(target, fetchImpl = fetch) {
+  const endpoint = `https://api-channel.sooplive.com/v1.1/channel/${encodeURIComponent(target.stationId)}/post/${target.postId}`;
+  const response = await fetchImpl(endpoint, { signal: AbortSignal.timeout(10000) });
+  let payload = null;
+  try { payload = await response.json(); } catch (_) { /* An unavailable post can return no JSON body. */ }
+
+  if (response.ok) {
+    return {
+      available: true,
+      visibility: 'public',
+      title: typeof payload?.titleName === 'string' ? payload.titleName.trim().slice(0, 300) : '',
+    };
+  }
+
+  // SOOP intentionally returns CHA0020 for posts in an "애청자 공개" board even
+  // though the post and its comments are publicly viewable.  This is not the same
+  // as a private/deleted post: the comment endpoint remains accessible, so allow
+  // this specific response and keep every other failure blocked.
+  if (response.status === 403 && payload?.code === 'CHA0020') {
+    return { available: true, visibility: 'fan', title: '' };
+  }
+
+  return { available: false, visibility: '', title: '' };
+}
+
+module.exports = { parsePostUrl, fetchComments, lookupPost };
