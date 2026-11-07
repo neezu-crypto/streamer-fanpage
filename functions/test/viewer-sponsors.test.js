@@ -37,3 +37,21 @@ test('활성·미만료 캠페인만 공개 목록에 남긴다', () => {
   }, now);
   assert.deepEqual(campaigns, [{ campaignId: 'active', status: 'active', expiresAt: 1001 }]);
 });
+
+test('SOOP 닉네임이 실제 상장 종목명과 일치할 때만 허용한다', () => {
+  const stocks = { one: { name: '[크루] 온이유_' }, two: { name: '다른스트리머' } };
+  assert.equal(__test.isListedNickname(stocks, '온이유_'), true);
+  assert.equal(__test.isListedNickname(stocks, '다른스트리머'), true);
+  assert.equal(__test.isListedNickname(stocks, '다른'), false);
+  assert.equal(__test.isListedNickname(stocks, ''), false);
+  assert.equal(__test.isListedNickname({}, '온이유_'), false);
+});
+
+test('대상 아이디의 승인된 홍보 이력만 인정하고 후원자와 미승인 신청은 제외한다', () => {
+  const items = { a: { soopId: 'target01', donorSoopId: 'donor01', status: 'approved' },
+    b: { soopId: 'pending01', status: 'pending' }, c: { soopId: 'rejected01', status: 'rejected' } };
+  assert.equal(__test.hasApprovedHistory(items, 'soopId', 'target01'), true);
+  for (const id of ['donor01', 'pending01', 'rejected01']) assert.equal(__test.hasApprovedHistory(items, 'soopId', id), false);
+  assert.equal(__test.hasApprovedHistory({ a: { streamerId: 'target01', status: 'approved' } }, 'streamerId', 'target01'), true);
+  assert.equal(__test.hasApprovedHistory({ a: { soopId: 'target01', status: 'active', expiresAt: 1 } }, 'soopId', 'target01', ['active']), true);
+});
