@@ -3653,19 +3653,13 @@ function updateSponsorPrice() {
 
 $('sponsorRequestForm').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const nickname = $('sponsorRequestNickname').value.trim();
   const soopId = $('sponsorRequestSoopId').value.trim().toLowerCase();
   const days = Number.parseInt($('sponsorRequestDays').value, 10);
   let firstInvalid = null;
-  $('sponsorNicknameError').textContent = '';
-  $('sponsorSoopIdMessage').textContent = 'SOOP 아이디를 입력하면 공개 프로필을 확인합니다.';
+  $('sponsorSoopIdMessage').textContent = '인증·주식시장 상장 또는 기존 홍보 이력이 있는 스트리머의 SOOP 아이디를 입력해 주세요.';
   $('sponsorSoopIdMessage').classList.remove('is-error');
   $('sponsorDaysError').textContent = '하루 10캐시 · 최대 30일';
   document.querySelectorAll('#sponsorRequestForm input').forEach((input) => input.removeAttribute('aria-invalid'));
-  if (!nickname || nickname.length > 40) {
-    $('sponsorNicknameError').textContent = '스트리머 닉네임을 입력해 주세요.';
-    firstInvalid ||= $('sponsorRequestNickname');
-  }
   if (!/^[a-z0-9]{2,20}$/.test(soopId)) {
     $('sponsorSoopIdMessage').textContent = 'SOOP 아이디를 영문 소문자와 숫자 2~20자로 입력해 주세요.';
     $('sponsorSoopIdMessage').classList.add('is-error');
@@ -3691,15 +3685,15 @@ $('sponsorRequestForm').addEventListener('submit', async (event) => {
     setSponsorHint('sponsorRequestStatus', `통합 캐시가 부족합니다. 필요 ${cashAmount.toLocaleString('ko-KR')}캐시입니다.`, true);
     return;
   }
-  if (!confirm(`${nickname || sponsorRequestRecord.nickname}을(를) ${days}일간 홍보합니다. 통합 캐시 ${cashAmount.toLocaleString('ko-KR')}캐시가 즉시 차감되며 일반 취소·환불은 할 수 없습니다. 계속할까요?`)) return;
+  if (!confirm(`${sponsorRequestRecord.nickname}을(를) ${days}일간 홍보합니다. 통합 캐시 ${cashAmount.toLocaleString('ko-KR')}캐시가 즉시 차감되며 일반 취소·환불은 할 수 없습니다. 계속할까요?`)) return;
   const submit = $('sponsorRequestSubmit');
   submit.disabled = true;
   setSponsorHint('sponsorRequestStatus', '통합 캐시 결제와 홍보 등록을 처리하고 있어요.');
   try {
     await getAuthReady();
-    const response = await callSponsorAds({ action: 'purchase', requestId: newSponsorRequestId(), nickname, soopId, days, rail: sponsorRequestRail });
+    const response = await callSponsorAds({ action: 'purchase', requestId: newSponsorRequestId(), soopId, days, rail: sponsorRequestRail });
     const data = response.data || {};
-    showSponsorPaymentComplete({ ...data, nickname: data.nickname || nickname || sponsorRequestRecord.nickname, soopId, days, cashAmount: Number(data.cashAmount) || cashAmount });
+    showSponsorPaymentComplete({ ...data, nickname: data.nickname || sponsorRequestRecord.nickname, soopId, days, cashAmount: Number(data.cashAmount) || cashAmount });
     await refreshSponsorAds();
   } catch (error) {
     const message = viewerStatsErrorMessage(error, '홍보 결제를 완료하지 못했습니다.');
@@ -3723,7 +3717,7 @@ let sponsorProfileDebounce = 0;
 $('sponsorRequestSoopId').addEventListener('input', () => {
   const soopId = $('sponsorRequestSoopId').value.trim().toLowerCase();
   const hint = $('sponsorSoopIdMessage');
-  hint.textContent = '홍보 중이거나 신청 확인 중인 스트리머는 중복 신청할 수 없어요.';
+  hint.textContent = '인증·주식시장 상장 또는 기존 홍보 이력이 있는 스트리머의 SOOP 아이디를 입력해 주세요.';
   hint.classList.remove('is-error');
   window.clearTimeout(sponsorProfileDebounce);
   const request = ++sponsorProfileRequestId;
@@ -3742,22 +3736,16 @@ $('sponsorRequestSoopId').addEventListener('input', () => {
       sponsorRequestRecord = { ...(sponsorRequestRecord || {}), ...profile, profileVerified: true };
       $('sponsorRequestProfileImage').src = profile.avatarUrl;
       $('sponsorRequestProfileImage').alt = `${profile.nickname} 프로필 이미지`;
-      $('sponsorRequestProfileStatus').textContent = `${$('sponsorRequestNickname').value.trim() || '닉네임 입력'} · @${profile.soopId}`;
+      $('sponsorRequestProfileStatus').textContent = `${profile.nickname} · @${profile.soopId}`;
       $('sponsorRequestSubmit').disabled = false;
       $('sponsorRequestSubmit').textContent = '통합 캐시로 홍보하기';
     } catch (error) {
       if (request !== sponsorProfileRequestId) return;
       $('sponsorRequestProfileStatus').textContent = viewerStatsErrorMessage(error, 'SOOP 프로필을 확인하지 못했습니다.');
-      $('sponsorSoopIdMessage').textContent = 'SOOP 아이디를 확인해 주세요.';
+      $('sponsorSoopIdMessage').textContent = viewerStatsErrorMessage(error, 'SOOP 아이디를 확인해 주세요.');
       $('sponsorSoopIdMessage').classList.add('is-error');
     }
   }, 450);
-});
-$('sponsorRequestNickname').addEventListener('input', () => {
-  if (sponsorRequestRecord && sponsorRequestRecord.profileVerified) {
-    const nickname = $('sponsorRequestNickname').value.trim() || '닉네임 입력';
-    $('sponsorRequestProfileStatus').textContent = `${nickname} · @${sponsorRequestRecord.soopId}`;
-  }
 });
 $('sponsorRequestDays').addEventListener('input', updateSponsorPrice);
 $('sponsorRequestClose').addEventListener('click', closeSponsorDialog);

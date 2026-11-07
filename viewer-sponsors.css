@@ -46,6 +46,7 @@
 .viewer-sponsor-dialog-card h2{margin:0;color:#17243a;font-size:23px}
 .viewer-sponsor-dialog-intro{margin:8px 44px 20px 0;color:#66758b;font-size:13px;line-height:1.7}
 .viewer-sponsor-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.viewer-sponsor-form-grid label:first-child{grid-column:1/-1}
 .viewer-sponsor-form-grid label{display:grid;gap:6px;color:#31435e;font-size:12px;font-weight:700}
 .viewer-sponsor-form-grid input{width:100%;min-height:44px;padding:0 12px;border:1px solid #cbd5e2;border-radius:0;background:#fff;color:#17243a;font:inherit;font-size:13px;outline:none}
 .viewer-sponsor-form-grid input:focus{border-color:#486bd6;box-shadow:0 0 0 3px #486bd61a}

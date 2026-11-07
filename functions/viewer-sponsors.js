@@ -11,24 +11,73 @@ const CAMPAIGNS_PATH = `${ROOT}/campaigns`;
 const CLAIMS_PATH = `${ROOT}/claimsBySoopId`;
 const RESULTS_PATH = `${ROOT}/paymentResults`;
 const LIMITS_PATH = `${ROOT}/limits`;
-const PROFILES_PATH = `${ROOT}/profileCache`;
 const LEGACY_ADS_PATH = 'streamerFanPageSponsorAds';
 const LEGACY_CLAIMS_PATH = 'streamerFanPageSponsorPlacementClaims';
 const WALLET_ROOT = 'gameSeriesWallet';
 const WALLET_PURCHASES_KEY = 'fanPageViewerSponsorPurchases';
 const WALLET_LEDGER_KIND = 'viewerSponsorPromotion';
 const FANPAGE_DATABASE_URL = 'https://streamer-fanpage-rtdb.firebaseio.com';
+const LIFE_GAME_DATABASE_URL = 'https://streamer-life-game-rtdb.firebaseio.com';
 const MAX_ADS_PER_RAIL = 5;
 const MAX_ACTIVE_ADS = MAX_ADS_PER_RAIL * 2;
 const CASH_PER_DAY = 10;
 const MAX_DAYS = 30;
 const REQUEST_COOLDOWN_MS = 60 * 1000;
 const RESERVATION_TTL_MS = 5 * 60 * 1000;
-const PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REQUEST_ID_RE = /^[A-Za-z0-9_-]{16,128}$/;
 const SOOP_ID_RE = /^[a-z0-9]{2,20}$/;
 const FORBIDDEN_TEXT_RE = /[<>\x00-\x1F\x7F]/;
+
+// 주식시장의 streamerStockListing.js와 동일한 종목명 비교 기준.
+function normalizeStockName(value) {
+  return String(value || '').normalize('NFC').trim()
+    .replace(/^\[[^\]]+\]\s*/u, '')
+    .toLocaleLowerCase('ko-KR')
+    .replace(/^[\s\p{P}\p{S}]+|[\s\p{P}\p{S}]+$/gu, '');
+}
+
+function isListedNickname(stocks, nickname) {
+  const normalized = normalizeStockName(nickname);
+  return !!normalized && Object.values(stocks || {}).some((stock) => normalizeStockName(stock && stock.name) === normalized);
+}
+
+function hasApprovedHistory(records, idField, soopId, statuses = ['approved']) {
+  return Object.values(records || {}).some((record) => record && statuses.includes(record.status)
+    && normalizeSoopId(record[idField]) === soopId);
+}
+
+async function hasPromotionEligibility(soopId, nickname) {
+  const shared = sharedDb();
+  const verified = await shared.ref('streamerVerifications').orderByChild('soopId').equalTo(soopId).get();
+  if (Object.values(verified.val() || {}).some((record) => typeof record?.nickname === 'string'
+    && normalizeSoopId(record.soopId) === soopId)) return true;
+  const stocks = (await shared.ref('stocks').get()).val();
+  if (isListedNickname(stocks, nickname)) return true;
+
+  const queryHistory = async (db, path, field, statuses, indexed = true) => {
+    // 기존 요청 노드는 status만 인덱스되어 있다. 캠페인은 별도 인덱스가 없다.
+    const ref = db.ref(path);
+    const snapshot = indexed && statuses.length === 1 && statuses[0] === 'approved'
+      ? await ref.orderByChild('status').equalTo('approved').get()
+      : await ref.get();
+    return hasApprovedHistory(snapshot.val(), field, soopId, statuses);
+  };
+  const life = getDatabaseWithUrl(LIFE_GAME_DATABASE_URL);
+  const checks = [
+    ...['bannerRequests', 'chartBannerRequests', 'cardBannerRequests', 'relayRoomRequests']
+      .map((path) => queryHistory(shared, path, 'streamerId', ['approved'])),
+    queryHistory(life, 'lifeGame/sponsorRequests', 'soopId', ['approved']),
+    queryHistory(fanpageDb(), 'streamerFanPageSponsorRequests', 'soopId', ['approved'], false),
+    queryHistory(fanpageDb(), CAMPAIGNS_PATH, 'soopId', ['active'], false),
+  ];
+  const results = await Promise.allSettled(checks);
+  if (results.some((result) => result.status === 'fulfilled' && result.value)) return true;
+  if (results.some((result) => result.status === 'rejected')) {
+    throw new HttpsError('unavailable', '홍보 이력을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+  return false;
+}
 
 const fanpageDb = () => getDatabaseWithUrl(FANPAGE_DATABASE_URL);
 const sharedDb = () => getDatabase();
@@ -102,39 +151,30 @@ async function isAdmin(uid) {
   return snapshot.val() === true;
 }
 
-async function resolveProfile(soopId, { force = false } = {}) {
+async function resolveProfile(soopId) {
   if (!SOOP_ID_RE.test(soopId)) {
     throw new HttpsError('invalid-argument', 'SOOP 아이디를 영문 소문자와 숫자 2~20자로 입력해 주세요.');
   }
-  const db = fanpageDb();
-  const now = Date.now();
-  const cached = (await db.ref(`${PROFILES_PATH}/${soopId}`).get()).val();
-  if (!force && cached && cached.verified === true && Number(cached.expiresAt) > now) {
-    return {
-      soopId,
-      nickname: String(cached.nickname || soopId).slice(0, 40),
-      avatarUrl: String(cached.avatarUrl || profileImageUrl(soopId)),
-      stationUrl: stationUrl(soopId),
-    };
-  }
-
-  const avatarUrl = profileImageUrl(soopId);
-  let imageExists = false;
+  let nickname = '';
   try {
-    const response = await fetch(avatarUrl, { method: 'GET', headers: { Range: 'bytes=0-0' }, signal: AbortSignal.timeout(8000) });
-    imageExists = response.ok && String(response.headers.get('content-type') || '').toLowerCase().startsWith('image/');
+    const url = new URL('https://sch.sooplive.co.kr/api.php');
+    url.search = new URLSearchParams({ l: 'DF', m: 'bjSearch', v: '3.0', szOrder: 'score', szKeyword: soopId, nPageNo: '1', nListCnt: '30', w: 'webk', tab: 'bj' }).toString();
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error('SOOP search failed');
+    const payload = await response.json();
+    if (Number(payload?.RESULT) !== 1 || !Array.isArray(payload.DATA)) throw new Error('Invalid SOOP response');
+    const match = payload.DATA.find((row) => normalizeSoopId(row?.user_id) === soopId);
+    nickname = typeof match?.user_nick === 'string' ? match.user_nick.trim() : '';
   } catch (_) {
-    imageExists = false;
+    throw new HttpsError('unavailable', 'SOOP 검색을 이용할 수 없습니다. 잠시 후 다시 시도해 주세요.');
   }
-  if (!imageExists) {
-    throw new HttpsError('not-found', 'SOOP 프로필을 찾지 못했습니다. 아이디를 확인해 주세요.');
+  if (!nickname || nickname.length > 40 || FORBIDDEN_TEXT_RE.test(nickname)) {
+    throw new HttpsError('not-found', 'SOOP에서 해당 아이디의 닉네임을 찾을 수 없습니다.');
   }
-
-  const nameSnapshot = await sharedDb().ref(`streamerNames/${soopId}`).get();
-  const nickname = String(nameSnapshot.val() || soopId).trim().slice(0, 40) || soopId;
-  const profile = { soopId, nickname, avatarUrl, verified: true, checkedAt: now, expiresAt: now + PROFILE_CACHE_TTL_MS };
-  await db.ref(`${PROFILES_PATH}/${soopId}`).set(profile);
-  return { soopId, nickname, avatarUrl, stationUrl: stationUrl(soopId) };
+  if (!await hasPromotionEligibility(soopId, nickname)) {
+    throw new HttpsError('failed-precondition', '인증·상장 또는 승인된 스트리머 홍보 이력을 찾을 수 없습니다.');
+  }
+  return { soopId, nickname, avatarUrl: profileImageUrl(soopId), stationUrl: stationUrl(soopId) };
 }
 
 async function getCashStatus(uid) {
@@ -379,12 +419,8 @@ const streamerFanPageViewerSponsors = onCall({ maxInstances: 20, enforceAppCheck
   }, undefined, false);
   if (!limit.committed) throw new HttpsError('resource-exhausted', '잠시 후 다시 시도해 주세요.');
 
-  const profile = await resolveProfile(soopId, { force: true });
-  const submittedNickname = typeof data.nickname === 'string' ? data.nickname.trim().slice(0, 40) : '';
-  if (submittedNickname && FORBIDDEN_TEXT_RE.test(submittedNickname)) {
-    throw new HttpsError('invalid-argument', '스트리머 닉네임을 확인해 주세요.');
-  }
-  const nickname = submittedNickname || profile.nickname;
+  const profile = await resolveProfile(soopId);
+  const nickname = profile.nickname;
   const cashAmount = days * CASH_PER_DAY;
   const paymentFingerprint = fingerprint({ soopId, rail, days, cashAmount });
   const expiresAt = now + days * DAY_MS;
@@ -463,5 +499,5 @@ module.exports = {
   refundCash,
   resolveProfile,
   // 외부 API 없이 확인 가능한 입력·공개 응답 규칙 테스트용 공개 헬퍼
-  __test: { normalizeSoopId, profileImageUrl, validateRequestId, toPublicCampaign, cleanCampaigns },
+  __test: { normalizeSoopId, profileImageUrl, validateRequestId, toPublicCampaign, cleanCampaigns, normalizeStockName, isListedNickname, hasApprovedHistory },
 };
