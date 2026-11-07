@@ -3594,6 +3594,51 @@ function newSponsorRequestId() {
   return `${Date.now()}${Math.random().toString(36).slice(2, 18)}`.replace(/[^A-Za-z0-9_-]/g, '').padEnd(16, '0').slice(0, 64);
 }
 
+function sponsorPendingKey() {
+  return auth.currentUser?.uid ? `viewerSponsorPending:${auth.currentUser.uid}` : '';
+}
+
+function readSponsorPending() {
+  try { return localStorage.getItem(sponsorPendingKey()) || ''; } catch (_) { return ''; }
+}
+
+function clearSponsorPending() {
+  try { localStorage.removeItem(sponsorPendingKey()); } catch (_) { /* 저장소 접근 불가 */ }
+  $('sponsorPaymentCheck').hidden = true;
+}
+
+async function checkSponsorPayment({ definitiveFailure = false } = {}) {
+  const requestId = readSponsorPending();
+  if (!requestId) return false;
+  $('sponsorPaymentCheck').hidden = false;
+  $('sponsorRequestSubmit').disabled = true;
+  setSponsorHint('sponsorRequestStatus', `결제 결과를 확인하고 있습니다. 요청 번호: ${requestId}`);
+  try {
+    const response = await callSponsorAds({ action: 'payment-status', requestId });
+    const result = response.data || {};
+    if (result.status === 'activated') {
+      clearSponsorPending();
+      showSponsorPaymentComplete(result);
+      await refreshSponsorAds();
+      return false;
+    }
+    if (result.status === 'refunded') {
+      clearSponsorPending();
+      setSponsorHint('sponsorRequestStatus', '이전 결제가 환불됐습니다. 다시 신청할 수 있습니다.');
+      return false;
+    }
+    if (result.status === 'failed-no-charge' || (result.status === 'unknown' && definitiveFailure)) {
+      clearSponsorPending();
+      setSponsorHint('sponsorRequestStatus', '결제가 진행되지 않았습니다. 입력 내용을 확인한 뒤 다시 시도해 주세요.', true);
+      return false;
+    }
+    setSponsorHint('sponsorRequestStatus', `이전 결제 결과를 확인 중입니다. 요청 번호 ${requestId}를 관리자에게 알려주세요.`, true);
+  } catch (_) {
+    setSponsorHint('sponsorRequestStatus', `결제 결과를 확인하지 못했습니다. 요청 번호 ${requestId}를 관리자에게 알려주세요.`, true);
+  }
+  return true;
+}
+
 function resetSponsorProfile() {
   const balanceCash = sponsorRequestRecord && sponsorRequestRecord.balanceCash;
   const cashPerDay = sponsorRequestRecord && sponsorRequestRecord.cashPerDay;
@@ -3623,6 +3668,7 @@ async function loadSponsorCashStatus() {
 }
 
 async function openSponsorRequest(button) {
+  await getAuthReady();
   sponsorRequestPreviousFocus = button;
   sponsorRequestRail = button.dataset.sponsorRail === 'right' ? 'right' : 'left';
   $('sponsorRequestStatus').textContent = '';
@@ -3634,6 +3680,8 @@ async function openSponsorRequest(button) {
   resetSponsorProfile();
   updateSponsorPrice();
   showViewerModal($('sponsorRequestDialog'));
+  if (await checkSponsorPayment()) return;
+  if (!$('sponsorDonationStep').classList.contains('hidden')) return;
   void loadSponsorCashStatus();
   if (!window.matchMedia('(hover: none), (pointer: coarse)').matches) {
     window.setTimeout(() => $('sponsorRequestSoopId').focus(), 0);
@@ -3656,6 +3704,7 @@ function updateSponsorPrice() {
 
 $('sponsorRequestForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (readSponsorPending()) { await checkSponsorPayment(); return; }
   const soopId = $('sponsorRequestSoopId').value.trim().toLowerCase();
   const days = Number.parseInt($('sponsorRequestDays').value, 10);
   let firstInvalid = null;
@@ -3694,11 +3743,20 @@ $('sponsorRequestForm').addEventListener('submit', async (event) => {
   setSponsorHint('sponsorRequestStatus', '통합 캐시 결제와 홍보 등록을 처리하고 있어요.');
   try {
     await getAuthReady();
-    const response = await callSponsorAds({ action: 'purchase', requestId: newSponsorRequestId(), soopId, days, rail: sponsorRequestRail });
+    const requestId = newSponsorRequestId();
+    try { localStorage.setItem(sponsorPendingKey(), requestId); } catch (_) { throw new Error('결제 결과를 보관할 수 없어 신청을 시작하지 않았습니다. 브라우저 저장소를 확인해 주세요.'); }
+    const response = await callSponsorAds({ action: 'purchase', requestId, soopId, days, rail: sponsorRequestRail });
     const data = response.data || {};
+    clearSponsorPending();
     showSponsorPaymentComplete({ ...data, nickname: data.nickname || sponsorRequestRecord.nickname, soopId, days, cashAmount: Number(data.cashAmount) || cashAmount });
     await refreshSponsorAds();
   } catch (error) {
+    if (readSponsorPending()) {
+      const code = String(error?.code || '');
+      const definitiveFailure = ['functions/invalid-argument', 'functions/failed-precondition', 'functions/not-found', 'functions/resource-exhausted', 'functions/already-exists', 'functions/permission-denied'].includes(code);
+      if (await checkSponsorPayment({ definitiveFailure })) return;
+      if (!$('sponsorDonationStep').classList.contains('hidden')) return;
+    }
     const message = viewerStatsErrorMessage(error, '홍보 결제를 완료하지 못했습니다.');
     const duplicate = String(error && error.code || '').endsWith('already-exists')
       || message.includes('이미 홍보 중')
@@ -3712,9 +3770,11 @@ $('sponsorRequestForm').addEventListener('submit', async (event) => {
     }
   } finally {
     if (!$('sponsorDonationStep').classList.contains('hidden')) return;
-    submit.disabled = false;
+    submit.disabled = !!readSponsorPending();
   }
 });
+
+$('sponsorPaymentCheck').addEventListener('click', () => void checkSponsorPayment());
 
 let sponsorProfileDebounce = 0;
 $('sponsorRequestSoopId').addEventListener('input', () => {
@@ -3740,7 +3800,7 @@ $('sponsorRequestSoopId').addEventListener('input', () => {
       $('sponsorRequestProfileImage').src = profile.avatarUrl;
       $('sponsorRequestProfileImage').alt = `${profile.nickname} 프로필 이미지`;
       $('sponsorRequestProfileStatus').textContent = `${profile.nickname} · @${profile.soopId}`;
-      $('sponsorRequestSubmit').disabled = false;
+      $('sponsorRequestSubmit').disabled = !!readSponsorPending();
       $('sponsorRequestSubmit').textContent = '통합 캐시로 홍보하기';
     } catch (error) {
       if (request !== sponsorProfileRequestId) return;

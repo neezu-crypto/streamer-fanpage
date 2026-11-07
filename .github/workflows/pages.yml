@@ -71,7 +71,7 @@ jobs:
       - name: Prepare Pages directory
         run: |
           mkdir -p _site
-          git ls-files -z | tar --null -T - -cf - | tar -xf - -C _site
+          git ls-files -z | tar --exclude='database.fanpage.rules.json' --exclude='AGENTS.md' --exclude='CLAUDE.md' --exclude='.github/copilot-instructions.md' --null -T - -cf - | tar -xf - -C _site
           mkdir -p _site/static-data/viewer-stats
           cp -a static-data/viewer-stats/. _site/static-data/viewer-stats/
       - name: Guard private admin snapshots

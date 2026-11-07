@@ -66,7 +66,12 @@ const {
 } = require('./sponsor-ads');
 const {
   streamerFanPageViewerSponsors,
+  reconcileViewerSponsorPayments,
 } = require('./viewer-sponsors');
+
+exports.streamerFanPageViewerSponsorPaymentReconcile = onSchedule({ schedule: 'every 15 minutes', maxInstances: 1, timeoutSeconds: 540 }, async () => {
+  await reconcileViewerSponsorPayments();
+});
 const {
   pruneVerifiedStreamerVisitDedup,
   recordVerifiedStreamerVisit,
