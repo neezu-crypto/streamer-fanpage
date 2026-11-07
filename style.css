@@ -1722,6 +1722,11 @@ dialog[open]{overscroll-behavior:contain}
 #fanPageView .video-library-edit-form select{width:100%;max-width:none}
 #fanPageView .video-library-load-more{justify-self:center;min-width:170px}
 #fanPageView .video-library-state{margin:0;padding:22px 14px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);font-size:12px;text-align:center}
+#fanPageView .video-library-loading{display:grid;gap:10px;justify-items:center;padding:20px 14px;color:var(--text);font-size:13px;text-align:center}
+#fanPageView .video-library-loading-track{display:block;position:relative;overflow:hidden;width:min(280px,100%);height:9px;border-radius:999px;background:#e3dbe4}
+#fanPageView .video-library-loading-bar{display:block;width:38%;height:100%;border-radius:inherit;background:#d96083;animation:video-library-loading 1.25s ease-in-out infinite alternate}
+@keyframes video-library-loading{from{transform:translateX(0)}to{transform:translateX(163%)}}
+@media(prefers-reduced-motion:reduce){#fanPageView .video-library-loading-bar{width:100%;animation:none;opacity:.75}}
 #fanPageView .video-library-state.is-error,#fanPageView .video-library-inline-error{color:#ffadb5}
 #fanPageView .video-library-state.is-error{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
 #fanPageView .video-library-inline-error{margin:0;font-size:11px}

@@ -26,7 +26,7 @@ async function fetchComments(target, streamerId, fetchImpl = fetch) {
     if (page >= lastPage) {
       const all = [...rows.values()];
       return all.filter(row => String(row.userId || '').toLowerCase() === streamerId.toLowerCase()).map(row => ({
-        id: String(row.pCommentNo), content: String(row.comment || '').slice(0, 2000), likes: Math.max(0, Number(row.likeCnt)),
+        id: String(row.pCommentNo), likes: Math.max(0, Number(row.likeCnt)),
         rank: 1 + all.filter(other => Number(other.likeCnt) > Number(row.likeCnt)).length,
         total: all.length,
       }));

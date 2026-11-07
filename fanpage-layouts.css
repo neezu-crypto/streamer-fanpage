@@ -4691,3 +4691,9 @@ body.fanpage-layout-three-active .profile-settings-dialog .profile-editor-hint {
   color:#665d5b !important;
   font-weight:500;
 }
+#fanPageView.fanpage-layout-2 .weekly-schedule-board-frame{background:#211e29;border-color:#45404f}
+#fanPageView.fanpage-layout-2 .weekly-schedule-date-caption{background:#292531;border-color:#514a5b;color:#f0eaf4;box-shadow:0 3px 0 #111017}
+#fanPageView.fanpage-layout-2 :is(.weekly-schedule-board-edit,.weekly-schedule-stage-previous,.weekly-schedule-stage-next){background:#302b39;border-color:#73687c;color:#fff;box-shadow:0 3px 0 #17141d}
+#fanPageView.fanpage-layout-2 :is(.weekly-schedule-board-edit,.weekly-schedule-stage-previous,.weekly-schedule-stage-next):hover{background:#4a3c50;color:#fff}
+#fanPageView.fanpage-layout-2 .weekly-template-controls select{background:#292531;border-color:#5a5263;color:#f8f4fa}
+#fanPageView.fanpage-layout-2 .weekly-schedule-editor-title{color:#f5eef5}

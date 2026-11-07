@@ -7387,16 +7387,17 @@ function renderCommentUpSection(page) {
       for (const entry of entries) {
         const card = document.createElement('article'); card.className = 'comment-up-card';
         const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '게시글 원본 보기 ↗';
-        const check = document.createElement('button'); check.type = 'button'; check.className = 'button'; check.textContent = '댓글 UP 확인';
+        const check = document.createElement('button'); check.type = 'button'; check.className = 'button'; check.textContent = '새로고침';
         const resultText = document.createElement('div'); resultText.setAttribute('role', 'status');
         check.addEventListener('click', async () => {
           check.disabled = true; resultText.textContent = '전체 댓글을 확인하고 있어요.';
           try {
             const result = (await callCommentUp({ action: 'check', streamerId: page.streamer.id, id: entry.id })).data;
+            link.textContent = result.title ? `${result.title} ↗` : '게시글 원본 보기 ↗';
             resultText.replaceChildren();
             if (!result.comments.length) resultText.textContent = '이 스트리머가 작성한 댓글을 찾지 못했어요.';
             result.comments.forEach(comment => {
-              const row = document.createElement('p'); row.textContent = `${comment.content || '(이미지 댓글)'} — UP ${comment.likes} · 공동 ${comment.rank}위 / 댓글 ${comment.total}개`; resultText.append(row);
+              const row = document.createElement('p'); row.textContent = `UP ${comment.likes} · 공동 ${comment.rank}위 / 댓글 ${comment.total}개`; resultText.append(row);
             });
           } catch (error) { resultText.textContent = error.message || '댓글을 확인하지 못했어요.'; }
           finally { check.disabled = false; }
@@ -8026,9 +8027,15 @@ function renderVideoLibrarySection(page) {
     section.append(admin);
   }
 
-  if (state.loading && !state.loaded) {
-    const loading = document.createElement('p'); loading.className = 'video-library-state';
-    loading.textContent = '공통 영상 모음을 불러오고 있어요.'; section.append(loading); return section;
+  if (state.loading || (!state.loaded && !state.error)) {
+    const loading = document.createElement('div'); loading.className = 'video-library-loading';
+    loading.setAttribute('role', 'status');
+    const label = document.createElement('span'); label.textContent = '즐겨찾기를 불러오고 있어요.';
+    const track = document.createElement('span'); track.className = 'video-library-loading-track';
+    track.setAttribute('role', 'progressbar'); track.setAttribute('aria-label', '즐겨찾기 불러오는 중');
+    const bar = document.createElement('span'); bar.className = 'video-library-loading-bar';
+    track.append(bar); loading.append(label, track); section.append(loading);
+    if (!state.loaded) return section;
   }
   if (state.error && !state.loaded) {
     const error = document.createElement('div'); error.className = 'video-library-state is-error';

@@ -7887,7 +7887,11 @@ exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 12
     if (!parsed) throw new HttpsError('not-found', '등록된 게시글을 찾을 수 없어요.');
     const check = await fetch(`https://api-channel.sooplive.com/v1.1/channel/${parsed.stationId}/post/${parsed.postId}`, { signal: AbortSignal.timeout(10000) });
     if (!check.ok) throw new HttpsError('failed-precondition', '공개 게시글을 확인할 수 없어요. 원본 게시글에서 확인해 주세요.');
-    try { return { comments: await require('./comment-up-check').fetchComments(parsed, target.streamer.soopId || target.streamer.id) }; }
+    try {
+      const post = await check.json();
+      const title = typeof post.titleName === 'string' ? post.titleName.trim().slice(0, 300) : '';
+      return { title, comments: await require('./comment-up-check').fetchComments(parsed, target.streamer.soopId || target.streamer.id) };
+    }
     catch (_) { throw new HttpsError('unavailable', '전체 댓글을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'); }
   }
   throw new HttpsError('invalid-argument', '요청을 확인해 주세요.');
