@@ -3612,7 +3612,7 @@ async function loadSponsorCashStatus() {
     const response = await callSponsorAds({ action: 'status' });
     const data = response.data || {};
     sponsorRequestRecord = { ...(sponsorRequestRecord || {}), balanceCash: Number(data.balanceCash) || 0, cashPerDay: Number(data.cashPerDay) || 10 };
-    $('sponsorRequestBalance').textContent = `현재 통합 캐시 ${sponsorRequestRecord.balanceCash.toLocaleString('ko-KR')}캐시`;
+    $('sponsorRequestBalance').textContent = `현재 내 캐시 ${sponsorRequestRecord.balanceCash.toLocaleString('ko-KR')}캐시`;
     updateSponsorPrice();
   } catch (error) {
     const message = viewerStatsErrorMessage(error, '통합 캐시 잔액을 확인하지 못했습니다.');
@@ -3651,7 +3651,7 @@ function updateSponsorPrice() {
   $('sponsorRequestBalance').classList.toggle('is-error', valid && !sufficient);
   $('sponsorChargeLink').hidden = !(valid && !sufficient);
   if (valid && !sufficient) $('sponsorRequestBalance').textContent = `통합 캐시가 부족합니다. 필요 ${total.toLocaleString('ko-KR')}캐시`;
-  else if (sponsorRequestRecord && Number.isFinite(sponsorRequestRecord.balanceCash)) $('sponsorRequestBalance').textContent = `현재 통합 캐시 ${sponsorRequestRecord.balanceCash.toLocaleString('ko-KR')}캐시`;
+  else if (sponsorRequestRecord && Number.isFinite(sponsorRequestRecord.balanceCash)) $('sponsorRequestBalance').textContent = `현재 내 캐시 ${sponsorRequestRecord.balanceCash.toLocaleString('ko-KR')}캐시`;
 }
 
 $('sponsorRequestForm').addEventListener('submit', async (event) => {
