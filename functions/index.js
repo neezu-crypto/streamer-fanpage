@@ -7845,6 +7845,54 @@ exports.streamerFanPageTamagotchiApplications = onCall({ maxInstances: 10 }, asy
   throw new HttpsError('invalid-argument', '다마고치 신청 요청을 확인해 주세요.');
 });
 
+exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 120 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || {};
+  const streamerId = String(data.streamerId || '').trim().toLowerCase();
+  const [target, verified, isAdmin] = await Promise.all([findVerifiedBySoopId(streamerId), findVerifiedByUid(uid), isAdminUid(uid)]);
+  if (!target) throw new HttpsError('not-found', '스트리머 팬페이지를 찾을 수 없습니다.');
+  const canManage = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
+  const root = db.ref(`streamerFanPageCommentUp/${target.streamer.id}`);
+  const action = String(data.action || 'list');
+  if (action === 'list') {
+    const value = (await root.get()).val() || {};
+    return { entries: Object.entries(value).map(([id, row]) => ({ id, url: row.url })), canManage };
+  }
+  if (!canManage && action !== 'check') throw new HttpsError('permission-denied', '스트리머 또는 관리자만 관리할 수 있어요.');
+  if (action === 'add') {
+    const parsed = require('./comment-up-check').parsePostUrl(data.url);
+    if (!parsed) throw new HttpsError('invalid-argument', 'SOOP 방송국 게시글 링크를 입력해 주세요.');
+    const canonical = `https://www.sooplive.com/station/${parsed.stationId}/post/${parsed.postId}`;
+    const check = await fetch(`https://api-channel.sooplive.com/v1.1/channel/${parsed.stationId}/post/${parsed.postId}`, { signal: AbortSignal.timeout(10000) });
+    if (!check.ok) throw new HttpsError('failed-precondition', '공개 게시글만 등록할 수 있어요. 애청자 전용 게시글은 원본에서 확인해 주세요.');
+    const id = `${parsed.stationId}_${parsed.postId}`;
+    const result = await root.transaction(current => {
+      const items = current && typeof current === 'object' ? current : {};
+      if (!items[id] && Object.keys(items).length >= 20) return;
+      items[id] = { url: canonical, createdAt: Date.now() }; return items;
+    });
+    if (!result.committed) throw new HttpsError('resource-exhausted', '게시글은 최대 20개까지 등록할 수 있어요.');
+    return { ok: true };
+  }
+  if (action === 'delete') {
+    const id = String(data.id || '');
+    if (!/^[a-z0-9_-]{1,30}_\d{1,20}$/.test(id)) throw new HttpsError('invalid-argument', '게시글을 확인해 주세요.');
+    await root.child(id).remove(); return { ok: true };
+  }
+  if (action === 'check') {
+    const id = String(data.id || '');
+    if (!/^[a-z0-9_-]{1,30}_\d{1,20}$/.test(id)) throw new HttpsError('invalid-argument', '게시글을 확인해 주세요.');
+    const entry = (await root.child(id).get()).val();
+    const parsed = require('./comment-up-check').parsePostUrl(entry?.url);
+    if (!parsed) throw new HttpsError('not-found', '등록된 게시글을 찾을 수 없어요.');
+    const check = await fetch(`https://api-channel.sooplive.com/v1.1/channel/${parsed.stationId}/post/${parsed.postId}`, { signal: AbortSignal.timeout(10000) });
+    if (!check.ok) throw new HttpsError('failed-precondition', '공개 게시글을 확인할 수 없어요. 원본 게시글에서 확인해 주세요.');
+    try { return { comments: await require('./comment-up-check').fetchComments(parsed, target.streamer.soopId || target.streamer.id) }; }
+    catch (_) { throw new HttpsError('unavailable', '전체 댓글을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'); }
+  }
+  throw new HttpsError('invalid-argument', '요청을 확인해 주세요.');
+});
+
 exports.streamerFanPageMemories = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};

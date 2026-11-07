@@ -32,6 +32,7 @@ const callSave = authenticatedCallable('streamerFanPageSave');
 const callSongbook = authenticatedCallable('streamerFanPageSongbook');
 const callPlayedGames = authenticatedCallable('streamerFanPagePlayedGames');
 const callMemories = authenticatedCallable('streamerFanPageMemories');
+const callCommentUp = authenticatedCallable('streamerFanPageCommentUp', { timeout: 120000 });
 const callVideoLibrary = authenticatedCallable('streamerFanPageVideoLibrary');
 const callTamagotchiApplications = authenticatedCallable('streamerFanPageTamagotchiApplications');
 const callRollingPaper = authenticatedCallable('streamerFanPageRollingPaper');
@@ -2785,15 +2786,15 @@ function renderKawaiiWelcome(page, onSectionNavigate = (sectionId) => {
   mascot.setAttribute('aria-pressed', 'false');
   const idle = document.createElement('img'); idle.className = 'fanpage-kawaii-mascot-idle';
   idle.src = usesDoodleMascot
-    ? 'assets/fanpage-doodle/design3-sketchbook-sprite.png'
+    ? 'assets/fanpage-doodle/design3-star-lamb-idle.png'
     : 'assets/fanpage-kawaii/moon-bunny-idle.png';
   idle.alt = usesDoodleMascot
-    ? '별을 든 작은 스케치북 요정'
+    ? '별을 든 작은 양 요정'
     : '별 머리핀을 한 작은 크림색 달토끼';
   idle.loading = 'lazy'; idle.decoding = 'async';
   const wink = document.createElement('img'); wink.className = 'fanpage-kawaii-mascot-wink';
   wink.src = usesDoodleMascot
-    ? 'assets/fanpage-doodle/design3-sketchbook-sprite.png'
+    ? 'assets/fanpage-doodle/design3-star-lamb-hover.png'
     : 'assets/fanpage-kawaii/moon-bunny-wink.png';
   wink.alt = ''; wink.setAttribute('aria-hidden', 'true');
   wink.loading = 'lazy'; wink.decoding = 'async';
@@ -4590,6 +4591,7 @@ function renderFanPage(page, options = {}) {
   if (!page.isOwner) view.append(back);
   function navigateToFanPageSection(sectionId) {
     const target = document.getElementById(sectionId);
+    if (target?.id === 'profileBoard' && target.hidden) view._selectFanPageTab?.('home');
     const tabPanel = target?.closest('.fanpage-tab-panel');
     if (tabPanel && tabPanel.hidden) view._selectFanPageTab?.(tabPanel.dataset.fanpageTabPanel);
     window.requestAnimationFrame(() => {
@@ -4650,6 +4652,7 @@ function renderFanPage(page, options = {}) {
     { key: 'video-library', label: '즐겨찾기', eyebrow: 'FAVORITES', title: '즐겨찾기', description: '스트리머가 라이브에서 자주 시청하는 영상을 모았습니다.' },
     { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 응원 메시지를 남겨 보세요.' },
     { key: 'memories', label: '기억의 순간', eyebrow: 'MEMORY MOMENTS', title: '기억의 순간', description: '100일·200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아봤어요.' },
+    { key: 'comment-up', label: '댓글 UP 체크', eyebrow: 'COMMENT UP', title: '댓글 UP 체크', description: '등록한 게시글에서 남긴 댓글의 UP과 순위를 확인해요.' },
     { key: 'tamagotchi', label: '다마고치', eyebrow: 'STREAMER TAMAGOTCHI', title: '다마고치', description: '스트리머의 개성을 담은 캐릭터와 원하는 상호작용을 신청해 보세요.' },
   ];
   const tabNav = document.createElement('div');
@@ -4748,7 +4751,8 @@ function renderFanPage(page, options = {}) {
     ['video-library', createFanPageTabPanel(tabDefinitions[3], [videoLibrarySection])],
     ['rolling-paper', createFanPageTabPanel(tabDefinitions[4], [rollingPaperSection])],
     ['memories', createFanPageTabPanel(tabDefinitions[5], [memoriesSection])],
-    ['tamagotchi', createFanPageTabPanel(tabDefinitions[6], [tamagotchiSection])],
+    ['comment-up', createFanPageTabPanel(tabDefinitions[6], [renderCommentUpSection(page)])],
+    ['tamagotchi', createFanPageTabPanel(tabDefinitions[7], [tamagotchiSection])],
   ]);
   function selectFanPageTab(tabKey, moveFocus = false) {
     if (!tabPanels.has(tabKey)) return;
@@ -4760,6 +4764,7 @@ function renderFanPage(page, options = {}) {
       refreshRollingPaperSection(page.streamer.id);
     }
     view.dataset.fanpageActiveTab = tabKey;
+    section.hidden = tabKey !== 'home';
     if (tabKey !== 'rolling-paper') {
       const stickerState = rollingPaperStateFor(page.streamer.id);
       stickerState.stickerActionMenuOpen = false; stickerState.selectedStickerMenuId = '';
@@ -4799,6 +4804,7 @@ function renderFanPage(page, options = {}) {
       }
     }
     if (tabKey === 'memories') loadFanPageMemories(page);
+    if (tabKey === 'comment-up') view.querySelector('#commentUpSection')?._load?.();
     if (tabKey === 'tamagotchi') loadTamagotchiApplication(page, tamagotchiSection);
     if (moveFocus) tabButtons.get(tabKey)?.focus();
   }
@@ -5243,6 +5249,7 @@ function createFanPageQuickRemote(view) {
     button.append(number, label);
     button.addEventListener('click', () => {
       const target = document.getElementById(section.id);
+      if (target?.id === 'profileBoard' && target.hidden) view._selectFanPageTab?.('home');
       const tabPanel = target?.closest('.fanpage-tab-panel');
       if (tabPanel && tabPanel.hidden) view._selectFanPageTab?.(tabPanel.dataset.fanpageTabPanel);
       window.requestAnimationFrame(() => {
@@ -6259,7 +6266,7 @@ function renderLiveSection(page) {
   copy.append(eyebrow, title, subtitle);
   const refresh = document.createElement('button'); refresh.type = 'button';
   refresh.className = 'button live-refresh-button'; refresh.disabled = state.loading;
-  refresh.textContent = state.loading ? '확인 중…' : '↻ 상태 새로고침';
+  refresh.textContent = state.loading ? '확인 중…' : '새로고침';
   refresh.setAttribute('aria-label', '라이브 상태 새로고침');
   refresh.dataset.liveFocus = 'refresh';
   refresh.addEventListener('click', () => loadLiveStatus(page.streamer.id));
@@ -7357,6 +7364,69 @@ function fanPageMemoryStateFor(streamerId) {
     fanPageMemoryStates.set(streamerId, state);
   }
   return state;
+}
+
+function renderCommentUpSection(page) {
+  const section = document.createElement('section'); section.id = 'commentUpSection'; section.className = 'content-card comment-up-section';
+  const note = document.createElement('p'); note.textContent = '공개 게시글의 댓글을 확인합니다. 같은 UP 수는 공동 순위로 표시해요.';
+  const form = document.createElement('form'); form.className = 'comment-up-form';
+  const input = document.createElement('input'); input.type = 'url'; input.required = true; input.maxLength = 500; input.placeholder = 'SOOP 게시글 링크'; input.setAttribute('aria-label', 'SOOP 게시글 링크');
+  const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary'; add.textContent = '게시글 추가';
+  form.append(input, add); form.hidden = !page.isOwner;
+  const status = document.createElement('p'); status.setAttribute('role', 'status');
+  const list = document.createElement('div'); list.className = 'comment-up-list';
+  section.append(note, form, status, list);
+  let loaded = false; let loading = false;
+  async function load() {
+    if (loading) return; loading = true; status.textContent = '게시글을 불러오고 있어요.';
+    try {
+      const result = (await callCommentUp({ action: 'list', streamerId: page.streamer.id })).data;
+      form.hidden = !result.canManage; list.replaceChildren();
+      const entries = Array.isArray(result.entries) ? result.entries : [];
+      status.textContent = entries.length ? '' : '등록된 게시글이 없어요.';
+      for (const entry of entries) {
+        const card = document.createElement('article'); card.className = 'comment-up-card';
+        const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '게시글 원본 보기 ↗';
+        const check = document.createElement('button'); check.type = 'button'; check.className = 'button'; check.textContent = '댓글 UP 확인';
+        const resultText = document.createElement('div'); resultText.setAttribute('role', 'status');
+        check.addEventListener('click', async () => {
+          check.disabled = true; resultText.textContent = '전체 댓글을 확인하고 있어요.';
+          try {
+            const result = (await callCommentUp({ action: 'check', streamerId: page.streamer.id, id: entry.id })).data;
+            resultText.replaceChildren();
+            if (!result.comments.length) resultText.textContent = '이 스트리머가 작성한 댓글을 찾지 못했어요.';
+            result.comments.forEach(comment => {
+              const row = document.createElement('p'); row.textContent = `${comment.content || '(이미지 댓글)'} — UP ${comment.likes} · 공동 ${comment.rank}위 / 댓글 ${comment.total}개`; resultText.append(row);
+            });
+          } catch (error) { resultText.textContent = error.message || '댓글을 확인하지 못했어요.'; }
+          finally { check.disabled = false; }
+        });
+        card.append(link, check, resultText);
+        if (result.canManage) {
+          const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button'; remove.textContent = '삭제';
+          remove.addEventListener('click', async () => {
+            if (!window.confirm('이 게시글을 목록에서 삭제할까요?')) return;
+            remove.disabled = true;
+            try { await callCommentUp({ action: 'delete', streamerId: page.streamer.id, id: entry.id }); loaded = false; await load(); }
+            catch (error) { status.textContent = error.message || '삭제하지 못했어요.'; remove.disabled = false; }
+          }); card.append(remove);
+        }
+        list.append(card);
+        check.click();
+      }
+      loaded = true;
+    } catch (error) { status.textContent = error.message || '게시글을 불러오지 못했어요.'; }
+    finally { loading = false; }
+  }
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); if (!form.reportValidity()) return;
+    add.disabled = true; status.textContent = '게시글을 확인하고 있어요.';
+    try { await callCommentUp({ action: 'add', streamerId: page.streamer.id, url: input.value }); input.value = ''; loaded = false; await load(); }
+    catch (error) { status.textContent = error.message || '게시글을 추가하지 못했어요.'; }
+    finally { add.disabled = false; }
+  });
+  section._load = () => { if (!loaded) void load(); };
+  return section;
 }
 
 function renderMemoriesSection(page) {
@@ -9402,12 +9472,12 @@ function renderWeeklyScheduleDialog(page) {
   const imageCard = document.createElement('div'); imageCard.className = 'account-dialog-card weekly-schedule-gallery-card';
   const imageHeading = document.createElement('div'); imageHeading.className = 'weekly-schedule-image-heading';
   const imageLabel = document.createElement('strong'); imageLabel.textContent = '갤러리 이미지';
-  const imageNote = document.createElement('small'); imageNote.textContent = '갤러리에서 선택하거나, 템플릿의 사진 칸에 파일을 끌어 놓으면 갤러리에 등록하고 바로 적용해요.';
+  const imageNote = document.createElement('small'); imageNote.textContent = '갤러리에서 선택하거나 직접 업로드해 주세요. 업로드한 이미지는 스크린샷 분류로 갤러리에도 등록됩니다.';
   const closeImageTools = document.createElement('button'); closeImageTools.type = 'button'; closeImageTools.className = 'button profile-settings-close weekly-schedule-image-tools-close'; closeImageTools.setAttribute('aria-label', '갤러리 이미지 창 닫기'); closeImageTools.textContent = '×';
   imageHeading.append(imageLabel, imageNote, closeImageTools);
   const imageActions = document.createElement('div'); imageActions.className = 'weekly-schedule-image-actions';
   const chooseImage = document.createElement('button'); chooseImage.type = 'button'; chooseImage.className = 'button'; chooseImage.textContent = '갤러리에서 선택';
-  const uploadImage = document.createElement('button'); uploadImage.type = 'button'; uploadImage.className = 'button'; uploadImage.textContent = '새 이미지 등록';
+  const uploadImage = document.createElement('button'); uploadImage.type = 'button'; uploadImage.className = 'button'; uploadImage.textContent = '직접 이미지 업로드';
   const clearImage = document.createElement('button'); clearImage.type = 'button'; clearImage.className = 'button weekly-schedule-clear-image'; clearImage.textContent = '선택 이미지 제거';
   imageActions.append(chooseImage, uploadImage, clearImage);
   const selectedImageNote = document.createElement('p'); selectedImageNote.className = 'weekly-schedule-selected-image'; selectedImageNote.textContent = '왼쪽 사진 영역을 눌러 선택해 주세요.';
@@ -9518,7 +9588,7 @@ function renderWeeklyScheduleDialog(page) {
   previewCanvas.width = WEEKLY_SCHEDULE_LAYOUT.width; previewCanvas.height = WEEKLY_SCHEDULE_LAYOUT.height; previewCanvas.setAttribute('aria-label', '주간 방송표 이미지 미리보기');
   const avatarHitArea = document.createElement('button'); avatarHitArea.type = 'button'; avatarHitArea.className = 'weekly-schedule-avatar-hit-area';
   setWeeklySchedulePercentRect(avatarHitArea, WEEKLY_SCHEDULE_LAYOUT.avatar);
-  avatarHitArea.setAttribute('aria-label', '템플릿 이미지 칸에서 갤러리 사진을 선택하거나 파일을 끌어 놓아 등록');
+  avatarHitArea.setAttribute('aria-label', '갤러리에서 선택하거나 이미지를 직접 업로드');
   avatarHitArea.title = '클릭해 갤러리 이미지를 선택하거나, 이미지 파일을 이 칸에 끌어 놓으세요.';
   const footerTextInput = document.createElement('input'); footerTextInput.type = 'text'; footerTextInput.className = 'weekly-schedule-footer-text';
   footerTextInput.maxLength = 48; footerTextInput.setAttribute('aria-label', '하단 리본 날짜 또는 문구');
@@ -10089,8 +10159,14 @@ function renderWeeklyScheduleDialog(page) {
   dialog.addEventListener('drop', (event) => { if (isFileDrag(event)) event.preventDefault(); });
   closeImageTools.addEventListener('click', () => { imageTools.close(); });
   uploadImage.addEventListener('click', () => {
-    state.uploadOpen = !state.uploadOpen; uploadPanel.hidden = !state.uploadOpen;
-    if (state.uploadOpen) { state.galleryOpen = false; galleryPanel.hidden = true; }
+    if (state.uploadBusy || state.weekNavigationBusy || state.loading) return;
+    category.value = 'screenshot';
+    fileInput.value = '';
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (file) void uploadScheduleGalleryImage(file, true);
   });
   clearImage.addEventListener('click', () => {
     if (state.localObjectUrl) URL.revokeObjectURL(state.localObjectUrl);
@@ -10098,7 +10174,7 @@ function renderWeeklyScheduleDialog(page) {
     if (imageTools.open) imageTools.close(); markWeeklyDirty();
   });
   galleryMore.addEventListener('click', () => loadScheduleGallery(true));
-  uploadSubmit.addEventListener('click', uploadScheduleGalleryImage);
+  uploadSubmit.addEventListener('click', () => { void uploadScheduleGalleryImage(); });
   linkedEventsToggle.addEventListener('click', () => {
     linkedEventsOpen = !linkedEventsOpen;
     linkedEventsPanel.hidden = !linkedEventsOpen;
