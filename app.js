@@ -7368,7 +7368,7 @@ function fanPageMemoryStateFor(streamerId) {
 
 function renderCommentUpSection(page) {
   const section = document.createElement('section'); section.id = 'commentUpSection'; section.className = 'content-card comment-up-section';
-  const note = document.createElement('p'); note.textContent = '공개 게시글의 댓글을 확인합니다. 같은 UP 수는 공동 순위로 표시해요.';
+  const note = document.createElement('p'); note.textContent = '공개·애청자 공개 게시글의 댓글을 확인합니다. 같은 UP 수는 공동 순위로 표시해요.';
   const form = document.createElement('form'); form.className = 'comment-up-form';
   const input = document.createElement('input'); input.type = 'url'; input.required = true; input.maxLength = 500; input.placeholder = 'SOOP 게시글 링크'; input.setAttribute('aria-label', 'SOOP 게시글 링크');
   const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary'; add.textContent = '게시글 추가';
@@ -7386,14 +7386,16 @@ function renderCommentUpSection(page) {
       status.textContent = entries.length ? '' : '등록된 게시글이 없어요.';
       for (const entry of entries) {
         const card = document.createElement('article'); card.className = 'comment-up-card';
-        const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '게시글 원본 보기 ↗';
+        const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = entry.visibility === 'fan' ? '애청자 게시글 원본 보기 ↗' : '게시글 원본 보기 ↗';
         const check = document.createElement('button'); check.type = 'button'; check.className = 'button'; check.textContent = '새로고침';
         const resultText = document.createElement('div'); resultText.setAttribute('role', 'status');
         check.addEventListener('click', async () => {
           check.disabled = true; resultText.textContent = '전체 댓글을 확인하고 있어요.';
           try {
             const result = (await callCommentUp({ action: 'check', streamerId: page.streamer.id, id: entry.id })).data;
-            link.textContent = result.title ? `${result.title} ↗` : '게시글 원본 보기 ↗';
+            link.textContent = result.title
+              ? `${result.title} ↗`
+              : result.visibility === 'fan' ? '애청자 게시글 원본 보기 ↗' : '게시글 원본 보기 ↗';
             resultText.replaceChildren();
             if (!result.comments.length) resultText.textContent = '이 스트리머가 작성한 댓글을 찾지 못했어요.';
             result.comments.forEach(comment => {
