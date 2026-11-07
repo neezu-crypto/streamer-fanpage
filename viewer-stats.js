@@ -25,7 +25,7 @@ const functions = getFunctions(app, 'us-central1');
 const callViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats');
 const callViewerStatsVisit = httpsCallable(functions, 'streamerFanPageViewerStatsVisit');
 const callViewerSubscription = httpsCallable(functions, 'streamerFanPageViewerSubscription');
-const callSponsorAds = httpsCallable(functions, 'streamerFanPageSponsorAds');
+const callSponsorAds = httpsCallable(functions, 'streamerFanPageViewerSponsors');
 const callAdminSponsorAds = httpsCallable(functions, 'streamerFanPageAdminSponsorAds');
 const callSponsorLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
 const $ = (id) => document.getElementById(id);
@@ -311,12 +311,9 @@ const viewerStatsStaticIndexCache = new Map();
 let viewerVodCatalogCache = null;
 let viewerVodCatalogPromise = null;
 const sponsorLiveStatusCache = new Map();
-const SPONSOR_PENDING_REQUEST_KEY = 'streamerFanPage.sponsor.pendingRequest.v1';
-let sponsorRequestId = '';
 let sponsorRequestRecord = null;
 let sponsorRequestRail = 'left';
 let sponsorProfileRequestId = 0;
-let sponsorPollTimer = 0;
 let sponsorRequestPreviousFocus = null;
 
 function waitForAuthRestore() {
@@ -3737,38 +3734,29 @@ async function refreshSponsorAds() {
     const response = await callSponsorAds({ action: 'list' });
     const data = response.data || {};
     renderSponsorRails(data.ads || [], data.pendingByRail || { left: 0, right: 0 });
-    $('sponsorAdminPanel').classList.toggle('hidden', data.isAdmin !== true);
-    if (data.isAdmin === true) await loadAdminSponsorRequests();
+    const adminPanel = $('sponsorAdminPanel');
+    if (adminPanel) {
+      adminPanel.classList.toggle('hidden', data.isAdmin !== true);
+      if (data.isAdmin === true) await loadAdminSponsorRequests();
+    }
   } catch (error) {
     console.error('오늘의 후원 스트리머를 불러오지 못했습니다.', error);
     renderSponsorRails([]);
   }
 }
 
-function getSavedSponsorRequestId() {
-  try { return localStorage.getItem(SPONSOR_PENDING_REQUEST_KEY) || ''; } catch (_) { return ''; }
-}
-
-function setSavedSponsorRequestId(requestId) {
-  try {
-    if (requestId) localStorage.setItem(SPONSOR_PENDING_REQUEST_KEY, requestId);
-    else localStorage.removeItem(SPONSOR_PENDING_REQUEST_KEY);
-  } catch (_) {}
-}
-
-function showSponsorDonationStep(record) {
-  sponsorRequestRecord = record;
+function showSponsorPaymentComplete(record) {
   $('sponsorRequestFields').classList.add('hidden');
   $('sponsorDonationStep').classList.remove('hidden');
-  $('sponsorRequestTitle').textContent = '후원 신청 확인';
-  $('sponsorRequestIntro').textContent = '후원 알림은 자동 감시·자동 승인하지 않습니다. 후원 완료 알리기를 전달하면 관리자가 후원 내역을 확인한 뒤 홍보 신청을 수동 승인합니다.';
+  $('sponsorRequestTitle').textContent = '홍보가 시작됐어요';
+  $('sponsorRequestIntro').textContent = '통합 캐시가 차감되고 오늘의 후원 스트리머 영역에 바로 표시됩니다.';
   const summary = $('sponsorDonationSummary');
   summary.replaceChildren();
   const rows = [
     ['홍보 스트리머', `${record.nickname} · ${record.soopId}`],
-    ['후원 계정', record.donorSoopId],
     ['노출 기간', `${record.days}일`],
-    ['필요 별풍선', `${Number(record.balloonCost).toLocaleString('ko-KR')}개`],
+    ['차감 캐시', `${Number(record.cashAmount).toLocaleString('ko-KR')}캐시`],
+    ['노출 종료', sponsorDate(record.expiresAt)],
   ];
   rows.forEach(([label, value]) => {
     const cell = document.createElement('div');
@@ -3779,119 +3767,88 @@ function showSponsorDonationStep(record) {
     cell.append(caption, strong);
     summary.append(cell);
   });
-  const completed = Number(record.donationCompletedAt) > 0;
-  $('sponsorDonationComplete').classList.toggle('hidden', completed);
-  $('sponsorRequestWithdraw').classList.toggle('hidden', completed);
-  $('sponsorDonationLink').classList.toggle('hidden', completed);
-  $('sponsorRequestDone').classList.toggle('hidden', false);
-  $('sponsorDonationStatus').textContent = completed
-    ? '후원 완료 알림을 전달했어요. 관리자가 후원 내역을 확인한 뒤 수동 승인합니다.'
-    : `운영자 방송국에 별풍선 ${Number(record.balloonCost).toLocaleString('ko-KR')}개를 후원한 뒤 완료 알리기를 눌러 주세요. 후원 알림은 자동 감시·자동 승인하지 않으며, 관리자가 내역을 확인해 수동 승인합니다. 알림이 없는 신청은 7일 후 만료됩니다.`;
+  $('sponsorDonationStatus').textContent = `잔여 통합 캐시 ${Number(record.remainingCash).toLocaleString('ko-KR')}캐시 · ${sponsorDate(record.expiresAt)}까지 노출됩니다.`;
   $('sponsorRequestStatus').textContent = '';
-  startSponsorStatusPolling();
 }
 
 function closeSponsorDialog() {
   const dialog = $('sponsorRequestDialog');
   if (dialog.open) dialog.close();
-  window.clearInterval(sponsorPollTimer);
-  sponsorPollTimer = 0;
   if (sponsorRequestPreviousFocus && document.contains(sponsorRequestPreviousFocus)) sponsorRequestPreviousFocus.focus();
 }
 
-async function refreshSponsorRequestStatus() {
-  if (!sponsorRequestId) return;
-  try {
-    const response = await callSponsorAds({ action: 'status', requestId: sponsorRequestId });
-    const data = response.data || {};
-    if (data.status === 'pending') {
-      sponsorRequestRecord = { ...data, requestId: sponsorRequestId };
-      if ($('sponsorRequestDialog').open) showSponsorDonationStep(sponsorRequestRecord);
-      return;
-    }
-    if (data.status === 'processing') {
-      if ($('sponsorRequestDialog').open) $('sponsorDonationStatus').textContent = '후원 내역을 확인해 홍보 카드를 승인 처리하고 있습니다.';
-      return;
-    }
-    window.clearInterval(sponsorPollTimer);
-    sponsorPollTimer = 0;
-    if (data.status === 'approved') {
-      setSavedSponsorRequestId('');
-      if ($('sponsorRequestDialog').open) {
-        $('sponsorDonationLink').classList.add('hidden');
-        $('sponsorDonationComplete').classList.add('hidden');
-        $('sponsorRequestWithdraw').classList.add('hidden');
-        $('sponsorRequestDone').classList.remove('hidden');
-        $('sponsorDonationStatus').textContent = `신청이 승인됐어요. ${sponsorDate(data.expiresAt)}까지 후원 스트리머 카드에 표시됩니다.`;
-      }
-      await refreshSponsorAds();
-      return;
-    }
-    setSavedSponsorRequestId('');
-    sponsorRequestId = '';
-    if ($('sponsorRequestDialog').open) {
-      $('sponsorDonationStep').classList.add('hidden');
-      $('sponsorRequestFields').classList.remove('hidden');
-      $('sponsorRequestTitle').textContent = '스트리머 홍보 신청';
-      $('sponsorRequestIntro').textContent = '홍보할 스트리머와 후원 계정, 노출 기간을 입력하세요.';
-      const messages = { rejected: '신청이 반려되었습니다. 입력 정보를 확인한 뒤 다시 신청할 수 있어요.', expired: '후원 완료 전 신청이 만료되었습니다. 다시 신청해 주세요.', cancelled: '신청이 취소되었습니다.' };
-      $('sponsorRequestStatus').textContent = messages[data.status] || '신청 상태가 변경되었습니다.';
-    }
-  } catch (error) {
-    if ($('sponsorRequestDialog').open) $('sponsorDonationStatus').textContent = viewerStatsErrorMessage(error, '신청 상태를 확인하지 못했습니다.');
-  }
+function newSponsorRequestId() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') return globalThis.crypto.randomUUID().replaceAll('-', '');
+  return `${Date.now()}${Math.random().toString(36).slice(2, 18)}`.replace(/[^A-Za-z0-9_-]/g, '').padEnd(16, '0').slice(0, 64);
 }
 
-function startSponsorStatusPolling() {
-  window.clearInterval(sponsorPollTimer);
-  if (!sponsorRequestId || !$('sponsorRequestDialog').open) return;
-  sponsorPollTimer = window.setInterval(refreshSponsorRequestStatus, 20000);
+function resetSponsorProfile() {
+  const balanceCash = sponsorRequestRecord && sponsorRequestRecord.balanceCash;
+  const cashPerDay = sponsorRequestRecord && sponsorRequestRecord.cashPerDay;
+  sponsorRequestRecord = Number.isFinite(balanceCash) || Number.isFinite(cashPerDay)
+    ? { balanceCash, cashPerDay }
+    : null;
+  $('sponsorRequestProfile').classList.add('hidden');
+  $('sponsorRequestProfileImage').removeAttribute('src');
+  $('sponsorRequestProfileStatus').textContent = '';
+  $('sponsorRequestSubmit').disabled = true;
+  $('sponsorRequestSubmit').textContent = '프로필을 확인해 주세요';
+}
+
+async function loadSponsorCashStatus() {
+  try {
+    const response = await callSponsorAds({ action: 'status' });
+    const data = response.data || {};
+    sponsorRequestRecord = { ...(sponsorRequestRecord || {}), balanceCash: Number(data.balanceCash) || 0, cashPerDay: Number(data.cashPerDay) || 10 };
+    $('sponsorRequestBalance').textContent = `현재 통합 캐시 ${sponsorRequestRecord.balanceCash.toLocaleString('ko-KR')}캐시`;
+    updateSponsorPrice();
+  } catch (error) {
+    const message = viewerStatsErrorMessage(error, '통합 캐시 잔액을 확인하지 못했습니다.');
+    $('sponsorRequestBalance').textContent = message === 'internal' ? '통합 캐시 잔액을 확인하지 못했습니다.' : message;
+    $('sponsorRequestBalance').classList.add('is-error');
+  }
 }
 
 async function openSponsorRequest(button) {
   sponsorRequestPreviousFocus = button;
   sponsorRequestRail = button.dataset.sponsorRail === 'right' ? 'right' : 'left';
-  sponsorRequestId = getSavedSponsorRequestId();
   $('sponsorRequestStatus').textContent = '';
+  $('sponsorRequestFields').classList.remove('hidden');
+  $('sponsorDonationStep').classList.add('hidden');
+  $('sponsorRequestTitle').textContent = '오늘의 후원 스트리머 홍보';
+  $('sponsorRequestIntro').textContent = '홍보할 스트리머를 확인한 뒤 통합 캐시로 즉시 결제합니다.';
+  $('sponsorRequestForm').reset();
+  resetSponsorProfile();
+  updateSponsorPrice();
   showViewerModal($('sponsorRequestDialog'));
-  if (sponsorRequestId) {
-    await refreshSponsorRequestStatus();
-    if (sponsorRequestId && !sponsorRequestRecord) {
-      $('sponsorRequestFields').classList.remove('hidden');
-      $('sponsorDonationStep').classList.add('hidden');
-    }
-  } else {
-    $('sponsorRequestFields').classList.remove('hidden');
-    $('sponsorDonationStep').classList.add('hidden');
-    $('sponsorRequestTitle').textContent = '스트리머 홍보 신청';
-    $('sponsorRequestIntro').textContent = '홍보할 스트리머와 후원 계정, 노출 기간을 입력하세요.';
-    $('sponsorRequestForm').reset();
-    updateSponsorPrice();
-    if (!window.matchMedia('(hover: none), (pointer: coarse)').matches) {
-      window.setTimeout(() => $('sponsorRequestNickname').focus(), 0);
-    }
+  void loadSponsorCashStatus();
+  if (!window.matchMedia('(hover: none), (pointer: coarse)').matches) {
+    window.setTimeout(() => $('sponsorRequestSoopId').focus(), 0);
   }
 }
 
 function updateSponsorPrice() {
   const days = Number.parseInt($('sponsorRequestDays').value, 10);
   const valid = Number.isInteger(days) && days >= 1 && days <= 30;
-  $('sponsorRequestCostLabel').textContent = valid ? `${days}일 × 10개` : '기간을 확인해 주세요';
-  $('sponsorRequestTotal').textContent = valid ? `${(days * 10).toLocaleString('ko-KR')}개` : '—';
+  const cashPerDay = Number(sponsorRequestRecord && sponsorRequestRecord.cashPerDay) || 10;
+  const total = valid ? days * cashPerDay : 0;
+  $('sponsorRequestCostLabel').textContent = valid ? `${days}일 × ${cashPerDay}캐시` : '기간을 확인해 주세요';
+  $('sponsorRequestTotal').textContent = valid ? `${total.toLocaleString('ko-KR')}캐시` : '—';
+  const sufficient = !sponsorRequestRecord || !Number.isFinite(sponsorRequestRecord.balanceCash) || sponsorRequestRecord.balanceCash >= total;
+  $('sponsorRequestBalance').classList.toggle('is-error', valid && !sufficient);
+  if (valid && !sufficient) $('sponsorRequestBalance').textContent = `통합 캐시가 부족합니다. 필요 ${total.toLocaleString('ko-KR')}캐시`;
 }
 
 $('sponsorRequestForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const nickname = $('sponsorRequestNickname').value.trim();
   const soopId = $('sponsorRequestSoopId').value.trim().toLowerCase();
-  const donorSoopId = $('sponsorRequestDonorId').value.trim().toLowerCase();
   const days = Number.parseInt($('sponsorRequestDays').value, 10);
   let firstInvalid = null;
   $('sponsorNicknameError').textContent = '';
-  $('sponsorSoopIdMessage').textContent = '홍보 중이거나 신청 확인 중인 스트리머는 중복 신청할 수 없어요.';
+  $('sponsorSoopIdMessage').textContent = 'SOOP 아이디를 입력하면 공개 프로필을 확인합니다.';
   $('sponsorSoopIdMessage').classList.remove('is-error');
-  $('sponsorDonorIdError').textContent = '';
-  $('sponsorDaysError').textContent = '하루 별풍선 10개 · 최대 30일';
+  $('sponsorDaysError').textContent = '하루 10캐시 · 최대 30일';
   document.querySelectorAll('#sponsorRequestForm input').forEach((input) => input.removeAttribute('aria-invalid'));
   if (!nickname || nickname.length > 40) {
     $('sponsorNicknameError').textContent = '스트리머 닉네임을 입력해 주세요.';
@@ -3902,10 +3859,6 @@ $('sponsorRequestForm').addEventListener('submit', async (event) => {
     $('sponsorSoopIdMessage').classList.add('is-error');
     firstInvalid ||= $('sponsorRequestSoopId');
   }
-  if (!/^[a-z0-9]{2,20}$/.test(donorSoopId)) {
-    $('sponsorDonorIdError').textContent = '후원 계정의 SOOP 아이디를 확인해 주세요.';
-    firstInvalid ||= $('sponsorRequestDonorId');
-  }
   if (!Number.isInteger(days) || days < 1 || days > 30) {
     $('sponsorDaysError').textContent = '홍보 기간은 1~30일로 선택해 주세요.';
     firstInvalid ||= $('sponsorRequestDays');
@@ -3915,19 +3868,29 @@ $('sponsorRequestForm').addEventListener('submit', async (event) => {
     firstInvalid.focus();
     return;
   }
+  if (!sponsorRequestRecord || sponsorRequestRecord.soopId !== soopId || !sponsorRequestRecord.profileVerified) {
+    $('sponsorSoopIdMessage').textContent = '먼저 SOOP 프로필을 확인해 주세요.';
+    $('sponsorSoopIdMessage').classList.add('is-error');
+    $('sponsorRequestSoopId').focus();
+    return;
+  }
+  const cashAmount = days * (Number(sponsorRequestRecord.cashPerDay) || 10);
+  if (Number(sponsorRequestRecord.balanceCash) < cashAmount) {
+    setSponsorHint('sponsorRequestStatus', `통합 캐시가 부족합니다. 필요 ${cashAmount.toLocaleString('ko-KR')}캐시입니다.`, true);
+    return;
+  }
+  if (!confirm(`${nickname || sponsorRequestRecord.nickname}을(를) ${days}일간 홍보합니다. 통합 캐시 ${cashAmount.toLocaleString('ko-KR')}캐시가 즉시 차감되며 일반 취소·환불은 할 수 없습니다. 계속할까요?`)) return;
   const submit = $('sponsorRequestSubmit');
   submit.disabled = true;
-  setSponsorHint('sponsorRequestStatus', '신청을 등록하고 있어요.');
+  setSponsorHint('sponsorRequestStatus', '통합 캐시 결제와 홍보 등록을 처리하고 있어요.');
   try {
     await getAuthReady();
-    const response = await callSponsorAds({ action: 'submit', nickname, soopId, donorSoopId, days, rail: sponsorRequestRail });
+    const response = await callSponsorAds({ action: 'purchase', requestId: newSponsorRequestId(), nickname, soopId, days, rail: sponsorRequestRail });
     const data = response.data || {};
-    sponsorRequestId = String(data.requestId || '');
-    sponsorRequestRecord = { requestId: sponsorRequestId, requestedAt: Number(data.requestedAt) || Date.now(), nickname, soopId, donorSoopId, days, balloonCost: Number(data.balloonCost) || days * 10, status: 'pending', donationCompletedAt: 0 };
-    setSavedSponsorRequestId(sponsorRequestId);
-    showSponsorDonationStep(sponsorRequestRecord);
+    showSponsorPaymentComplete({ ...data, nickname: data.nickname || nickname || sponsorRequestRecord.nickname, soopId, days, cashAmount: Number(data.cashAmount) || cashAmount });
+    await refreshSponsorAds();
   } catch (error) {
-    const message = viewerStatsErrorMessage(error, '신청을 접수하지 못했습니다.');
+    const message = viewerStatsErrorMessage(error, '홍보 결제를 완료하지 못했습니다.');
     const duplicate = String(error && error.code || '').endsWith('already-exists')
       || message.includes('이미 홍보 중')
       || message.includes('이미 확인 중');
@@ -3939,33 +3902,48 @@ $('sponsorRequestForm').addEventListener('submit', async (event) => {
       setSponsorHint('sponsorRequestStatus', message, true);
     }
   } finally {
+    if (!$('sponsorDonationStep').classList.contains('hidden')) return;
     submit.disabled = false;
   }
 });
 
+let sponsorProfileDebounce = 0;
 $('sponsorRequestSoopId').addEventListener('input', () => {
   const soopId = $('sponsorRequestSoopId').value.trim().toLowerCase();
   const hint = $('sponsorSoopIdMessage');
   hint.textContent = '홍보 중이거나 신청 확인 중인 스트리머는 중복 신청할 수 없어요.';
   hint.classList.remove('is-error');
-  const image = $('sponsorRequestProfileImage');
-  const profile = $('sponsorRequestProfile');
+  window.clearTimeout(sponsorProfileDebounce);
   const request = ++sponsorProfileRequestId;
+  resetSponsorProfile();
   if (!/^[a-z0-9]{2,20}$/.test(soopId)) {
-    profile.classList.add('hidden');
-    image.removeAttribute('src');
-    $('sponsorRequestProfileStatus').textContent = '';
     return;
   }
-  profile.classList.remove('hidden');
+  $('sponsorRequestProfile').classList.remove('hidden');
   $('sponsorRequestProfileStatus').textContent = 'SOOP 프로필을 확인 중…';
-  image.onload = () => {
-    if (request === sponsorProfileRequestId) $('sponsorRequestProfileStatus').textContent = '입력한 SOOP 프로필';
-  };
-  image.onerror = () => {
-    if (request === sponsorProfileRequestId) $('sponsorRequestProfileStatus').textContent = '프로필을 불러오지 못했어요. 아이디를 확인해 주세요.';
-  };
-  image.src = `https://stimg.sooplive.com/LOGO/${soopId.slice(0, 2)}/${soopId}/${soopId}.jpg`;
+  sponsorProfileDebounce = window.setTimeout(async () => {
+    try {
+      await getAuthReady();
+      const response = await callSponsorAds({ action: 'profile', soopId });
+      const profile = response.data && response.data.profile;
+      if (request !== sponsorProfileRequestId || !profile) return;
+      sponsorRequestRecord = { ...(sponsorRequestRecord || {}), ...profile, profileVerified: true };
+      $('sponsorRequestProfileImage').src = profile.avatarUrl;
+      $('sponsorRequestProfileImage').alt = `${profile.nickname} 프로필 이미지`;
+      $('sponsorRequestProfileStatus').textContent = `${profile.nickname} · @${profile.soopId}`;
+      if (!$('sponsorRequestNickname').value.trim() || $('sponsorRequestNickname').dataset.autoFilled === 'true') {
+        $('sponsorRequestNickname').value = profile.nickname;
+        $('sponsorRequestNickname').dataset.autoFilled = 'true';
+      }
+      $('sponsorRequestSubmit').disabled = false;
+      $('sponsorRequestSubmit').textContent = '통합 캐시로 홍보하기';
+    } catch (error) {
+      if (request !== sponsorProfileRequestId) return;
+      $('sponsorRequestProfileStatus').textContent = viewerStatsErrorMessage(error, 'SOOP 프로필을 확인하지 못했습니다.');
+      $('sponsorSoopIdMessage').textContent = 'SOOP 아이디를 확인해 주세요.';
+      $('sponsorSoopIdMessage').classList.add('is-error');
+    }
+  }, 450);
 });
 $('sponsorRequestDays').addEventListener('input', updateSponsorPrice);
 $('sponsorRequestClose').addEventListener('click', closeSponsorDialog);
@@ -3974,50 +3952,6 @@ $('sponsorRequestDone').addEventListener('click', closeSponsorDialog);
 $('sponsorRequestDialog').addEventListener('click', (event) => {
   if (event.target === $('sponsorRequestDialog')) closeSponsorDialog();
 });
-$('sponsorRequestDialog').addEventListener('close', () => {
-  window.clearInterval(sponsorPollTimer);
-  sponsorPollTimer = 0;
-});
-$('sponsorDonationComplete').addEventListener('click', async () => {
-  if (!sponsorRequestId) return;
-  const button = $('sponsorDonationComplete');
-  button.disabled = true;
-  try {
-    const response = await callSponsorAds({ action: 'donationComplete', requestId: sponsorRequestId });
-    const result = response.data || {};
-    if (result.status === 'approved' || result.status === 'processing') {
-      await refreshSponsorRequestStatus();
-      return;
-    }
-    if (sponsorRequestRecord) sponsorRequestRecord.donationCompletedAt = Date.now();
-    $('sponsorDonationStatus').textContent = '후원 완료 알림을 전달했어요. 관리자가 후원 내역을 확인한 뒤 수동 승인합니다.';
-    showSponsorDonationStep(sponsorRequestRecord);
-  } catch (error) {
-    $('sponsorDonationStatus').textContent = viewerStatsErrorMessage(error, '후원 완료를 접수하지 못했습니다.');
-    button.disabled = false;
-  }
-});
-$('sponsorRequestWithdraw').addEventListener('click', async () => {
-  if (!sponsorRequestId || !confirm('홍보 신청을 취소할까요?')) return;
-  const button = $('sponsorRequestWithdraw');
-  button.disabled = true;
-  try {
-    await callSponsorAds({ action: 'cancel', requestId: sponsorRequestId });
-    setSavedSponsorRequestId('');
-    sponsorRequestId = '';
-    sponsorRequestRecord = null;
-    $('sponsorDonationStep').classList.add('hidden');
-    $('sponsorRequestFields').classList.remove('hidden');
-    $('sponsorRequestTitle').textContent = '스트리머 홍보 신청';
-    setSponsorHint('sponsorRequestStatus', '신청을 취소했습니다.');
-  } catch (error) {
-    $('sponsorDonationStatus').textContent = viewerStatsErrorMessage(error, '신청을 취소하지 못했습니다.');
-  } finally {
-    button.disabled = false;
-  }
-});
-$('sponsorAdminRefresh').addEventListener('click', loadAdminSponsorRequests);
-
 let sponsorLoadedForUid = '';
 onAuthStateChanged(auth, (user) => {
   if (!user || sponsorLoadedForUid === user.uid) return;
@@ -4027,7 +3961,6 @@ onAuthStateChanged(auth, (user) => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     refreshSponsorAds();
-    if ($('sponsorRequestDialog').open && sponsorRequestId) refreshSponsorRequestStatus();
   }
 });
 
@@ -4060,7 +3993,4 @@ document.querySelectorAll('.viewer-affiliate-image img').forEach((image) => {
 });
 renderComparisonSelection();
 loadDevbarLinks();
-getAuthReady().then(() => {
-  sponsorRequestId = getSavedSponsorRequestId();
-  if (sponsorRequestId) refreshSponsorRequestStatus();
-}).catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));
+getAuthReady().catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));
