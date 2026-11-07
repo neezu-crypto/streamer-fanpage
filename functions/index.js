@@ -65,6 +65,9 @@ const {
   streamerFanPageAdminSponsorAds,
 } = require('./sponsor-ads');
 const {
+  streamerFanPageViewerSponsors,
+} = require('./viewer-sponsors');
+const {
   pruneVerifiedStreamerVisitDedup,
   recordVerifiedStreamerVisit,
 } = require('./verified-streamer-visits');
@@ -109,6 +112,7 @@ exports.streamerFanPageViewerSubscription = streamerFanPageViewerSubscription;
 exports.streamerFanPageAdminViewerSubscriptionRequests = streamerFanPageAdminViewerSubscriptionRequests;
 exports.streamerFanPageSponsorAds = streamerFanPageSponsorAds;
 exports.streamerFanPageAdminSponsorAds = streamerFanPageAdminSponsorAds;
+exports.streamerFanPageViewerSponsors = streamerFanPageViewerSponsors;
 const MAX_INTRO_LENGTH = 700;
 const MAX_BANNER_IMAGE_ITEMS = 20;
 const FANPAGE_COMPETITION_HISTORY_MAX_ITEMS = 30;
@@ -4817,9 +4821,12 @@ exports.streamerFanPageLiveStatus = onCall({ maxInstances: 20 }, async (request)
   const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
   const target = await findVerifiedBySoopId(streamerId);
   if (target) return await fetchSoopLiveStatus(target.streamer.soopId);
-  const sponsorSnapshot = await db.ref('streamerFanPageSponsorAds').get();
+  const [legacySponsorSnapshot, cashSponsorSnapshot] = await Promise.all([
+    db.ref('streamerFanPageSponsorAds').get(),
+    db.ref('streamerFanPageViewerSponsors/campaigns').get(),
+  ]);
   const now = Date.now();
-  const sponsored = Object.values(sponsorSnapshot.val() || {}).some((ad) => ad
+  const sponsored = [...Object.values(legacySponsorSnapshot.val() || {}), ...Object.values(cashSponsorSnapshot.val() || {})].some((ad) => ad
     && String(ad.soopId || '').toLowerCase() === streamerId
     && ad.status === 'active'
     && Number(ad.expiresAt) > now);

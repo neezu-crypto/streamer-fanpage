@@ -56,6 +56,8 @@
 .viewer-sponsor-profile img{width:40px;height:40px;border:1px solid #dbe3ef;object-fit:cover}
 .viewer-sponsor-price{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding:13px 14px;border:1px solid #d7e0ee;background:#f0f4ff;color:#63738b;font-size:12px}
 .viewer-sponsor-price strong{color:#3658bd;font-size:19px}
+.viewer-sponsor-balance{min-height:18px;margin:10px 0 0;color:#3f5fb5;font-size:12px;font-weight:700;line-height:1.6}
+.viewer-sponsor-balance.is-error{color:#c63d5b}
 .viewer-sponsor-notice{margin:12px 0 0;padding:10px 12px;border-left:3px solid #486bd6;background:#f4f7fc;color:#65738a;font-size:11px;line-height:1.6}
 .viewer-sponsor-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:18px}
 .viewer-sponsor-actions .button{min-height:42px;padding:9px 14px;border-radius:0;font-size:12px}
