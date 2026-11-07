@@ -3616,6 +3616,7 @@ async function loadSponsorCashStatus() {
     updateSponsorPrice();
   } catch (error) {
     const message = viewerStatsErrorMessage(error, '통합 캐시 잔액을 확인하지 못했습니다.');
+    $('sponsorChargeLink').hidden = true;
     $('sponsorRequestBalance').textContent = message === 'internal' ? '통합 캐시 잔액을 확인하지 못했습니다.' : message;
     $('sponsorRequestBalance').classList.add('is-error');
   }
@@ -3648,7 +3649,9 @@ function updateSponsorPrice() {
   $('sponsorRequestTotal').textContent = valid ? `${total.toLocaleString('ko-KR')}캐시` : '—';
   const sufficient = !sponsorRequestRecord || !Number.isFinite(sponsorRequestRecord.balanceCash) || sponsorRequestRecord.balanceCash >= total;
   $('sponsorRequestBalance').classList.toggle('is-error', valid && !sufficient);
+  $('sponsorChargeLink').hidden = !(valid && !sufficient);
   if (valid && !sufficient) $('sponsorRequestBalance').textContent = `통합 캐시가 부족합니다. 필요 ${total.toLocaleString('ko-KR')}캐시`;
+  else if (sponsorRequestRecord && Number.isFinite(sponsorRequestRecord.balanceCash)) $('sponsorRequestBalance').textContent = `현재 통합 캐시 ${sponsorRequestRecord.balanceCash.toLocaleString('ko-KR')}캐시`;
 }
 
 $('sponsorRequestForm').addEventListener('submit', async (event) => {
@@ -3763,6 +3766,7 @@ onAuthStateChanged(auth, (user) => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     refreshSponsorAds();
+    if ($('sponsorRequestDialog').open) void loadSponsorCashStatus();
   }
 });
 
