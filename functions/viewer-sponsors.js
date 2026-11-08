@@ -356,10 +356,11 @@ async function activateCampaign({ db, campaign, requestId, now }) {
   if (!saved || saved.paymentRequestId !== requestId || saved.status !== 'active') {
     throw new HttpsError('aborted', '홍보 캠페인을 시작하지 못했습니다.');
   }
-  const claim = await db.ref(`${CLAIMS_PATH}/${campaign.soopId}`).transaction((current) => {
-    if (!current || current.requestId !== requestId) return;
+  const claimRef = db.ref(`${CLAIMS_PATH}/${campaign.soopId}`);
+  const claim = await withFreshValue(claimRef, () => claimRef.transaction((current) => {
+    if (!current || current.requestId !== requestId || (current.status !== 'active' && Number(current.expiresAt) <= Date.now())) return;
     return { ...current, status: 'active', campaignId: requestId, expiresAt: campaign.expiresAt, updatedAt: now };
-  }, undefined, false);
+  }, undefined, false));
   if (!claim.committed && (!claim.snapshot.val() || claim.snapshot.val().campaignId !== requestId)) {
     throw new HttpsError('aborted', '홍보 자리 상태를 확정하지 못했습니다.');
   }
