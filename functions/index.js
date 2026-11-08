@@ -12,6 +12,20 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onTaskDispatched } = require('firebase-functions/v2/tasks');
 const { onValueWritten } = require('firebase-functions/v2/database');
 const { defineSecret } = require('firebase-functions/params');
+const { submitBugReport, bugReportStatus } = require('./viewer-bug-reports');
+const { hasViewerUnlock } = require('./viewer-unlock-access');
+const { purchaseViewerUnlock, reconcileViewerUnlockPayments } = require('./viewer-unlock-purchase');
+const { refundUnactivatedUnlock } = require('./viewer-unlock-refund');
+const { transferViewerUnlockFeature } = require('./viewer-unlock-transfer');
+const {
+  CODE_TTL_MS,
+  makeTransferCode,
+  digestTransferCode,
+  isRecentAuthentication,
+  claimTransferRequest,
+} = require('./viewer-unlock-transfer-policy');
+const { FEATURES } = require('./viewer-unlock-policy');
+const { nextPaidBurstState } = require('./viewer-unlock-abuse');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { createHash, randomUUID } = require('node:crypto');
 const { parseWeFlabRouletteHtml, parseWeFlabRouletteUrl } = require('./weflab-roulette');
@@ -217,6 +231,8 @@ const FANPAGE_UPBO_MAX_ITEMS = 100;
 const FANPAGE_UPBO_BOARD_PAGE_SIZE = 100;
 const FANPAGE_UPBO_MAX_QUANTITY = 1000000;
 const YOUTUBE_DATA_API_KEY = defineSecret('YOUTUBE_DATA_API_KEY');
+// 이전 코드는 DB에 평문으로 남기지 않는다. 배포 전에 32바이트 이상 Secret을 등록한다.
+const VIEWER_UNLOCK_TRANSFER_SECRET = defineSecret('VIEWER_UNLOCK_TRANSFER_SECRET');
 const GALLERY_PUBLIC_IMAGE_HOST = 'pub-aa5574dbd45e4404b18ab8efaae54e67.r2.dev';
 const GALLERY_CATEGORY_LABELS = Object.freeze({
   screenshot: '방송 캡처',
@@ -493,6 +509,171 @@ function requireAuth(request) {
   return request.auth.uid;
 }
 
+exports.streamerFanPageViewerStatsBugReports = onCall({ maxInstances: 10, enforceAppCheck: true }, async (request) => {
+  const uid = requireAuth(request);
+  if (await resolveViewerStatsBaseTier(uid, request.auth) !== 'account') {
+    throw new HttpsError('permission-denied', '버그 제보는 로그인 후 이용할 수 있습니다.');
+  }
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  if (data.action === 'status') return bugReportStatus({ db, uid, requestId: String(data.requestId || '') });
+  if (data.action !== 'submit') throw new HttpsError('invalid-argument', '제보 요청을 확인해 주세요.');
+  return submitBugReport({ db, uid, requestId: String(data.requestId || ''), title: data.title == null ? '' : data.title, content: data.content });
+});
+
+exports.streamerFanPageViewerStatsUnlocks = onCall({
+  maxInstances: 10,
+  enforceAppCheck: true,
+  secrets: [VIEWER_UNLOCK_TRANSFER_SECRET],
+}, async (request) => {
+  const uid = requireAuth(request);
+  const isAdmin = await isAdminUid(uid);
+  if (!isAdmin && await resolveViewerStatsBaseTier(uid, request.auth) !== 'account') throw new HttpsError('permission-denied', '기능 해금은 로그인 후 이용할 수 있습니다.');
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  if (data.action === 'access') {
+    const features = {};
+    for (const featureId of Object.keys(FEATURES)) features[featureId] = await hasViewerUnlock({ db, uid, featureId, isAdmin, authenticated: true });
+    const account = (await sharedDb.ref(`gameSeriesWallet/accounts/${uid}/balanceCash`).get()).val();
+    return { features, prices: FEATURES, balanceCash: Math.max(0, Number(account) || 0), isAdmin };
+  }
+  if (data.action === 'status') {
+    const requestId = String(data.requestId || '');
+    if (!/^[A-Za-z0-9_-]{16,128}$/.test(requestId)) throw new HttpsError('invalid-argument', '요청 번호를 확인해 주세요.');
+    const operation = (await db.ref(`viewerStatsUnlockPayments/operations/${requestId}`).get()).val();
+    if (operation && operation.uid !== uid) throw new HttpsError('permission-denied', '다른 계정의 결제 요청입니다.');
+    return { status: operation?.status || 'unknown', featureId: operation?.featureId || '', cashAmount: operation?.cashAmount || 0, createdAt: operation?.createdAt || null };
+  }
+  if (data.action === 'myHistory') {
+    const snapshot = await db.ref(`viewerStatsUnlockPayments/byUser/${uid}`).get();
+    const entries = Object.entries(snapshot.val() || {}).filter(([id, item]) => /^[A-Za-z0-9_-]{16,128}$/.test(id) && item?.requestId === id)
+      .sort((a, b) => Number(b[1].createdAt || 0) - Number(a[1].createdAt || 0));
+    const selected = entries.slice(0, 100);
+    const items = (await Promise.all(selected.map(async ([requestId]) => {
+      const operation = (await db.ref(`viewerStatsUnlockPayments/operations/${requestId}`).get()).val();
+      if (!operation || operation.uid !== uid) return null;
+      return { requestId, featureId: operation.featureId, status: operation.status, cashAmount: operation.cashAmount, createdAt: operation.createdAt, updatedAt: operation.updatedAt || null };
+    }))).filter(Boolean);
+    return { items, hasMore: entries.length > selected.length };
+  }
+  if (data.action === 'transferStart') {
+    const featureId = String(data.featureId || '');
+    if (!Object.prototype.hasOwnProperty.call(FEATURES, featureId)) throw new HttpsError('invalid-argument', '이전할 기능을 확인해 주세요.');
+    if (isAdmin || !isRecentAuthentication(request.auth)) {
+      throw new HttpsError('failed-precondition', '권한을 옮기려면 일반 로그인 계정으로 다시 로그인한 뒤 5분 안에 시작해 주세요.');
+    }
+    const current = await db.ref(`viewerStatsUnlocks/${uid}/${featureId}`).get();
+    const ownershipId = String(current.val()?.ownershipId || '');
+    if (!/^[A-Za-z0-9_-]{16,128}$/.test(ownershipId)) throw new HttpsError('not-found', '이전할 해금 권한을 찾지 못했습니다.');
+    const ownership = (await db.ref(`viewerStatsUnlockTransfers/ownership/${ownershipId}`).get()).val();
+    if (!ownership || ownership.ownerUid !== uid || ownership.status !== 'active' || ownership.featureId !== featureId) {
+      throw new HttpsError('failed-precondition', '현재 계정에서 이전할 수 있는 활성 권한이 아닙니다.');
+    }
+    const secret = VIEWER_UNLOCK_TRANSFER_SECRET.value();
+    const code = makeTransferCode();
+    const now = Date.now();
+    const transferId = randomUUID().replace(/-/g, '');
+    await db.ref(`viewerStatsUnlockTransfers/requests/${transferId}`).set({
+      transferId,
+      sourceUid: uid,
+      featureId,
+      ownershipId,
+      codeDigest: digestTransferCode(code, secret),
+      status: 'pending',
+      attempts: 0,
+      createdAt: now,
+      expiresAt: now + CODE_TTL_MS,
+    });
+    return { transferId, featureId, code, expiresAt: now + CODE_TTL_MS };
+  }
+  if (data.action === 'transferClaim') {
+    const transferId = String(data.transferId || '');
+    const rawCode = String(data.code || '').trim().toUpperCase();
+    if (!/^[A-Za-z0-9_-]{16,128}$/.test(transferId) || !/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(rawCode)) {
+      throw new HttpsError('invalid-argument', '이전 요청 번호와 8자리 인증 코드를 확인해 주세요.');
+    }
+    if (isAdmin || !isRecentAuthentication(request.auth)) {
+      throw new HttpsError('failed-precondition', '권한을 받으려면 일반 로그인 계정으로 다시 로그인한 뒤 5분 안에 인증해 주세요.');
+    }
+    const now = Date.now();
+    const requestRef = db.ref(`viewerStatsUnlockTransfers/requests/${transferId}`);
+    const candidateDigest = digestTransferCode(rawCode, VIEWER_UNLOCK_TRANSFER_SECRET.value());
+    let claimError = '';
+    const claim = await requestRef.transaction((current) => {
+      const result = claimTransferRequest(current, { targetUid: uid, candidateDigest, now });
+      claimError = result.error || '';
+      return result.request || undefined;
+    }, undefined, false);
+    if (!claim.committed || claimError) {
+      const messages = {
+        'invalid-code': '인증 코드가 맞지 않습니다. 5회 틀리면 새 이전 코드를 발급해야 합니다.',
+        'attempt-limit': '인증 코드 입력 횟수를 초과했습니다. 이전 코드부터 새로 발급해 주세요.',
+        expired: '이전 코드가 만료되었습니다. 원래 계정에서 새 코드를 발급해 주세요.',
+        'same-account': '같은 계정으로는 권한을 옮길 수 없습니다.',
+        'already-claimed': '이전 코드가 다른 계정에서 이미 사용되었습니다.',
+      };
+      throw new HttpsError('failed-precondition', messages[claimError] || '이전 요청을 확인할 수 없습니다.');
+    }
+    const transferRequest = claim.snapshot.val();
+    try {
+      const moved = await transferViewerUnlockFeature({
+        db,
+        walletDb: sharedDb,
+        sourceUid: transferRequest.sourceUid,
+        targetUid: uid,
+        featureId: transferRequest.featureId,
+        ownershipId: transferRequest.ownershipId,
+        transferId,
+        now,
+      });
+      await requestRef.transaction((current) => {
+        if (!current || current.targetUid !== uid || current.status !== 'claimed') return current;
+        return { ...current, status: 'completed', completedAt: Date.now() };
+      });
+      return { transferred: true, featureId: transferRequest.featureId, merged: moved.merged === true };
+    } catch (error) {
+      console.error('고점체크 해금 권한 이전 처리 확인 필요', { transferId, message: String(error?.message || error) });
+      throw new HttpsError('aborted', '권한 이전 결과를 확인하고 있습니다. 같은 인증 코드로 잠시 뒤 다시 시도해 주세요.');
+    }
+  }
+  if (data.action === 'adminRecover') {
+    if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 결제 복구를 실행할 수 있습니다.');
+    return reconcileViewerUnlockPayments({ fanpageDb: db, walletDb: sharedDb, limit: 50 });
+  }
+  if (data.action === 'adminRefund') {
+    if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 환불할 수 있습니다.');
+    const requestId = String(data.requestId || '');
+    const reason = String(data.reason || '').trim().slice(0, 300);
+    if (!reason) throw new HttpsError('invalid-argument', '환불 사유를 입력해 주세요.');
+    try {
+      const result = await refundUnactivatedUnlock({ fanpageDb: db, walletDb: sharedDb, requestId });
+      await db.ref(`viewerStatsUnlockPayments/operations/${requestId}`).update({
+        refundReason: reason,
+        refundedBy: uid,
+        refundReviewedAt: Date.now(),
+      });
+      return result;
+    } catch (error) {
+      if (String(error?.message || '') === 'operation-unavailable') throw new HttpsError('failed-precondition', '미확정 결제만 환불할 수 있습니다.');
+      throw new HttpsError('aborted', '환불 결과를 확인하지 못했습니다. 결제 내역을 다시 확인해 주세요.');
+    }
+  }
+  if (data.action !== 'purchase') throw new HttpsError('invalid-argument', '요청을 확인해 주세요.');
+  if (isAdmin) throw new HttpsError('failed-precondition', '관리자는 결제 없이 이용할 수 있습니다.');
+  try {
+    return await purchaseViewerUnlock({ fanpageDb: db, walletDb: sharedDb, uid, featureId: data.featureId, requestId: data.requestId });
+  } catch (error) {
+    const message = String(error?.message || 'unknown');
+    if (message === 'insufficient') throw new HttpsError('failed-precondition', '통합 캐시가 부족합니다.');
+    if (message === 'already-owned') throw new HttpsError('already-exists', '이미 해금한 기능입니다.');
+    if (message === 'invalid-input') throw new HttpsError('invalid-argument', '상품 또는 요청 번호를 확인해 주세요.');
+    console.error('고점체크 기능 해금 처리 확인 필요', { code: message });
+    throw new HttpsError('aborted', '결제 결과를 확인하고 있습니다. 같은 요청 번호로 다시 확인해 주세요.');
+  }
+});
+
+exports.streamerFanPageViewerStatsUnlockRecovery = onSchedule({ schedule: 'every 15 minutes', maxInstances: 1, timeoutSeconds: 60 }, async () => {
+  await reconcileViewerUnlockPayments({ fanpageDb: db, walletDb: sharedDb, limit: 50 });
+});
+
 async function resolveViewerStatsBaseTier(uid, auth) {
   const signInProvider = auth && auth.token && auth.token.firebase
     ? String(auth.token.firebase.sign_in_provider || '')
@@ -628,6 +809,42 @@ async function cleanupOldViewerStatsJobs(now = Date.now()) {
     }
   })();
   return viewerStatsJobCleanupPromise;
+}
+
+async function enforceViewerPaidBurstLimit(uid) {
+  const reference = viewerStatsRef(`viewerStatsPaidBurst/${viewerStatsUidKey(uid)}`);
+  const now = Date.now();
+  let decision;
+  const result = await reference.transaction((current) => {
+    decision = nextPaidBurstState(current, now);
+    return decision.allowed ? decision.state : undefined;
+  }, undefined, false);
+  if (!result.committed) throw new HttpsError('resource-exhausted', '요청이 너무 빠르게 반복되고 있습니다.', { retryAfterSeconds: Math.ceil((decision?.retryAfterMs || 10000) / 1000) });
+}
+
+// 유료 해금은 화면의 표시 상태가 아니라, 실제 통계 요청마다 다시 검증한다.
+// 이렇게 해야 개발자 도구로 클라이언트 상태를 바꿔도 다른 분석 기능을 우회할 수 없다.
+async function requireViewerPaidFeature(uid, auth, featureId) {
+  if (!Object.prototype.hasOwnProperty.call(FEATURES, featureId)) {
+    throw new HttpsError('invalid-argument', '유료 기능을 확인해 주세요.');
+  }
+  const [baseTier, isAdmin] = await Promise.all([
+    resolveViewerStatsBaseTier(uid, auth),
+    isAdminUid(uid),
+  ]);
+  if (!isAdmin && baseTier !== 'account') {
+    throw new HttpsError('permission-denied', '로그인한 계정에서 기능을 해금한 뒤 이용해 주세요.');
+  }
+  const allowed = await hasViewerUnlock({
+    db,
+    uid,
+    featureId,
+    isAdmin,
+    authenticated: baseTier === 'account',
+  });
+  if (!allowed) throw new HttpsError('permission-denied', '이 분석 기능을 먼저 해금해 주세요.');
+  if (!isAdmin) await enforceViewerPaidBurstLimit(uid);
+  return { isAdmin, tier: isAdmin ? 'admin' : 'account' };
 }
 
 async function enforceViewerStatsRateLimit(uid, action, usageContext = {}) {
@@ -2163,7 +2380,7 @@ function viewerStatsForResponse(stats, includePremiumMetrics) {
   return publicStats;
 }
 
-async function enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiumMetrics) {
+async function enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiumMetrics, paidFeature = '') {
   const now = Date.now();
   await cleanupOldViewerStatsJobs(now);
   const dayKey = viewerStatsDayKey(now);
@@ -2179,6 +2396,9 @@ async function enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiu
       streamerId,
       vodId,
       includePremiumMetrics: includePremiumMetrics === true,
+      // 결과를 다시 읽을 때도 어느 유료 상품으로 생성됐는지 서버에서 재검증한다.
+      // 클라이언트가 jobId만 바꿔 평균 지표를 읽는 우회를 막기 위한 권위 필드다.
+      paidFeature: Object.prototype.hasOwnProperty.call(FEATURES, paidFeature) ? paidFeature : '',
       queueKey,
       status: 'queued',
       createdAt: now,
@@ -2890,7 +3110,7 @@ exports.streamerFanPageMessengerVodAnalysisWorker = onTaskDispatched({
   });
 });
 
-async function getViewerStatsJobResult(uid, jobId) {
+async function getViewerStatsJobResult(uid, auth, jobId) {
   const jobRef = viewerStatsJobRef(jobId);
   const snapshot = await jobRef.get();
   if (!snapshot.exists()) return { status: 'expired', errorMessage: '집계 요청이 만료됐어요. 다시 요청해 주세요.' };
@@ -2899,11 +3119,14 @@ async function getViewerStatsJobResult(uid, jobId) {
     throw new HttpsError('permission-denied', '이 집계 요청을 확인할 권한이 없습니다.');
   }
   if (job.includePremiumMetrics === true) {
-    const access = await resolveViewerSubscriberFeatureAccess(uid);
-    if (!canAccessViewerSubscriberFeatures(access)) {
-      throw new HttpsError('permission-denied', VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY
-        ? '평균 시청자 지표는 현재 관리자만 확인할 수 있습니다.'
-        : '구독 전용 지표를 확인할 수 없습니다.');
+    if (Object.prototype.hasOwnProperty.call(FEATURES, job.paidFeature)) {
+      await requireViewerPaidFeature(uid, auth, job.paidFeature);
+    } else {
+      // 구독제 종료 전 생성된 작업만 기존 관리자 권한으로 보수적으로 처리한다.
+      const access = await resolveViewerSubscriberFeatureAccess(uid);
+      if (!canAccessViewerSubscriberFeatures(access)) {
+        throw new HttpsError('permission-denied', '이전 분석 결과를 확인할 권한이 없습니다.');
+      }
     }
   }
   if (Number(job.expiresAt) <= Date.now() && !['completed', 'failed', 'cancelled'].includes(job.status)) {
@@ -5265,7 +5488,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
 
   if (action === 'statsResult') {
     const jobId = String(data.jobId || '');
-    return getViewerStatsJobResult(uid, jobId);
+    return getViewerStatsJobResult(uid, request.auth, jobId);
   }
 
   if (action === 'cancelStatsJob') {
@@ -5279,21 +5502,8 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
   }
 
   if (action === 'periodPeaks') {
-    const [access, baseTier] = await Promise.all([
-      resolveViewerSubscriberFeatureAccess(uid),
-      resolveViewerStatsBaseTier(uid, request.auth),
-    ]);
-    if (!canAccessViewerSubscriberFeatures(access)) {
-      throw new HttpsError('permission-denied', VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY
-        ? '기간별 최고 시청 순간은 현재 관리자만 이용할 수 있습니다.'
-        : '기간별 최고 시청 순간은 구독 계정에서 이용할 수 있습니다.');
-    }
-    const tier = viewerStatsTier(request.auth, {
-      isAdmin: access.isAdmin,
-      isSubscribed: access.isSubscribed,
-      isProtectedAccount: baseTier === 'account',
-    });
-    await enforceViewerStatsRateLimit(uid, 'stats', { tier });
+    await requireViewerPaidFeature(uid, request.auth, 'period');
+    // 기능 해금자는 상품의 횟수 제한 없이 공용 큐와 동시 실행 제한을 사용한다.
     const result = await getViewerPeriodPeaks(
       streamerId,
       data.mode === 'build' || data.forceRefresh === true,
@@ -5322,8 +5532,17 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     if (sortOrder === 'catalog' && page !== 1) {
       throw new HttpsError('invalid-argument', '전체 다시보기 정렬 요청을 확인해 주세요.');
     }
-    const tier = await resolveViewerStatsTier(uid, request.auth);
-    await enforceViewerStatsRateLimit(uid, sortOrder === 'catalog' ? 'vodCatalog' : action, { streamerId, page, tier });
+    const paidFeature = typeof data.paidFeature === 'string' ? data.paidFeature : '';
+    let tier = await resolveViewerStatsTier(uid, request.auth);
+    if (paidFeature) {
+      if (!['period', 'same_day', 'keyword'].includes(paidFeature)) {
+        throw new HttpsError('invalid-argument', '유료 분석 기능을 확인해 주세요.');
+      }
+      await requireViewerPaidFeature(uid, request.auth, paidFeature);
+      tier = 'account';
+    } else {
+      await enforceViewerStatsRateLimit(uid, sortOrder === 'catalog' ? 'vodCatalog' : action, { streamerId, page, tier });
+    }
     if (sortOrder === 'catalog') {
       const catalog = await fetchSoopVodCatalog(streamerId, keyword);
       const nickname = catalog.nickname || await lookupSoopStreamerNickname(streamerId);
@@ -5370,27 +5589,27 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
     const vodId = String(data.vodId || '').trim();
     if (!/^\d{1,20}$/.test(vodId)) throw new HttpsError('invalid-argument', '다시보기 번호를 확인해 주세요.');
     const includePremiumMetrics = data.includePremiumMetrics === true;
-    const [access, baseTier] = await Promise.all([
-      resolveViewerSubscriberFeatureAccess(uid),
-      resolveViewerStatsBaseTier(uid, request.auth),
-    ]);
-    if (includePremiumMetrics && !canAccessViewerSubscriberFeatures(access)) {
-      throw new HttpsError('permission-denied', VIEWER_SUBSCRIBER_FEATURES_ADMIN_ONLY
-        ? '평균 시청자 지표는 현재 관리자만 확인할 수 있습니다.'
-        : '구독 전용 비교 기능은 구독 계정에서 이용할 수 있습니다.');
+    const paidFeature = typeof data.paidFeature === 'string' ? data.paidFeature : '';
+    let tier = await resolveViewerStatsTier(uid, request.auth);
+    if (paidFeature) {
+      if (!['period', 'same_day', 'keyword'].includes(paidFeature)) {
+        throw new HttpsError('invalid-argument', '유료 분석 기능을 확인해 주세요.');
+      }
+      if (includePremiumMetrics && paidFeature === 'period') {
+        throw new HttpsError('permission-denied', '기간별 최고 시청 순간에는 평균 시청자 지표를 사용하지 않습니다.');
+      }
+      await requireViewerPaidFeature(uid, request.auth, paidFeature);
+      tier = 'account';
+    } else if (includePremiumMetrics) {
+      throw new HttpsError('permission-denied', '평균 시청자 지표는 해당 유료 기능을 해금한 뒤 이용해 주세요.');
     }
-    const tier = viewerStatsTier(request.auth, {
-      isAdmin: access.isAdmin,
-      isSubscribed: access.isSubscribed,
-      isProtectedAccount: baseTier === 'account',
-    });
     const cacheKey = streamerId + ':' + vodId;
     const cached = fanpageViewerStatsMemoryCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      await enforceViewerStatsRateLimit(uid, action, { tier, cacheHit: true });
+      if (!paidFeature) await enforceViewerStatsRateLimit(uid, action, { tier, cacheHit: true });
       return { stats: viewerStatsForResponse(cached.value, includePremiumMetrics) };
     }
-    await enforceViewerStatsRateLimit(uid, action, { tier });
+    if (!paidFeature) await enforceViewerStatsRateLimit(uid, action, { tier });
     const persistentCachedStats = await readPersistentViewerStatsCache(streamerId, vodId);
     if (persistentCachedStats) {
       rememberViewerStatsInMemory(cacheKey, persistentCachedStats);
@@ -5398,7 +5617,7 @@ exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck:
         .catch((error) => console.warn('Could not record viewer stats cache hit:', error));
       return { stats: viewerStatsForResponse(persistentCachedStats, includePremiumMetrics) };
     }
-    return enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiumMetrics);
+    return enqueueViewerStatsJob(uid, tier, streamerId, vodId, includePremiumMetrics, paidFeature);
   }
 
   throw new HttpsError('invalid-argument', '시청 통계 요청을 확인해 주세요.');

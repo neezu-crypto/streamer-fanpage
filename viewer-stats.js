@@ -27,7 +27,189 @@ const callViewerStatsVisit = httpsCallable(functions, 'streamerFanPageViewerStat
 const callSponsorAds = httpsCallable(functions, 'streamerFanPageViewerSponsors');
 const callAdminSponsorAds = httpsCallable(functions, 'streamerFanPageAdminSponsorAds');
 const callSponsorLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatus');
+const callViewerBugReports = httpsCallable(functions, 'streamerFanPageViewerStatsBugReports');
+const callViewerUnlocks = httpsCallable(functions, 'streamerFanPageViewerStatsUnlocks');
 const $ = (id) => document.getElementById(id);
+let viewerBugPending = null;
+function viewerBugPendingKey() { return auth.currentUser?.uid ? `viewerBugPending:${auth.currentUser.uid}` : ''; }
+function viewerUnlockPendingKey(featureId) { return auth.currentUser?.uid ? `viewerUnlockPending:${auth.currentUser.uid}:${featureId}` : ''; }
+async function checkViewerBugPending() {
+  await getAuthReady();
+  const key = viewerBugPendingKey();
+  let requestId = '';
+  try { requestId = key ? localStorage.getItem(key) || '' : ''; } catch (_) { return false; }
+  $('viewerBugCheck').hidden = !requestId;
+  if (!requestId) return false;
+  try {
+    const response = await callViewerBugReports({ action: 'status', requestId });
+    if (response.data?.status === 'submitted') {
+      localStorage.removeItem(key); viewerBugPending = null; $('viewerBugCheck').hidden = true;
+      $('viewerBugStatus').textContent = '이전 버그 제보가 접수됐습니다.';
+      return false;
+    }
+  } catch (_) { /* 확인되지 않은 요청은 그대로 보관한다. */ }
+  $('viewerBugStatus').textContent = `이전 제보의 접수 상태를 확인하고 있습니다. 요청 번호: ${requestId}`;
+  return true;
+}
+function selectViewerService(name) {
+  // 탭별 첫 화면은 분리한다. 이미 선택한 스트리머 결과는 유료 분석의 입력 맥락으로
+  // 유지하되, 무료 검색 폼은 유료/제보 탭에서 함께 노출하지 않는다.
+  $('viewerFreeService').hidden = name !== 'free';
+  $('viewerPaidService').hidden = name !== 'paid';
+  $('viewerBugService').hidden = name !== 'bug';
+  $('viewerFreeTab').setAttribute('aria-selected', String(name === 'free'));
+  $('viewerPaidTab').setAttribute('aria-selected', String(name === 'paid'));
+  $('viewerBugTab').setAttribute('aria-selected', String(name === 'bug'));
+  if (name === 'paid') void refreshUnlockAccess();
+}
+$('viewerFreeTab').addEventListener('click', () => selectViewerService('free'));
+$('viewerPaidTab').addEventListener('click', () => selectViewerService('paid'));
+$('viewerBugTab').addEventListener('click', () => { selectViewerService('bug'); void checkViewerBugPending(); });
+$('viewerBugCheck').addEventListener('click', () => void checkViewerBugPending());
+$('viewerUnlockClose').addEventListener('click', () => $('viewerUnlockDialog').close());
+$('viewerUnlockCancel').addEventListener('click', () => $('viewerUnlockDialog').close());
+$('viewerUnlockHistoryClose').addEventListener('click', () => $('viewerUnlockHistoryDialog').close());
+$('viewerPaidTutorialClose').addEventListener('click', () => $('viewerPaidTutorialDialog').close());
+$('viewerPaidTutorialDone').addEventListener('click', () => $('viewerPaidTutorialDialog').close());
+$('viewerUnlockTransferClose').addEventListener('click', () => $('viewerUnlockTransferDialog').close());
+$('viewerUnlockForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const featureId = pendingUnlockFeature;
+  if (!paidFeatureMeta[featureId]) return;
+  const button = $('viewerUnlockSubmit'); button.disabled = true;
+  $('viewerUnlockDialogStatus').textContent = '결제와 해금 결과를 확인하고 있어요.';
+  try {
+    await getAuthReady();
+    // 네트워크 응답만 유실된 경우에도 같은 요청 번호를 다시 보내야 중복 차감 없이
+    // 서버가 이미 끝난 결제를 확인할 수 있다.
+    const pendingKey = viewerUnlockPendingKey(featureId);
+    const requestId = (pendingKey && localStorage.getItem(pendingKey)) || crypto.randomUUID().replaceAll('-', '');
+    if (pendingKey) localStorage.setItem(pendingKey, requestId);
+    const result = (await callViewerUnlocks({ action: 'purchase', featureId, requestId })).data || {};
+    if (result.status !== 'activated') throw new Error('해금 결과를 확인하지 못했습니다.');
+    if (pendingKey) localStorage.removeItem(pendingKey);
+    $('viewerUnlockDialog').close();
+    await refreshUnlockAccess();
+    openPaidFeature(featureId);
+  } catch (error) {
+    const price = Number(unlockState.prices[featureId] || 40);
+    $('viewerUnlockChargeLink').hidden = error?.code !== 'functions/failed-precondition';
+    $('viewerUnlockDialogStatus').textContent = viewerStatsErrorMessage(error, '결제 결과를 확인하지 못했습니다. 다시 시도해 주세요.');
+    if (error?.code === 'functions/failed-precondition') $('viewerUnlockDialogBalance').textContent = `현재 내 캐시 ${Number(unlockState.balanceCash || 0).toLocaleString('ko-KR')}캐시 · ${price}캐시 필요`;
+  } finally { button.disabled = false; }
+});
+$('viewerPaidHistoryButton').addEventListener('click', async () => {
+  const root = $('viewerUnlockHistoryList'); root.textContent = '해금 내역을 불러오고 있어요.'; showViewerModal($('viewerUnlockHistoryDialog'));
+  try {
+    await getAuthReady(); const data = (await callViewerUnlocks({ action: 'myHistory' })).data || {};
+    root.replaceChildren(...(data.items || []).map((item) => {
+      const row = document.createElement('article'); row.className = 'viewer-unlock-history-item';
+      const meta = paidFeatureMeta[item.featureId];
+      const summary = document.createElement('p');
+      summary.textContent = `${meta?.title || item.featureId} · ${Number(item.cashAmount || 0)}캐시 · ${item.status === 'activated' ? '해금 완료' : item.status}`;
+      const detail = document.createElement('small');
+      detail.textContent = `결제 요청 번호: ${item.requestId || '확인 불가'} · ${item.createdAt ? formatSubscriptionDate(item.createdAt) : '시각 확인 중'}`;
+      const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'button viewer-unlock-copy'; copy.textContent = '요청 번호 복사';
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(String(item.requestId || '')); copy.textContent = '복사됨'; }
+        catch (_) { copy.textContent = '복사 실패'; }
+      });
+      row.append(summary, detail, copy);
+      return row;
+    }));
+    if (!root.children.length) root.textContent = '아직 해금한 기능이 없습니다.';
+  } catch (error) { root.textContent = viewerStatsErrorMessage(error, '해금 내역을 불러오지 못했습니다.'); }
+});
+$('viewerUnlockTransferButton').addEventListener('click', async () => {
+  await refreshUnlockAccess();
+  const select = $('viewerUnlockTransferFeature');
+  select.replaceChildren(...Object.entries(paidFeatureMeta).map(([featureId, meta]) => {
+    const option = document.createElement('option'); option.value = featureId; option.textContent = `${meta.title}${canUsePaidFeature(featureId) ? '' : ' · 해금 필요'}`; option.disabled = !canUsePaidFeature(featureId); return option;
+  }));
+  const usable = [...select.options].some((option) => !option.disabled);
+  $('viewerUnlockTransferIssued').textContent = usable ? '' : '현재 계정에서 이전할 해금 권한이 없습니다.';
+  $('viewerUnlockTransferStatus').textContent = '';
+  showViewerModal($('viewerUnlockTransferDialog'));
+});
+$('viewerUnlockTransferStartForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  button.disabled = true;
+  const issued = $('viewerUnlockTransferIssued'); issued.textContent = '이전 코드를 발급하고 있어요.';
+  try {
+    await getAuthReady();
+    const data = (await callViewerUnlocks({ action: 'transferStart', featureId: $('viewerUnlockTransferFeature').value })).data || {};
+    $('viewerUnlockTransferId').value = data.transferId || '';
+    issued.textContent = `인증 코드: ${data.code} · 10분 안에 새 계정에서 요청 번호와 함께 입력하세요.`;
+  } catch (error) { issued.textContent = viewerStatsErrorMessage(error, '인증 코드를 발급하지 못했습니다.'); }
+  finally { button.disabled = false; }
+});
+$('viewerUnlockTransferClaimForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  button.disabled = true;
+  const status = $('viewerUnlockTransferStatus'); status.textContent = '권한 이전 결과를 확인하고 있어요.';
+  try {
+    await getAuthReady();
+    const data = (await callViewerUnlocks({
+      action: 'transferClaim',
+      transferId: $('viewerUnlockTransferId').value.trim(),
+      code: $('viewerUnlockTransferCode').value.trim(),
+    })).data || {};
+    status.textContent = `${paidFeatureMeta[data.featureId]?.title || '해금 권한'} 이전이 완료되었습니다.`;
+    await refreshUnlockAccess();
+  } catch (error) { status.textContent = viewerStatsErrorMessage(error, '권한 이전 결과를 확인하지 못했습니다.'); }
+  finally { button.disabled = false; }
+});
+$('viewerBugForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const status = $('viewerBugStatus');
+  const title = $('viewerBugTitleInput').value.trim();
+  const content = $('viewerBugContent').value.trim();
+  if (viewerBugPending && (viewerBugPending.title !== title || viewerBugPending.content !== content)) {
+    status.textContent = '이전 제보의 접수 결과를 확인해야 합니다. 입력을 이전 내용으로 되돌리고 다시 보내 주세요.';
+    return;
+  }
+  const button = $('viewerBugSubmit'); button.disabled = true;
+  try {
+    await getAuthReady();
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      throw new Error('버그 제보는 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요.');
+    }
+    const key = viewerBugPendingKey();
+    if (viewerBugPending && viewerBugPending.uid !== auth.currentUser?.uid) {
+      viewerBugPending = null;
+      throw new Error('계정이 변경됐습니다. 현재 계정으로 다시 제보해 주세요.');
+    }
+    const savedRequest = key ? localStorage.getItem(key) : '';
+    if (savedRequest && !viewerBugPending) {
+      // 새로고침 후에는 본문을 저장하지 않는다. 사용자가 동일한 내용을 다시 입력하면
+      // 같은 요청 번호로만 재시도하며, 서버가 본문 지문과 접수 여부를 검증한다.
+      if (!await checkViewerBugPending()) return;
+      viewerBugPending = { requestId: savedRequest, title, content, uid: auth.currentUser.uid };
+    }
+    if (!viewerBugPending) {
+      if (!key) throw new Error('로그인 후 이용해 주세요.');
+      const pending = { requestId: crypto.randomUUID().replaceAll('-', ''), title, content, uid: auth.currentUser.uid };
+      localStorage.setItem(key, pending.requestId);
+      viewerBugPending = pending;
+    }
+    await callViewerBugReports({ action: 'submit', requestId: viewerBugPending.requestId, title, content });
+    localStorage.removeItem(key); viewerBugPending = null; $('viewerBugCheck').hidden = true; $('viewerBugForm').reset(); status.textContent = '버그 제보가 접수됐습니다. 감사합니다.';
+  } catch (error) {
+    const code = String(error?.code || '');
+    if (['functions/permission-denied', 'functions/invalid-argument', 'functions/resource-exhausted'].includes(code)) {
+      const key = viewerBugPendingKey(); if (key) { try { localStorage.removeItem(key); } catch (_) {} }
+      viewerBugPending = null;
+    } else if (code === 'functions/already-exists') {
+      viewerBugPending = null;
+      $('viewerBugCheck').hidden = false;
+      status.textContent = '이전 요청과 내용이 다릅니다. 이전에 작성한 내용으로 다시 시도하거나 접수 결과를 확인해 주세요.';
+      return;
+    } else if (viewerBugPending) $('viewerBugCheck').hidden = false;
+    status.textContent = viewerStatsErrorMessage(error, '제보 결과를 확인하지 못했습니다. 같은 내용으로 다시 보내 주세요.');
+  } finally { button.disabled = false; }
+});
 const viewerTooltipPopup = document.createElement('div');
 viewerTooltipPopup.id = 'viewerTooltipPopup';
 viewerTooltipPopup.className = 'viewer-tooltip-popup';
@@ -265,8 +447,6 @@ let statsQueue = [];
 let periodScanToken = 0;
 let vodPagesByNumber = new Map();
 let vodPagesStreamerId = '';
-let subscriptionRefreshToken = 0;
-let subscriptionRefreshTimer = 0;
 let comparisonSelection = [null, null];
 let comparisonSearchRequestSequence = [0, 0];
 let pendingComparisonRequest = null;
@@ -283,26 +463,6 @@ let keywordComparisonRunning = false;
 let keywordComparisonGateWaiting = false;
 let keywordComparisonStatusMessage = '키워드와 스트리머 2명 이상을 선택해 주세요.';
 let keywordComparisonStatusIsError = false;
-let subscriptionState = {
-  loaded: false,
-  accountProtected: false,
-  isAdmin: false,
-  subscribed: false,
-  subscriberFeaturesAdminOnly: true,
-  expiresAt: 0,
-  pending: false,
-  pendingRequestId: '',
-  pendingRequestStatus: '',
-  pendingCanRenewCode: false,
-  pendingVerificationMethod: '',
-  pendingSoopId: '',
-  pendingCodeExpiresAt: 0,
-  pendingDonorSoopId: '',
-  pendingBalloonCost: 33,
-  pendingDonationCompletedAt: 0,
-  lastRequestStatus: '',
-};
-let subscriptionVerificationCode = '';
 const viewerStatsMemoryCache = new Map();
 const viewerStatsInProgress = new Map();
 const viewerStatsStaticCache = new Map();
@@ -413,99 +573,140 @@ function formatSubscriptionDate(value) {
   }).format(new Date(timestamp));
 }
 
-function canViewSubscriberFeatures() {
-  return subscriptionState.loaded && subscriptionState.isAdmin;
+const unlockState = { loaded: false, isAdmin: false, features: { period: false, same_day: false, keyword: false }, prices: { period: 40, same_day: 40, keyword: 40 }, balanceCash: 0 };
+const paidFeatureMeta = {
+  period: { title: '기간별 최고 시청 순간', description: '최근 1년의 다시보기를 기준으로 7일·30일·90일·1년 최고 순간을 확인합니다.', guide: ['분석 설정을 열고 스트리머를 검색해 다시보기 목록을 준비합니다.', '기간별 최고 시청 순간에서 최근 1년 분석 조건을 확인합니다.', '결과 보기 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 결과 보기를 다시 눌러 7일·30일·90일·1년 결과를 확인합니다.'] },
+  same_day: { title: '같은 날 스트리머 2명 비교', description: '두 스트리머의 같은 날 방송 고점과 평균 대비 상승률을 비교합니다.', guide: ['분석 설정을 열고 비교할 스트리머 두 명과 날짜를 선택합니다.', '선택한 조건은 결과를 보기 전까지 자유롭게 바꿀 수 있습니다.', '비교 결과 확인을 누르면 결과 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 비교 결과 확인을 다시 눌러 결과를 불러옵니다.'] },
+  keyword: { title: '키워드 여러 스트리머 고점 비교', description: '키워드로 찾은 다시보기의 고점을 2~5명 사이에서 비교합니다.', guide: ['분석 설정을 열고 키워드와 스트리머 2~5명을 선택합니다.', '선택한 조건은 결과를 보기 전까지 자유롭게 바꿀 수 있습니다.', '고점 비교를 누르면 결과 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 고점 비교를 다시 눌러 결과를 불러옵니다.'] },
+};
+let pendingUnlockFeature = '';
+
+function canUsePaidFeature(featureId) {
+  return unlockState.loaded && (unlockState.isAdmin || unlockState.features[featureId] === true);
+}
+
+function renderPaidFeatures() {
+  const root = $('viewerPaidFeatureGrid');
+  if (!root) return;
+  root.replaceChildren(...Object.entries(paidFeatureMeta).map(([featureId, meta]) => {
+    const card = document.createElement('article'); card.className = 'viewer-paid-feature';
+    const title = document.createElement('h3'); title.textContent = meta.title;
+    const description = document.createElement('p'); description.textContent = meta.description;
+    const price = document.createElement('p'); price.className = 'viewer-paid-price';
+    const unlocked = canUsePaidFeature(featureId);
+    price.textContent = unlocked ? (unlockState.isAdmin ? '관리자 이용 가능' : '해금 완료') : `${Number(unlockState.prices[featureId] || 40)}캐시 · 1회 해금`;
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'button button-primary';
+    button.textContent = '분석 설정하기';
+    button.addEventListener('click', () => openPaidFeature(featureId));
+    const guide = document.createElement('button'); guide.type = 'button'; guide.className = 'button viewer-paid-guide'; guide.textContent = '사용 방법';
+    guide.addEventListener('click', () => openPaidTutorial(featureId));
+    const actions = document.createElement('div'); actions.className = 'viewer-paid-actions'; actions.append(button, guide);
+    card.append(title, description, price, actions); return card;
+  }));
+  const signedIn = !!auth.currentUser && !auth.currentUser.isAnonymous;
+  $('viewerPaidStatus').textContent = unlockState.loaded
+    ? `현재 내 캐시 ${Number(unlockState.balanceCash || 0).toLocaleString('ko-KR')}캐시`
+    : signedIn
+      ? '해금 상태를 확인하고 있어요.'
+      : '분석 조건은 누구나 설정할 수 있고, 결과를 볼 때 일반 로그인이 필요해요.';
+}
+
+function openPaidFeature(featureId) {
+  // 분석 조건은 누구나 설정할 수 있다. 실제 분석 요청은 결과를 확인하는 시점에만 해금 여부를 검사한다.
+  selectViewerService('free');
+  if (!selectedStreamer) {
+    $('viewerSearchHint').textContent = '먼저 스트리머를 검색한 뒤 분석 조건을 설정해 주세요. 결과를 볼 때만 해금 여부를 확인합니다.';
+    $('viewerSearchInput').focus({ preventScroll: true });
+    $('viewerSearchForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  if (featureId === 'period') $('viewerPeriodPeaks').open = true;
+  if (featureId === 'same_day') $('viewerComparisonPanel').open = true;
+  if (featureId === 'keyword') $('viewerKeywordComparisonPanel').open = true;
+  const target = featureId === 'period' ? $('viewerPeriodPeaks') : featureId === 'same_day' ? $('viewerComparisonPanel') : $('viewerKeywordComparisonPanel');
+  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function openUnlockDialog(featureId) {
+  await getAuthReady();
+  if (!auth.currentUser || auth.currentUser.isAnonymous) {
+    $('viewerPaidStatus').textContent = '유료 기능 해금은 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요.';
+    return;
+  }
+  pendingUnlockFeature = featureId;
+  const meta = paidFeatureMeta[featureId]; if (!meta) return;
+  $('viewerUnlockDialogTitle').textContent = meta.title + ' 해금';
+  $('viewerUnlockDialogDescription').textContent = meta.description;
+  const price = Number(unlockState.prices[featureId] || 40);
+  $('viewerUnlockDialogPrice').textContent = `한 번 해금 · ${price}캐시`;
+  $('viewerUnlockDialogBalance').textContent = `현재 내 캐시 ${Number(unlockState.balanceCash || 0).toLocaleString('ko-KR')}캐시`;
+  $('viewerUnlockChargeLink').hidden = Number(unlockState.balanceCash || 0) >= price;
+  const pendingKey = viewerUnlockPendingKey(featureId);
+  const pendingRequestId = pendingKey ? localStorage.getItem(pendingKey) : '';
+  $('viewerUnlockDialogStatus').textContent = pendingRequestId
+    ? '이전 결제 요청의 결과를 확인합니다. 다시 해금하기를 누르면 같은 결제를 안전하게 재확인합니다.'
+    : '';
+  showViewerModal($('viewerUnlockDialog'));
+}
+
+async function canViewPaidResult(featureId, setStatus) {
+  await getAuthReady();
+  if (!auth.currentUser || auth.currentUser.isAnonymous) {
+    setStatus('분석 조건이 준비됐어요. 결과를 보려면 일반 로그인 후 기능을 해금해 주세요.', true);
+    return false;
+  }
+  if (!canUsePaidFeature(featureId) && !await refreshUnlockAccess()) {
+    setStatus('해금 상태를 확인하지 못했어요. 잠시 후 다시 결과 보기를 눌러 주세요.', true);
+    return false;
+  }
+  if (!canUsePaidFeature(featureId)) {
+    setStatus('분석 조건이 준비됐어요. 결과를 보려면 이 기능을 해금해 주세요.', false);
+    await openUnlockDialog(featureId);
+    return false;
+  }
+  return true;
+}
+
+function openPaidTutorial(featureId) {
+  const meta = paidFeatureMeta[featureId]; if (!meta) return;
+  $('viewerPaidTutorialTitle').textContent = meta.title + ' 사용 방법';
+  $('viewerPaidTutorialSteps').replaceChildren(...meta.guide.map((text) => {
+    const item = document.createElement('li'); item.textContent = text; return item;
+  }));
+  $('viewerPaidTutorialStatus').textContent = canUsePaidFeature(featureId)
+    ? '해금되어 있어요. 조건을 설정한 뒤 바로 결과를 확인할 수 있습니다.'
+    : `분석 조건은 지금 바로 설정할 수 있어요. 결과를 보는 시점에 ${Number(unlockState.prices[featureId] || 40)}캐시 해금을 안내합니다.`;
+  showViewerModal($('viewerPaidTutorialDialog'));
+}
+
+async function refreshUnlockAccess() {
+  try {
+    await getAuthReady();
+    const data = (await callViewerUnlocks({ action: 'access' })).data || {};
+    unlockState.loaded = true; unlockState.isAdmin = data.isAdmin === true;
+    unlockState.features = { ...unlockState.features, ...(data.features || {}) };
+    unlockState.prices = { ...unlockState.prices, ...(data.prices || {}) };
+    unlockState.balanceCash = Math.max(0, Number(data.balanceCash) || 0);
+    renderSubscriptionControls(); renderPaidFeatures(); return true;
+  } catch (error) {
+    $('viewerPaidStatus').textContent = viewerStatsErrorMessage(error, '해금 상태를 확인하지 못했습니다.');
+    renderPaidFeatures();
+    return false;
+  }
 }
 
 function renderSubscriptionControls() {
-  const state = subscriptionState;
-  const canViewFeatures = canViewSubscriberFeatures();
-  $('viewerPeriodPeaks').hidden = !canViewFeatures;
-  $('viewerComparisonPanel').hidden = !canViewFeatures;
-  $('viewerKeywordComparisonPanel').hidden = !canViewFeatures;
-  $('viewerPeriodScanButton').textContent = canViewFeatures
-    ? '최근 1년 분석'
-    : '관리자 전용 분석';
-}
-
-function scheduleSubscriptionStatusRefresh() {
-  window.clearTimeout(subscriptionRefreshTimer);
-  if (subscriptionState.pending) {
-    subscriptionRefreshTimer = window.setTimeout(() => refreshSubscriptionStatus(), 10 * 1000);
-    return;
-  }
-  if (subscriptionState.isAdmin) {
-    subscriptionRefreshTimer = window.setTimeout(() => refreshSubscriptionStatus(), 6 * 60 * 60 * 1000);
-    return;
-  }
-  if (!subscriptionState.subscribed || !subscriptionState.expiresAt) return;
-  const untilExpiry = Math.max(1000, subscriptionState.expiresAt - Date.now() + 1000);
-  subscriptionRefreshTimer = window.setTimeout(
-    () => refreshSubscriptionStatus(),
-    Math.min(untilExpiry, 6 * 60 * 60 * 1000),
-  );
+  $('viewerPeriodPeaks').hidden = false;
+  $('viewerComparisonPanel').hidden = false;
+  $('viewerKeywordComparisonPanel').hidden = false;
+  $('viewerPeriodScanButton').textContent = '결과 보기';
 }
 
 async function refreshSubscriptionStatus({ resumeComparison = true, resumeKeywordComparison = true } = {}) {
-  const token = ++subscriptionRefreshToken;
-  try {
-    await getAuthReady();
-    const response = await callViewerStats({ action: 'access' });
-    if (token !== subscriptionRefreshToken) return;
-    const previousFeatureAccess = canViewSubscriberFeatures();
-    const data = response.data || {};
-    subscriptionState = {
-      loaded: true,
-      accountProtected: data.accountProtected === true,
-      isAdmin: data.isAdmin === true,
-      subscribed: data.subscribed === true,
-      subscriberFeaturesAdminOnly: data.subscriberFeaturesAdminOnly !== false,
-      expiresAt: Number(data.expiresAt) || 0,
-      pending: data.pending === true,
-      pendingRequestId: typeof data.pendingRequestId === 'string' ? data.pendingRequestId : '',
-      pendingRequestStatus: typeof data.pendingRequestStatus === 'string' ? data.pendingRequestStatus : '',
-      pendingCanRenewCode: data.pendingCanRenewCode === true,
-      pendingVerificationMethod: typeof data.pendingVerificationMethod === 'string' ? data.pendingVerificationMethod : '',
-      pendingSoopId: typeof data.pendingSoopId === 'string' ? data.pendingSoopId : '',
-      pendingCodeExpiresAt: Number(data.pendingCodeExpiresAt) || 0,
-      pendingDonorSoopId: typeof data.pendingDonorSoopId === 'string' ? data.pendingDonorSoopId : '',
-      pendingBalloonCost: Number(data.pendingBalloonCost) || 33,
-      pendingDonationCompletedAt: Number(data.pendingDonationCompletedAt) || 0,
-      lastRequestStatus: typeof data.lastRequestStatus === 'string' ? data.lastRequestStatus : '',
-    };
-    renderSubscriptionControls();
-    scheduleSubscriptionStatusRefresh();
-    if (previousFeatureAccess !== canViewSubscriberFeatures()) {
-      if (selectedStreamer) {
-        periodScanToken += 1;
-        $('viewerPeriodScanButton').disabled = false;
-        $('viewerPeriodStatus').textContent = canViewSubscriberFeatures()
-          ? '이용 권한이 확인됐어요. 최근 1년 분석을 시작하면 7일·30일·90일·1년 최고 순간을 찾습니다.'
-          : '기간별 최고 시청 순간과 비교 기능은 현재 관리자만 이용할 수 있습니다.';
-        renderPeriodPeakCards(new Map(), new Map(), false, !canViewSubscriberFeatures());
-      }
-    }
-    if (pendingComparisonRequest && !canViewSubscriberFeatures()) {
-      pendingComparisonRequest = null;
-      comparisonRunning = false;
-      comparisonGateWaiting = false;
-      setComparisonStatus('스트리머 비교 기능은 현재 점검 중이며 관리자만 이용할 수 있습니다.');
-      renderComparisonSelection();
-    }
-    if (pendingKeywordComparisonRequest && !canViewSubscriberFeatures()) {
-      pendingKeywordComparisonRequest = null;
-      keywordComparisonRunning = false;
-      keywordComparisonGateWaiting = false;
-      setKeywordComparisonStatus('키워드 고점 비교는 현재 점검 중이며 관리자만 이용할 수 있습니다.');
-      renderKeywordComparisonSelection();
-    }
-    if (resumeComparison) resumePendingComparisonIfReady();
-    if (resumeKeywordComparison) resumePendingKeywordComparisonIfReady();
-    return true;
-  } catch (error) {
-    if (token !== subscriptionRefreshToken) return;
-    return false;
-  }
+  const ready = await refreshUnlockAccess();
+  if (ready && resumeComparison) resumePendingComparisonIfReady();
+  if (ready && resumeKeywordComparison) resumePendingKeywordComparisonIfReady();
+  return ready;
 }
 
 function showViewerModal(dialog) {
@@ -1577,6 +1778,7 @@ function pumpStatsQueue() {
       streamerId: job.streamerId,
       vodId: job.vod.id,
       includePremiumMetrics: job.includePremiumMetrics,
+      paidFeature: job.paidFeature || '',
     })
       .then(async (result) => {
         const response = result.data || {};
@@ -1605,8 +1807,9 @@ function loadVodStats(
   shouldStart = () => true,
   includePremiumMetrics = false,
   onWaiting = null,
+  paidFeature = '',
 ) {
-  const key = String(streamerId).toLowerCase() + ':' + String(vod.id) + (includePremiumMetrics ? ':premium' : '');
+  const key = String(streamerId).toLowerCase() + ':' + String(vod.id) + (includePremiumMetrics ? ':premium' : '') + ':' + paidFeature;
   if (viewerStatsMemoryCache.has(key)) {
     const cached = viewerStatsMemoryCache.get(key);
     viewerStatsMemoryCache.delete(key);
@@ -1628,6 +1831,7 @@ function loadVodStats(
     vod,
     streamerId,
     includePremiumMetrics,
+    paidFeature,
     onWaiting,
     promise,
     shouldStart,
@@ -1646,8 +1850,8 @@ function isCurrentComparisonRequest(request) {
     && request.selectionKey === comparisonSelectionKey();
 }
 
-async function getViewerVodPage(streamerId, page, keyword = '', sortOrder = 'newest') {
-  const response = await callViewerStats({ action: 'vods', streamerId, page, keyword, sortOrder });
+async function getViewerVodPage(streamerId, page, keyword = '', sortOrder = 'newest', paidFeature = '') {
+  const response = await callViewerStats({ action: 'vods', streamerId, page, keyword, sortOrder, paidFeature });
   return response.data || {};
 }
 
@@ -1750,7 +1954,7 @@ async function findComparisonVodsOnDate(streamer, date, request, index) {
       return normalized;
     }
     if (!isCurrentComparisonRequest(request)) return null;
-    const payload = await getViewerVodPage(streamerId, page);
+    const payload = await getViewerVodPage(streamerId, page, '', 'newest', 'same_day');
     if (!isCurrentComparisonRequest(request)) return null;
     const pageData = {
       vods: Array.isArray(payload.vods) ? payload.vods : [],
@@ -1876,6 +2080,7 @@ async function analyzeComparisonStreamer(streamer, vods, request, index) {
           () => isCurrentComparisonRequest(request),
           true,
           () => setComparisonStatus('현재 이용자가 많아 집계 시간이 길어지고 있습니다. 날짜별 다시보기를 계속 확인하고 있어요.'),
+          'same_day',
         );
         if (!isCurrentComparisonRequest(request)) return;
         const peak = Number(stats.highest && stats.highest.viewers);
@@ -2065,10 +2270,10 @@ async function loadComparisonResults(request) {
       comparisonGateWaiting = true;
       await refreshSubscriptionStatus({ resumeComparison: false });
       if (!isCurrentComparisonRequest(request)) return;
-      if (!canViewSubscriberFeatures()) {
+      if (!canUsePaidFeature('same_day')) {
         pendingComparisonRequest = null;
         comparisonGateWaiting = false;
-        setComparisonStatus('스트리머 비교 기능은 현재 점검 중이며 관리자만 이용할 수 있습니다.');
+        setComparisonStatus('스트리머 비교 기능을 먼저 해금해 주세요.');
         renderComparisonSelection();
         return;
       }
@@ -2086,7 +2291,7 @@ async function loadComparisonResults(request) {
 
 function resumePendingComparisonIfReady() {
   const request = pendingComparisonRequest;
-  if (!request || comparisonRunning || !canViewSubscriberFeatures()) return;
+  if (!request || comparisonRunning || !canUsePaidFeature('same_day')) return;
   if (!isCurrentComparisonRequest(request)) {
     pendingComparisonRequest = null;
     comparisonGateWaiting = false;
@@ -2117,56 +2322,11 @@ async function runComparison() {
     date: $('viewerComparisonDate').value,
     selectionKey: comparisonSelectionKey(),
   };
-  pendingComparisonRequest = request;
-  comparisonRunning = true;
-  setComparisonStatus('비교 결과를 열 수 있는 계정인지 안전하게 확인하고 있어요.');
-  renderComparisonSelection();
-  try {
-    await getAuthReady();
-    const response = await callViewerStats({ action: 'adminAccess' });
-    if (!isCurrentComparisonRequest(request)) return;
-    const access = response.data || {};
-    subscriptionState.isAdmin = access.isAdmin === true;
-    subscriptionState.subscriberFeaturesAdminOnly = access.subscriberFeaturesAdminOnly !== false;
-    subscriptionState.accountProtected = subscriptionState.accountProtected || subscriptionState.isAdmin;
-    subscriptionState.subscribed = true;
-    subscriptionState.expiresAt = Number(access.expiresAt) || subscriptionState.expiresAt;
-    subscriptionState.loaded = true;
-    renderSubscriptionControls();
-    scheduleSubscriptionStatusRefresh();
-    comparisonRunning = false;
-    resumePendingComparisonIfReady();
-  } catch (error) {
-    if (!isCurrentComparisonRequest(request)) return;
-    if (!error || error.code !== 'functions/permission-denied') {
-      pendingComparisonRequest = null;
-      comparisonRunning = false;
-      comparisonGateWaiting = false;
-      setComparisonStatus(viewerStatsErrorMessage(error, '비교 권한을 확인하지 못했어요. 다시 시도해 주세요.'), true);
-      renderComparisonSelection();
-      return;
-    }
-    const refreshed = await refreshSubscriptionStatus({ resumeComparison: false });
-    if (!isCurrentComparisonRequest(request)) return;
-    if (!refreshed) {
-      pendingComparisonRequest = null;
-      comparisonRunning = false;
-      comparisonGateWaiting = false;
-      setComparisonStatus('관리자 권한을 확인하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.', true);
-      renderComparisonSelection();
-      return;
-    }
-    if (canViewSubscriberFeatures()) {
-      comparisonRunning = false;
-      resumePendingComparisonIfReady();
-      return;
-    }
-    pendingComparisonRequest = null;
-    comparisonRunning = false;
-    comparisonGateWaiting = false;
-    setComparisonStatus('스트리머 비교 기능은 현재 점검 중이며 관리자만 이용할 수 있습니다.');
+  if (!await canViewPaidResult('same_day', setComparisonStatus)) {
     renderComparisonSelection();
+    return;
   }
+  pendingComparisonRequest = request; comparisonRunning = false; resumePendingComparisonIfReady();
 }
 
 function keywordComparisonSlotIndex(streamer) {
@@ -2178,7 +2338,7 @@ async function findKeywordComparisonVods(streamer, request) {
   if (!isCurrentKeywordComparisonRequest(request)) return null;
   const slotIndex = keywordComparisonSlotIndex(streamer);
   if (slotIndex >= 0) setKeywordPickerStatus(slotIndex, (streamer.nickname || streamer.soopId) + ' · 키워드 다시보기 검색 중…');
-  const data = await getViewerVodPage(streamer.soopId, 1, request.keyword);
+  const data = await getViewerVodPage(streamer.soopId, 1, request.keyword, 'newest', 'keyword');
   if (!isCurrentKeywordComparisonRequest(request)) return null;
   const vods = Array.isArray(data.vods) ? data.vods : [];
   const totalMatches = Math.max(0, Number(data.total) || 0);
@@ -2245,6 +2405,7 @@ async function analyzeKeywordComparisonVods(request, vodGroups) {
           () => isCurrentKeywordComparisonRequest(request),
           true,
           () => setKeywordComparisonStatus('현재 이용자가 많아 집계 시간이 길어지고 있습니다. 키워드 고점 분석을 계속 진행하고 있어요.'),
+          'keyword',
         );
         if (!isCurrentKeywordComparisonRequest(request)) return;
         const peak = Number(stats.highest && stats.highest.viewers);
@@ -2424,10 +2585,10 @@ async function loadKeywordComparisonResults(request) {
       keywordComparisonGateWaiting = true;
       const refreshed = await refreshSubscriptionStatus({ resumeComparison: false, resumeKeywordComparison: false });
       if (!isCurrentKeywordComparisonRequest(request)) return;
-      if (refreshed && !canViewSubscriberFeatures()) {
+      if (refreshed && !canUsePaidFeature('keyword')) {
         pendingKeywordComparisonRequest = null;
         keywordComparisonGateWaiting = false;
-        setKeywordComparisonStatus('키워드 고점 비교는 현재 점검 중이며 관리자만 이용할 수 있습니다.');
+        setKeywordComparisonStatus('키워드 고점 비교 기능을 먼저 해금해 주세요.');
         renderKeywordComparisonSelection();
         return;
       }
@@ -2450,7 +2611,7 @@ async function loadKeywordComparisonResults(request) {
 
 function resumePendingKeywordComparisonIfReady() {
   const request = pendingKeywordComparisonRequest;
-  if (!request || keywordComparisonRunning || !canViewSubscriberFeatures()) return;
+  if (!request || keywordComparisonRunning || !canUsePaidFeature('keyword')) return;
   if (!isCurrentKeywordComparisonRequest(request)) {
     pendingKeywordComparisonRequest = null;
     keywordComparisonGateWaiting = false;
@@ -2488,56 +2649,11 @@ async function runKeywordComparison() {
     streamers,
     selectionKey: keywordComparisonSelectionKey(),
   };
-  pendingKeywordComparisonRequest = request;
-  keywordComparisonRunning = true;
-  setKeywordComparisonStatus('비교 결과를 열 수 있는 계정인지 확인하고 있어요.');
-  renderKeywordComparisonSelection();
-  try {
-    await getAuthReady();
-    const response = await callViewerStats({ action: 'adminAccess' });
-    if (!isCurrentKeywordComparisonRequest(request)) return;
-    const access = response.data || {};
-    subscriptionState.isAdmin = access.isAdmin === true;
-    subscriptionState.subscriberFeaturesAdminOnly = access.subscriberFeaturesAdminOnly !== false;
-    subscriptionState.accountProtected = subscriptionState.accountProtected || subscriptionState.isAdmin;
-    subscriptionState.subscribed = true;
-    subscriptionState.expiresAt = Number(access.expiresAt) || subscriptionState.expiresAt;
-    subscriptionState.loaded = true;
-    renderSubscriptionControls();
-    scheduleSubscriptionStatusRefresh();
-    keywordComparisonRunning = false;
-    resumePendingKeywordComparisonIfReady();
-  } catch (error) {
-    if (!isCurrentKeywordComparisonRequest(request)) return;
-    if (!error || error.code !== 'functions/permission-denied') {
-      pendingKeywordComparisonRequest = null;
-      keywordComparisonRunning = false;
-      keywordComparisonGateWaiting = false;
-      setKeywordComparisonStatus(viewerStatsErrorMessage(error, '관리자 권한을 확인하지 못했어요. 다시 시도해 주세요.'), true);
-      renderKeywordComparisonSelection();
-      return;
-    }
-    const refreshed = await refreshSubscriptionStatus({ resumeComparison: false, resumeKeywordComparison: false });
-    if (!isCurrentKeywordComparisonRequest(request)) return;
-    if (!refreshed) {
-      pendingKeywordComparisonRequest = null;
-      keywordComparisonRunning = false;
-      keywordComparisonGateWaiting = false;
-      setKeywordComparisonStatus('관리자 권한을 확인하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.', true);
-      renderKeywordComparisonSelection();
-      return;
-    }
-    if (canViewSubscriberFeatures()) {
-      keywordComparisonRunning = false;
-      resumePendingKeywordComparisonIfReady();
-      return;
-    }
-    pendingKeywordComparisonRequest = null;
-    keywordComparisonRunning = false;
-    keywordComparisonGateWaiting = false;
-    setKeywordComparisonStatus('키워드 고점 비교는 현재 점검 중이며 관리자만 이용할 수 있습니다.');
+  if (!await canViewPaidResult('keyword', setKeywordComparisonStatus)) {
     renderKeywordComparisonSelection();
+    return;
   }
+  pendingKeywordComparisonRequest = request; keywordComparisonRunning = false; resumePendingKeywordComparisonIfReady();
 }
 
 function cancelQueuedStatsRequests() {
@@ -2577,7 +2693,7 @@ function enqueueStats(card, vod, loadToken) {
       if (!card.isConnected || loadToken !== activeLoadToken) return;
       if (includePremiumMetrics && error && error.code === 'functions/permission-denied') {
         await refreshSubscriptionStatus();
-        if (subscriptionState.subscribed) return showStatsError(card, error, loadToken);
+        if (canUsePaidFeature('same_day')) return showStatsError(card, error, loadToken);
         card.dataset.statsState = 'idle';
         enqueueStats(card, vod, loadToken);
         return;
@@ -2654,7 +2770,7 @@ async function loadVodPage(loadToken, page) {
   }
 }
 
-function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !canViewSubscriberFeatures()) {
+function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !canUsePaidFeature('period')) {
   const grid = $('viewerPeriodGrid');
   grid.replaceChildren();
   VIEWER_PEAK_PERIODS.forEach((period) => {
@@ -2687,7 +2803,7 @@ function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !canView
       const vodCount = Number(vodCounts.get(period.days)) || 0;
       empty.textContent = isScanning
         ? '분석 중…'
-        : isLocked ? '관리자 전용'
+        : isLocked ? '결과 잠김 · 조건 설정 후 해금'
         : !vodCounts.has(period.days) ? '분석 전'
           : vodCount > 0 ? '통계 확인 가능한 순간 없음' : '기간 내 다시보기 없음';
       card.append(empty);
@@ -2722,7 +2838,7 @@ function showSharedPeriodPeakResult(data) {
 }
 
 function isCurrentPeriodScan(scanToken, loadToken) {
-  return scanToken === periodScanToken && loadToken === activeLoadToken && !!selectedStreamer && canViewSubscriberFeatures();
+  return scanToken === periodScanToken && loadToken === activeLoadToken && !!selectedStreamer && canUsePaidFeature('period');
 }
 
 async function fetchRecentYearVods(scanToken, loadToken, yearCutoff) {
@@ -2736,7 +2852,7 @@ async function fetchRecentYearVods(scanToken, loadToken, yearCutoff) {
     if (!isCurrentPeriodScan(scanToken, loadToken)) return null;
     let pageData = vodPagesByNumber.get(page);
     if (!pageData) {
-      const payload = await getViewerVodPage(streamerId, page);
+      const payload = await getViewerVodPage(streamerId, page, '', 'newest', 'period');
       if (!isCurrentPeriodScan(scanToken, loadToken)) return null;
       const rows = Array.isArray(payload.vods) ? payload.vods : [];
       pageData = {
@@ -2772,27 +2888,12 @@ async function fetchRecentYearVods(scanToken, loadToken, yearCutoff) {
 
 async function runPeriodPeakScan({ forceRefresh = false } = {}) {
   if (!selectedStreamer) return;
+  if (!await canViewPaidResult('period', (message, isError) => {
+    $('viewerPeriodStatus').textContent = message;
+    $('viewerPeriodStatus').classList.toggle('is-error', isError);
+  })) return;
   const streamerId = selectedStreamer.soopId;
   const loadToken = activeLoadToken;
-  try {
-    const access = await callViewerStats({ action: 'adminAccess' });
-    if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
-    subscriptionState.isAdmin = access.data && access.data.isAdmin === true;
-    subscriptionState.subscriberFeaturesAdminOnly = !access.data || access.data.subscriberFeaturesAdminOnly !== false;
-    if (subscriptionState.isAdmin) subscriptionState.accountProtected = true;
-    subscriptionState.subscribed = true;
-    subscriptionState.expiresAt = Number(access.data && access.data.expiresAt) || subscriptionState.expiresAt;
-    subscriptionState.loaded = true;
-    renderSubscriptionControls();
-    scheduleSubscriptionStatusRefresh();
-  } catch (error) {
-    await refreshSubscriptionStatus();
-    if (!selectedStreamer || loadToken !== activeLoadToken || selectedStreamer.soopId !== streamerId) return;
-    $('viewerPeriodStatus').textContent = '기간별 최고 시청 순간은 현재 관리자만 이용할 수 있습니다.';
-    $('viewerPeriodStatus').classList.remove('is-error');
-    renderPeriodPeakCards(new Map(), new Map(), false, true);
-    return;
-  }
   const scanToken = ++periodScanToken;
   const scanStartedAt = Date.now();
   const dayMs = 24 * 60 * 60 * 1000;
@@ -2893,6 +2994,7 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
             () => {
               $('viewerPeriodStatus').textContent = '현재 이용자가 많아 집계 시간이 길어지고 있습니다. 분석을 계속 진행하고 있어요.';
             },
+            'period',
           );
           if (!isCurrentPeriodScan(scanToken, loadToken)) return;
           const peakViewers = Number(stats.highest.viewers);
@@ -2999,14 +3101,10 @@ async function selectStreamer(streamer) {
   $('viewerVodGrid').replaceChildren();
   $('viewerLoadMore').classList.add('hidden');
   $('viewerPeriodScanButton').disabled = false;
-  $('viewerPeriodScanButton').textContent = canViewSubscriberFeatures()
-    ? '최근 1년 분석'
-    : '관리자 전용 분석';
-  $('viewerPeriodStatus').textContent = canViewSubscriberFeatures()
+  $('viewerPeriodScanButton').textContent = '결과 보기';
+  $('viewerPeriodStatus').textContent = canUsePaidFeature('period')
     ? '최근 1년 다시보기를 분석해 7일·30일·90일·1년 최고 순간을 찾습니다.'
-    : subscriptionState.subscriberFeaturesAdminOnly
-      ? '기간별 최고 시청 순간은 현재 관리자만 이용할 수 있습니다.'
-      : '기간별 최고 시청 순간은 관리자만 이용할 수 있습니다.';
+    : '분석 조건을 확인한 뒤 결과 보기를 누르세요. 결과 직전에 로그인·해금 여부를 확인합니다.';
   $('viewerPeriodStatus').classList.remove('is-error');
   renderPeriodPeakCards(new Map(), new Map(), false);
   $('viewerResults').classList.remove('hidden');
@@ -3873,5 +3971,8 @@ document.querySelectorAll('.viewer-affiliate-image img').forEach((image) => {
   if (image.complete && image.naturalWidth === 0) showFallback();
 });
 renderComparisonSelection();
+// 인증 상태 조회 전에도 상품 카드를 먼저 그린다. 네트워크 지연이나 익명 상태 때문에
+// 유료 탭이 비어 보이지 않으며, 실제 결제·권한 판정은 호출 서버가 다시 검증한다.
+renderPaidFeatures();
 loadDevbarLinks();
 getAuthReady().catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));

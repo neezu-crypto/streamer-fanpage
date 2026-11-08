@@ -1688,3 +1688,36 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 #sponsorRequestCancel:focus-visible,
 #sponsorPaymentCheck:focus-visible { outline: 3px solid #476de0; outline-offset: 2px; }
 #sponsorPaymentCheck[hidden] { display: none; }
+#viewerFreeService[hidden], #viewerPaidService[hidden], #viewerBugService[hidden] { display: none; }
+.viewer-service-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+.viewer-service-tabs [aria-selected="true"] { background: #486bd6; color: #fff; }
+#viewerBugForm { display: grid; gap: 10px; }
+#viewerBugForm input, #viewerBugForm textarea { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #bdcce4; color: #17243a; background: #fff; font: inherit; }
+#viewerBugForm button { justify-self: start; }
+.viewer-unlock-transfer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.viewer-unlock-transfer-grid form { display: grid; gap: 9px; align-content: start; padding: 14px; border: 1px solid #d8deee; border-radius: 12px; background: #f8faff; }
+.viewer-unlock-transfer-grid h3 { margin: 0; font-size: 1rem; }
+.viewer-unlock-transfer-grid label { font-weight: 700; }
+.viewer-unlock-transfer-grid input, .viewer-unlock-transfer-grid select { min-width: 0; box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid #bdcce4; border-radius: 8px; font: inherit; }
+@media (max-width: 680px) { .viewer-unlock-transfer-grid { grid-template-columns: 1fr; } }
+.viewer-paid-service { margin-top: 18px; }
+.viewer-paid-feature-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:16px; }
+.viewer-paid-feature { border:1px solid #c9d5ea; border-radius:10px; padding:16px; background:#f8fbff; display:grid; gap:8px; }
+.viewer-paid-feature h3,.viewer-paid-feature p { margin:0; }
+.viewer-paid-feature .viewer-paid-price { color:#315ac8; font-weight:800; }
+.viewer-paid-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.viewer-paid-actions .button { justify-self:start; }
+.viewer-paid-guide { background:#fff; }
+.viewer-paid-history-row { display:flex; gap:12px; align-items:center; margin-top:16px; }
+.viewer-unlock-dialog { width:min(520px,calc(100vw - 32px)); padding:0; border:0; border-radius:16px; color:#17243a; background:#fff; box-shadow:0 22px 70px rgba(23,36,58,.3); }
+.viewer-unlock-dialog::backdrop { background:rgba(17,28,48,.6); }
+.viewer-unlock-dialog-card { position:relative; display:grid; gap:12px; padding:28px; }
+.viewer-unlock-dialog-card h2,.viewer-unlock-dialog-card p { margin:0; }
+.viewer-unlock-price { padding:12px; border-radius:8px; background:#edf3ff; color:#315ac8; font-weight:800; font-size:18px; }
+.viewer-unlock-history-item { display:grid; gap:7px; padding:12px 0; border-bottom:1px solid #e3eaf5; }
+.viewer-unlock-history-item p { margin:0; font-weight:700; }
+.viewer-unlock-history-item small { color:#596b84; overflow-wrap:anywhere; }
+.viewer-unlock-copy { justify-self:start; padding:7px 10px; font-size:.82rem; }
+.viewer-unlock-tutorial-steps { display:grid; gap:11px; margin:0; padding:4px 0 4px 24px; color:#4f6078; line-height:1.6; }
+.viewer-unlock-actions { display:flex; justify-content:flex-end; margin-top:4px; }
+@media(max-width:700px) { .viewer-paid-feature-grid{grid-template-columns:1fr;} .viewer-unlock-dialog-card{padding:22px 18px;} }
