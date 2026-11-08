@@ -1673,3 +1673,18 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
     font-size: 13px;
   }
 }
+#sponsorRequestCancel,
+#sponsorPaymentCheck {
+  color: #263c68;
+  background: #f2f5fc;
+  border: 1px solid #a9bad9;
+  border-radius: 3px;
+  min-height: 42px;
+  padding: 9px 15px;
+  font-weight: 600;
+}
+#sponsorRequestCancel:hover,
+#sponsorPaymentCheck:hover { background: #e4ebfa; border-color: #5a75b2; }
+#sponsorRequestCancel:focus-visible,
+#sponsorPaymentCheck:focus-visible { outline: 3px solid #476de0; outline-offset: 2px; }
+#sponsorPaymentCheck[hidden] { display: none; }
