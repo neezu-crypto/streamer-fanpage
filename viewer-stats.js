@@ -3347,6 +3347,10 @@ function makeSponsorPendingSlot() {
   return card;
 }
 
+window.addEventListener('scroll', () => {
+  document.querySelectorAll('.viewer-sponsor-live-preview').forEach((item) => item.remove());
+}, true);
+
 function makeSponsorLivePreview() {
   const preview = document.createElement('span');
   preview.className = 'viewer-sponsor-live-preview';
@@ -3418,10 +3422,22 @@ function makeSponsorAdCard(ad, rail) {
   const nickname = document.createElement('strong');
   nickname.textContent = ad.nickname;
   const previewParts = makeSponsorLivePreview();
-  card.append(image, fallback, nickname, previewParts.preview);
-  const requestPreview = () => loadSponsorLivePreview(card, previewParts);
-  card.addEventListener('mouseenter', requestPreview, { once: true });
-  card.addEventListener('focus', requestPreview, { once: true });
+  card.append(image, fallback, nickname);
+  const hidePreview = () => previewParts.preview.remove();
+  const requestPreview = () => {
+    if (!window.matchMedia('(min-width: 1440px)').matches) return;
+    document.querySelectorAll('.viewer-sponsor-live-preview').forEach((item) => item.remove());
+    const rect = card.getBoundingClientRect();
+    const preview = previewParts.preview;
+    preview.style.left = `${Math.max(4, Math.min(window.innerWidth - 256, rail === 'right' ? rect.left - 252 : rect.right))}px`;
+    preview.style.top = `${Math.max(4, Math.min(window.innerHeight - 160, rect.top))}px`;
+    document.body.append(preview);
+    loadSponsorLivePreview(card, previewParts);
+  };
+  card.addEventListener('mouseenter', requestPreview);
+  card.addEventListener('focus', requestPreview);
+  card.addEventListener('mouseleave', hidePreview);
+  card.addEventListener('blur', hidePreview);
   card.dataset.rail = rail;
   return card;
 }
@@ -3443,6 +3459,7 @@ function distributeSponsorAds(ads) {
 }
 
 function renderSponsorRails(ads, pendingByRail = { left: 0, right: 0 }) {
+  document.querySelectorAll('.viewer-sponsor-live-preview').forEach((item) => item.remove());
   const rails = distributeSponsorAds(ads);
   const pending = {
     left: Math.max(0, Math.min(5, Number(pendingByRail.left) || 0)),
