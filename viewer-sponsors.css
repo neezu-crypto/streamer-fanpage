@@ -26,6 +26,7 @@
 .viewer-sponsor-live-preview-label{position:absolute;top:8px;left:8px;padding:4px 6px;background:#17243add;color:#fff;font-size:9px;font-weight:800;letter-spacing:.08em}
 .viewer-sponsor-card[data-live-state="loading"] .viewer-sponsor-live-preview,.viewer-sponsor-card[data-live-state="loaded"] .viewer-sponsor-live-preview,.viewer-sponsor-card[data-live-state="offline"] .viewer-sponsor-live-preview,.viewer-sponsor-card[data-live-state="error"] .viewer-sponsor-live-preview{opacity:1;visibility:visible;transform:translateX(0)}
 .viewer-sponsor-mobile{display:none}
+@media(min-width:1440px){.viewer-sponsor-rail{overflow-x:hidden}.viewer-sponsor-live-preview{position:fixed;z-index:1000;opacity:1;visibility:visible;transform:none}}
 @media(min-width:1440px){.viewer-stats-main{width:min(1320px,calc(100% - 360px))}}
 .viewer-sponsor-admin{margin:0 0 25px;padding:20px;border:1px solid #d8dfeb;background:#fff;box-shadow:0 6px 22px #24344d08}
 .viewer-sponsor-admin-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
