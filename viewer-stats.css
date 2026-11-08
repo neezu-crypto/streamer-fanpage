@@ -1,3 +1,12 @@
+/* The analytics page is long by design. Keep the document scrollbar usable
+   without letting Chromium's system-width rail dominate the right edge. */
+html{scrollbar-width:thin;scrollbar-color:#9aa8bd transparent}
+html::-webkit-scrollbar{width:10px;height:10px}
+html::-webkit-scrollbar-track{background:transparent}
+html::-webkit-scrollbar-thumb{border:3px solid transparent;border-radius:999px;background:#9aa8bd;background-clip:padding-box}
+html::-webkit-scrollbar-thumb:hover{background:#71829a;background-clip:padding-box}
+html::-webkit-scrollbar-corner{background:transparent}
+
 .viewer-stats-shell [hidden]{display:none!important}
 .viewer-stats-main{padding:62px 0 76px}
 .viewer-stats-hero{max-width:830px;margin:0 auto 34px;text-align:center}
