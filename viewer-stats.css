@@ -371,7 +371,7 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 /* Disclosed affiliate card beside the analytics introduction. */
 .viewer-hero-group {
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(220px, .88fr);
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 330px);
   align-items: center;
   gap: clamp(14px, 2vw, 26px);
   min-width: 0;
@@ -1689,8 +1689,19 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 #sponsorPaymentCheck:focus-visible { outline: 3px solid #476de0; outline-offset: 2px; }
 #sponsorPaymentCheck[hidden] { display: none; }
 #viewerFreeService[hidden], #viewerPaidService[hidden], #viewerBugService[hidden] { display: none; }
-.viewer-service-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+.viewer-workspace { row-gap: 20px; }
+.viewer-workspace > .viewer-hero-group,
+.viewer-workspace > .viewer-service-tabs,
+.viewer-workspace > #viewerFreeService,
+.viewer-workspace > #viewerPaidService,
+.viewer-workspace > #viewerBugService { grid-column: 1 / -1; min-width: 0; }
+.viewer-service-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 .viewer-service-tabs [aria-selected="true"] { background: #486bd6; color: #fff; }
+.viewer-stats-shell .viewer-service-tabs .button[aria-selected="true"]:hover {
+  background: #3659c2;
+  border-color: #3659c2;
+  color: #fff;
+}
 #viewerBugForm { display: grid; gap: 10px; }
 #viewerBugForm input, #viewerBugForm textarea { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #bdcce4; color: #17243a; background: #fff; font: inherit; }
 #viewerBugForm button { justify-self: start; }
