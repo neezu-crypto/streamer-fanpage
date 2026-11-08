@@ -30,6 +30,20 @@ const callSponsorLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatu
 const callViewerBugReports = httpsCallable(functions, 'streamerFanPageViewerStatsBugReports');
 const callViewerUnlocks = httpsCallable(functions, 'streamerFanPageViewerStatsUnlocks');
 const $ = (id) => document.getElementById(id);
+(() => {
+  // 스크롤 직후에는 위치를 확인할 수 있게 보여주고, 입력이 멈추면 자연스럽게 숨긴다.
+  const root = document.documentElement;
+  let idleTimer = 0;
+  const revealScrollbar = () => {
+    root.classList.remove('viewer-scrollbar-idle');
+    window.clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(() => root.classList.add('viewer-scrollbar-idle'), 1400);
+  };
+  ['scroll', 'wheel', 'touchmove', 'keydown'].forEach((eventName) => {
+    window.addEventListener(eventName, revealScrollbar, { passive: eventName !== 'keydown' });
+  });
+  revealScrollbar();
+})();
 let viewerBugPending = null;
 function viewerBugPendingKey() { return auth.currentUser?.uid ? `viewerBugPending:${auth.currentUser.uid}` : ''; }
 function viewerUnlockPendingKey(featureId) { return auth.currentUser?.uid ? `viewerUnlockPending:${auth.currentUser.uid}:${featureId}` : ''; }

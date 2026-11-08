@@ -6,6 +6,9 @@ html::-webkit-scrollbar-track{background:transparent}
 html::-webkit-scrollbar-thumb{border:3px solid transparent;border-radius:999px;background:#9aa8bd;background-clip:padding-box}
 html::-webkit-scrollbar-thumb:hover{background:#71829a;background-clip:padding-box}
 html::-webkit-scrollbar-corner{background:transparent}
+html.viewer-scrollbar-idle{scrollbar-color:transparent transparent}
+html.viewer-scrollbar-idle::-webkit-scrollbar-thumb{background:transparent;background-clip:padding-box}
+html.viewer-scrollbar-idle::-webkit-scrollbar-thumb:hover{background:#71829a;background-clip:padding-box}
 
 .viewer-stats-shell [hidden]{display:none!important}
 .viewer-stats-main{padding:62px 0 76px}
