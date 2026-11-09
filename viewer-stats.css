@@ -1802,6 +1802,7 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 .viewer-paid-history-row { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; margin-top:16px; padding:10px 12px; border:1px solid #d7dfed; border-radius:8px; background:#f8faff; }
 .viewer-paid-history-row #viewerPaidStatus { margin-right:auto; color:#25344d; font-size:14px; font-weight:700; }
 .viewer-paid-history-row .button { min-height:44px; }
+.viewer-paid-history-row .button[hidden], .viewer-bug-actions .button[hidden] { display:none; }
 .viewer-paid-learn { color:#4f6078; font-size:13px; line-height:1.55; }
 .viewer-paid-feature.is-unlocked { border-color:#8fcfae; background:#f3fbf6; }
 .viewer-paid-feature.is-unlocked .viewer-paid-price { color:#1e7a4c; }

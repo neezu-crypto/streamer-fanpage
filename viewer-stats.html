@@ -10,8 +10,8 @@
   <script src="input-privacy.js?v=20261016-input-privacy"></script>
   <link rel="icon" type="image/svg+xml" href="viewer-stats-icon.svg">
   <link rel="stylesheet" href="style.css?v=20261101-vod-analytics-link-v1">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261110-ux-v1">
-  <link rel="stylesheet" href="viewer-sponsors.css?v=20261110-ux-v1">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261110-ux-v2">
+  <link rel="stylesheet" href="viewer-sponsors.css?v=20261110-ux-v2">
 </head>
 <body class="viewer-stats-page">
   <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
@@ -329,6 +329,7 @@
         <p>필요한 분석만 40캐시로 한 번 해금하면 이용 횟수 제한 없이 사용할 수 있어요. 자동화 방지를 위한 짧은 요청 간격만 적용됩니다.</p>
         <div class="viewer-paid-history-row">
           <span id="viewerPaidStatus" role="status" aria-live="polite"></span>
+          <button type="button" class="button button-primary" id="viewerPaidLogin" hidden>로그인</button>
           <button type="button" class="button" id="viewerPaidHistoryButton">내 해금 내역</button>
           <button type="button" class="button" id="viewerUnlockTransferButton">해금 권한 이전</button>
         </div>
@@ -356,6 +357,7 @@
           <small class="viewer-bug-count" id="viewerBugContentCount">0 / 2000</small>
           <div class="viewer-bug-actions">
             <button type="submit" class="button button-primary" id="viewerBugSubmit">제보 보내기</button>
+            <button type="button" class="button" id="viewerBugLogin" hidden>로그인하고 제보하기</button>
             <button type="button" class="button" id="viewerBugCheck" hidden>이전 접수 결과 확인</button>
           </div>
         </form>
@@ -411,6 +413,19 @@
       <p class="viewer-sponsor-dialog-status" id="sponsorRequestStatus" role="status" aria-live="polite"></p>
       <button class="button" id="sponsorPaymentCheck" type="button" hidden>기존 결제 결과 확인</button>
     </form>
+  </dialog>
+  <dialog class="viewer-unlock-dialog" id="viewerLoginDialog" aria-labelledby="viewerLoginDialogTitle">
+    <div class="viewer-unlock-dialog-card">
+      <button class="viewer-sponsor-close" id="viewerLoginClose" type="button" aria-label="닫기">×</button>
+      <p class="eyebrow">LOGIN</p>
+      <h2 id="viewerLoginDialogTitle">결과를 보려면 로그인이 필요해요</h2>
+      <p>분석 조건은 그대로 유지돼요. 새 탭에서 Google 또는 카카오로 로그인하면 이 화면으로 돌아와 결과 확인을 이어갑니다.</p>
+      <p id="viewerLoginDialogStatus" role="status" aria-live="polite"></p>
+      <div class="viewer-sponsor-actions">
+        <button class="button" id="viewerLoginCancel" type="button">나중에</button>
+        <button class="button button-primary" id="viewerLoginSubmit" type="button">로그인하기</button>
+      </div>
+    </div>
   </dialog>
   <dialog class="viewer-unlock-dialog" id="viewerUnlockDialog" aria-labelledby="viewerUnlockDialogTitle">
     <form method="dialog" class="viewer-unlock-dialog-card" id="viewerUnlockForm">
@@ -469,6 +484,6 @@
       </div>
     </div>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261110-ux-v1"></script>
+  <script type="module" src="viewer-stats.js?v=20261110-ux-v2"></script>
 </body>
 </html>

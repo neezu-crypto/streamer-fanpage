@@ -65,6 +65,39 @@ function setBugStatus(state, message) {
   status.setAttribute('role', ['error-retry', 'error-conflict', 'rate-limited'].includes(state) ? 'alert' : 'status');
   status.hidden = !message;
 }
+// 로그인 화면은 팬페이지(index.html)가 맡는다. 새 탭에서 로그인하면 같은 출처라 인증 상태가 이 탭에도 반영되고, 로그인 탭은 스스로 닫힌다.
+function openLoginTab() {
+  const url = new URL('index.html', window.location.href);
+  url.searchParams.set('login', '1');
+  const opened = window.open(url.href, '_blank');
+  if (!opened) {
+    $('viewerLoginDialogStatus').textContent = '로그인 창을 열지 못했어요. 팝업 차단을 해제하고 다시 눌러 주세요.';
+    $('viewerPaidStatus').textContent = '로그인 창을 열지 못했어요. 팝업 차단을 해제하고 다시 눌러 주세요.';
+    setBugStatus('login-required', '로그인 창을 열지 못했어요. 팝업 차단을 해제하고 다시 눌러 주세요.');
+  }
+}
+function updateLoginButtons() {
+  const signedIn = !!auth.currentUser && !auth.currentUser.isAnonymous;
+  const anonymous = !!auth.currentUser && auth.currentUser.isAnonymous;
+  $('viewerPaidLogin').hidden = !anonymous;
+  $('viewerBugLogin').hidden = !anonymous;
+  if (signedIn && $('viewerBugStatus').dataset.state === 'login-required') setBugStatus('idle', '');
+}
+let pendingLoginResume = null;
+function askLoginForResult(resume) {
+  pendingLoginResume = typeof resume === 'function' ? resume : null;
+  $('viewerLoginDialogStatus').textContent = '';
+  showViewerModal($('viewerLoginDialog'));
+}
+$('viewerLoginSubmit').addEventListener('click', () => {
+  $('viewerLoginDialogStatus').textContent = '새 탭에서 로그인을 마치면 자동으로 이어집니다.';
+  openLoginTab();
+});
+$('viewerLoginClose').addEventListener('click', () => { pendingLoginResume = null; $('viewerLoginDialog').close(); });
+$('viewerLoginCancel').addEventListener('click', () => { pendingLoginResume = null; $('viewerLoginDialog').close(); });
+$('viewerLoginDialog').addEventListener('close', () => { pendingLoginResume = null; });
+$('viewerPaidLogin').addEventListener('click', openLoginTab);
+$('viewerBugLogin').addEventListener('click', openLoginTab);
 function updateBugCounters() {
   $('viewerBugTitleCount').textContent = `${$('viewerBugTitleInput').value.length} / 80`;
   $('viewerBugContentCount').textContent = `${$('viewerBugContent').value.length} / 2000`;
@@ -757,7 +790,7 @@ function openPaidFeature(featureId) {
 async function openUnlockDialog(featureId) {
   await getAuthReady();
   if (!auth.currentUser || auth.currentUser.isAnonymous) {
-    $('viewerPaidStatus').textContent = '유료 기능 해금은 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요.';
+    $('viewerPaidStatus').textContent = '유료 기능 해금은 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요. 로그인 버튼을 눌러 주세요.';
     return;
   }
   pendingUnlockFeature = featureId;
@@ -776,10 +809,11 @@ async function openUnlockDialog(featureId) {
   showViewerModal($('viewerUnlockDialog'));
 }
 
-async function canViewPaidResult(featureId, setStatus) {
+async function canViewPaidResult(featureId, setStatus, resume) {
   await getAuthReady();
   if (!auth.currentUser || auth.currentUser.isAnonymous) {
-    setStatus('분석 조건이 준비됐어요. 결과를 보려면 일반 로그인 후 기능을 해금해 주세요.', true);
+    setStatus('분석 조건이 준비됐어요. 결과를 보려면 로그인이 필요해요. 로그인하면 결과 확인을 이어갑니다.', true);
+    askLoginForResult(resume);
     return false;
   }
   if (!canUsePaidFeature(featureId) && !await refreshUnlockAccess()) {
@@ -2479,7 +2513,7 @@ async function runComparison() {
     date: $('viewerComparisonDate').value,
     selectionKey: comparisonSelectionKey(),
   };
-  if (!await canViewPaidResult('same_day', setComparisonStatus)) {
+  if (!await canViewPaidResult('same_day', setComparisonStatus, runComparison)) {
     renderComparisonSelection();
     return;
   }
@@ -2807,7 +2841,7 @@ async function runKeywordComparison() {
     streamers,
     selectionKey: keywordComparisonSelectionKey(),
   };
-  if (!await canViewPaidResult('keyword', setKeywordComparisonStatus)) {
+  if (!await canViewPaidResult('keyword', setKeywordComparisonStatus, runKeywordComparison)) {
     renderKeywordComparisonSelection();
     return;
   }
@@ -3202,7 +3236,7 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
   if (!await canViewPaidResult('period', (message, isError) => {
     $('viewerPeriodStatus').textContent = message;
     $('viewerPeriodStatus').classList.toggle('is-error', isError);
-  })) return;
+  }, () => runPeriodPeakScan({ forceRefresh }))) return;
   const streamerId = selectedStreamer.soopId;
   const loadToken = activeLoadToken;
   const scanToken = ++periodScanToken;
@@ -4304,7 +4338,13 @@ onAuthStateChanged(auth, (user) => {
   unlockState.features = { period: false, same_day: false, keyword: false };
   affiliateAuthResolved = true;
   updateAffiliateVisibility();
+  updateLoginButtons();
   renderPaidFeatures();
+  if (!user.isAnonymous && pendingLoginResume) {
+    const resume = pendingLoginResume; pendingLoginResume = null;
+    $('viewerLoginDialog').close();
+    window.setTimeout(() => { void resume(); }, 0);
+  }
   refreshSubscriptionStatus();
 });
 document.addEventListener('visibilitychange', () => {
