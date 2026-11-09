@@ -807,6 +807,9 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
   border: 1px solid #dbe2ec;
   background: #f8fafc;
 }
+.viewer-period-picker {
+  margin: 0 0 14px;
+}
 .viewer-comparison-label {
   display: flex;
   align-items: center;
