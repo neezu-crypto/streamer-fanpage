@@ -77,6 +77,9 @@ async function checkViewerBugPending() {
 function selectViewerService(name) {
   // 탭별 첫 화면은 분리한다. 이미 선택한 스트리머 결과는 유료 분석의 입력 맥락으로
   // 유지하되, 무료 검색 폼은 유료/제보 탭에서 함께 노출하지 않는다.
+  // 무료 다시보기의 첫 분석 안내는 무료 탭에서만 의미가 있다. 유료 분석 조건을
+  // 설정하는 중에 무료 안내가 끼어들지 않도록 탭을 바꾸면 기존 안내를 닫는다.
+  if (name !== 'free') clearFirstAnalysisTutorial(false);
   $('viewerFreeService').hidden = name !== 'free';
   $('viewerPaidService').hidden = name !== 'paid';
   $('viewerBugService').hidden = name !== 'bug';
@@ -84,6 +87,11 @@ function selectViewerService(name) {
   $('viewerPaidTab').setAttribute('aria-selected', String(name === 'paid'));
   $('viewerBugTab').setAttribute('aria-selected', String(name === 'bug'));
   if (name === 'paid') void refreshUnlockAccess();
+}
+
+function isViewerFreeServiceActive() {
+  const service = $('viewerFreeService');
+  return !!service && !service.hidden;
 }
 $('viewerFreeTab').addEventListener('click', () => selectViewerService('free'));
 $('viewerPaidTab').addEventListener('click', () => selectViewerService('paid'));
@@ -1518,6 +1526,7 @@ function showFirstAnalysisTutorial(target, loadToken) {
 
 function watchForFirstAnalysisTutorial(loadToken) {
   clearFirstAnalysisTutorial(false);
+  if (!isViewerFreeServiceActive()) return;
   const heading = $('viewerVodHeading');
   requestAnimationFrame(() => {
     if (loadToken !== activeLoadToken) return;
@@ -2995,7 +3004,9 @@ async function selectPeriodStreamer(streamer) {
   renderPeriodSearchResults([]);
   setPeriodPickerStatus('다시보기 목록을 준비하고 있어요…');
   try {
-    await selectStreamer({ ...streamer, soopId });
+    // 유료 탭의 조건 설정은 무료 다시보기 분석 흐름과 분리한다. 여기서
+    // selectStreamer를 재사용하되 첫 분석 튜토리얼은 표시하지 않는다.
+    await selectStreamer({ ...streamer, soopId }, { showFirstAnalysisTutorial: false });
     if (!selectedStreamer || String(selectedStreamer.soopId).toLowerCase() !== soopId) return;
     renderPeriodSelection();
     setPeriodPickerStatus((selectedStreamer.nickname || selectedStreamer.soopId) + '을(를) 선택했어요. 결과 보기를 눌러 기간별 고점을 확인하세요.');
@@ -3248,7 +3259,7 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
   }
 }
 
-async function selectStreamer(streamer) {
+async function selectStreamer(streamer, { showFirstAnalysisTutorial = true } = {}) {
   if (isSuppressedSoopSearchResult(streamer)) {
     searchRequestId += 1;
     activeLoadToken += 1;
@@ -3304,7 +3315,11 @@ async function selectStreamer(streamer) {
   }
   setSearchHint((streamer.nickname || streamer.soopId) + '의 다시보기를 불러옵니다. 카드나 최고·최저 링크를 누르면 해당 시점부터 재생됩니다.');
   updateVodHeading();
-  watchForFirstAnalysisTutorial(loadToken);
+  if (showFirstAnalysisTutorial && isViewerFreeServiceActive()) {
+    watchForFirstAnalysisTutorial(loadToken);
+  } else {
+    clearFirstAnalysisTutorial(false);
+  }
   await loadVodPage(loadToken, 1);
 }
 
