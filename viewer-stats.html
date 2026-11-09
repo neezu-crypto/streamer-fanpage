@@ -10,8 +10,8 @@
   <script src="input-privacy.js?v=20261016-input-privacy"></script>
   <link rel="icon" type="image/svg+xml" href="viewer-stats-icon.svg">
   <link rel="stylesheet" href="style.css?v=20261101-vod-analytics-link-v1">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261109-paid-search-v1">
-  <link rel="stylesheet" href="viewer-sponsors.css?v=20261108-sponsor-preview-v3">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261110-ux-v1">
+  <link rel="stylesheet" href="viewer-sponsors.css?v=20261110-ux-v1">
 </head>
 <body class="viewer-stats-page">
   <div id="sig-opening-stage" role="button" tabindex="0" aria-label="시그니처 오프닝, 클릭하거나 Enter 키를 눌러 건너뛰기">
@@ -78,28 +78,19 @@
             <p>다시보기별 최고·최저 시청 순간과 날짜별 시청 흐름을 확인할 수 있습니다.</p>
         </section>
 
-        <article class="viewer-affiliate-card" aria-labelledby="viewerAffiliateTitle">
-          <p class="viewer-affiliate-label">광고 · 제휴</p>
-          <p class="viewer-affiliate-disclosure">구매가 발생하면 고점체크 운영자가 수수료를 받습니다.</p>
-          <div class="viewer-affiliate-product">
-            <a class="viewer-affiliate-image" href="https://bitl.bz/4aO8WU" target="_blank" rel="sponsored nofollow noopener noreferrer" aria-label="먼작귀 목쿠션 상품 페이지 열기">
-              <img src="https://sitem.ssgcdn.com/49/33/50/item/1000815503349_i1_1200.jpg" alt="먼작귀 목쿠션 상품 이미지" loading="lazy" decoding="async">
-              <span class="viewer-affiliate-image-fallback" aria-hidden="true">먼작귀<br>목쿠션</span>
-            </a>
-            <div class="viewer-affiliate-copy">
-              <h2 id="viewerAffiliateTitle">먼작귀 목쿠션</h2>
-              <a class="viewer-affiliate-cta" href="https://bitl.bz/4aO8WU" target="_blank" rel="sponsored nofollow noopener noreferrer">상품 보러가기 <span aria-hidden="true">↗</span></a>
-            </div>
-          </div>
-        </article>
+        <ol class="viewer-flow-steps" aria-label="이용 방법">
+          <li><strong>1</strong><span>스트리머 검색</span></li>
+          <li><strong>2</strong><span>다시보기 선택</span></li>
+          <li><strong>3</strong><span>시청 흐름 확인</span></li>
+        </ol>
       </div>
 
-      <nav class="viewer-service-tabs" aria-label="고점체크 서비스">
-        <button type="button" class="button" id="viewerFreeTab" aria-selected="true">무료 서비스</button>
-        <button type="button" class="button" id="viewerPaidTab" aria-selected="false">유료 서비스</button>
-        <button type="button" class="button" id="viewerBugTab" aria-selected="false">버그 제보</button>
-      </nav>
-      <div id="viewerFreeService">
+      <div class="viewer-service-tabs" role="tablist" aria-label="고점체크 서비스">
+        <button type="button" class="button" role="tab" id="viewerFreeTab" aria-selected="true" aria-controls="viewerFreeService" tabindex="0">무료 서비스</button>
+        <button type="button" class="button" role="tab" id="viewerPaidTab" aria-selected="false" aria-controls="viewerPaidService" tabindex="-1">유료 서비스</button>
+        <button type="button" class="button" role="tab" id="viewerBugTab" aria-selected="false" aria-controls="viewerBugService" tabindex="-1">버그 제보</button>
+      </div>
+      <div id="viewerFreeService" role="tabpanel" aria-labelledby="viewerFreeTab">
       <section class="viewer-search-panel" aria-labelledby="viewerSearchTitle">
         <form id="viewerSearchForm" class="viewer-search-form" autocomplete="off">
           <label id="viewerSearchTitle" for="viewerSearchInput">스트리머 검색</label>
@@ -113,20 +104,12 @@
           <span class="viewer-search-progress-track" aria-hidden="true"><span></span></span>
         </div>
         <p class="viewer-search-hint" id="viewerSearchHint" role="status" aria-live="polite">닉네임 또는 SOOP 방송국 아이디·주소로 검색하세요.</p>
-        <p class="viewer-queue-note">익명도 이용할 수 있어요. 혼잡하면 로그인 사용자의 요청이 먼저 처리될 수 있고, 이용 등급별 한도가 적용됩니다.</p>
+        <details class="viewer-queue-note"><summary>이용 안내</summary><p>익명도 이용할 수 있어요. 혼잡하면 로그인 사용자의 요청이 먼저 처리될 수 있고, 이용 등급별 한도가 적용됩니다.</p></details>
         <div class="viewer-search-results" id="viewerSearchResults" aria-label="스트리머 검색 결과"></div>
       </section>
 
       <section class="viewer-sponsor-mobile" id="sponsorRailMobile" aria-label="오늘의 후원 스트리머"></section>
 
-      <section class="viewer-sponsor-admin hidden" id="sponsorAdminPanel" aria-labelledby="sponsorAdminTitle">
-        <div class="viewer-sponsor-admin-heading">
-          <div><p class="viewer-sponsor-eyebrow">ADMIN · SPONSOR PLACEMENTS</p><h2 id="sponsorAdminTitle">스트리머 홍보 신청 관리</h2></div>
-          <button class="button" id="sponsorAdminRefresh" type="button">새로고침</button>
-        </div>
-        <p class="viewer-sponsor-admin-status" id="sponsorAdminStatus" role="status" aria-live="polite"></p>
-        <div class="viewer-sponsor-request-list" id="sponsorAdminRequests"></div>
-      </section>
 
       <section class="viewer-results hidden" id="viewerResults" aria-live="polite">
         <div class="viewer-results-heading">
@@ -139,6 +122,7 @@
             </div>
           </div>
           <a class="button" id="viewerStationLink" href="https://www.sooplive.com/" target="_blank" rel="noopener noreferrer">SOOP 방송국 ↗</a>
+          <button type="button" class="button viewer-paid-entry" id="viewerPeriodEntry">이 스트리머의 기간별 최고 순간 보기 ▸</button>
         </div>
         <div class="viewer-list-heading" id="viewerVodHeading">
           <div><p class="eyebrow">VOD LIBRARY</p><h3>방송 다시보기</h3><span id="viewerVodCount"></span></div>
@@ -302,6 +286,7 @@
             </div>
             <p class="viewer-keyword-comparison-status" id="viewerKeywordComparisonStatus" role="status" aria-live="polite">키워드와 스트리머 2명 이상을 선택해 주세요.</p>
             <div class="viewer-comparison-actions">
+              <button class="button viewer-keyword-add-slot" id="viewerKeywordAddSlot" type="button">+ 스트리머 추가 (최대 5명)</button>
               <button class="button" id="viewerKeywordComparisonClear" type="button" disabled>선택 초기화</button>
               <button class="button button-primary" id="viewerKeywordComparisonRun" type="button" disabled>고점 비교</button>
             </div>
@@ -315,31 +300,66 @@
         <strong>스트리머를 검색해 주세요</strong>
         <p>각 다시보기의 최고·최저 시청자 시점으로 바로 이동할 수 있어요.</p>
       </section>
+      <article class="viewer-affiliate-card" id="viewerAffiliateCard" aria-labelledby="viewerAffiliateTitle" hidden>
+        <p class="viewer-affiliate-label">광고 · 제휴</p>
+        <p class="viewer-affiliate-disclosure">구매가 발생하면 고점체크 운영자가 수수료를 받습니다.</p>
+        <div class="viewer-affiliate-product">
+          <a class="viewer-affiliate-image" href="https://bitl.bz/4aO8WU" target="_blank" rel="sponsored nofollow noopener noreferrer" aria-label="먼작귀 목쿠션 상품 페이지 열기">
+            <img src="https://sitem.ssgcdn.com/49/33/50/item/1000815503349_i1_1200.jpg" alt="먼작귀 목쿠션 상품 이미지" loading="lazy" decoding="async">
+            <span class="viewer-affiliate-image-fallback" aria-hidden="true">먼작귀<br>목쿠션</span>
+          </a>
+          <div class="viewer-affiliate-copy">
+            <h2 id="viewerAffiliateTitle">먼작귀 목쿠션</h2>
+            <a class="viewer-affiliate-cta" href="https://bitl.bz/4aO8WU" target="_blank" rel="sponsored nofollow noopener noreferrer">상품 보러가기 <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+      </article>
+      <section class="viewer-sponsor-admin hidden" id="sponsorAdminPanel" aria-labelledby="sponsorAdminTitle">
+        <div class="viewer-sponsor-admin-heading">
+          <div><p class="viewer-sponsor-eyebrow">ADMIN · SPONSOR PLACEMENTS</p><h2 id="sponsorAdminTitle">스트리머 홍보 신청 관리</h2></div>
+          <button class="button" id="sponsorAdminRefresh" type="button">새로고침</button>
+        </div>
+        <p class="viewer-sponsor-admin-status" id="sponsorAdminStatus" role="status" aria-live="polite"></p>
+        <div class="viewer-sponsor-request-list" id="sponsorAdminRequests"></div>
+      </section>
       </div>
-      <section class="viewer-search-panel viewer-paid-service" id="viewerPaidService" hidden aria-labelledby="viewerPaidTitle">
+      <section class="viewer-search-panel viewer-paid-service" id="viewerPaidService" role="tabpanel" hidden aria-labelledby="viewerPaidTab">
         <p class="eyebrow">PAID ANALYSIS</p>
         <h2 id="viewerPaidTitle">기능별 해금</h2>
         <p>필요한 분석만 40캐시로 한 번 해금하면 이용 횟수 제한 없이 사용할 수 있어요. 자동화 방지를 위한 짧은 요청 간격만 적용됩니다.</p>
-        <div class="viewer-paid-feature-grid" id="viewerPaidFeatureGrid"></div>
         <div class="viewer-paid-history-row">
+          <span id="viewerPaidStatus" role="status" aria-live="polite"></span>
           <button type="button" class="button" id="viewerPaidHistoryButton">내 해금 내역</button>
           <button type="button" class="button" id="viewerUnlockTransferButton">해금 권한 이전</button>
-          <span id="viewerPaidStatus" role="status" aria-live="polite"></span>
         </div>
-        <div id="viewerPaidAnalysisMount" class="viewer-paid-analysis-mount" aria-label="유료 분석 결과"></div>
+        <div class="viewer-paid-feature-grid" id="viewerPaidFeatureGrid"></div>
+        <div class="viewer-paid-workspace" id="viewerPaidWorkspace" hidden>
+          <div class="viewer-paid-workspace-bar">
+            <button type="button" class="button" id="viewerPaidBack">← 기능 목록</button>
+            <div class="viewer-paid-switch" id="viewerPaidSwitch" role="group" aria-label="분석 기능 전환"></div>
+          </div>
+          <p class="viewer-paid-workspace-desc"><span id="viewerPaidWorkspaceDesc"></span> <button type="button" class="viewer-paid-guide-link" id="viewerPaidWorkspaceGuide">사용 방법</button></p>
+        </div>
+        <div id="viewerPaidAnalysisMount" class="viewer-paid-analysis-mount" aria-label="유료 분석 작업 공간" hidden></div>
       </section>
-      <section id="viewerBugService" class="viewer-search-panel" hidden aria-labelledby="viewerBugTitle">
+      <section id="viewerBugService" class="viewer-search-panel" role="tabpanel" hidden aria-labelledby="viewerBugTab">
         <h2 id="viewerBugTitle">버그 제보</h2>
         <p>오류 내용과 재현 방법을 알려주세요. 로그인한 계정만 제보할 수 있습니다.</p>
+        <p class="viewer-bug-limit">제보는 1분에 1건, 하루 5건까지 보낼 수 있고 같은 내용은 24시간 동안 다시 접수되지 않아요.</p>
+        <p id="viewerBugStatus" class="viewer-form-status" role="status" aria-live="polite" data-state="idle" hidden></p>
         <form id="viewerBugForm">
           <label for="viewerBugTitleInput">제목 (선택)</label>
-          <input id="viewerBugTitleInput" type="text" maxlength="80">
-          <label for="viewerBugContent">오류 내용</label>
-          <textarea id="viewerBugContent" minlength="5" maxlength="2000" required rows="7"></textarea>
-          <button type="submit" class="button button-primary" id="viewerBugSubmit">제보 보내기</button>
-          <button type="button" class="button" id="viewerBugCheck" hidden>이전 접수 결과 확인</button>
-          <p id="viewerBugStatus" role="status" aria-live="polite"></p>
+          <input id="viewerBugTitleInput" type="text" maxlength="80" aria-describedby="viewerBugTitleCount">
+          <small class="viewer-bug-count" id="viewerBugTitleCount">0 / 80</small>
+          <label for="viewerBugContent">오류 내용 <span class="viewer-required">(필수)</span></label>
+          <textarea id="viewerBugContent" minlength="5" maxlength="2000" required rows="7" aria-describedby="viewerBugContentCount"></textarea>
+          <small class="viewer-bug-count" id="viewerBugContentCount">0 / 2000</small>
+          <div class="viewer-bug-actions">
+            <button type="submit" class="button button-primary" id="viewerBugSubmit">제보 보내기</button>
+            <button type="button" class="button" id="viewerBugCheck" hidden>이전 접수 결과 확인</button>
+          </div>
         </form>
+      </section>
       </section>
     </main>
 
@@ -449,6 +469,6 @@
       </div>
     </div>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261109-paid-tutorial-boundary-v1"></script>
+  <script type="module" src="viewer-stats.js?v=20261110-ux-v1"></script>
 </body>
 </html>

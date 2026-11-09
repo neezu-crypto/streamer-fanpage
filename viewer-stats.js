@@ -4,6 +4,7 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gst
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { createViewerStatsVisitNotifier } from './viewer-stats-visit.mjs';
+import { VIEWER_SERVICES, serviceFromHash, nextTabIndex, hasAnyPaidUnlock, shouldShowAffiliate, mergeSponsorStrip, bugReportStateFromError } from './viewer-stats-ui.mjs?v=20261110-ui-v1';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -56,6 +57,18 @@ mountPaidAnalysisPanels();
 let viewerBugPending = null;
 function viewerBugPendingKey() { return auth.currentUser?.uid ? `viewerBugPending:${auth.currentUser.uid}` : ''; }
 function viewerUnlockPendingKey(featureId) { return auth.currentUser?.uid ? `viewerUnlockPending:${auth.currentUser.uid}:${featureId}` : ''; }
+// 버그 제보 상태 배너. state: idle | login-required | submitting | success | error-retry | error-conflict | rate-limited | checking
+function setBugStatus(state, message) {
+  const status = $('viewerBugStatus');
+  status.dataset.state = state;
+  status.textContent = message || '';
+  status.setAttribute('role', ['error-retry', 'error-conflict', 'rate-limited'].includes(state) ? 'alert' : 'status');
+  status.hidden = !message;
+}
+function updateBugCounters() {
+  $('viewerBugTitleCount').textContent = `${$('viewerBugTitleInput').value.length} / 80`;
+  $('viewerBugContentCount').textContent = `${$('viewerBugContent').value.length} / 2000`;
+}
 async function checkViewerBugPending() {
   await getAuthReady();
   const key = viewerBugPendingKey();
@@ -67,25 +80,32 @@ async function checkViewerBugPending() {
     const response = await callViewerBugReports({ action: 'status', requestId });
     if (response.data?.status === 'submitted') {
       localStorage.removeItem(key); viewerBugPending = null; $('viewerBugCheck').hidden = true;
-      $('viewerBugStatus').textContent = '이전 버그 제보가 접수됐습니다.';
+      setBugStatus('success', '이전 버그 제보가 접수됐습니다.');
       return false;
     }
   } catch (_) { /* 확인되지 않은 요청은 그대로 보관한다. */ }
-  $('viewerBugStatus').textContent = `이전 제보의 접수 상태를 확인하고 있습니다. 요청 번호: ${requestId}`;
+  setBugStatus('checking', `이전 제보의 접수 상태를 확인하고 있습니다. 요청 번호: ${requestId}`);
   return true;
 }
-function selectViewerService(name) {
+const VIEWER_SERVICE_TAB_IDS = { free: 'viewerFreeTab', paid: 'viewerPaidTab', bug: 'viewerBugTab' };
+const VIEWER_SERVICE_PANEL_IDS = { free: 'viewerFreeService', paid: 'viewerPaidService', bug: 'viewerBugService' };
+function selectViewerService(name, { updateHash = true } = {}) {
   // 탭별 첫 화면은 분리한다. 이미 선택한 스트리머 결과는 유료 분석의 입력 맥락으로
   // 유지하되, 무료 검색 폼은 유료/제보 탭에서 함께 노출하지 않는다.
   // 무료 다시보기의 첫 분석 안내는 무료 탭에서만 의미가 있다. 유료 분석 조건을
   // 설정하는 중에 무료 안내가 끼어들지 않도록 탭을 바꾸면 기존 안내를 닫는다.
+  if (!VIEWER_SERVICES.includes(name)) name = 'free';
   if (name !== 'free') clearFirstAnalysisTutorial(false);
-  $('viewerFreeService').hidden = name !== 'free';
-  $('viewerPaidService').hidden = name !== 'paid';
-  $('viewerBugService').hidden = name !== 'bug';
-  $('viewerFreeTab').setAttribute('aria-selected', String(name === 'free'));
-  $('viewerPaidTab').setAttribute('aria-selected', String(name === 'paid'));
-  $('viewerBugTab').setAttribute('aria-selected', String(name === 'bug'));
+  VIEWER_SERVICES.forEach((service) => {
+    const selected = service === name;
+    $(VIEWER_SERVICE_PANEL_IDS[service]).hidden = !selected;
+    const tab = $(VIEWER_SERVICE_TAB_IDS[service]);
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  });
+  if (updateHash && window.location.hash !== `#${name}`) {
+    try { history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${name}`); } catch (_) {}
+  }
   if (name === 'paid') void refreshUnlockAccess();
 }
 
@@ -96,6 +116,22 @@ function isViewerFreeServiceActive() {
 $('viewerFreeTab').addEventListener('click', () => selectViewerService('free'));
 $('viewerPaidTab').addEventListener('click', () => selectViewerService('paid'));
 $('viewerBugTab').addEventListener('click', () => { selectViewerService('bug'); void checkViewerBugPending(); });
+$('viewerFreeTab').parentElement.addEventListener('keydown', (event) => {
+  const index = VIEWER_SERVICES.findIndex((service) => $(VIEWER_SERVICE_TAB_IDS[service]) === document.activeElement);
+  if (index < 0) return;
+  const next = nextTabIndex(event.key, index, VIEWER_SERVICES.length);
+  if (next === null) return;
+  event.preventDefault();
+  const name = VIEWER_SERVICES[next];
+  selectViewerService(name);
+  $(VIEWER_SERVICE_TAB_IDS[name]).focus();
+  if (name === 'bug') void checkViewerBugPending();
+});
+window.addEventListener('hashchange', () => {
+  const name = serviceFromHash(window.location.hash);
+  selectViewerService(name, { updateHash: false });
+  if (name === 'bug') void checkViewerBugPending();
+});
 $('viewerBugCheck').addEventListener('click', () => void checkViewerBugPending());
 $('viewerUnlockClose').addEventListener('click', () => $('viewerUnlockDialog').close());
 $('viewerUnlockCancel').addEventListener('click', () => $('viewerUnlockDialog').close());
@@ -192,25 +228,34 @@ $('viewerUnlockTransferClaimForm').addEventListener('submit', async (event) => {
   } catch (error) { status.textContent = viewerStatsErrorMessage(error, '권한 이전 결과를 확인하지 못했습니다.'); }
   finally { button.disabled = false; }
 });
+function onBugInput() {
+  updateBugCounters();
+  if ($('viewerBugStatus').dataset.state === 'success') setBugStatus('idle', '');
+}
+$('viewerBugTitleInput').addEventListener('input', onBugInput);
+$('viewerBugContent').addEventListener('input', onBugInput);
+updateBugCounters();
 $('viewerBugForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const status = $('viewerBugStatus');
   const title = $('viewerBugTitleInput').value.trim();
   const content = $('viewerBugContent').value.trim();
   if (viewerBugPending && (viewerBugPending.title !== title || viewerBugPending.content !== content)) {
-    status.textContent = '이전 제보의 접수 결과를 확인해야 합니다. 입력을 이전 내용으로 되돌리고 다시 보내 주세요.';
+    setBugStatus('error-conflict', '이전 제보의 접수 결과를 확인해야 합니다. 입력을 이전 내용으로 되돌리고 다시 보내 주세요.');
     return;
   }
   const button = $('viewerBugSubmit');
-  const originalLabel = button.textContent;
+  const originalLabel = '제보 보내기';
   button.disabled = true;
   button.setAttribute('aria-busy', 'true');
-  button.textContent = '제보 접수 중…';
-  status.textContent = '제보 내용을 전송하고 있어요.';
+  button.textContent = '보내는 중…';
+  $('viewerBugForm').querySelectorAll('input, textarea').forEach((field) => { field.readOnly = true; });
+  setBugStatus('submitting', '제보를 보내는 중이에요…');
+  $('viewerBugForm').setAttribute('aria-busy', 'true');
   try {
     await getAuthReady();
     if (!auth.currentUser || auth.currentUser.isAnonymous) {
-      throw new Error('버그 제보는 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요.');
+      throw Object.assign(new Error('버그 제보는 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요.'), { code: 'functions/unauthenticated' });
     }
     const key = viewerBugPendingKey();
     if (viewerBugPending && viewerBugPending.uid !== auth.currentUser?.uid) {
@@ -231,7 +276,7 @@ $('viewerBugForm').addEventListener('submit', async (event) => {
       viewerBugPending = pending;
     }
     await callViewerBugReports({ action: 'submit', requestId: viewerBugPending.requestId, title, content });
-    localStorage.removeItem(key); viewerBugPending = null; $('viewerBugCheck').hidden = true; $('viewerBugForm').reset(); status.textContent = '버그 제보가 접수됐습니다. 감사합니다.';
+    localStorage.removeItem(key); viewerBugPending = null; $('viewerBugCheck').hidden = true; $('viewerBugForm').reset(); updateBugCounters(); setBugStatus('success', '버그 제보가 접수됐습니다. 감사합니다.');
   } catch (error) {
     const code = String(error?.code || '');
     if (['functions/permission-denied', 'functions/invalid-argument', 'functions/resource-exhausted'].includes(code)) {
@@ -240,12 +285,16 @@ $('viewerBugForm').addEventListener('submit', async (event) => {
     } else if (code === 'functions/already-exists') {
       viewerBugPending = null;
       $('viewerBugCheck').hidden = false;
-      status.textContent = '이전 요청과 내용이 다릅니다. 이전에 작성한 내용으로 다시 시도하거나 접수 결과를 확인해 주세요.';
+      setBugStatus('error-conflict', '이전 요청과 내용이 다릅니다. 이전에 작성한 내용으로 다시 시도하거나 접수 결과를 확인해 주세요.');
       return;
     } else if (viewerBugPending) $('viewerBugCheck').hidden = false;
-    status.textContent = viewerStatsErrorMessage(error, '제보 결과를 확인하지 못했습니다. 같은 내용으로 다시 보내 주세요.');
+    const failure = bugReportStateFromError(code);
+    const message = viewerStatsErrorMessage(error, '제보 결과를 확인하지 못했습니다. 같은 내용으로 다시 보내 주세요.');
+    setBugStatus(failure, failure === 'error-retry' ? `${message} 입력한 내용은 그대로 두었어요.` : message);
   } finally {
+    $('viewerBugForm').removeAttribute('aria-busy');
     button.disabled = false;
+    $('viewerBugForm').querySelectorAll('input, textarea').forEach((field) => { field.readOnly = false; });
     button.removeAttribute('aria-busy');
     button.textContent = originalLabel;
   }
@@ -616,9 +665,9 @@ function formatSubscriptionDate(value) {
 
 const unlockState = { loaded: false, isAdmin: false, features: { period: false, same_day: false, keyword: false }, prices: { period: 40, same_day: 40, keyword: 40 }, balanceCash: 0 };
 const paidFeatureMeta = {
-  period: { title: '기간별 최고 시청 순간', description: '최근 1년의 다시보기를 기준으로 7일·30일·90일·1년 최고 순간을 확인합니다.', guide: ['유료 서비스 탭의 기간별 최고 시청 순간에서 분석할 스트리머를 검색해 선택합니다.', '최근 1년 분석 조건을 확인합니다.', '결과 보기 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 결과 보기를 다시 눌러 7일·30일·90일·1년 결과를 확인합니다.'] },
-  same_day: { title: '같은 날 스트리머 2명 비교', description: '두 스트리머의 같은 날 방송 고점과 평균 대비 상승률을 비교합니다.', guide: ['분석 설정을 열고 비교할 스트리머 두 명과 날짜를 선택합니다.', '선택한 조건은 결과를 보기 전까지 자유롭게 바꿀 수 있습니다.', '비교 결과 확인을 누르면 결과 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 비교 결과 확인을 다시 눌러 결과를 불러옵니다.'] },
-  keyword: { title: '키워드 여러 스트리머 고점 비교', description: '키워드로 찾은 다시보기의 고점을 2~5명 사이에서 비교합니다.', guide: ['분석 설정을 열고 키워드와 스트리머 2~5명을 선택합니다.', '선택한 조건은 결과를 보기 전까지 자유롭게 바꿀 수 있습니다.', '고점 비교를 누르면 결과 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 고점 비교를 다시 눌러 결과를 불러옵니다.'] },
+  period: { title: '기간별 최고 시청 순간', shortTitle: '기간별', learn: '이 스트리머가 최근 7일·30일·90일·1년 중 언제 가장 많이 시청됐는지 알 수 있어요.', description: '최근 1년의 다시보기를 기준으로 7일·30일·90일·1년 최고 순간을 확인합니다.', guide: ['유료 서비스 탭의 기간별 최고 시청 순간에서 분석할 스트리머를 검색해 선택합니다.', '최근 1년 분석 조건을 확인합니다.', '결과 보기 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 결과 보기를 다시 눌러 7일·30일·90일·1년 결과를 확인합니다.'] },
+  same_day: { title: '같은 날 스트리머 2명 비교', shortTitle: '같은 날 비교', learn: '같은 날 방송한 두 스트리머의 고점과 평균 대비 상승률을 비교해요.', description: '두 스트리머의 같은 날 방송 고점과 평균 대비 상승률을 비교합니다.', guide: ['분석 설정을 열고 비교할 스트리머 두 명과 날짜를 선택합니다.', '선택한 조건은 결과를 보기 전까지 자유롭게 바꿀 수 있습니다.', '비교 결과 확인을 누르면 결과 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 비교 결과 확인을 다시 눌러 결과를 불러옵니다.'] },
+  keyword: { title: '키워드 여러 스트리머 고점 비교', shortTitle: '키워드 비교', learn: '같은 키워드의 방송에서 2~5명 중 누가 가장 높았는지 순위를 볼 수 있어요.', description: '키워드로 찾은 다시보기의 고점을 2~5명 사이에서 비교합니다.', guide: ['분석 설정을 열고 키워드와 스트리머 2~5명을 선택합니다.', '선택한 조건은 결과를 보기 전까지 자유롭게 바꿀 수 있습니다.', '고점 비교를 누르면 결과 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 고점 비교를 다시 눌러 결과를 불러옵니다.'] },
 };
 let pendingUnlockFeature = '';
 
@@ -626,43 +675,83 @@ function canUsePaidFeature(featureId) {
   return unlockState.loaded && (unlockState.isAdmin || unlockState.features[featureId] === true);
 }
 
+function paidCardPrice(featureId) {
+  if (canUsePaidFeature(featureId)) return unlockState.isAdmin ? '관리자 이용 가능' : '해금됨 · 계속 사용';
+  return `${Number(unlockState.prices[featureId] || 40)}캐시 · 1회 해금 · 계속 사용`;
+}
+
 function renderPaidFeatures() {
   const root = $('viewerPaidFeatureGrid');
   if (!root) return;
   root.replaceChildren(...Object.entries(paidFeatureMeta).map(([featureId, meta]) => {
-    const card = document.createElement('article'); card.className = 'viewer-paid-feature';
+    const unlocked = canUsePaidFeature(featureId);
+    const card = document.createElement('article'); card.className = 'viewer-paid-feature'; card.classList.toggle('is-unlocked', unlocked);
     const title = document.createElement('h3'); title.textContent = meta.title;
     const description = document.createElement('p'); description.textContent = meta.description;
+    const learn = document.createElement('p'); learn.className = 'viewer-paid-learn'; learn.textContent = meta.learn;
     const price = document.createElement('p'); price.className = 'viewer-paid-price';
-    const unlocked = canUsePaidFeature(featureId);
-    price.textContent = unlocked ? (unlockState.isAdmin ? '관리자 이용 가능' : '해금 완료') : `${Number(unlockState.prices[featureId] || 40)}캐시 · 1회 해금`;
+    price.textContent = (unlocked ? '✓ ' : '') + paidCardPrice(featureId);
     const button = document.createElement('button'); button.type = 'button'; button.className = 'button button-primary';
-    button.textContent = '분석 설정하기';
+    button.textContent = unlocked ? '분석 시작' : '분석 설정하기';
     button.addEventListener('click', () => openPaidFeature(featureId));
     const guide = document.createElement('button'); guide.type = 'button'; guide.className = 'button viewer-paid-guide'; guide.textContent = '사용 방법';
     guide.addEventListener('click', () => openPaidTutorial(featureId));
     const actions = document.createElement('div'); actions.className = 'viewer-paid-actions'; actions.append(button, guide);
-    card.append(title, description, price, actions); return card;
+    card.append(title, description, learn, price, actions); return card;
   }));
   const signedIn = !!auth.currentUser && !auth.currentUser.isAnonymous;
+  const adFree = unlockState.loaded && hasAnyPaidUnlock(unlockState);
   $('viewerPaidStatus').textContent = unlockState.loaded
-    ? `현재 내 캐시 ${Number(unlockState.balanceCash || 0).toLocaleString('ko-KR')}캐시`
+    ? `현재 내 캐시 ${Number(unlockState.balanceCash || 0).toLocaleString('ko-KR')}캐시${adFree ? ' · 광고 없이 이용 중' : ''}`
     : signedIn
       ? '해금 상태를 확인하고 있어요.'
       : '분석 조건은 누구나 설정할 수 있고, 결과를 볼 때 일반 로그인이 필요해요.';
+  renderPaidSwitch();
+}
+
+// 유료 탭 상태: 'list'(기능 카드만) | 'period' | 'same_day' | 'keyword'(선택한 기능의 작업 공간만).
+// 작업 공간 패널 3개는 mountPaidAnalysisPanels()가 #viewerPaidAnalysisMount로 옮겨 두며, 이 상태에 따라 하나만 보인다.
+const PAID_PANEL_IDS = { period: 'viewerPeriodPeaks', same_day: 'viewerComparisonPanel', keyword: 'viewerKeywordComparisonPanel' };
+let paidView = 'list';
+function renderPaidSwitch() {
+  const root = $('viewerPaidSwitch');
+  if (!root) return;
+  root.replaceChildren(...Object.entries(paidFeatureMeta).map(([featureId, meta]) => {
+    const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'button viewer-paid-chip';
+    chip.textContent = meta.shortTitle;
+    chip.setAttribute('aria-pressed', String(featureId === paidView));
+    chip.addEventListener('click', () => setPaidView(featureId));
+    return chip;
+  }));
+}
+function applyPaidView() {
+  const inWorkspace = paidView !== 'list';
+  $('viewerPaidFeatureGrid').hidden = inWorkspace;
+  $('viewerPaidWorkspace').hidden = !inWorkspace;
+  $('viewerPaidAnalysisMount').hidden = !inWorkspace;
+  Object.entries(PAID_PANEL_IDS).forEach(([featureId, id]) => {
+    const panel = $(id);
+    const show = inWorkspace && featureId === paidView;
+    panel.hidden = !show;
+    if (show) panel.open = true;
+  });
+  if (inWorkspace) $('viewerPaidWorkspaceDesc').textContent = paidFeatureMeta[paidView].description;
+  renderPaidSwitch();
+}
+function setPaidView(view) {
+  paidView = Object.prototype.hasOwnProperty.call(paidFeatureMeta, view) ? view : 'list';
+  applyPaidView();
 }
 
 function openPaidFeature(featureId) {
   selectViewerService('paid');
-  if (featureId === 'period') $('viewerPeriodPeaks').open = true;
-  if (featureId === 'same_day') $('viewerComparisonPanel').open = true;
-  if (featureId === 'keyword') $('viewerKeywordComparisonPanel').open = true;
-  const target = featureId === 'period' ? $('viewerPeriodPeaks') : featureId === 'same_day' ? $('viewerComparisonPanel') : $('viewerKeywordComparisonPanel');
-  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setPaidView(featureId);
+  $('viewerPaidWorkspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   if (featureId === 'period' && !selectedStreamer) {
     setPeriodPickerStatus('닉네임 또는 SOOP ID를 검색해 분석할 스트리머를 선택하세요.');
-    window.setTimeout(() => $('viewerPeriodSearchInput')?.focus({ preventScroll: true }), 250);
   }
+  const focusId = featureId === 'period' ? 'viewerPeriodSearchInput' : featureId === 'same_day' ? 'viewerComparisonSearch0' : 'viewerKeywordComparisonKeyword';
+  window.setTimeout(() => $(focusId)?.focus({ preventScroll: true }), 250);
 }
 
 async function openUnlockDialog(featureId) {
@@ -717,26 +806,42 @@ function openPaidTutorial(featureId) {
   showViewerModal($('viewerPaidTutorialDialog'));
 }
 
+function unlockIdentity() {
+  const user = auth.currentUser;
+  return user ? `${user.uid}:${user.isAnonymous}` : '';
+}
+
 async function refreshUnlockAccess() {
   try {
     await getAuthReady();
+    const requestedIdentity = unlockIdentity();
     const data = (await callViewerUnlocks({ action: 'access' })).data || {};
+    // 응답을 기다리는 사이 계정이 바뀌었으면 이전 계정의 해금 상태를 반영하지 않는다.
+    if (requestedIdentity !== unlockIdentity()) return false;
     unlockState.loaded = true; unlockState.isAdmin = data.isAdmin === true;
     unlockState.features = { ...unlockState.features, ...(data.features || {}) };
     unlockState.prices = { ...unlockState.prices, ...(data.prices || {}) };
     unlockState.balanceCash = Math.max(0, Number(data.balanceCash) || 0);
-    renderSubscriptionControls(); renderPaidFeatures(); return true;
+    renderSubscriptionControls(); renderPaidFeatures(); updateAffiliateVisibility(); return true;
   } catch (error) {
     $('viewerPaidStatus').textContent = viewerStatsErrorMessage(error, '해금 상태를 확인하지 못했습니다.');
     renderPaidFeatures();
+    updateAffiliateVisibility();
     return false;
   }
 }
 
+// 제휴 카드: 비해금 사용자(익명 포함)에게만 무료 탭 결과 아래에 표시한다.
+// 해금 사용자·관리자는 광고를 보지 않는다. 광고 노출은 권한이 아니므로 서버 검증은 없다.
+let affiliateAuthResolved = false;
+function updateAffiliateVisibility() {
+  const card = $('viewerAffiliateCard');
+  if (!card) return;
+  card.hidden = !shouldShowAffiliate({ authResolved: affiliateAuthResolved, user: auth.currentUser, unlock: unlockState });
+}
+
 function renderSubscriptionControls() {
-  $('viewerPeriodPeaks').hidden = false;
-  $('viewerComparisonPanel').hidden = false;
-  $('viewerKeywordComparisonPanel').hidden = false;
+  applyPaidView();
   $('viewerPeriodScanButton').textContent = '결과 보기';
 }
 
@@ -1007,6 +1112,8 @@ function invalidateKeywordComparisonResult() {
   $('viewerKeywordComparisonResults').classList.add('hidden');
 }
 
+// 키워드 비교는 처음에 스트리머 칸 2개만 보이고, `+ 스트리머 추가`로 최대 5개까지 펼친다.
+let keywordSlotsShown = 2;
 function renderKeywordComparisonSelection() {
   const selectedCount = keywordComparisonSelection.filter(Boolean).length;
   const keywordInput = $('viewerKeywordComparisonKeyword');
@@ -1020,6 +1127,7 @@ function renderKeywordComparisonSelection() {
     const slotDisabled = keywordComparisonRunning || (!streamer && selectedCount >= 5);
     search.disabled = slotDisabled;
     searchButton.disabled = slotDisabled || searchButton.dataset.searching === 'true';
+    picker.hidden = index >= keywordSlotsShown && !streamer;
     picker.classList.toggle('is-selected', !!streamer);
     selected.replaceChildren();
     selected.classList.toggle('hidden', !streamer);
@@ -1046,6 +1154,9 @@ function renderKeywordComparisonSelection() {
     }
     if (slotDisabled && !streamer) results.replaceChildren();
   });
+  const visibleSlots = keywordComparisonSelection.filter((streamer, index) => index < keywordSlotsShown || streamer).length;
+  $('viewerKeywordAddSlot').hidden = visibleSlots >= keywordComparisonSelection.length;
+  $('viewerKeywordAddSlot').disabled = keywordComparisonRunning;
   const keyword = String(keywordInput.value || '').trim();
   $('viewerKeywordComparisonCount').textContent = selectedCount + ' / 5명 선택';
   $('viewerKeywordComparisonClear').disabled = (selectedCount === 0 && !keyword) || keywordComparisonRunning;
@@ -2328,6 +2439,12 @@ async function loadComparisonResults(request) {
   }
 }
 
+// 로그인·해금 뒤 대기 중이던 결과를 불러올 때, 사용자가 유료 탭의 기능 목록에 있으면 해당 작업 공간을 보여 준다.
+// 다른 작업 공간이나 다른 탭에 있으면 사용자의 화면을 바꾸지 않는다.
+function revealPaidWorkspace(featureId) {
+  if (!$('viewerPaidService').hidden && paidView === 'list') setPaidView(featureId);
+}
+
 function resumePendingComparisonIfReady() {
   const request = pendingComparisonRequest;
   if (!request || comparisonRunning || !canUsePaidFeature('same_day')) return;
@@ -2339,6 +2456,7 @@ function resumePendingComparisonIfReady() {
   }
   comparisonGateWaiting = false;
   comparisonRunning = true;
+  revealPaidWorkspace('same_day');
   void loadComparisonResults(request);
 }
 
@@ -2659,6 +2777,7 @@ function resumePendingKeywordComparisonIfReady() {
   }
   keywordComparisonGateWaiting = false;
   keywordComparisonRunning = true;
+  revealPaidWorkspace('keyword');
   void loadKeywordComparisonResults(request);
 }
 
@@ -3623,7 +3742,11 @@ function setSponsorHint(id, message, isError = false) {
 function makeSponsorTitle() {
   const title = document.createElement('p');
   title.className = 'viewer-sponsor-rail-title';
-  title.textContent = '오늘의 후원 스트리머';
+  title.textContent = '오늘의 후원 스트리머 ';
+  const chip = document.createElement('span');
+  chip.className = 'viewer-sponsor-promo-chip';
+  chip.textContent = '홍보';
+  title.append(chip);
   return title;
 }
 
@@ -3787,28 +3910,34 @@ function renderSponsorRails(ads, pendingByRail = { left: 0, right: 0 }) {
     if (!rail) continue;
     rail.replaceChildren(makeSponsorTitle());
     rails[side].forEach((ad) => {
-      const card = makeSponsorAdCard(ad, side);
-      rail.append(card);
-      mobileItems[side].push(makeSponsorAdCard(ad, side));
+      rail.append(makeSponsorAdCard(ad, side));
+      mobileItems[side].push({ kind: 'ad', soopId: ad.soopId, ad });
     });
     for (let index = 0; index < pending[side]; index += 1) {
       rail.append(makeSponsorPendingSlot());
-      mobileItems[side].push(makeSponsorPendingSlot());
+      mobileItems[side].push({ kind: 'pending' });
     }
     if (rails[side].length + pending[side] < 5) {
       rail.append(makeSponsorOpenCard(side));
-      mobileItems[side].push(makeSponsorOpenCard(side));
+      mobileItems[side].push({ kind: 'open', side });
     }
   }
 
   const mobile = $('sponsorRailMobile');
   if (!mobile) return;
+  // 모바일·중간 폭 스트립: 좌우 항목을 번갈아 합치되 같은 스트리머는 한 번만 보이고,
+  // 홍보 신청 카드는 스트립 마지막에 한 장만 둔다(신청 레일은 좌우 중 여유가 있는 쪽).
+  const merged = mergeSponsorStrip(mobileItems.left, mobileItems.right);
+  const requestSide = rails.left.length + pending.left <= rails.right.length + pending.right ? 'left' : 'right';
+  const liveCount = merged.filter((item) => item.kind !== 'open').length;
+  mobile.classList.toggle('is-empty', liveCount === 0);
+  mobile.dataset.count = String(Math.min(liveCount + 1, 6));
   mobile.replaceChildren(makeSponsorTitle());
-  const max = Math.max(mobileItems.left.length, mobileItems.right.length);
-  for (let index = 0; index < max; index += 1) {
-    if (mobileItems.left[index]) mobile.append(mobileItems.left[index]);
-    if (mobileItems.right[index]) mobile.append(mobileItems.right[index]);
-  }
+  merged.forEach((item) => {
+    if (item.kind === 'ad') mobile.append(makeSponsorAdCard(item.ad, requestSide));
+    else if (item.kind === 'pending') mobile.append(makeSponsorPendingSlot());
+    else mobile.append(makeSponsorOpenCard(requestSide));
+  });
 }
 
 function sponsorDate(timestamp) {
@@ -4170,6 +4299,12 @@ onAuthStateChanged(auth, (user) => {
   const identity = user.uid + ':' + String(user.isAnonymous);
   if (identity === observedAuthIdentity) return;
   observedAuthIdentity = identity;
+  // 계정이 바뀌면 이전 계정의 해금 상태로 광고·카드를 판단하지 않는다.
+  unlockState.loaded = false; unlockState.isAdmin = false;
+  unlockState.features = { period: false, same_day: false, keyword: false };
+  affiliateAuthResolved = true;
+  updateAffiliateVisibility();
+  renderPaidFeatures();
   refreshSubscriptionStatus();
 });
 document.addEventListener('visibilitychange', () => {
@@ -4182,15 +4317,40 @@ if (initialStreamerId) {
   void runSearch(initialStreamerId, { exactSoopId: initialStreamerId });
 }
 
+{
+  const initialService = serviceFromHash(window.location.hash);
+  if (initialService !== 'free') {
+    selectViewerService(initialService, { updateHash: false });
+    if (initialService === 'bug') void checkViewerBugPending();
+  }
+}
 setupDevbarMarquee();
 document.querySelectorAll('.viewer-affiliate-image img').forEach((image) => {
   const showFallback = () => image.closest('.viewer-affiliate-image')?.classList.add('is-unavailable');
   image.addEventListener('error', showFallback, { once: true });
   if (image.complete && image.naturalWidth === 0) showFallback();
 });
+// 작업 공간 안에서는 패널을 접을 수 없다(결과가 사라지는 것을 막는다).
+Object.values(PAID_PANEL_IDS).forEach((id) => {
+  $(id).addEventListener('toggle', () => { if (!$(id).open && !$(id).hidden) $(id).open = true; });
+});
+// 무료 결과에서 이어지는 맥락 진입: 선택한 스트리머가 기간별 작업 공간에 미리 채워진다.
+$('viewerPeriodEntry').addEventListener('click', () => openPaidFeature('period'));
+$('viewerPaidBack').addEventListener('click', () => {
+  setPaidView('list');
+  $('viewerPaidService').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.setTimeout(() => $('viewerPaidFeatureGrid').querySelector('button')?.focus({ preventScroll: true }), 200);
+});
+$('viewerKeywordAddSlot').addEventListener('click', () => {
+  keywordSlotsShown = Math.min(keywordComparisonSelection.length, keywordSlotsShown + 1);
+  renderKeywordComparisonSelection();
+  $('viewerKeywordSearch' + (keywordSlotsShown - 1))?.focus();
+});
+$('viewerPaidWorkspaceGuide').addEventListener('click', () => openPaidTutorial(paidView));
 renderComparisonSelection();
 // 인증 상태 조회 전에도 상품 카드를 먼저 그린다. 네트워크 지연이나 익명 상태 때문에
 // 유료 탭이 비어 보이지 않으며, 실제 결제·권한 판정은 호출 서버가 다시 검증한다.
 renderPaidFeatures();
+applyPaidView();
 loadDevbarLinks();
 getAuthReady().catch((error) => setSearchHint(viewerStatsErrorMessage(error, '통계 연결을 시작하지 못했어요.'), true));
