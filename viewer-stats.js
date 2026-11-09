@@ -481,6 +481,7 @@ let vodPagesByNumber = new Map();
 let vodPagesStreamerId = '';
 let comparisonSelection = [null, null];
 let comparisonSearchRequestSequence = [0, 0];
+let periodSearchRequestSequence = 0;
 let pendingComparisonRequest = null;
 let comparisonRequestSequence = 0;
 let comparisonRunning = false;
@@ -607,7 +608,7 @@ function formatSubscriptionDate(value) {
 
 const unlockState = { loaded: false, isAdmin: false, features: { period: false, same_day: false, keyword: false }, prices: { period: 40, same_day: 40, keyword: 40 }, balanceCash: 0 };
 const paidFeatureMeta = {
-  period: { title: '기간별 최고 시청 순간', description: '최근 1년의 다시보기를 기준으로 7일·30일·90일·1년 최고 순간을 확인합니다.', guide: ['분석 설정을 열고 스트리머를 검색해 다시보기 목록을 준비합니다.', '기간별 최고 시청 순간에서 최근 1년 분석 조건을 확인합니다.', '결과 보기 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 결과 보기를 다시 눌러 7일·30일·90일·1년 결과를 확인합니다.'] },
+  period: { title: '기간별 최고 시청 순간', description: '최근 1년의 다시보기를 기준으로 7일·30일·90일·1년 최고 순간을 확인합니다.', guide: ['유료 서비스 탭의 기간별 최고 시청 순간에서 분석할 스트리머를 검색해 선택합니다.', '최근 1년 분석 조건을 확인합니다.', '결과 보기 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 결과 보기를 다시 눌러 7일·30일·90일·1년 결과를 확인합니다.'] },
   same_day: { title: '같은 날 스트리머 2명 비교', description: '두 스트리머의 같은 날 방송 고점과 평균 대비 상승률을 비교합니다.', guide: ['분석 설정을 열고 비교할 스트리머 두 명과 날짜를 선택합니다.', '선택한 조건은 결과를 보기 전까지 자유롭게 바꿀 수 있습니다.', '비교 결과 확인을 누르면 결과 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 비교 결과 확인을 다시 눌러 결과를 불러옵니다.'] },
   keyword: { title: '키워드 여러 스트리머 고점 비교', description: '키워드로 찾은 다시보기의 고점을 2~5명 사이에서 비교합니다.', guide: ['분석 설정을 열고 키워드와 스트리머 2~5명을 선택합니다.', '선택한 조건은 결과를 보기 전까지 자유롭게 바꿀 수 있습니다.', '고점 비교를 누르면 결과 직전에 로그인·해금 여부를 확인합니다.', '해금이 끝나면 입력해 둔 조건으로 고점 비교를 다시 눌러 결과를 불러옵니다.'] },
 };
@@ -644,20 +645,16 @@ function renderPaidFeatures() {
 }
 
 function openPaidFeature(featureId) {
-  // 분석 조건은 누구나 설정할 수 있다. 결과 패널은 유료 서비스 탭 안에서만 보여준다.
-  if (!selectedStreamer) {
-    selectViewerService('free');
-    $('viewerSearchHint').textContent = '먼저 스트리머를 검색한 뒤 분석 조건을 설정해 주세요. 결과를 볼 때만 해금 여부를 확인합니다.';
-    $('viewerSearchInput').focus({ preventScroll: true });
-    $('viewerSearchForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
   selectViewerService('paid');
   if (featureId === 'period') $('viewerPeriodPeaks').open = true;
   if (featureId === 'same_day') $('viewerComparisonPanel').open = true;
   if (featureId === 'keyword') $('viewerKeywordComparisonPanel').open = true;
   const target = featureId === 'period' ? $('viewerPeriodPeaks') : featureId === 'same_day' ? $('viewerComparisonPanel') : $('viewerKeywordComparisonPanel');
   target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (featureId === 'period' && !selectedStreamer) {
+    setPeriodPickerStatus('닉네임 또는 SOOP ID를 검색해 분석할 스트리머를 선택하세요.');
+    window.setTimeout(() => $('viewerPeriodSearchInput')?.focus({ preventScroll: true }), 250);
+  }
 }
 
 async function openUnlockDialog(featureId) {
@@ -2919,8 +2916,159 @@ async function fetchRecentYearVods(scanToken, loadToken, yearCutoff) {
   return { vods, pageLimitReached, reachedYearCutoff };
 }
 
-async function runPeriodPeakScan({ forceRefresh = false } = {}) {
+function setPeriodPickerStatus(message, isError = false) {
+  const status = $('viewerPeriodPickerStatus');
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle('is-error', isError);
+}
+
+function renderPeriodSearchResults(streamers) {
+  const results = $('viewerPeriodSearchResults');
+  if (!results) return;
+  results.replaceChildren();
+  const visibleStreamers = filterVisibleSoopSearchResults(streamers);
+  visibleStreamers.forEach((streamer, streamerIndex) => {
+    const button = document.createElement('button');
+    button.className = 'viewer-comparison-search-result';
+    button.type = 'button';
+    button.setAttribute('role', 'option');
+    button.dataset.periodStreamerIndex = String(streamerIndex);
+    const avatar = document.createElement('img');
+    avatar.alt = '';
+    avatar.loading = 'lazy';
+    avatar.src = streamer.avatarUrl || '';
+    avatar.addEventListener('error', () => { avatar.hidden = true; }, { once: true });
+    const copy = document.createElement('span');
+    copy.className = 'viewer-comparison-search-copy';
+    const name = document.createElement('strong');
+    name.textContent = streamer.nickname || streamer.soopId;
+    const favorites = document.createElement('span');
+    favorites.className = 'viewer-comparison-search-popularity';
+    favorites.textContent = Number.isFinite(streamer.favoriteCount)
+      ? '즐겨찾기 ' + streamer.favoriteCount.toLocaleString('ko-KR') + '개'
+      : '즐겨찾기 수 확인 불가';
+    const id = document.createElement('span');
+    id.textContent = 'SOOP ID · ' + streamer.soopId;
+    copy.append(name, favorites, id);
+    const select = document.createElement('span');
+    select.className = 'viewer-comparison-search-select';
+    select.textContent = (streamerIndex + 1) + '위 · 선택';
+    button.append(avatar, copy, select);
+    results.append(button);
+  });
+  results._streamers = visibleStreamers;
+}
+
+function renderPeriodSelection() {
+  const selected = $('viewerPeriodSelected');
+  if (!selected) return;
+  selected.replaceChildren();
+  selected.classList.toggle('hidden', !selectedStreamer);
   if (!selectedStreamer) return;
+  const avatar = document.createElement('img');
+  avatar.alt = '';
+  avatar.src = selectedStreamer.avatarUrl || '';
+  avatar.addEventListener('error', () => { avatar.hidden = true; }, { once: true });
+  const copy = document.createElement('span');
+  copy.className = 'viewer-comparison-selected-copy';
+  const name = document.createElement('strong');
+  name.textContent = selectedStreamer.nickname || selectedStreamer.soopId;
+  const id = document.createElement('span');
+  id.textContent = 'SOOP ID · ' + selectedStreamer.soopId + ' · 기간별 분석 대상';
+  copy.append(name, id);
+  selected.append(avatar, copy);
+}
+
+async function selectPeriodStreamer(streamer) {
+  const soopId = String(streamer && streamer.soopId || '').trim().toLowerCase();
+  if (isSuppressedSoopSearchResult(streamer)) {
+    renderPeriodSearchResults([]);
+    setPeriodPickerStatus('검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.', true);
+    return;
+  }
+  if (!SOOP_ID_PATTERN.test(soopId)) {
+    setPeriodPickerStatus('SOOP ID를 확인하지 못했어요. 다른 검색어를 입력해 주세요.', true);
+    return;
+  }
+  $('viewerPeriodSearchInput').value = '';
+  renderPeriodSearchResults([]);
+  setPeriodPickerStatus('다시보기 목록을 준비하고 있어요…');
+  try {
+    await selectStreamer({ ...streamer, soopId });
+    if (!selectedStreamer || String(selectedStreamer.soopId).toLowerCase() !== soopId) return;
+    renderPeriodSelection();
+    setPeriodPickerStatus((selectedStreamer.nickname || selectedStreamer.soopId) + '을(를) 선택했어요. 결과 보기를 눌러 기간별 고점을 확인하세요.');
+  } catch (error) {
+    setPeriodPickerStatus(viewerStatsErrorMessage(error, '스트리머를 선택하지 못했어요. 다시 시도해 주세요.'), true);
+  }
+}
+
+async function searchPeriodStreamer(query) {
+  const cleanQuery = String(query || '').trim();
+  if (!cleanQuery) {
+    setPeriodPickerStatus('닉네임, SOOP 아이디 또는 방송국 주소를 입력해 주세요.', true);
+    return;
+  }
+  const requestId = ++periodSearchRequestSequence;
+  const button = $('viewerPeriodSearchButton');
+  if (isSuppressedSoopSearchInput(cleanQuery)) {
+    renderPeriodSearchResults([]);
+    setPeriodPickerStatus('검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.', true);
+    return;
+  }
+  const idFromInput = parseSoopId(cleanQuery);
+  const searchQuery = idFromInput || cleanQuery;
+  button.disabled = true;
+  setPeriodPickerStatus('스트리머를 찾고 있어요…');
+  renderPeriodSearchResults([]);
+  try {
+    await getAuthReady();
+    const response = await callViewerStats({ action: 'search', query: searchQuery, sortByFavorites: true });
+    if (requestId !== periodSearchRequestSequence) return;
+    const candidates = filterVisibleSoopSearchResults(response.data && response.data.streamers);
+    const isStationUrl = /^https?:\/\//i.test(cleanQuery) && Boolean(idFromInput);
+    if (idFromInput && !candidates.some((item) => String(item.soopId).toLowerCase() === idFromInput)
+      && (isStationUrl || candidates.length === 0)) candidates.unshift(streamerForId(idFromInput));
+    const exactIdMatches = idFromInput
+      ? candidates.filter((item) => String(item.soopId).toLowerCase() === idFromInput)
+      : [];
+    if (exactIdMatches.length === 1) {
+      await selectPeriodStreamer(exactIdMatches[0]);
+      return;
+    }
+    if (candidates.length === 1) {
+      await selectPeriodStreamer(candidates[0]);
+      return;
+    }
+    renderPeriodSearchResults(candidates);
+    const resultMessage = !candidates.length
+      ? '검색 결과가 없어요. 다른 이름이나 SOOP 아이디를 입력해 주세요.'
+      : response.data && response.data.favoritesSorted
+        ? response.data.hasMore
+          ? '즐겨찾기 수 기준 상위 3명 · 분석할 스트리머를 선택해 주세요.'
+          : '즐겨찾기 수가 많은 순으로 ' + candidates.length.toLocaleString('ko-KR') + '명 · 분석할 스트리머를 선택해 주세요.'
+        : '아래 결과에서 분석할 스트리머를 선택해 주세요.';
+    setPeriodPickerStatus(resultMessage, !candidates.length);
+  } catch (error) {
+    if (requestId === periodSearchRequestSequence) {
+      const rawMessage = String(error && error.message || '');
+      const message = /unauthenticated/i.test(rawMessage)
+        ? '로그인 정보를 준비하지 못했어요. 새로고침 후 다시 시도해 주세요.'
+        : viewerStatsErrorMessage(error, '스트리머 검색에 실패했어요.');
+      setPeriodPickerStatus(message, true);
+    }
+  } finally {
+    if (requestId === periodSearchRequestSequence) button.disabled = false;
+  }
+}
+
+async function runPeriodPeakScan({ forceRefresh = false } = {}) {
+  if (!selectedStreamer) {
+    setPeriodPickerStatus('먼저 분석할 스트리머를 검색해 선택해 주세요.', true);
+    $('viewerPeriodSearchInput')?.focus({ preventScroll: true });
+    return;
+  }
   if (!await canViewPaidResult('period', (message, isError) => {
     $('viewerPeriodStatus').textContent = message;
     $('viewerPeriodStatus').classList.toggle('is-error', isError);
@@ -3124,6 +3272,7 @@ async function selectStreamer(streamer) {
   vodPagesByNumber = new Map();
   vodPagesStreamerId = String(streamer.soopId || '').toLowerCase();
   selectedStreamer = streamer;
+  renderPeriodSelection();
   vodSearchKeyword = '';
   $('viewerVodSearchInput').value = '';
   $('viewerVodSearchButton').disabled = false;
@@ -3427,6 +3576,27 @@ renderKeywordComparisonSelection();
 $('viewerPeriodScanButton').addEventListener('click', () => {
   runPeriodPeakScan({ forceRefresh: $('viewerPeriodScanButton').dataset.hasResult === 'true' });
 });
+
+$('viewerPeriodSearchForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  void searchPeriodStreamer($('viewerPeriodSearchInput').value);
+});
+$('viewerPeriodSearchInput').addEventListener('input', () => {
+  periodSearchRequestSequence += 1;
+  $('viewerPeriodSearchButton').disabled = false;
+  renderPeriodSearchResults([]);
+  setPeriodPickerStatus(selectedStreamer
+    ? '현재 분석 대상은 ' + (selectedStreamer.nickname || selectedStreamer.soopId) + '입니다. 다른 스트리머를 검색해 바꿀 수 있어요.'
+    : '닉네임 또는 SOOP ID를 검색해 분석할 스트리머를 선택하세요.');
+});
+$('viewerPeriodSearchResults').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-period-streamer-index]');
+  if (!button) return;
+  const streamers = $('viewerPeriodSearchResults')._streamers || [];
+  const streamer = streamers[Number(button.dataset.periodStreamerIndex)];
+  if (streamer) void selectPeriodStreamer(streamer);
+});
+renderPeriodSelection();
 
 function setSponsorHint(id, message, isError = false) {
   const hint = $(id);

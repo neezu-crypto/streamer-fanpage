@@ -10,7 +10,7 @@
   <script src="input-privacy.js?v=20261016-input-privacy"></script>
   <link rel="icon" type="image/svg+xml" href="viewer-stats-icon.svg">
   <link rel="stylesheet" href="style.css?v=20261101-vod-analytics-link-v1">
-  <link rel="stylesheet" href="viewer-stats.css?v=20261109-scrollbar-v1">
+  <link rel="stylesheet" href="viewer-stats.css?v=20261109-paid-search-v1">
   <link rel="stylesheet" href="viewer-sponsors.css?v=20261108-sponsor-preview-v3">
 </head>
 <body class="viewer-stats-page">
@@ -176,6 +176,16 @@
             <span class="viewer-collapsible-hint">최근 7일 · 30일 · 90일 · 1년</span>
           </summary>
           <div class="viewer-collapsible-content">
+            <div class="viewer-comparison-picker viewer-period-picker" id="viewerPeriodPicker">
+              <label class="viewer-comparison-label" for="viewerPeriodSearchInput"><span>01</span>분석할 스트리머</label>
+              <form class="viewer-comparison-search-form" id="viewerPeriodSearchForm" autocomplete="off">
+                <input id="viewerPeriodSearchInput" type="search" maxlength="100" placeholder="닉네임 또는 SOOP ID" autocomplete="off">
+                <button class="button" type="submit" id="viewerPeriodSearchButton">검색</button>
+              </form>
+              <div class="viewer-comparison-search-results" id="viewerPeriodSearchResults" role="listbox" aria-label="기간별 분석 스트리머 검색 결과"></div>
+              <div class="viewer-comparison-selected hidden" id="viewerPeriodSelected"></div>
+              <p class="viewer-comparison-picker-status" id="viewerPeriodPickerStatus" role="status" aria-live="polite">닉네임 또는 SOOP ID를 검색해 분석할 스트리머를 선택하세요.</p>
+            </div>
             <div class="viewer-period-heading">
               <button class="button" id="viewerPeriodScanButton" type="button">결과 보기</button>
               <button class="viewer-tooltip-trigger" type="button" aria-label="기간 분석 도움말" data-tooltip="최근 1년 다시보기를 살펴 7일·30일·90일·1년별 최고 순간을 찾습니다. 분석 조건은 누구나 설정할 수 있고, 결과를 확인하는 시점에 해금 여부를 확인합니다.">?</button>
@@ -439,6 +449,6 @@
       </div>
     </div>
   </dialog>
-  <script type="module" src="viewer-stats.js?v=20261109-paid-result-tab-loading-v1"></script>
+  <script type="module" src="viewer-stats.js?v=20261109-paid-search-v1"></script>
 </body>
 </html>
