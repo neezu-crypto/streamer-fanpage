@@ -1701,6 +1701,7 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 #sponsorPaymentCheck:focus-visible { outline: 3px solid #476de0; outline-offset: 2px; }
 #sponsorPaymentCheck[hidden] { display: none; }
 #viewerFreeService[hidden], #viewerPaidService[hidden], #viewerBugService[hidden] { display: none; }
+#viewerResults > .viewer-collapsible-panel { display: none; }
 .viewer-workspace { row-gap: 20px; }
 .viewer-workspace > .viewer-hero-group,
 .viewer-workspace > .viewer-service-tabs,
@@ -1732,6 +1733,8 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 .viewer-paid-actions .button { justify-self:start; }
 .viewer-paid-guide { background:#fff; }
 .viewer-paid-history-row { display:flex; gap:12px; align-items:center; margin-top:16px; }
+.viewer-paid-analysis-mount { display:grid; gap:16px; margin-top:22px; }
+.viewer-paid-analysis-mount > .viewer-collapsible-panel { margin:0 !important; }
 .viewer-unlock-dialog { width:min(520px,calc(100vw - 32px)); padding:0; border:0; border-radius:16px; color:#17243a; background:#fff; box-shadow:0 22px 70px rgba(23,36,58,.3); }
 .viewer-unlock-dialog::backdrop { background:rgba(17,28,48,.6); }
 .viewer-unlock-dialog-card { position:relative; display:grid; gap:12px; padding:28px; }

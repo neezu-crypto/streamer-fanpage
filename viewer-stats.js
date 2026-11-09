@@ -30,6 +30,15 @@ const callSponsorLiveStatus = httpsCallable(functions, 'streamerFanPageLiveStatu
 const callViewerBugReports = httpsCallable(functions, 'streamerFanPageViewerStatsBugReports');
 const callViewerUnlocks = httpsCallable(functions, 'streamerFanPageViewerStatsUnlocks');
 const $ = (id) => document.getElementById(id);
+function mountPaidAnalysisPanels() {
+  const mount = $('viewerPaidAnalysisMount');
+  if (!mount) return;
+  ['viewerPeriodPeaks', 'viewerComparisonPanel', 'viewerKeywordComparisonPanel'].forEach((id) => {
+    const panel = $(id);
+    if (panel && panel.parentElement !== mount) mount.append(panel);
+  });
+}
+mountPaidAnalysisPanels();
 (() => {
   // 스크롤 직후에는 위치를 확인할 수 있게 보여주고, 입력이 멈추면 자연스럽게 숨긴다.
   const root = document.documentElement;
@@ -184,7 +193,12 @@ $('viewerBugForm').addEventListener('submit', async (event) => {
     status.textContent = '이전 제보의 접수 결과를 확인해야 합니다. 입력을 이전 내용으로 되돌리고 다시 보내 주세요.';
     return;
   }
-  const button = $('viewerBugSubmit'); button.disabled = true;
+  const button = $('viewerBugSubmit');
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  button.textContent = '제보 접수 중…';
+  status.textContent = '제보 내용을 전송하고 있어요.';
   try {
     await getAuthReady();
     if (!auth.currentUser || auth.currentUser.isAnonymous) {
@@ -222,7 +236,11 @@ $('viewerBugForm').addEventListener('submit', async (event) => {
       return;
     } else if (viewerBugPending) $('viewerBugCheck').hidden = false;
     status.textContent = viewerStatsErrorMessage(error, '제보 결과를 확인하지 못했습니다. 같은 내용으로 다시 보내 주세요.');
-  } finally { button.disabled = false; }
+  } finally {
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+    button.textContent = originalLabel;
+  }
 });
 const viewerTooltipPopup = document.createElement('div');
 viewerTooltipPopup.id = 'viewerTooltipPopup';
@@ -626,14 +644,15 @@ function renderPaidFeatures() {
 }
 
 function openPaidFeature(featureId) {
-  // 분석 조건은 누구나 설정할 수 있다. 실제 분석 요청은 결과를 확인하는 시점에만 해금 여부를 검사한다.
-  selectViewerService('free');
+  // 분석 조건은 누구나 설정할 수 있다. 결과 패널은 유료 서비스 탭 안에서만 보여준다.
   if (!selectedStreamer) {
+    selectViewerService('free');
     $('viewerSearchHint').textContent = '먼저 스트리머를 검색한 뒤 분석 조건을 설정해 주세요. 결과를 볼 때만 해금 여부를 확인합니다.';
     $('viewerSearchInput').focus({ preventScroll: true });
     $('viewerSearchForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
+  selectViewerService('paid');
   if (featureId === 'period') $('viewerPeriodPeaks').open = true;
   if (featureId === 'same_day') $('viewerComparisonPanel').open = true;
   if (featureId === 'keyword') $('viewerKeywordComparisonPanel').open = true;
