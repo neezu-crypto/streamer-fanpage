@@ -5,6 +5,7 @@ const { resolveTemplate, mayUseTemplate } = require('./weekly-schedule-template'
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase, getDatabaseWithUrl, ServerValue } = require('firebase-admin/database');
 const { isSuppressedSoopSearchQuery, isSuppressedSoopSearchResult } = require('./soopSearchSuppression');
+const { normalizeVerifySearchQuery, shapeVerifySearchResults, createVerifySearchLimiter } = require('./verification-search');
 const { getFunctions: getAdminFunctions } = require('firebase-admin/functions');
 const { getStorage } = require('firebase-admin/storage');
 const { HttpsError, onCall, onRequest } = require('firebase-functions/v2/https');
@@ -5395,6 +5396,21 @@ exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => 
   const streamers = [...byId.values()]
     .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'));
   return { streamers: includeAll ? streamers : streamers.slice(0, 30) };
+});
+
+// 스트리머 인증 모달 전용 SOOP 검색. 고점체크 통계·등급 한도와 분리하고, 저장 없이 후보 목록만 돌려준다.
+const verifySearchLimiter = createVerifySearchLimiter();
+exports.streamerFanPageVerifySearch = onCall({ maxInstances: 5, timeoutSeconds: 15 }, async (request) => {
+  const uid = requireAuth(request);
+  const query = normalizeVerifySearchQuery(request.data && request.data.query);
+  if (query === null) throw new HttpsError('invalid-argument', '검색어가 너무 깁니다.');
+  if (!query || isSuppressedSoopSearchQuery(query)) return { streamers: [] };
+  const allowed = verifySearchLimiter(uid);
+  if (!allowed.ok) {
+    throw new HttpsError('resource-exhausted', '검색이 너무 잦아요. 잠시 후 다시 시도해 주세요.', { retryAfterMs: allowed.retryAfterMs });
+  }
+  const found = await searchSoopStreamers(query);
+  return { streamers: shapeVerifySearchResults(found, query) };
 });
 
 exports.streamerFanPageViewerStats = onCall({ maxInstances: 20, enforceAppCheck: true, timeoutSeconds: 300 }, async (request) => {

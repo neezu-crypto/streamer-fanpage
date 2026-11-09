@@ -28,7 +28,7 @@
   <link rel="preload" as="image" href="assets/fanpage-kawaii/cat-paw-close.svg" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/GowunDodum-Regular.woff2?v=20261024-korean-fonts" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/Jua-Regular.woff2?v=20261024-korean-fonts" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css?v=20261107-favorites-loading-v1">
+  <link rel="stylesheet" href="style.css?v=20261110-verify-search-v1">
   <link rel="stylesheet" href="fanpage-layouts.css?v=20261107-mobile-controls-v3">
   <link rel="stylesheet" href="fanpage-mobile-actions.css?v=20261105-mobile-actions-v1">
 </head>
@@ -182,12 +182,26 @@
         <div><p class="eyebrow">STREAMER VERIFICATION</p><h2>스트리머 인증</h2></div>
         <button class="button profile-settings-close" id="closeStreamerVerification" type="button" aria-label="스트리머 인증 창 닫기">×</button>
       </div>
-      <p>닉네임과 SOOP 아이디를 입력해 인증을 신청하세요. 신청은 서버에서 확인하며, 승인 후 본인 팬페이지로 자동 연결됩니다.</p>
-      <label for="verificationNickname">스트리머 닉네임</label>
-      <input id="verificationNickname" name="nickname" maxlength="20" autocomplete="off" required>
-      <label for="verificationSoopId">SOOP 아이디</label>
-      <input id="verificationSoopId" name="soopId" minlength="2" maxlength="20" pattern="[A-Za-z0-9]{2,20}" autocomplete="off" required>
-      <p class="verification-status" id="verificationStatus" role="status" aria-live="polite">관리자 승인 후 인증이 완료됩니다.</p>
+      <p>스트리머 닉네임이나 SOOP 아이디로 검색해 본인을 선택하세요. 신청은 서버에서 확인하며, 승인 후 본인 팬페이지로 자동 연결됩니다.</p>
+      <div id="verificationSearchStep">
+        <label for="verificationSearchInput">스트리머 검색</label>
+        <input id="verificationSearchInput" type="search" maxlength="40" placeholder="닉네임 또는 SOOP 아이디 (2자 이상)" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="verificationSearchResults" aria-autocomplete="list">
+        <ul class="verification-search-results" id="verificationSearchResults" role="listbox" aria-label="검색 결과" hidden></ul>
+        <p class="verification-search-hint" id="verificationSearchHint" role="status" aria-live="polite"></p>
+        <button class="verification-manual-toggle" id="verificationManualToggle" type="button">찾는 스트리머가 없나요? 직접 입력하기</button>
+      </div>
+      <div id="verificationSelected" class="verification-selected" hidden>
+        <img id="verificationSelectedAvatar" alt="" width="44" height="44" referrerpolicy="no-referrer">
+        <div><strong id="verificationSelectedName"></strong><span id="verificationSelectedId"></span></div>
+        <button class="button" id="verificationReselect" type="button">다시 선택</button>
+      </div>
+      <div id="verificationManualFields" hidden>
+        <label for="verificationNickname">스트리머 닉네임</label>
+        <input id="verificationNickname" name="nickname" maxlength="20" autocomplete="off">
+        <label for="verificationSoopId">SOOP 아이디</label>
+        <input id="verificationSoopId" name="soopId" maxlength="20" autocomplete="off">
+      </div>
+      <p class="verification-status" id="verificationStatus" role="status" aria-live="polite">검색해서 스트리머를 선택하면 인증 신청 단계로 넘어갑니다.</p>
       <div id="verificationNote" hidden style="padding:12px;border:1px solid #aaa;border-radius:10px;margin:12px 0;">
         <strong>SOOP 쪽지로 본인 확인</strong>
         <p>6자리 코드를 SOOP 쪽지로 보내주세요. 계정 전환 신청은 기존 인증 스트리머의 SOOP 아이디로 보내야 자동 승인됩니다. 상태 확인은 코드를 바꾸지 않습니다.</p>
@@ -198,7 +212,7 @@
       </div>
       <div class="account-dialog-actions verification-actions">
         <button class="button" id="checkStreamerVerification" type="button">승인 여부 확인</button>
-        <button class="button button-primary" id="submitStreamerVerification" type="submit">인증 신청</button>
+        <button class="button button-primary" id="submitStreamerVerification" type="submit" disabled>인증 신청</button>
       </div>
     </form>
   </dialog>
@@ -295,7 +309,7 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261107-comment-title-v1"></script>
+  <script type="module" src="app.js?v=20261110-verify-search-v1"></script>
   <script type="module" src="https://neezu-crypto.github.io/streamer-game-series-shop/game-series-emotes.js?game=streamerFanPage&amp;v=20261028-emote-modal-bottom-right"></script>
 </body>
 </html>

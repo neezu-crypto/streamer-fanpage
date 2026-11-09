@@ -1894,3 +1894,19 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 @media(min-width:721px){.weekly-schedule-view-dialog.weekly-schedule-view-public .weekly-schedule-view-details-title,.weekly-schedule-view-dialog.weekly-schedule-view-public .weekly-schedule-view-details{display:none}}
 @media(max-width:700px){.weekly-schedule-view-frame{width:100%;max-width:100%}}
 @media(max-width:720px){.streamer-edit-verification-prompt{flex-basis:42px;width:42px;height:42px;min-width:42px;min-height:42px}.memory-moment-actions .streamer-edit-verification-prompt{flex-basis:42px}.youtube-heading-actions .streamer-edit-verification-prompt,.upbo-heading-actions .streamer-edit-verification-prompt{flex-basis:42px}}
+.verification-form #verificationSearchInput{margin-bottom:6px}
+.verification-search-results{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px;max-height:min(260px,36dvh);overflow-y:auto}
+.verification-search-results[hidden]{display:none}
+.verification-search-item{display:flex;width:100%;min-height:44px;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:9px;background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;font:600 13px var(--font);text-align:left;cursor:pointer}
+.verification-search-item span{flex:none;font-weight:500;font-size:12px;opacity:.7}
+.verification-search-item:hover,.verification-search-item:focus-visible{border-color:#ae88ff;outline:none;box-shadow:0 0 0 3px rgba(174,136,255,.18)}
+.verification-search-hint{min-height:18px;margin:8px 0 0!important;font-size:12px!important;opacity:.8}
+.verification-manual-toggle{align-self:flex-start;margin-top:4px;padding:6px 0;border:0;background:none;color:inherit;font:600 12px var(--font);text-decoration:underline;cursor:pointer;opacity:.85}
+.verification-selected{display:flex;align-items:center;gap:12px;margin-top:17px;padding:10px 12px;border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:10px;background:color-mix(in srgb,currentColor 5%,transparent)}
+.verification-selected[hidden],#verificationSearchStep[hidden],#verificationManualFields[hidden]{display:none}
+.verification-selected img{flex:none;width:44px;height:44px;border-radius:50%;object-fit:cover}
+.verification-selected img[hidden]{display:none}
+.verification-selected>div{flex:1;min-width:0;overflow-wrap:anywhere}
+.verification-selected strong{font-size:14px}
+.verification-selected span{font-size:12px;opacity:.7}
+.verification-form .verification-actions button:disabled{opacity:.5;cursor:not-allowed}

@@ -59,6 +59,7 @@ const callUpbo = authenticatedCallable('streamerFanPageUpbo');
 const callLinkGoogle = authenticatedCallable('linkGoogleAccount');
 const callLinkKakao = authenticatedCallable('linkKakaoAccount');
 const callStreamerVerification = authenticatedCallable('requestStreamerVerification');
+const callVerifySearch = authenticatedCallable('streamerFanPageVerifySearch');
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
@@ -11105,6 +11106,117 @@ $('closeLoginAssistTab').addEventListener('click', () => {
     if (!window.closed) $('loginAssistCloseStatus').textContent = '브라우저에서 자동 닫기를 허용하지 않으면 탭의 닫기 버튼을 눌러 주세요.';
   }, 200);
 });
+// 스트리머 인증 모달: SOOP 검색 → 선택 → 인증 신청 단계.
+const VERIFY_SEARCH_DEBOUNCE_MS = 350;
+let verifySearchTimer = 0;
+let verifySearchSequence = 0;
+function setVerifyStatus(message) { $('verificationStatus').textContent = message; }
+function updateVerifySubmitState() {
+  const manual = !$('verificationManualFields').hidden;
+  const ready = !$('verificationSelected').hidden || (manual && $('verificationNickname').value.trim() && $('verificationSoopId').value.trim());
+  $('submitStreamerVerification').disabled = !ready;
+}
+function clearVerifyResults(hint = '') {
+  const list = $('verificationSearchResults');
+  list.replaceChildren();
+  list.hidden = true;
+  $('verificationSearchInput').setAttribute('aria-expanded', 'false');
+  $('verificationSearchHint').textContent = hint;
+}
+function showVerifySearchStep() {
+  $('verificationSearchStep').hidden = false;
+  $('verificationSelected').hidden = true;
+  $('verificationNickname').value = '';
+  $('verificationSoopId').value = '';
+  updateVerifySubmitState();
+}
+function setVerifyManualMode(on) {
+  $('verificationManualFields').hidden = !on;
+  $('verificationManualToggle').textContent = on ? '검색으로 돌아가기' : '찾는 스트리머가 없나요? 직접 입력하기';
+  if (on) $('verificationNickname').focus({ preventScroll: true });
+  updateVerifySubmitState();
+}
+function selectVerifyStreamer(item) {
+  $('verificationNickname').value = item.nickname;
+  $('verificationSoopId').value = item.soopId;
+  $('verificationSelectedName').textContent = item.nickname;
+  $('verificationSelectedId').textContent = ` · ${item.soopId}`;
+  const avatar = $('verificationSelectedAvatar');
+  avatar.hidden = !item.avatarUrl;
+  avatar.onerror = () => { avatar.hidden = true; };
+  if (item.avatarUrl) avatar.src = item.avatarUrl;
+  $('verificationSearchStep').hidden = true;
+  $('verificationManualFields').hidden = true;
+  $('verificationSelected').hidden = false;
+  clearVerifyResults();
+  setVerifyStatus(`${item.nickname}(${item.soopId}) 님으로 인증을 신청합니다. 맞다면 '인증 신청'을 눌러 주세요.`);
+  updateVerifySubmitState();
+  $('submitStreamerVerification').focus({ preventScroll: true });
+}
+function renderVerifyResults(streamers) {
+  const list = $('verificationSearchResults');
+  list.replaceChildren(...streamers.map((item) => {
+    const row = document.createElement('li');
+    row.setAttribute('role', 'option');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'verification-search-item';
+    const strong = document.createElement('strong'); strong.textContent = item.nickname;
+    const id = document.createElement('span'); id.textContent = item.soopId;
+    button.append(strong, id);
+    button.addEventListener('click', () => selectVerifyStreamer(item));
+    row.append(button);
+    return row;
+  }));
+  list.hidden = streamers.length === 0;
+  $('verificationSearchInput').setAttribute('aria-expanded', String(streamers.length > 0));
+}
+async function runVerifySearch(query) {
+  const sequence = ++verifySearchSequence;
+  $('verificationSearchHint').textContent = '검색하고 있어요…';
+  try {
+    const result = (await callVerifySearch({ query })).data || {};
+    if (sequence !== verifySearchSequence) return;
+    const streamers = Array.isArray(result.streamers) ? result.streamers : [];
+    renderVerifyResults(streamers);
+    $('verificationSearchHint').textContent = streamers.length
+      ? `${streamers.length}명을 찾았어요. 본인을 선택해 주세요.`
+      : '검색 결과가 없어요. 닉네임이나 아이디를 확인하거나 직접 입력해 주세요.';
+  } catch (error) {
+    if (sequence !== verifySearchSequence) return;
+    clearVerifyResults(error?.code === 'functions/resource-exhausted'
+      ? '검색이 너무 잦아요. 잠시 후 다시 시도해 주세요.'
+      : '검색을 불러오지 못했어요. 아래의 직접 입력하기를 이용해 주세요.');
+  }
+}
+$('verificationSearchInput').addEventListener('input', (event) => {
+  window.clearTimeout(verifySearchTimer);
+  verifySearchSequence += 1;
+  const query = event.target.value.trim();
+  if (query.length < 2) { clearVerifyResults(query ? '두 글자 이상 입력해 주세요.' : ''); return; }
+  verifySearchTimer = window.setTimeout(() => { void runVerifySearch(query); }, VERIFY_SEARCH_DEBOUNCE_MS);
+});
+$('verificationSearchInput').addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowDown') {
+    const first = $('verificationSearchResults').querySelector('button');
+    if (first) { event.preventDefault(); first.focus(); }
+  }
+});
+$('verificationSearchResults').addEventListener('keydown', (event) => {
+  const buttons = [...$('verificationSearchResults').querySelectorAll('button')];
+  const index = buttons.indexOf(document.activeElement);
+  if (index < 0) return;
+  if (event.key === 'ArrowDown') { event.preventDefault(); buttons[Math.min(index + 1, buttons.length - 1)].focus(); }
+  else if (event.key === 'ArrowUp') { event.preventDefault(); (index === 0 ? $('verificationSearchInput') : buttons[index - 1]).focus(); }
+  else if (event.key === 'Escape') { event.preventDefault(); $('verificationSearchInput').focus(); }
+});
+$('verificationManualToggle').addEventListener('click', () => setVerifyManualMode($('verificationManualFields').hidden));
+$('verificationReselect').addEventListener('click', () => {
+  showVerifySearchStep();
+  setVerifyStatus('검색해서 스트리머를 선택하면 인증 신청 단계로 넘어갑니다.');
+  $('verificationSearchInput').focus({ preventScroll: true });
+});
+['verificationNickname', 'verificationSoopId'].forEach((id) => $(id).addEventListener('input', updateVerifySubmitState));
 $('openStreamerVerification').addEventListener('click', () => {
   $('loginChoiceDialog').close();
   showFanPageModal($('streamerVerifyDialog'));
@@ -11270,9 +11382,18 @@ async function submitOrCheckStreamerVerification(checkOnly, renewOnly = false) {
   const status = $('verificationStatus');
   const nickname = $('verificationNickname').value.trim();
   const soopId = $('verificationSoopId').value.trim().toLowerCase();
-  if (!checkOnly && !renewOnly && !$('streamerVerificationForm').reportValidity()) return;
+  if (!checkOnly && !renewOnly && !/^[A-Za-z0-9]{2,20}$/.test(soopId)) {
+    status.textContent = '스트리머를 검색해 선택하거나, 직접 입력에서 SOOP 아이디(영문·숫자 2~20자)를 확인해 주세요.';
+    return;
+  }
+  if (!checkOnly && !renewOnly && !nickname) {
+    status.textContent = '스트리머 닉네임을 입력해 주세요.';
+    return;
+  }
+  const renewButton = $('renewVerificationCode');
   submitButton.disabled = true;
   checkButton.disabled = true;
+  renewButton.disabled = true;
   status.textContent = checkOnly ? '인증 상태를 확인하고 있어요.' : renewOnly ? '새 코드를 발급하고 있어요.' : '인증 신청을 접수하고 있어요.';
   try {
     const previousText = $('verificationNoteCode').textContent.trim();
@@ -11307,7 +11428,9 @@ async function submitOrCheckStreamerVerification(checkOnly, renewOnly = false) {
         const codeButton = $('verificationNoteCode');
         codeButton.textContent = code || '코드 없음';
         codeButton.disabled = !code;
-        $('verificationNoteStatus').textContent = code ? '' : '코드가 없거나 만료됐어요. 새 코드를 발급해주세요.';
+        $('verificationNoteStatus').textContent = code ? '' : (!checkOnly && !renewOnly
+          ? '이미 접수된 신청이라 코드를 다시 보여드릴 수 없어요. 코드를 이미 보냈다면 아래 "승인 여부 확인"을, 코드를 잃어버렸다면 "새 코드 발급"을 눌러 주세요. (새 코드는 직전 발급 1분 후부터 가능해요)'
+          : '코드가 없거나 만료됐어요. 새 코드를 발급해주세요.');
         codeButton.onclick = async () => {
           try { await navigator.clipboard.writeText(code); $('verificationNoteStatus').textContent = '복사했어요. 쪽지 본문에 붙여넣어 보내주세요.'; }
           catch (_) { $('verificationNoteStatus').textContent = '코드를 선택해 직접 복사해주세요.'; }
@@ -11319,7 +11442,9 @@ async function submitOrCheckStreamerVerification(checkOnly, renewOnly = false) {
           : '계정 전환 신청은 관리자 수동 검수가 필요합니다.')
         : checkOnly
           ? `${result.nickname || '스트리머'} 인증은 아직 검토 중이에요. 승인 후 다시 확인해 주세요.`
-          : '인증 신청을 접수했어요. SOOP 쪽지의 발신자 아이디와 코드를 대조해 자동 승인합니다.';
+          : (canSendNote && !renewOnly && !result.verificationCode
+            ? '이미 인증 신청이 접수되어 있어요. SOOP 쪽지의 발신자 아이디와 코드를 대조해 자동 승인합니다.'
+            : '인증 신청을 접수했어요. SOOP 쪽지의 발신자 아이디와 코드를 대조해 자동 승인합니다.');
       return;
     }
     throw new Error('인증 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -11327,7 +11452,8 @@ async function submitOrCheckStreamerVerification(checkOnly, renewOnly = false) {
     console.error('Streamer verification failed:', error);
     status.textContent = error.message || '인증 요청에 실패했어요. 잠시 후 다시 시도해 주세요.';
   } finally {
-    submitButton.disabled = false;
+    updateVerifySubmitState();
     checkButton.disabled = false;
+    renewButton.disabled = false;
   }
 }
