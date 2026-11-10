@@ -19,6 +19,8 @@ const WALLET_PURCHASES_KEY = 'fanPageViewerSponsorPurchases';
 const WALLET_LEDGER_KIND = 'viewerSponsorPromotion';
 const FANPAGE_DATABASE_URL = 'https://streamer-fanpage-rtdb.firebaseio.com';
 const LIFE_GAME_DATABASE_URL = 'https://streamer-life-game-rtdb.firebaseio.com';
+const STOCK_MARKET_DATABASE_URL = 'https://soop-stock-market-rtdb.firebaseio.com';
+const STOCK_MARKET_MIGRATION_STATE_PATH = 'adminCenter/stockMarketDatabaseMigration/state';
 const MAX_ADS_PER_RAIL = 5;
 const MAX_ACTIVE_ADS = MAX_ADS_PER_RAIL * 2;
 const CASH_PER_DAY = 10;
@@ -50,10 +52,11 @@ function hasApprovedHistory(records, idField, soopId, statuses = ['approved']) {
 
 async function hasPromotionEligibility(soopId, nickname) {
   const shared = sharedDb();
+  const market = await activeStockMarketDatabase(shared);
   const verified = await shared.ref('streamerVerifications').orderByChild('soopId').equalTo(soopId).get();
   if (Object.values(verified.val() || {}).some((record) => typeof record?.nickname === 'string'
     && normalizeSoopId(record.soopId) === soopId)) return true;
-  const stocks = (await shared.ref('stocks').get()).val();
+  const stocks = (await market.ref('stocks').get()).val();
   if (isListedNickname(stocks, nickname)) return true;
 
   const queryHistory = async (db, path, field, statuses, indexed = true) => {
@@ -67,7 +70,7 @@ async function hasPromotionEligibility(soopId, nickname) {
   const life = getDatabaseWithUrl(LIFE_GAME_DATABASE_URL);
   const checks = [
     ...['bannerRequests', 'chartBannerRequests', 'cardBannerRequests', 'relayRoomRequests']
-      .map((path) => queryHistory(shared, path, 'streamerId', ['approved'])),
+      .map((path) => queryHistory(market, path, 'streamerId', ['approved'])),
     queryHistory(life, 'lifeGame/sponsorRequests', 'soopId', ['approved']),
     queryHistory(fanpageDb(), 'streamerFanPageSponsorRequests', 'soopId', ['approved'], false),
     queryHistory(fanpageDb(), CAMPAIGNS_PATH, 'soopId', ['active', 'ended'], false),
@@ -82,6 +85,10 @@ async function hasPromotionEligibility(soopId, nickname) {
 
 const fanpageDb = () => getDatabaseWithUrl(FANPAGE_DATABASE_URL);
 const sharedDb = () => getDatabase();
+async function activeStockMarketDatabase(shared = sharedDb()) {
+  const state = (await shared.ref(STOCK_MARKET_MIGRATION_STATE_PATH).get()).val() || {};
+  return state.phase === 'market-primary' ? getDatabaseWithUrl(STOCK_MARKET_DATABASE_URL) : shared;
+}
 
 function requireAuth(request) {
   if (!request.auth || typeof request.auth.uid !== 'string') {

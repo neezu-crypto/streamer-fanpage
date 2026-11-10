@@ -17,6 +17,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
+// 주식 시세·스파크라인 전용 참조. 이전 데이터 대조가 끝나는 전환 배포 전까지
+// 기본 DB를 유지하므로 팬페이지의 사용자·인증 데이터에는 영향이 없다.
+const stockDb = getDatabase(app, 'https://soop-stock-market-rtdb.firebaseio.com');
+const STOCK_MARKET_DATABASE_PRIMARY = true;
+const marketDb = STOCK_MARKET_DATABASE_PRIMARY ? stockDb : db;
 const functions = getFunctions(app, 'us-central1');
 function authenticatedCallable(name, options) {
   const callable = httpsCallable(functions, name, options);
@@ -6116,7 +6121,7 @@ function renderStreamerStockPrice(page) {
       change.classList.toggle('is-down', !isUp);
     };
 
-    stockPriceUnsubscribe = onValue(ref(db, `stocksPublic/${stock.id}`), (snapshot) => {
+    stockPriceUnsubscribe = onValue(ref(marketDb, `stocksPublic/${stock.id}`), (snapshot) => {
       const value = snapshot.val();
       const currentPrice = Number(value && value.price);
       if (!snapshot.exists() || !value || value.price === null || value.price === '' || !Number.isFinite(currentPrice)) {
@@ -6141,7 +6146,7 @@ function renderStreamerStockPrice(page) {
       chart.replaceChildren();
     });
 
-    get(ref(db, `sparklines/${stock.id}`)).then((snapshot) => {
+    get(ref(marketDb, `sparklines/${stock.id}`)).then((snapshot) => {
       if (requestId !== stockPriceSparklineRequest) return;
       const saved = snapshot.val();
       history = Array.isArray(saved)
