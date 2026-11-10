@@ -4977,3 +4977,67 @@ body.fanpage-layout-three-active :is(.profile-link-editor-note, .profile-editor-
 .admin-design-usage-more { margin-top: 8px; min-height: 36px; padding: 4px 12px; border: 1px solid #ffffff22; border-radius: 999px; background: transparent; color: inherit; font-size: 12px; cursor: pointer; }
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-usage-more { border-color: #e8deea; color: #51465d; }
 body.fanpage-layout-three-active .account-dialog .admin-design-usage-more { border: 2px solid #2f2a2c; color: #2f2a2c; }
+
+
+/* 디자인 3 관리자 팝업: 디자인 1의 밝은 팝업 규칙을 그대로 적용해 어두운 테마 색이 남지 않게 한다 */
+body.fanpage-layout-three-active .account-dialog .admin-stats-dialog-card { color: #51465d; }
+body.fanpage-layout-three-active .account-dialog :is(.admin-stats-tile, .admin-stat-card, .admin-viewer-usage-tile, .admin-viewer-subscription-row, .admin-stat-metric, .admin-viewer-usage-action, .admin-viewer-usage-tier, .admin-viewer-usage-streamer) {
+  border-color: #e8deea;
+  background: #fffafd;
+  color: #51465d;
+}
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-heading { color: #51465d; }
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-range { color: #786c82; }
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-range select {
+  border-color: #e1d6e6;
+  background: #fff;
+  color: #51465d;
+}
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-range select:focus-visible { outline-color: var(--dialog-accent-strong); }
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-tile {
+  border-color: #e8deea;
+  background: #fffafd;
+  color: #51465d;
+}
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-tile span,
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-tile small,
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-note { color: #786c82; }
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-tile strong { color: #a54268; }
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-cost {
+  background: #fff3f7;
+  color: #5d5267;
+}
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-cost strong { color: #a54268; }
+body.fanpage-layout-three-active .account-dialog .admin-viewer-data-cost.total {
+  border-color: #e7b5c8;
+  background: #ffedf3;
+}
+body.fanpage-layout-three-active .account-dialog :is(.admin-stats-tile span, .admin-stats-status, .admin-stats-list-heading span, .admin-stats-note, .admin-viewer-usage-heading > span, .admin-viewer-usage-note, .admin-viewer-usage-tile span, .admin-viewer-usage-action, .admin-viewer-usage-tier, .admin-viewer-usage-streamers-heading span, .admin-viewer-usage-streamer-identity small, .admin-viewer-subscription-identity small, .admin-viewer-subscription-status) { color: #81758b !important; }
+body.fanpage-layout-three-active .account-dialog :is(.admin-stats-list-heading, .admin-viewer-usage-streamers-heading, .admin-viewer-usage-streamer-identity strong, .admin-viewer-subscription-identity strong, .admin-stats-tile strong, .admin-viewer-usage-tile strong) { color: #51465d; }
+body.fanpage-layout-three-active .account-dialog :is(.admin-viewer-usage, .admin-viewer-subscriptions) { border-color: color-mix(in srgb, var(--dialog-accent), transparent 72%); background: linear-gradient(135deg, color-mix(in srgb, var(--dialog-accent), transparent 94%), #fffafd); }
+body.fanpage-layout-three-active .account-dialog :is(.admin-viewer-subscription-empty, .admin-viewer-usage-streamers-empty, .admin-stats-empty) { border-color: #e8deea; background: #fff8fc; color: #81758b; }
+body.fanpage-layout-three-active .account-dialog .admin-stat-name small,
+body.fanpage-layout-three-active .account-dialog .admin-stat-metric small { color: #81758b; }
+body.fanpage-layout-three-active .account-dialog .admin-viewer-usage-chart span,
+body.fanpage-layout-three-active .account-dialog .admin-stat-sparkline span { background: linear-gradient(180deg, var(--dialog-accent), var(--dialog-accent-strong)); }
+body.fanpage-layout-three-active .account-dialog :is(.admin-viewer-usage-action strong, .admin-viewer-usage-tier strong, .admin-viewer-usage-streamer-count, .admin-viewer-usage-streamer-rank) { color: var(--dialog-accent-strong); }
+body.fanpage-layout-three-active .account-dialog .admin-design-feedback { border-color: #e8deea; background: #fffafd; }
+body.fanpage-layout-three-active .account-dialog .admin-design-feedback-item { border-color: #e8deea; background: #fff; }
+body.fanpage-layout-three-active .account-dialog .admin-design-feedback-category { border-color: color-mix(in srgb, var(--dialog-accent), transparent 65%); color: var(--dialog-accent-strong); }
+body.fanpage-layout-three-active .account-dialog .admin-design-feedback-content { color: #5d5267; }
+body.fanpage-layout-three-active .account-dialog .admin-design-feedback-meta { color: #81758b; }
+body.fanpage-layout-three-active .account-dialog .admin-design-feedback-empty { border-color: #e8deea; background: #fff8fc; color: #81758b; }
+body.fanpage-layout-three-active .account-dialog :is(.admin-stats-list, .admin-viewer-usage-streamers, .admin-viewer-subscription-list) { scrollbar-color: #cbb5d0 #f8eff8; }
+#fanPageView.fanpage-layout-3 .live-offline-copy span { color: var(--d3-muted-strong) !important; }
+/* 통계 창의 스트리머 카드는 버튼이지만 종이 버튼 그림을 쓰지 않고 일반 카드로 보여 준다(그림 테두리가 닉네임을 덮던 문제) */
+body.fanpage-layout-three-active dialog.account-dialog .admin-stat-card {
+  background: #fffafd !important; background-image: none !important;
+  border: 1px solid #e8deea !important; border-radius: 11px !important;
+  box-shadow: none !important; transform: none !important; filter: none !important;
+}
+body.fanpage-layout-three-active dialog.account-dialog .admin-stat-card::before,
+body.fanpage-layout-three-active dialog.account-dialog .admin-stat-card::after { display: none !important; }
+/* 통계 창: 디자인 3은 창 장식(테이프)이 잘리지 않도록 창은 overflow visible을 유지하고, 안쪽 카드가 스크롤되게 한다 */
+body.fanpage-layout-three-active dialog.admin-stats-dialog .admin-stats-dialog-card {
+  max-height: calc(100dvh - 28px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+}
