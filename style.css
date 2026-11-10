@@ -1931,3 +1931,6 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 .admin-design-usage-empty{color:#aaa3b1;font-size:12px}
 .admin-design-usage-warning{margin:8px 0 0;color:#e0a96b;font-size:12px}
 @media(max-width:720px){.admin-design-usage-grid{grid-template-columns:1fr}}
+
+/* hidden 속성이 있는 폼은 display 규칙이 있어도 숨긴다(권한 없는 사용자에게 입력 폼이 보이던 문제) */
+:is(.comment-up-form, .songbook-add-form, .played-games-add-form, .memory-moments-form, .profile-link-editor, .upbo-request-form)[hidden] { display: none !important; }

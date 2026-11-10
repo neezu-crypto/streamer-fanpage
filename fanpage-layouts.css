@@ -4965,3 +4965,15 @@ body.fanpage-layout-three-active .account-dialog .admin-design-usage-card { bord
 body.fanpage-layout-three-active .account-dialog :is(.admin-design-usage-heading span, .admin-design-usage-card > small, .admin-design-usage-empty) { color: var(--d3-muted-strong); }
 body.fanpage-layout-three-active .account-dialog .admin-design-usage-chip { border: 2px solid #2f2a2c; color: #2f2a2c; }
 body.fanpage-layout-three-active .account-dialog .admin-design-usage-warning, body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-usage-warning { color: #8a4b00; }
+
+/* 관리자 점검 후 보정: 디자인 3 밝은 바탕에서 어두운 테마 기본 글자색이 남은 곳의 대비 */
+#fanPageView.fanpage-layout-3 :is(.profile-link-editor label, .video-library-channel-card a, .profile-inline-editor label) { color: var(--doodle-ink, #2f2a2c) !important; }
+#fanPageView.fanpage-layout-3 :is(.memory-moments-count, .songbook-count, .played-games-count, .competition-history-count, details > summary) { color: var(--d3-muted-strong) !important; }
+body.fanpage-layout-three-active :is(.profile-link-editor-note, .profile-editor-hint) { font-size: 12px; }
+
+/* 관리자 통계: 디자인 카드 정렬과 긴 목록 접기 */
+.admin-design-usage-grid { align-items: start; }
+.admin-design-usage { margin-top: 12px; }
+.admin-design-usage-more { margin-top: 8px; min-height: 36px; padding: 4px 12px; border: 1px solid #ffffff22; border-radius: 999px; background: transparent; color: inherit; font-size: 12px; cursor: pointer; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-usage-more { border-color: #e8deea; color: #51465d; }
+body.fanpage-layout-three-active .account-dialog .admin-design-usage-more { border: 2px solid #2f2a2c; color: #2f2a2c; }
