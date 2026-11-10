@@ -368,6 +368,47 @@ let verifiedStreamerUid = '';
 let verifiedStreamerProfile = null;
 let verifiedStreamerProfileUid = '';
 let isAdminUser = false;
+
+// 디자인 3 편집 모드: 인증 스트리머·관리자만 편집할 수 있고, 디자인 3에서는 기본이 "팬이 보는 화면"이다.
+// 편집 UI는 편집 모드를 켠 뒤에만 만들어지며(렌더링 자체를 하지 않음), 권한 판정은 서버가 하므로 이 값은 화면 구성에만 쓴다.
+// 디자인 1·2는 이 값과 무관하게 지금처럼 항상 편집 UI를 보인다.
+const FANPAGE_EDIT_MODE_STORAGE_KEY = 'fanpageD3EditMode';
+let fanpageD3EditMode = (() => {
+  try { return sessionStorage.getItem(FANPAGE_EDIT_MODE_STORAGE_KEY) === '1'; } catch { return false; }
+})();
+function isFanpageLayoutThree(page) { return Number(page?.profile?.layoutDesign) === 3; }
+function editUiAllowed(page = currentPage) { return !isFanpageLayoutThree(page) || fanpageD3EditMode; }
+// 서버가 준 관리 권한 값(true)을 현재 화면(팬 화면/편집 화면)에 맞게 거른다.
+function uiCan(flag) { return flag === true && editUiAllowed(); }
+// page.isOwner는 읽을 때마다 "실제 관리 권한 && 편집 화면 여부"로 계산한다. 실제 권한은 page.canManage에 둔다.
+function installPageOwnership(page, canManage) {
+  page.canManage = canManage === true;
+  Object.defineProperty(page, 'isOwner', {
+    configurable: true,
+    enumerable: true,
+    get() { return page.canManage === true && editUiAllowed(page); },
+    set(value) { page.canManage = value === true; },
+  });
+}
+function setFanpageEditMode(next, page = currentPage) {
+  fanpageD3EditMode = next === true;
+  try { sessionStorage.setItem(FANPAGE_EDIT_MODE_STORAGE_KEY, fanpageD3EditMode ? '1' : '0'); } catch { /* 저장소를 못 써도 화면 전환은 동작한다 */ }
+  if (!page) return;
+  const scrollY = window.scrollY;
+  renderFanPage(page);
+  window.requestAnimationFrame(() => window.scrollTo(0, scrollY));
+}
+function createFanpageEditModeToggle(page) {
+  if (!page || page.canManage !== true || !isFanpageLayoutThree(page)) return null;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button fanpage-edit-mode-toggle';
+  button.setAttribute('aria-pressed', String(fanpageD3EditMode));
+  button.textContent = fanpageD3EditMode ? '✓ 편집 끝내기' : '✎ 편집 모드';
+  button.title = fanpageD3EditMode ? '팬이 보는 화면으로 돌아가요.' : '입력·추가·삭제 같은 편집 도구를 열어요.';
+  button.addEventListener('click', () => setFanpageEditMode(!fanpageD3EditMode, page));
+  return button;
+}
 let adminStatsLoading = false;
 let adminStatsData = null;
 let adminViewerSubscriptionsLoading = false;
@@ -1464,7 +1505,7 @@ function renderUpboRangeTable(rows, kind, page, topic, state) {
     const reward = document.createElement('span'); reward.className = 'upbo-range-reward'; reward.textContent = row.reward;
     line.append(count, reward);
     const status = document.createElement('span'); status.className = `upbo-achievement${row.achieved ? ' is-achieved' : ''}`;
-    if (state.canManage) {
+    if (uiCan(state.canManage)) {
       const label = document.createElement('label'); label.className = 'upbo-achievement-control';
       const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = row.achieved === true;
       checkbox.disabled = state.saving;
@@ -1486,7 +1527,7 @@ function renderUpboRangeTable(rows, kind, page, topic, state) {
 
 async function updateUpboRowAchievement(page, topic, kind, rowId, achieved) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving) return;
+  if (!uiCan(state.canManage) || state.saving) return;
   const sourceTopic = state.topic && state.topic.id === topic.id ? state.topic : topic;
   const updateRows = (rows, targetKind) => rows.map((row) => ({
     ...row,
@@ -1542,7 +1583,7 @@ function renderUpboSection(page) {
   const refresh = upboButton(state.loadingBoard ? '불러오는 중…' : '↻ 새로고침', 'upbo-refresh-button', () => loadUpboBoard(page.streamer.id));
   refresh.disabled = state.loadingBoard || state.loadingMorePending || state.loadingMoreRecords || state.saving;
   actions.append(refresh);
-  if (state.canManage) {
+  if (uiCan(state.canManage)) {
     const addItem = upboButton('+ 신청 항목 추가', 'button-primary upbo-add-topic', () => openUpboItemEditor(page));
     addItem.disabled = state.saving; actions.append(addItem);
   } else {
@@ -1552,7 +1593,7 @@ function renderUpboSection(page) {
   heading.append(copy, actions); section.append(heading);
 
   if (!state.boardLoaded || state.loadingBoard) {
-    const status = document.createElement('p'); status.className = 'upbo-status'; status.textContent = '업보 정리를 불러오고 있어요.';
+    const status = document.createElement('p'); status.className = 'upbo-status is-loading'; status.textContent = '업보 정리를 불러오고 있어요.';
     section.append(status); return section;
   }
   if (state.error && !state.items.length && !state.records.length && !state.pending.length) {
@@ -1564,7 +1605,7 @@ function renderUpboSection(page) {
   }
   const tabs = [
     { id: 'request', label: '업보 신청' },
-    ...(state.canManage ? [
+    ...(uiCan(state.canManage) ? [
       { id: 'items', label: '신청 가능한 항목' },
       { id: 'pending', label: '팬 신청 검토' },
     ] : []),
@@ -1586,8 +1627,8 @@ function renderUpboSection(page) {
   });
   section.append(tablist);
   if (state.activeTab === 'request') section.append(renderUpboRequestForm(page, state));
-  if (state.activeTab === 'items' && state.canManage) section.append(renderUpboItemManager(page, state));
-  if (state.activeTab === 'pending' && state.canManage) section.append(renderUpboPendingQueue(page, state));
+  if (state.activeTab === 'items' && uiCan(state.canManage)) section.append(renderUpboItemManager(page, state));
+  if (state.activeTab === 'pending' && uiCan(state.canManage)) section.append(renderUpboPendingQueue(page, state));
   if (state.activeTab === 'records') section.append(renderUpboRecords(page, state));
   return section;
 }
@@ -1608,7 +1649,7 @@ function renderUpboRequestForm(page, state) {
   const items = state.items.filter((item) => item.active);
   if (!items.length) {
     const empty = document.createElement('p'); empty.className = 'upbo-inline-empty';
-    if (state.canManage) {
+    if (uiCan(state.canManage)) {
       empty.textContent = '신청 항목을 추가하면 팬들이 여기서 신청할 수 있어요.';
     } else {
       empty.classList.add('upbo-request-empty');
@@ -1996,7 +2037,7 @@ function renderUpboRecords(page, state) {
     const date = document.createElement('small'); date.textContent = `등록 ${formatUpboDateTime(record.approvedAt)}`;
     copy.append(name, detail, date);
     row.append(copy);
-    if (state.canManage) {
+    if (uiCan(state.canManage)) {
       const actions = document.createElement('div'); actions.className = 'upbo-row-actions';
       actions.append(
         upboButton('수정', 'upbo-small-button', () => openUpboSubmissionEditor(page, record, true)),
@@ -2077,7 +2118,7 @@ function loadMoreUpboPending(streamerId) { return loadUpboBoard(streamerId, 'pen
 
 async function importUpboRouletteItems(page) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving) return;
+  if (!uiCan(state.canManage) || state.saving) return;
   if (!String(page.profile && page.profile.rouletteUrl || '').trim()) {
     showToast('프로필 설정에 위플랩 공개 룰렛 링크를 먼저 등록해 주세요.');
     return;
@@ -2106,7 +2147,7 @@ async function importUpboRouletteItems(page) {
 
 function openUpboItemEditor(page, existingItem = null) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving) return;
+  if (!uiCan(state.canManage) || state.saving) return;
   if (!existingItem && state.items.length >= MAX_UPBO_ITEMS) {
     showToast('신청 항목은 최대 100개까지 등록할 수 있어요.'); return;
   }
@@ -2307,7 +2348,7 @@ function openUpboItemEditor(page, existingItem = null) {
 
 async function deleteUpboItem(page, item) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving || !confirm(`“${item.name}” 항목을 삭제할까요? 기존 신청과 확정 기록은 보관됩니다.`)) return;
+  if (!uiCan(state.canManage) || state.saving || !confirm(`“${item.name}” 항목을 삭제할까요? 기존 신청과 확정 기록은 보관됩니다.`)) return;
   state.saving = true; refreshUpboSection(page.streamer.id);
   try {
     await callUpbo({ action: 'deleteItem', streamerId: page.streamer.id, itemId: item.id });
@@ -2320,7 +2361,7 @@ async function deleteUpboItem(page, item) {
 
 function openUpboSubmissionEditor(page, entry, isRecord = false) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving) return;
+  if (!uiCan(state.canManage) || state.saving) return;
   const dialog = document.createElement('dialog'); dialog.className = 'account-dialog upbo-editor-dialog';
   const form = document.createElement('form'); form.className = 'account-dialog-card upbo-editor-form';
   const heading = document.createElement('div'); heading.className = 'profile-editor-heading';
@@ -2385,7 +2426,7 @@ function openUpboSubmissionEditor(page, entry, isRecord = false) {
 
 async function deleteUpboSubmission(page, entry) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving || !confirm(`“${entry.nickname} · ${entry.itemName} × ${entry.quantity}” 신청을 반려할까요?`)) return;
+  if (!uiCan(state.canManage) || state.saving || !confirm(`“${entry.nickname} · ${entry.itemName} × ${entry.quantity}” 신청을 반려할까요?`)) return;
   state.saving = true; refreshUpboSection(page.streamer.id);
   try {
     await callUpbo({ action: 'deleteRequest', streamerId: page.streamer.id, requestId: entry.id });
@@ -2396,7 +2437,7 @@ async function deleteUpboSubmission(page, entry) {
 
 async function deleteUpboRecord(page, entry) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving || !confirm(`“${entry.nickname} · ${entry.itemName}” 확정 기록을 삭제할까요?`)) return;
+  if (!uiCan(state.canManage) || state.saving || !confirm(`“${entry.nickname} · ${entry.itemName}” 확정 기록을 삭제할까요?`)) return;
   state.saving = true; refreshUpboSection(page.streamer.id);
   try {
     await callUpbo({ action: 'deleteRecord', streamerId: page.streamer.id, recordId: entry.id });
@@ -2489,7 +2530,7 @@ function collectUpboRangeEditorRows(container, kind) {
 
 function openUpboTopicEditor(page, existingTopic = null) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving) return;
+  if (!uiCan(state.canManage) || state.saving) return;
   const dialog = document.createElement('dialog'); dialog.className = 'account-dialog upbo-editor-dialog';
   const form = document.createElement('form'); form.className = 'account-dialog-card upbo-editor-form';
   const heading = document.createElement('div'); heading.className = 'profile-editor-heading';
@@ -2557,7 +2598,7 @@ function openUpboTopicEditor(page, existingTopic = null) {
 
 function openUpboViewerEditor(page, topic, existingViewer = null) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving) return;
+  if (!uiCan(state.canManage) || state.saving) return;
   const dialog = document.createElement('dialog'); dialog.className = 'account-dialog upbo-editor-dialog';
   const form = document.createElement('form'); form.className = 'account-dialog-card upbo-editor-form';
   const heading = document.createElement('div'); heading.className = 'profile-editor-heading';
@@ -2610,7 +2651,7 @@ function openUpboViewerEditor(page, topic, existingViewer = null) {
 
 async function deleteUpboViewer(page, topicId, viewer) {
   const state = upboStateFor(page.streamer.id);
-  if (!state.canManage || state.saving || !confirm(`${viewer.nickname}님의 후원 기록을 삭제할까요?`)) return;
+  if (!uiCan(state.canManage) || state.saving || !confirm(`${viewer.nickname}님의 후원 기록을 삭제할까요?`)) return;
   state.saving = true; refreshUpboSection(page.streamer.id);
   try {
     await callUpbo({ action: 'deleteViewer', streamerId: page.streamer.id, topicId, viewerId: viewer.id });
@@ -2624,7 +2665,7 @@ async function deleteUpboViewer(page, topicId, viewer) {
 async function deleteUpboTopic(page, topicId) {
   const state = upboStateFor(page.streamer.id);
   const topic = state.topics.find((item) => item.id === topicId);
-  if (!state.canManage || state.saving || !topic || !confirm(`“${topic.title}” 주제와 시청자 기록을 모두 삭제할까요?`)) return;
+  if (!uiCan(state.canManage) || state.saving || !topic || !confirm(`“${topic.title}” 주제와 시청자 기록을 모두 삭제할까요?`)) return;
   state.saving = true; refreshUpboSection(page.streamer.id);
   try {
     await callUpbo({ action: 'deleteTopic', streamerId: page.streamer.id, topicId });
@@ -2936,7 +2977,7 @@ function renderRollingPaperSection(page) {
     page, activeTopic ? `${activeTopic.title} 롤링페이퍼 주제` : '롤링페이퍼 주제 관리',
   );
   if (topicManagementPrompt) actions.append(topicManagementPrompt);
-  if (activeTopic && activeTopic.id !== 'general' && page.isOwner && state.canManageTopics) {
+  if (activeTopic && activeTopic.id !== 'general' && page.isOwner && uiCan(state.canManageTopics)) {
     const deleteTopic = document.createElement('button'); deleteTopic.type = 'button';
     deleteTopic.className = 'button rolling-paper-topic-delete'; deleteTopic.textContent = '주제 삭제';
     deleteTopic.addEventListener('click', () => deleteRollingPaperTopic(page, activeTopic, deleteTopic));
@@ -2952,7 +2993,7 @@ function renderRollingPaperSection(page) {
     const status = document.createElement('p'); status.className = 'rolling-paper-status';
     status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const loadingTopics = state.topicsLoading || (!state.topicsLoaded && !state.topicError);
-    if (loadingTopics) status.textContent = '롤링페이퍼 주제를 불러오고 있어요.';
+    if (loadingTopics) { status.textContent = '롤링페이퍼 주제를 불러오고 있어요.'; status.classList.add('is-loading'); }
     else if (state.topicError) { status.textContent = state.topicError; status.classList.add('is-error'); }
     if (loadingTopics || state.topicError) section.append(status);
     const grid = document.createElement('div'); grid.className = 'rolling-paper-topic-grid';
@@ -2988,7 +3029,7 @@ function renderRollingPaperSection(page) {
       }
       const topicEditPrompt = createStreamerEditVerificationPrompt(page, `${topic.title} 롤링페이퍼 주제`);
       if (topicEditPrompt) cardActions.append(topicEditPrompt);
-      if (topic.id !== 'general' && page.isOwner && state.canManageTopics) {
+      if (topic.id !== 'general' && page.isOwner && uiCan(state.canManageTopics)) {
         const deleteTopic = document.createElement('button'); deleteTopic.type = 'button';
         deleteTopic.className = 'button rolling-paper-topic-delete'; deleteTopic.textContent = '주제 삭제';
         deleteTopic.addEventListener('click', () => deleteRollingPaperTopic(page, topic, deleteTopic));
@@ -3078,7 +3119,7 @@ function renderRollingPaperSection(page) {
 
   const status = document.createElement('p'); status.className = 'rolling-paper-status';
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-  if (state.loadingTopicId === activeTopic.id) status.textContent = '롤링페이퍼를 불러오고 있어요.';
+  if (state.loadingTopicId === activeTopic.id) { status.textContent = '롤링페이퍼를 불러오고 있어요.'; status.classList.add('is-loading'); }
   else if (state.entryError) { status.textContent = state.entryError; status.classList.add('is-error'); }
   if (state.loadingTopicId === activeTopic.id || state.entryError) section.append(status);
 
@@ -3205,7 +3246,7 @@ function renderRollingPaperStickerBoard(page, state) {
       const hiddenForViewer = hiddenStickerIds.has(sticker.id);
       if (hiddenForViewer && !state.showHiddenStickers) return;
       const item = document.createElement('div'); item.className = 'rolling-paper-sticker';
-      const canMove = state.canManageStickers && state.movingStickerId === sticker.id;
+      const canMove = uiCan(state.canManageStickers) && state.movingStickerId === sticker.id;
       const menuOpen = state.selectedStickerMenuId === sticker.id;
       item.classList.toggle('is-movable', canMove);
       item.classList.toggle('is-menu-open', menuOpen);
@@ -3217,8 +3258,8 @@ function renderRollingPaperStickerBoard(page, state) {
       const menuCenterX = liveBoardBounds ? liveBoardBounds.left + liveBoardBounds.width * sticker.x / 100 : window.innerWidth / 2;
       const menuCenterY = liveBoardBounds ? liveBoardBounds.top + liveBoardBounds.height * sticker.y / 100 : window.innerHeight / 2;
       const menuWidth = Math.max(120, Math.min(190, window.innerWidth - 28));
-      const menuActionCount = 1 + (state.canManageStickers ? 1 : 0)
-        + (state.canManageStickers || sticker.id === state.ownStickerId ? 1 : 0);
+      const menuActionCount = 1 + (uiCan(state.canManageStickers) ? 1 : 0)
+        + (uiCan(state.canManageStickers) || sticker.id === state.ownStickerId ? 1 : 0);
       const menuHeight = menuActionCount * 43 + 14;
       item.dataset.menuSide = menuCenterX + 28 + menuWidth > window.innerWidth - 8 ? 'left' : 'right';
       const menuWouldOverflowBottom = menuCenterY + 35 + menuHeight > window.innerHeight - 8;
@@ -3249,7 +3290,7 @@ function renderRollingPaperStickerBoard(page, state) {
         if (hiddenForViewer && !updated.size) state.showHiddenStickers = false;
         refreshRollingPaperSection(streamerId);
       });
-      if (state.canManageStickers) {
+      if (uiCan(state.canManageStickers)) {
         if (canMove) {
           addContextAction('이동 취소', () => cancelRollingPaperStickerMove(page, sticker.id));
         } else {
@@ -3261,7 +3302,7 @@ function renderRollingPaperStickerBoard(page, state) {
           }, true);
         }
       }
-      if (state.canManageStickers || sticker.id === state.ownStickerId) {
+      if (uiCan(state.canManageStickers) || sticker.id === state.ownStickerId) {
         addContextAction(sticker.id === state.ownStickerId ? '내 스티커 떼기' : '스티커 삭제', (button) => {
           state.selectedStickerMenuId = '';
           void deleteRollingPaperStickerFromBoard(page, sticker.id, button);
@@ -3405,7 +3446,7 @@ async function addRollingPaperStickerToBoard(page, emoji, position) {
 
 async function moveRollingPaperStickerOnBoard(page, sticker, item) {
   const state = rollingPaperStateFor(page.streamer.id);
-  if (!state.canManageStickers || (state.savingSticker && !state.stickerMovePromise)) return;
+  if (!uiCan(state.canManageStickers) || (state.savingSticker && !state.stickerMovePromise)) return;
   state.stickerMoveQueue.set(sticker.id, { x: sticker.x, y: sticker.y });
   if (state.stickerMovePromise) return state.stickerMovePromise;
 
@@ -3708,7 +3749,7 @@ async function deleteRollingPaperEntry(page, topicId, entry, button) {
 
 async function deleteRollingPaperTopic(page, topic, button) {
   const state = rollingPaperStateFor(page.streamer.id);
-  if (!page.isOwner || !state.canManageTopics || button.disabled
+  if (!page.isOwner || !uiCan(state.canManageTopics) || button.disabled
     || !window.confirm(`“${topic.title}” 주제와 그 안의 메시지를 모두 삭제할까요? 삭제 후에는 복구할 수 없어요.`)) return;
   button.disabled = true; button.textContent = '삭제 중…';
   try {
@@ -4211,7 +4252,7 @@ function renderTamagotchiApplication(page, section) {
 
   const profile = state.profile;
   const application = state.application;
-  const isOwner = page.isStreamerOwner === true;
+  const isOwner = page.isStreamerOwner === true && editUiAllowed(page);
   if (profile) {
     const approved = document.createElement('article'); approved.className = 'tamagotchi-approved-card';
     const symbol = document.createElement('span'); symbol.className = 'tamagotchi-placeholder-symbol'; symbol.setAttribute('aria-hidden', 'true'); symbol.textContent = '✦';
@@ -4446,7 +4487,11 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       optionDescription.textContent = '관리자 전용 · 현재 적용 중인 디자인';
     }
     copy.append(optionTitle, optionDescription);
-    option.append(radio, copy);
+    const thumb = document.createElement('span');
+    thumb.className = `profile-layout-thumb profile-layout-thumb-${value}`;
+    thumb.setAttribute('aria-hidden', 'true');
+    thumb.innerHTML = '<i></i><i></i><i></i>';
+    option.append(radio, thumb, copy);
     layoutOptions.append(option);
   });
   if (!canUseLayoutThree) {
@@ -4536,7 +4581,10 @@ function renderFanPage(page, options = {}) {
     ['birthday', '생일', profile.birthday], ['mbti', 'MBTI', profile.mbti],
     ['major', '전공', profile.major], ['debutDate', '데뷔', profile.debutDate],
   ];
+  // 디자인 3: 팬 화면에서는 비어 있는 프로필 칸을 숨긴다(편집 모드의 스트리머·관리자에게만 빈 칸을 보여 채우게 한다).
+  const hideEmptyProfileFields = isFanpageLayoutThree(page) && !page.isOwner;
   factRows.forEach(([field, labelText, value]) => {
+    if (hideEmptyProfileFields && !value) return;
     const row = document.createElement(canShowProfileQuickEdit ? 'button' : 'div'); row.className = 'profile-fact';
     const term = document.createElement('span'); term.textContent = labelText;
     const description = document.createElement('strong'); description.className = 'profile-field-value'; description.textContent = value || '미등록';
@@ -4558,6 +4606,7 @@ function renderFanPage(page, options = {}) {
     ['contents', '콘텐츠', Array.isArray(profile.contents) ? profile.contents.join(' · ') : ''], ['scheduleText', '방송 시간', profile.scheduleText],
   ];
   detailRows.forEach(([field, labelText, value]) => {
+    if (hideEmptyProfileFields && !value) return;
     const item = document.createElement(canShowProfileQuickEdit ? 'button' : 'div'); item.className = 'profile-detail';
     const term = document.createElement('span'); term.className = 'profile-detail-label'; term.textContent = labelText;
     const description = document.createElement('span'); description.className = 'profile-detail-value profile-field-value'; description.textContent = value || '미등록';
@@ -4737,6 +4786,8 @@ function renderFanPage(page, options = {}) {
     const description = document.createElement('p');
     description.textContent = tab.description;
     heading.append(eyebrow, title, description);
+    const editModeToggle = createFanpageEditModeToggle(page);
+    if (editModeToggle) heading.append(editModeToggle);
     const grid = document.createElement('div');
     grid.className = 'fanpage-tab-panel-grid';
     sections.filter(Boolean).forEach((sectionElement) => grid.append(sectionElement));
@@ -4825,6 +4876,14 @@ function renderFanPage(page, options = {}) {
     if (tabKey === 'memories') loadFanPageMemories(page);
     if (tabKey === 'comment-up') view.querySelector('#commentUpSection')?._load?.();
     if (tabKey === 'tamagotchi') loadTamagotchiApplication(page, tamagotchiSection);
+    // 디자인 3 모바일은 탭 바가 한 줄 가로 스크롤이므로 선택한 탭이 항상 보이도록 가운데로 맞춘다.
+    if (view.classList.contains('fanpage-layout-3') && tabNav.scrollWidth > tabNav.clientWidth + 1) {
+      const activeButton = tabButtons.get(tabKey);
+      if (activeButton) {
+        const targetLeft = activeButton.offsetLeft - (tabNav.clientWidth - activeButton.offsetWidth) / 2;
+        tabNav.scrollTo({ left: Math.max(0, targetLeft), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      }
+    }
     if (moveFocus) tabButtons.get(tabKey)?.focus();
   }
   view._selectFanPageTab = selectFanPageTab;
@@ -4837,7 +4896,7 @@ function renderFanPage(page, options = {}) {
     document.body.classList.add('fanpage-bottom-banner-active');
     view.append(bottomBanner);
   }
-  if (page.isOwner || isAdminUser) view.append(renderWeeklyScheduleDialog(page));
+  if (page.isOwner || (isAdminUser && editUiAllowed(page))) view.append(renderWeeklyScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
   fanPageQuickNavCleanup = createFanPageQuickRemote(view);
@@ -4875,7 +4934,12 @@ function renderFanPage(page, options = {}) {
     const inputMap = {};
     const bannerEditors = {};
     const grid = document.createElement('div'); grid.className = 'profile-editor-grid';
+    const editorGroupTitles = { birthday: '프로필', rouletteUrl: '링크 연결' };
     fields.forEach(([key, labelText, maxLength]) => {
+      if (editorGroupTitles[key]) {
+        const groupTitle = document.createElement('h3'); groupTitle.className = 'profile-editor-group-title'; groupTitle.textContent = editorGroupTitles[key];
+        grid.append(groupTitle);
+      }
       const wrapper = document.createElement('label'); wrapper.className = 'profile-editor-field'; wrapper.textContent = labelText;
       const input = key === 'scheduleText' ? document.createElement('textarea') : document.createElement('input');
       input.name = key; input.maxLength = maxLength;
@@ -4928,7 +4992,8 @@ function renderFanPage(page, options = {}) {
     bannerEditors.bottomBannerImageUrls = createBannerSettingsEditor(
       'bottomBannerImageUrls', '하단 배너 이미지', profile.bottomBannerImageUrls || [], { layoutSelect: bottomBannerLayout },
     );
-    grid.append(bannerEditors.topBannerImageUrls.element, bottomBannerLayoutField, bannerEditors.bottomBannerImageUrls.element);
+    const bannerGroupTitle = document.createElement('h3'); bannerGroupTitle.className = 'profile-editor-group-title'; bannerGroupTitle.textContent = '배너';
+    grid.append(bannerGroupTitle, bannerEditors.topBannerImageUrls.element, bottomBannerLayoutField, bannerEditors.bottomBannerImageUrls.element);
     const introLabel = document.createElement('label'); introLabel.className = 'profile-editor-field profile-editor-wide'; introLabel.textContent = 'ABOUT 문구';
     const introInput = document.createElement('textarea'); introInput.name = 'intro'; introInput.maxLength = 700; introInput.value = page.intro || '';
     introLabel.append(introInput); grid.append(introLabel);
@@ -5124,7 +5189,7 @@ function createFanPageQuickRemote(view) {
         stickerState.stickerPlacing = false; stickerState.selectedStickerEmoji = '';
         stickerState.stickerActionMenuOpen = false; refreshRollingPaperSection(currentPage.streamer.id);
       });
-    } else if (stickerState.movingStickerId && stickerState.canManageStickers) {
+    } else if (stickerState.movingStickerId && uiCan(stickerState.canManageStickers)) {
       addNote('노란 테두리 스티커를 드래그해 위치를 옮기세요.');
       addAction('이동 취소', () => cancelRollingPaperStickerMove(currentPage, stickerState.movingStickerId));
     } else {
@@ -5323,11 +5388,11 @@ function createFanPageQuickRemote(view) {
       control.style.setProperty('display', 'grid', 'important');
       control.style.setProperty('visibility', 'visible', 'important');
       control.style.setProperty('opacity', '1', 'important');
-      control.style.setProperty('width', '58px', 'important');
-      control.style.setProperty('height', '58px', 'important');
-      control.style.setProperty('min-width', '58px', 'important');
-      control.style.setProperty('min-height', '58px', 'important');
-      control.style.setProperty('flex', '0 0 58px', 'important');
+      control.style.setProperty('width', '44px', 'important');
+      control.style.setProperty('height', '44px', 'important');
+      control.style.setProperty('min-width', '44px', 'important');
+      control.style.setProperty('min-height', '44px', 'important');
+      control.style.setProperty('flex', '0 0 44px', 'important');
       control.style.setProperty('place-items', 'center', 'important');
       control.style.setProperty('padding', '0', 'important');
       control.style.setProperty('border', '0', 'important');
@@ -6619,6 +6684,7 @@ function renderYouTubeSection(page) {
   if (!videos.length) {
     const empty = document.createElement('p'); empty.className = 'youtube-empty-state';
     empty.textContent = state.hasLoaded ? '아직 공개된 YouTube 영상이 없어요.' : '최신 영상을 불러오고 있어요.';
+    if (!state.hasLoaded) empty.classList.add('is-loading');
     section.append(empty);
     return section;
   }
@@ -6695,7 +6761,7 @@ function renderSongbookSection(page) {
   if (!entries.length) {
     const empty = document.createElement('p'); empty.className = 'songbook-empty-state';
     if (!state.songbookLoaded) {
-      if (state.songbookLoading) empty.textContent = '노래 목록을 불러오고 있어요.';
+      if (state.songbookLoading) { empty.textContent = '노래 목록을 불러오고 있어요.'; empty.classList.add('is-loading'); }
       else if (state.songbookError) {
         empty.textContent = state.songbookError;
         const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button songbook-retry-button';
@@ -7025,7 +7091,7 @@ function renderPlayedGamesSection(page) {
   if (!games.length) {
     const empty = document.createElement('p'); empty.className = 'played-games-empty-state';
     if (!state.playedGamesLoaded) {
-      if (state.playedGamesLoading) empty.textContent = '플레이한 게임 목록을 불러오고 있어요.';
+      if (state.playedGamesLoading) { empty.textContent = '플레이한 게임 목록을 불러오고 있어요.'; empty.classList.add('is-loading'); }
       else if (state.playedGamesError) {
         empty.textContent = state.playedGamesError;
         const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button played-games-retry-button';
@@ -7400,7 +7466,7 @@ function renderCommentUpSection(page) {
     if (loading) return; loading = true; status.textContent = '게시글을 불러오고 있어요.';
     try {
       const result = (await callCommentUp({ action: 'list', streamerId: page.streamer.id })).data;
-      form.hidden = !result.canManage; list.replaceChildren();
+      form.hidden = !uiCan(result.canManage); list.replaceChildren();
       const entries = Array.isArray(result.entries) ? result.entries : [];
       status.textContent = entries.length ? '' : '등록된 게시글이 없어요.';
       for (const entry of entries) {
@@ -7424,7 +7490,7 @@ function renderCommentUpSection(page) {
           finally { check.disabled = false; }
         });
         card.append(link, check, resultText);
-        if (result.canManage) {
+        if (uiCan(result.canManage)) {
           const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button'; remove.textContent = '삭제';
           remove.addEventListener('click', async () => {
             if (!window.confirm('이 게시글을 목록에서 삭제할까요?')) return;
@@ -7497,7 +7563,7 @@ function renderMemoriesSection(page) {
   if (!memories.length) {
     const empty = document.createElement('p'); empty.className = 'memory-moments-empty';
     if (!state.loaded) {
-      if (state.loading) empty.textContent = '기억의 순간을 불러오고 있어요.';
+      if (state.loading) { empty.textContent = '기억의 순간을 불러오고 있어요.'; empty.classList.add('is-loading'); }
       else if (state.error) {
         empty.textContent = state.error;
         const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button memory-moments-retry-button';
@@ -7765,7 +7831,7 @@ function openVideoLibraryAddDialog(page) {
       addOption('category', '▦', '카테고리', '영상을 주제별로 나눌 새 카테고리');
       addOption('video', '▶', '영상', editableCategories.length ? 'YouTube 또는 SOOP 다시보기 링크' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
       addOption('flashgame', '✦', '플래시게임', editableCategories.length ? '게임 페이지 제목과 썸네일을 자동으로 등록' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
-      if (state.isAdmin) addOption('channel', '▣', 'YouTube 채널', editableCategories.length ? '채널의 전체 공개 영상 가져오기' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
+      if (uiCan(state.isAdmin)) addOption('channel', '▣', 'YouTube 채널', editableCategories.length ? '채널의 전체 공개 영상 가져오기' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
       card.append(options);
       if (!editableCategories.length) {
         const hint = document.createElement('p'); hint.className = 'video-library-add-dialog-hint';
@@ -7834,7 +7900,7 @@ function openVideoLibraryAddDialog(page) {
       });
       card.append(form);
       if (!state.saving) url.focus({ preventScroll: true });
-    } else if (mode === 'channel' && state.isAdmin) {
+    } else if (mode === 'channel' && uiCan(state.isAdmin)) {
       const form = document.createElement('form'); form.className = 'video-library-add-dialog-form';
       const categoryLabel = document.createElement('label'); categoryLabel.className = 'video-library-add-dialog-field'; categoryLabel.textContent = '추가할 카테고리';
       const category = videoLibraryCategorySelect(editableCategories, editableCategories.some((item) => item.id === state.categoryId)
@@ -7909,7 +7975,7 @@ function renderVideoLibrarySection(page) {
   count.textContent = `${state.items.length.toLocaleString('ko-KR')}개 표시`;
   copy.append(count);
   const headingActions = document.createElement('div'); headingActions.className = 'video-library-heading-actions';
-  if (state.isAdmin) {
+  if (uiCan(state.isAdmin)) {
     const add = document.createElement('button'); add.type = 'button'; add.className = 'button button-primary video-library-add-open';
     add.textContent = '＋ 추가하기'; add.disabled = state.saving || state.loading;
     add.addEventListener('click', () => openVideoLibraryAddDialog(page));
@@ -7920,7 +7986,7 @@ function renderVideoLibrarySection(page) {
   refresh.textContent = state.loading ? '불러오는 중…' : '↻ 새로고침';
   refresh.addEventListener('click', () => loadVideoLibrary(page, { refresh: true }));
   headingActions.append(refresh);
-  if (state.isAdmin) {
+  if (uiCan(state.isAdmin)) {
     const cinetyRefresh = document.createElement('button'); cinetyRefresh.type = 'button';
     cinetyRefresh.className = 'button video-library-cinety-refresh';
     cinetyRefresh.disabled = state.loading || state.saving;
@@ -7947,7 +8013,7 @@ function renderVideoLibrarySection(page) {
   section.append(categoryBar);
 
   const selectedCategory = state.categories.find((category) => category.id === state.categoryId);
-  if (state.isAdmin && selectedCategory && selectedCategory.sourceType !== 'cinety') {
+  if (uiCan(state.isAdmin) && selectedCategory && selectedCategory.sourceType !== 'cinety') {
     const categoryTools = document.createElement('div'); categoryTools.className = 'video-library-category-tools';
     const editorContent = document.createElement('div'); editorContent.className = 'video-library-category-editor';
     editorContent.id = 'videoLibraryCategoryEditor';
@@ -8011,7 +8077,7 @@ function renderVideoLibrarySection(page) {
     section.append(categoryTools);
   }
 
-  if (state.isAdmin && state.channels.length) {
+  if (uiCan(state.isAdmin) && state.channels.length) {
     const admin = document.createElement('details'); admin.className = 'video-library-admin-tools';
     const summary = document.createElement('summary'); summary.textContent = '관리자 · 등록 채널 관리';
     admin.append(summary);
@@ -8118,7 +8184,7 @@ function renderVideoLibrarySection(page) {
       ? '첫 영상을 가져오고 있어요. 잠시 후 목록에 표시됩니다.'
       : state.isSyncing
         ? '채널 영상을 가져오고 있어요. 새로고침하면 추가된 영상을 확인할 수 있습니다.'
-        : state.isAdmin && !state.categories.length
+        : uiCan(state.isAdmin) && !state.categories.length
           ? '먼저 하위 카테고리를 추가해 주세요.' : '아직 등록된 영상이 없어요.';
     section.append(empty);
   }
@@ -8202,7 +8268,7 @@ function renderVideoLibraryItems(page, section, state) {
         ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }).format(published)
         : '날짜 정보 없음';
     body.append(source, name, meta); card.append(play, body);
-    if (state.isAdmin && item.sourceType === 'manual') {
+    if (uiCan(state.isAdmin) && item.sourceType === 'manual') {
       const actions = document.createElement('div'); actions.className = 'video-library-card-actions';
       const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'button'; edit.textContent = state.editingId === item.id ? '편집 닫기' : '편집';
       edit.addEventListener('click', () => { state.editingId = state.editingId === item.id ? '' : item.id; refreshVideoLibrarySection(page.streamer.id); });
@@ -8298,7 +8364,7 @@ async function loadVideoLibrary(page, options = {}) {
       refreshVideoLibrarySection(page.streamer.id, { preserveSearchFocus: true });
       clearTimeout(state.syncTimer);
       const view = $('fanPageView');
-      if ((state.isAdmin && state.channels.some((channel) => channel.syncStatus === 'syncing')
+      if ((uiCan(state.isAdmin) && state.channels.some((channel) => channel.syncStatus === 'syncing')
         || state.isInitialImporting) && !state.searchMode
         && view?.dataset.fanpageActiveTab === 'video-library') {
         state.syncTimer = window.setTimeout(() => loadVideoLibrary(page, { refresh: true }), 6500);
@@ -9031,7 +9097,7 @@ async function loadWeeklySchedulePageData(page, weekStart, board, options = {}) 
 
 function renderCalendarSection(page) {
   const state = weeklyScheduleGraphicStateFor(page.streamer.id);
-  const canManage = page.isOwner || isAdminUser;
+  const canManage = page.isOwner || (isAdminUser && editUiAllowed(page));
   const mobileScheduleMedia = window.matchMedia('(max-width: 720px)');
   const section = document.createElement('section');
   section.className = 'weekly-schedule-board content-card'; section.id = 'calendarSection';
@@ -9121,7 +9187,11 @@ function renderCalendarSection(page) {
       days.forEach((weekday, index) => {
         const row = document.createElement('article'); row.className = 'weekly-schedule-mobile-day';
         const date = new Date(weekStart); date.setDate(date.getDate() + index);
-        const label = document.createElement('strong'); label.textContent = `${date.getMonth() + 1}월 ${date.getDate()}일 ${weekday}`;
+        const label = document.createElement('strong');
+        const fullDayLabel = `${date.getMonth() + 1}월 ${date.getDate()}일 ${weekday}`;
+        // 디자인 3: 요일 라벨을 한 줄로 고정하려고 "11/9 월" 형태로 줄인다(스크린리더에는 전체 날짜를 읽어 준다).
+        if (isFanpageLayoutThree(currentPage)) { label.textContent = `${date.getMonth() + 1}/${date.getDate()} ${String(weekday).charAt(0)}`; label.setAttribute('aria-label', fullDayLabel); }
+        else label.textContent = fullDayLabel;
         const details = document.createElement('p');
         const entry = state.entries[index] || {}; const linked = state.linkedEvents[index] || [];
         const lines = [];
@@ -9131,6 +9201,7 @@ function renderCalendarSection(page) {
           linked.forEach((event) => lines.push(`${event.time ? `${event.time} ` : ''}${event.title || event.typeName || '방송 일정'}`));
         }
         details.textContent = lines.length ? lines.join(' / ') : '등록된 일정 없음';
+        if (!lines.length) row.classList.add('is-empty');
         row.append(label, details); mobileList.append(row);
       });
       const savedAvatarUrl = state.selectedImage?.thumbUrl || state.savedAvatar?.thumbUrl
@@ -9222,7 +9293,7 @@ function installWeeklySparkleEffect(root) {
 
 function renderWeeklyScheduleViewDialog(page, board) {
   const state = weeklyScheduleGraphicStateFor(page.streamer.id);
-  const canManage = page.isOwner === true || page.isStreamerOwner === true || isAdminUser;
+  const canManage = editUiAllowed(page) && (page.isOwner === true || page.isStreamerOwner === true || isAdminUser);
   const dialog = document.createElement('dialog'); dialog.className = `account-dialog weekly-schedule-view-dialog${canManage ? '' : ' weekly-schedule-view-public'}`;
   dialog.setAttribute('aria-label', '주간 방송표');
   const card = document.createElement('section'); card.className = 'account-dialog-card weekly-schedule-view-card';
@@ -11056,7 +11127,7 @@ async function loadApp() {
       const page = result.page;
       page.isStreamerOwner = !!(result.verifiedStreamer && result.verifiedStreamer.id === page.streamer.id);
       // 관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
-      page.isOwner = page.isStreamerOwner || result.isAdmin === true;
+      installPageOwnership(page, page.isStreamerOwner || result.isAdmin === true);
       setVisibleView(page);
       openTamagotchiAdminFromDeepLink();
       recentPromise.then((recent) => {
@@ -11083,7 +11154,7 @@ async function loadApp() {
           const wasStreamerOwner = currentPage.isStreamerOwner;
           currentPage.isStreamerOwner = !!(authenticated.verifiedStreamer
             && authenticated.verifiedStreamer.id === currentPage.streamer.id);
-          currentPage.isOwner = currentPage.isStreamerOwner || authenticated.isAdmin === true;
+          installPageOwnership(currentPage, currentPage.isStreamerOwner || authenticated.isAdmin === true);
           if (wasOwner !== currentPage.isOwner || wasStreamerOwner !== currentPage.isStreamerOwner) {
             renderFanPage(currentPage);
           }

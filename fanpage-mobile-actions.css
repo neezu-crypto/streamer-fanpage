@@ -9,18 +9,21 @@
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote.fan-quick-mobile-illustrated {
     position: fixed !important;
     z-index: 80 !important;
-    right: calc(8px + env(safe-area-inset-right)) !important;
-    top: 50% !important;
+    /* 본문 글자를 가리지 않도록 화면 가운데 오른쪽이 아니라 아래쪽 줄로 옮긴다.
+       오른쪽 끝에는 감정표현 버튼(약 124px)이 있으므로 그 왼쪽에 붙인다. */
+    right: calc(140px + env(safe-area-inset-right)) !important;
+    top: auto !important;
+    bottom: calc(10px + env(safe-area-inset-bottom)) !important;
     display: flex !important;
     overflow: visible !important;
-    transform: translateY(-50%) !important;
+    transform: none !important;
   }
 
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-remote.fan-quick-mobile-illustrated .fan-quick-mobile-actions {
     display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-end !important;
-    gap: 7px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
     overflow: visible !important;
     visibility: visible !important;
     opacity: 1 !important;
@@ -30,11 +33,11 @@
     display: grid !important;
     visibility: visible !important;
     opacity: 1 !important;
-    width: 58px !important;
-    height: 58px !important;
-    min-width: 58px !important;
-    min-height: 58px !important;
-    flex: 0 0 58px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    flex: 0 0 44px !important;
     place-items: center !important;
     padding: 0 !important;
     border: 0 !important;
