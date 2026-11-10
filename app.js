@@ -742,12 +742,25 @@ function showToast(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
 }
+// SOOP 프로필 이미지는 계정에 따라 stimg 주소가 404인 경우가 있어, 같은 경로의 profile.img 주소를 먼저 시도하고 실패하면 stimg로 대체한다.
+const SOOP_LOGO_URL_RE = /^https:\/\/(?:stimg|profile\.img)\.sooplive\.com(\/LOGO\/[A-Za-z0-9]{2}\/[A-Za-z0-9]+\/[A-Za-z0-9]+\.jpg)$/;
+function avatarUrlCandidates(url) {
+  const raw = String(url || '');
+  const match = SOOP_LOGO_URL_RE.exec(raw);
+  if (!match) return raw ? [raw] : [];
+  return [`https://profile.img.sooplive.com${match[1]}`, `https://stimg.sooplive.com${match[1]}`];
+}
 function setImage(img, url, nickname) {
   img.loading = 'lazy';
   img.referrerPolicy = 'no-referrer';
-  img.src = url || '';
+  const queue = avatarUrlCandidates(url);
   img.alt = `${nickname} 프로필`;
-  img.addEventListener('error', () => { img.src = ''; img.classList.add('avatar-fallback'); }, { once: true });
+  img.addEventListener('error', () => {
+    if (queue.length) { img.src = queue.shift(); return; }
+    img.removeAttribute('src');
+    img.classList.add('avatar-fallback');
+  });
+  img.src = queue.length ? queue.shift() : '';
 }
 function streamerCard(streamer, recent = false) {
   const button = document.createElement('button');
@@ -11147,10 +11160,7 @@ function selectVerifyStreamer(item) {
   $('verificationSelectedName').textContent = item.nickname;
   $('verificationSelectedId').textContent = ` · ${item.soopId}`;
   const avatar = $('verificationSelectedAvatar');
-  const selectedAvatarUrl = verifyAvatarUrl(item);
-  avatar.hidden = !selectedAvatarUrl;
-  avatar.onerror = () => { avatar.hidden = true; };
-  if (selectedAvatarUrl) avatar.src = selectedAvatarUrl;
+  applyVerifyAvatar(avatar, item);
   $('verificationSearchStep').hidden = true;
   $('verificationManualFields').hidden = true;
   $('verificationSelected').hidden = false;
@@ -11160,11 +11170,24 @@ function selectVerifyStreamer(item) {
   $('submitStreamerVerification').focus({ preventScroll: true });
 }
 const VERIFY_AVATAR_PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#475569"/><circle cx="18" cy="14" r="6" fill="#cbd5e1"/><path d="M6 32c2-7 8-9 12-9s10 2 12 9z" fill="#cbd5e1"/></svg>');
-// 서버가 avatarUrl을 비워 보내도 SOOP 프로필 이미지 규칙으로 미리보기를 만든다.
-function verifyAvatarUrl(item) {
-  if (item.avatarUrl) return item.avatarUrl;
+// 인증 모달 미리보기: 서버가 avatarUrl을 비워 보내도 SOOP 프로필 이미지 규칙으로 후보 주소를 만들고, 실패하면 차례로 대체한다.
+function verifyAvatarCandidates(item) {
   const id = String(item.soopId || '').toLowerCase();
-  return /^[a-z0-9]{2,20}$/.test(id) ? `https://stimg.sooplive.com/LOGO/${id.slice(0, 2)}/${id}/${id}.jpg` : '';
+  const urls = /^[a-z0-9]{2,20}$/.test(id)
+    ? avatarUrlCandidates(`https://stimg.sooplive.com/LOGO/${id.slice(0, 2)}/${id}/${id}.jpg`)
+    : [];
+  if (item.avatarUrl && !urls.includes(item.avatarUrl)) urls.push(item.avatarUrl);
+  return urls;
+}
+function applyVerifyAvatar(img, item) {
+  const queue = verifyAvatarCandidates(item);
+  img.hidden = false;
+  img.onerror = () => {
+    if (queue.length) { img.src = queue.shift(); return; }
+    img.onerror = null;
+    img.src = VERIFY_AVATAR_PLACEHOLDER;
+  };
+  img.src = queue.length ? queue.shift() : VERIFY_AVATAR_PLACEHOLDER;
 }
 function renderVerifyResults(streamers) {
   const list = $('verificationSearchResults');
@@ -11180,10 +11203,8 @@ function renderVerifyResults(streamers) {
     avatar.width = 36; avatar.height = 36;
     avatar.loading = 'lazy';
     avatar.referrerPolicy = 'no-referrer';
-    const avatarUrl = verifyAvatarUrl(item);
-    // 이미지가 없는 계정도 목록 정렬이 흐트러지지 않도록 기본 아이콘으로 대체한다.
-    avatar.onerror = () => { avatar.onerror = null; avatar.src = VERIFY_AVATAR_PLACEHOLDER; };
-    avatar.src = avatarUrl || VERIFY_AVATAR_PLACEHOLDER;
+    // 이미지가 없는 계정도 목록 정렬이 흐트러지지 않도록 후보 주소를 차례로 시도한 뒤 기본 아이콘으로 대체한다.
+    applyVerifyAvatar(avatar, item);
     const text = document.createElement('span'); text.className = 'verification-search-text';
     const strong = document.createElement('strong'); strong.textContent = item.nickname;
     const id = document.createElement('span'); id.textContent = item.soopId;
