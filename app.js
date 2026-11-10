@@ -5072,6 +5072,7 @@ function createFanPageQuickRemote(view) {
     ['ogq-section', 'OGQ 이모티콘'], ['cafe-section', '네이버 카페'],
     ['calendar-section', '주간일정표'], ['weekly-schedule-board', '주간일정표'], ['fan-gallery-section', '팬 갤러리'],
     ['video-library-section', '즐겨찾기'],
+    ['comment-up-section', '댓글 UP 체크'], ['affiliate-promo-card', '제휴 상품'],
     ['fan-banner-bottom', '하단 배너'],
   ];
   const candidates = [...view.children].flatMap((element) => {
@@ -5093,7 +5094,9 @@ function createFanPageQuickRemote(view) {
       const label = index === 0 ? '메인'
         : sectionLabels.find(([className]) => element.classList.contains(className))?.[1]
         || element.querySelector('h1, h2, h3')?.textContent.trim().replace(/\s+/g, ' ').slice(0, 18)
-        || `영역 ${index + 1}`;
+        // 제목이 없는 섹션은 소속 탭 이름(명사)을 쓴다. 번호 이름("영역 N")은 쓰지 않는다.
+        || element.closest('.fanpage-tab-panel')?.querySelector('.fanpage-tab-panel-heading h2')?.textContent.trim()
+        || '기타 항목';
       if (!element.id) element.id = `fanpage-quick-section-${index + 1}`;
       return { id: element.id, label };
     });
