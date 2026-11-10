@@ -961,8 +961,12 @@ function renderAdminDesignUsage(streamers) {
       const empty = document.createElement('small'); empty.className = 'admin-design-usage-empty'; empty.textContent = '적용한 스트리머가 없어요.';
       chips.append(empty);
     }
-    members.forEach((streamer) => {
+    const COLLAPSED_COUNT = 12;
+    let expanded = members.length <= COLLAPSED_COUNT;
+    const chipElements = [];
+    members.forEach((streamer, memberIndex) => {
       const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'admin-design-usage-chip';
+      chipElements.push(chip);
       chip.textContent = streamer.layoutDesignSaved ? streamer.nickname : `${streamer.nickname} (기본)`;
       chip.setAttribute('aria-label', `${streamer.nickname} 팬페이지 열기`);
       chip.addEventListener('click', () => {
@@ -971,7 +975,19 @@ function renderAdminDesignUsage(streamers) {
       });
       chips.append(chip);
     });
-    card.append(chips); grid.append(card);
+    card.append(chips);
+    if (members.length > COLLAPSED_COUNT) {
+      // 인원이 많은 디자인(기본값 사용자 다수)은 12명만 먼저 보여 주고 나머지는 펼쳐서 본다.
+      const more = document.createElement('button'); more.type = 'button'; more.className = 'admin-design-usage-more';
+      const sync = () => {
+        chipElements.forEach((chip, index) => { chip.hidden = !expanded && index >= COLLAPSED_COUNT; });
+        more.textContent = expanded ? '접기' : `나머지 ${formatStatCount(members.length - COLLAPSED_COUNT)}명 보기`;
+        more.setAttribute('aria-expanded', String(expanded));
+      };
+      more.addEventListener('click', () => { expanded = !expanded; sync(); });
+      sync(); card.append(more);
+    }
+    grid.append(card);
   });
   section.append(grid);
   const unknown = list.filter((streamer) => streamer.layoutDesign == null).length;
