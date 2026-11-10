@@ -4720,6 +4720,14 @@ body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-s
   }
 }
 
+/* 디자인 3 공용 색 토큰(값은 그대로, 이름만 부여). 새 규칙은 하드코딩 색 대신 이 토큰을 쓴다. */
+body.fanpage-layout-three-active {
+  --d3-muted-strong: #665d5b;
+  --d3-rose: #b13a63;
+  --d3-up: #c0262d;
+  --d3-down: #1f5fbf;
+  --d3-paper-warm: #fff8ed;
+}
 /* ===== 디자인 3 모바일 개선 1단계 (2026-11-11) =====
    범위: 폭 720px 이하의 디자인 3(`fanpage-layout-three-active` + `fanpage-layout-3`)만.
    디자인 1·2와 데스크톱에는 영향을 주지 않는다. 앞쪽 규칙이 !important로 겹겹이 쌓여 있어
@@ -4776,14 +4784,14 @@ body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-s
 
 /* ===== 디자인 3 개선 2단계: 글자 크기·대비·눌림 영역 (2026-11-11) =====
    디자인 3(`fanpage-layout-three-active` + `fanpage-layout-3`)만. 색은 모든 폭에서, 크기·눌림 영역은 모바일(720px 이하)에서 조정한다. */
-/* 대비: 크림 바탕 위에서 4.5:1에 못 미치던 연한 보조 글자 색을 --doodle-muted(#665d5b) 계열로 통일한다. */
+/* 대비: 크림 바탕 위에서 4.5:1에 못 미치던 연한 보조 글자 색을 --doodle-muted(var(--d3-muted-strong)) 계열로 통일한다. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(
   .profile-stock-meta, .upbo-request-empty-hint, .competition-history-count, .video-library-count,
   .rolling-paper-count, .fan-gallery-count, .vod-count, .live-status-detail, .live-subtitle
-) { color: #665d5b !important; }
-body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .video-library-source { color: #b13a63 !important; }
-body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-change.is-up { color: #c0262d !important; }
-body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-change.is-down { color: #1f5fbf !important; }
+) { color: var(--d3-muted-strong) !important; }
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .video-library-source { color: var(--d3-rose) !important; }
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-change.is-up { color: var(--d3-up) !important; }
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-change.is-down { color: var(--d3-down) !important; }
 
 @media (max-width: 720px) {
   /* 보조 글자는 12px 이상, 영문 장식 라벨(eyebrow)은 11px 이상 */
@@ -4829,7 +4837,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-edit-mod
   margin-top: 10px; min-height: 44px; font-size: 13px; font-weight: 800;
 }
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-edit-mode-toggle[aria-pressed="true"] {
-  background: #b13a63; color: #fff; border-color: #b13a63;
+  background: var(--d3-rose); color: #fff; border-color: var(--d3-rose);
 }
 @media (min-width: 721px) {
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-edit-mode-toggle {
@@ -4853,7 +4861,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .streamer-edit-ve
   padding: 22px 16px;
   border: 2px dashed var(--doodle-ink);
   border-radius: 14px;
-  background: #fff8ed;
+  background: var(--d3-paper-warm);
   color: var(--doodle-muted);
   font-size: 14px;
   line-height: 1.6;
@@ -4898,7 +4906,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .streamer-edit-ve
 /* 6단계: 디자인 3 로딩 스켈레톤 — 불러오는 중 문구 상자에 종이 카드 윤곽 + 반짝임(디자인 3에서만) */
 #fanPageView.fanpage-layout-3 .is-loading:is(.upbo-status, .rolling-paper-status, .youtube-empty-state, .songbook-empty-state, .played-games-empty-state, .memory-moments-empty) {
   position: relative; overflow: hidden; min-height: 96px; display: flex; align-items: center; justify-content: center;
-  border: 2px dashed var(--doodle-ink); border-radius: 14px; background: #fff8ed; color: var(--doodle-muted);
+  border: 2px dashed var(--doodle-ink); border-radius: 14px; background: var(--d3-paper-warm); color: var(--doodle-muted);
 }
 #fanPageView.fanpage-layout-3 .is-loading:is(.upbo-status, .rolling-paper-status, .youtube-empty-state, .songbook-empty-state, .played-games-empty-state, .memory-moments-empty)::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
@@ -4947,4 +4955,4 @@ body.fanpage-layout-three-active .profile-layout-thumb i { display: block; borde
 body.fanpage-layout-three-active .profile-layout-thumb i:first-child { opacity: .9; }
 body.fanpage-layout-three-active .profile-layout-thumb-1 { background: #fff0f6; color: #e98ab0; }
 body.fanpage-layout-three-active .profile-layout-thumb-2 { background: #1b1924; color: #f58cac; }
-body.fanpage-layout-three-active .profile-layout-thumb-3 { background: #fff8ed; color: #e8745f; border-style: dashed; }
+body.fanpage-layout-three-active .profile-layout-thumb-3 { background: var(--d3-paper-warm); color: #e8745f; border-style: dashed; }
