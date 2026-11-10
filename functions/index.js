@@ -6,6 +6,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getDatabase, getDatabaseWithUrl, ServerValue } = require('firebase-admin/database');
 const { isSuppressedSoopSearchQuery, isSuppressedSoopSearchResult } = require('./soopSearchSuppression');
 const { normalizeVerifySearchQuery, shapeVerifySearchResults, createVerifySearchLimiter } = require('./verification-search');
+const { isServicePaused } = require('./service-pause');
 const { getFunctions: getAdminFunctions } = require('firebase-admin/functions');
 const { getStorage } = require('firebase-admin/storage');
 const { HttpsError, onCall, onRequest } = require('firebase-functions/v2/https');
@@ -7624,6 +7625,8 @@ exports.streamerFanPageVideoLibrarySyncRecovery = onSchedule({
 exports.streamerFanPageVideoLibraryIncrementalSync = onSchedule({
   schedule: 'every 72 hours', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
 }, async () => {
+  // 서비스 일시정지 중에는 외부 목록 갱신과 영상 동기화를 시작하지 않는다(기본 상태: 정상 운영). 이미 진행 중인 동기화·복구 작업은 그대로 끝낸다.
+  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
   try { await syncCinetyCatalogs(); }
   catch (error) { console.warn('Could not refresh Cinety catalogs:', error.message || error); }
   const snapshot = await videoLibraryRef('channels').get();
@@ -7638,6 +7641,7 @@ exports.streamerFanPageVideoLibraryIncrementalSync = onSchedule({
 exports.streamerFanPageVideoLibraryFullSync = onSchedule({
   schedule: 'every sunday 03:00', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
 }, async () => {
+  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
   const snapshot = await videoLibraryRef('channels').get();
   const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
   const dueBefore = Date.now() - 6 * 24 * 60 * 60 * 1000;
