@@ -29,9 +29,9 @@
   <link rel="preload" as="image" href="assets/fanpage-kawaii/cat-paw-close.svg" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/GowunDodum-Regular.woff2?v=20261024-korean-fonts" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/Jua-Regular.woff2?v=20261024-korean-fonts" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css?v=20261110-verify-avatar">
-  <link rel="stylesheet" href="fanpage-layouts.css?v=20261111-d3-s11">
-  <link rel="stylesheet" href="fanpage-mobile-actions.css?v=20261111-d3-s11">
+  <link rel="stylesheet" href="style.css?v=20261111-design-usage">
+  <link rel="stylesheet" href="fanpage-layouts.css?v=20261111-design-usage">
+  <link rel="stylesheet" href="fanpage-mobile-actions.css?v=20261111-design-usage">
 </head>
 <body>
   <div class="startup-cover" id="startupCover" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
@@ -241,6 +241,7 @@
         <button class="button" id="refreshAdminStats" type="button">↻ 스냅샷 다시 불러오기</button>
       </div>
       <p class="admin-stats-status" id="adminStatsStatus" role="status" aria-live="polite">관리자 통계를 불러옵니다.</p>
+      <section class="admin-design-usage" id="adminDesignUsage" aria-labelledby="adminDesignUsageTitle"></section>
       <div class="admin-stats-list-heading"><strong>스트리머별 집계</strong><span id="adminStatsStreamerCount"></span></div>
       <div class="admin-stats-list" id="adminStatsList"></div>
       <p class="admin-stats-note">관리자와 해당 스트리머 본인의 열람은 제외합니다. 날짜별 순방문 수는 합계로 표시하며 방문자별 식별 정보는 통계 화면에 표시하지 않습니다.</p>
@@ -310,7 +311,7 @@
     </section>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261111-d3-s11"></script>
+  <script type="module" src="app.js?v=20261111-design-usage"></script>
   <script type="module" src="https://neezu-crypto.github.io/streamer-game-series-shop/game-series-emotes.js?game=streamerFanPage&amp;v=20261028-emote-modal-bottom-right"></script>
 </body>
 </html>

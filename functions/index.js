@@ -99,6 +99,7 @@ const {
   isAdminStatsSnapshotStale,
   validateAdminStatsSnapshot,
 } = require('./admin-stats-snapshot');
+const { attachLayoutDesigns } = require('./design-usage');
 const {
   CINETY_CATEGORY_DEFINITIONS,
   isCinetyCategoryId,
@@ -5842,7 +5843,13 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
   if (!await isAdminUid(uid)) {
     throw new HttpsError('permission-denied', '관리자만 팬페이지 통계를 볼 수 있습니다.');
   }
-  return readPrivateAdminStatsSnapshot();
+  const snapshot = await readPrivateAdminStatsSnapshot();
+  // 디자인별 적용 스트리머 카드용: 인증 스트리머마다 저장된 layoutDesign만 읽어 붙인다(관리자 전용 응답, UID 없음).
+  const streamers = await attachLayoutDesigns(
+    snapshot.streamers,
+    async (streamerId) => (await pageRef(streamerId).child('profile/layoutDesign').get()).val(),
+  );
+  return { ...snapshot, streamers };
 });
 
 exports.streamerFanPageDesignFeedback = onCall({ maxInstances: 10 }, async (request) => {

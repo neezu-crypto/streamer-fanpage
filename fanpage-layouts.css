@@ -4956,3 +4956,12 @@ body.fanpage-layout-three-active .profile-layout-thumb i:first-child { opacity: 
 body.fanpage-layout-three-active .profile-layout-thumb-1 { background: #fff0f6; color: #e98ab0; }
 body.fanpage-layout-three-active .profile-layout-thumb-2 { background: #1b1924; color: #f58cac; }
 body.fanpage-layout-three-active .profile-layout-thumb-3 { background: var(--d3-paper-warm); color: #e8745f; border-style: dashed; }
+
+/* 관리자 통계: 디자인별 적용 스트리머 카드 — 밝은 팝업(디자인 1·3)에서 읽히도록 색을 맞춘다 */
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-usage-card { border-color: #e8deea; background: #fffafd; color: #51465d; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog :is(.admin-design-usage-heading span, .admin-design-usage-card > small, .admin-design-usage-empty) { color: #6f6479; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-usage-chip { border-color: #e8deea; color: #51465d; }
+body.fanpage-layout-three-active .account-dialog .admin-design-usage-card { border: 2px solid var(--doodle-ink, #2f2a2c); background: var(--d3-paper-warm); color: #2f2a2c; }
+body.fanpage-layout-three-active .account-dialog :is(.admin-design-usage-heading span, .admin-design-usage-card > small, .admin-design-usage-empty) { color: var(--d3-muted-strong); }
+body.fanpage-layout-three-active .account-dialog .admin-design-usage-chip { border: 2px solid #2f2a2c; color: #2f2a2c; }
+body.fanpage-layout-three-active .account-dialog .admin-design-usage-warning, body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-usage-warning { color: #8a4b00; }

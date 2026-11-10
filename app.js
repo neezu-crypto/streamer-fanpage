@@ -933,6 +933,54 @@ function renderAdminStatsList(streamers) {
     container.append(card);
   }
 }
+const ADMIN_DESIGN_USAGE_ROWS = [
+  [1, '디자인 1 · 파스텔 만화풍', ''],
+  [2, '디자인 2 · 기존 팬페이지', ''],
+  [3, '디자인 3 · 손그림 스티커북', '관리자 전용 · 미공개'],
+];
+// 디자인별 적용 스트리머 카드. 저장된 값이 없는 스트리머는 기본 디자인(1)으로 세되 "기본"으로 표시한다.
+function renderAdminDesignUsage(streamers) {
+  const section = $('adminDesignUsage');
+  section.replaceChildren();
+  const list = Array.isArray(streamers) ? streamers : [];
+  const heading = document.createElement('div'); heading.className = 'admin-design-usage-heading';
+  const title = document.createElement('strong'); title.id = 'adminDesignUsageTitle'; title.textContent = '디자인별 적용 스트리머';
+  const hint = document.createElement('span'); hint.textContent = '인증 스트리머 기준 · 저장된 값이 없으면 기본(디자인 1)';
+  heading.append(title, hint); section.append(heading);
+  const grid = document.createElement('div'); grid.className = 'admin-design-usage-grid';
+  ADMIN_DESIGN_USAGE_ROWS.forEach(([design, label, note]) => {
+    const members = list.filter((streamer) => streamer.layoutDesign === design);
+    const card = document.createElement('div'); card.className = 'admin-design-usage-card';
+    const head = document.createElement('div'); head.className = 'admin-design-usage-card-head';
+    const name = document.createElement('strong'); name.textContent = label;
+    const count = document.createElement('span'); count.className = 'admin-design-usage-count'; count.textContent = `${formatStatCount(members.length)}명`;
+    head.append(name, count); card.append(head);
+    if (note) { const noteEl = document.createElement('small'); noteEl.textContent = note; card.append(noteEl); }
+    const chips = document.createElement('div'); chips.className = 'admin-design-usage-chips';
+    if (!members.length) {
+      const empty = document.createElement('small'); empty.className = 'admin-design-usage-empty'; empty.textContent = '적용한 스트리머가 없어요.';
+      chips.append(empty);
+    }
+    members.forEach((streamer) => {
+      const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'admin-design-usage-chip';
+      chip.textContent = streamer.layoutDesignSaved ? streamer.nickname : `${streamer.nickname} (기본)`;
+      chip.setAttribute('aria-label', `${streamer.nickname} 팬페이지 열기`);
+      chip.addEventListener('click', () => {
+        $('adminStatsDialog').close();
+        if (routeId() !== streamer.id) goPage(streamer.id);
+      });
+      chips.append(chip);
+    });
+    card.append(chips); grid.append(card);
+  });
+  section.append(grid);
+  const unknown = list.filter((streamer) => streamer.layoutDesign == null).length;
+  if (unknown) {
+    const warn = document.createElement('p'); warn.className = 'admin-design-usage-warning';
+    warn.textContent = `디자인을 확인하지 못한 스트리머 ${formatStatCount(unknown)}명은 집계에서 제외했어요.`;
+    section.append(warn);
+  }
+}
 function renderAdminStats(data) {
   const totals = data && data.totals ? data.totals : {};
   $('adminStatsSummary').replaceChildren();
@@ -947,6 +995,7 @@ function renderAdminStats(data) {
     const count = document.createElement('strong'); count.textContent = value;
     tile.append(title, count); $('adminStatsSummary').append(tile);
   });
+  renderAdminDesignUsage(data && data.streamers);
   renderViewerStatsUsage(data && data.viewerStatsUsage);
   renderAdminStatsList(data && data.streamers);
 }

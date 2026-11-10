@@ -1915,3 +1915,19 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 .verification-selected strong{font-size:14px}
 .verification-selected span{font-size:12px;opacity:.7}
 .verification-form .verification-actions button:disabled{opacity:.5;cursor:not-allowed}
+
+/* 관리자 통계: 디자인별 적용 스트리머 카드 */
+.admin-design-usage{margin:0 0 18px}
+.admin-design-usage-heading{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:9px}
+.admin-design-usage-heading span{color:#aaa3b1;font-size:12px}
+.admin-design-usage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.admin-design-usage-card{min-width:0;padding:12px;border:1px solid #ffffff14;border-radius:11px;background:#ffffff05}
+.admin-design-usage-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.admin-design-usage-count{font:18px var(--display)}
+.admin-design-usage-card>small{display:block;margin-top:2px;color:#aaa3b1;font-size:12px}
+.admin-design-usage-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.admin-design-usage-chip{min-height:32px;padding:4px 10px;border:1px solid #ffffff22;border-radius:999px;background:transparent;color:inherit;font-size:12px;cursor:pointer}
+.admin-design-usage-chip:hover{background:#ffffff10}
+.admin-design-usage-empty{color:#aaa3b1;font-size:12px}
+.admin-design-usage-warning{margin:8px 0 0;color:#e0a96b;font-size:12px}
+@media(max-width:720px){.admin-design-usage-grid{grid-template-columns:1fr}}
