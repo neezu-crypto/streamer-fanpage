@@ -86,6 +86,7 @@ const {
 } = require('./viewer-sponsors');
 
 exports.streamerFanPageViewerSponsorPaymentReconcile = onSchedule({ schedule: 'every 15 minutes', maxInstances: 1, timeoutSeconds: 540 }, async () => {
+  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
   await reconcileViewerSponsorPayments();
 });
 const {
@@ -673,6 +674,7 @@ exports.streamerFanPageViewerStatsUnlocks = onCall({
 });
 
 exports.streamerFanPageViewerStatsUnlockRecovery = onSchedule({ schedule: 'every 15 minutes', maxInstances: 1, timeoutSeconds: 60 }, async () => {
+  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
   await reconcileViewerUnlockPayments({ fanpageDb: db, walletDb: sharedDb, limit: 50 });
 });
 
@@ -5647,6 +5649,7 @@ exports.streamerFanPageViewerStatsJobCleanup = onSchedule({
   region: 'us-central1',
   maxInstances: 1,
 }, async () => {
+  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
   lastViewerStatsJobCleanupAt = 0;
   await cleanupOldViewerStatsJobs();
   await cleanupVerifiedStreamerVisitDedup(fanPageStatsDateKey());
@@ -5778,6 +5781,7 @@ exports.streamerFanPageAdminStatsProjectionCleanup = onSchedule({
   region: 'us-central1',
   maxInstances: 1,
 }, async () => {
+  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
   const cutoff = new Date(`${fanPageStatsDateKey()}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - (ADMIN_STATS_DAYS - 1));
   const cutoffKey = fanPageStatsDateKey(cutoff.getTime());
@@ -7606,6 +7610,7 @@ exports.streamerFanPageVideoLibraryCleanupWorker = onTaskDispatched({
 exports.streamerFanPageVideoLibrarySyncRecovery = onSchedule({
   schedule: 'every 5 minutes', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
 }, async () => {
+  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
   const snapshot = await videoLibraryRef('channels').get();
   const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
   const now = Date.now();
