@@ -11147,9 +11147,10 @@ function selectVerifyStreamer(item) {
   $('verificationSelectedName').textContent = item.nickname;
   $('verificationSelectedId').textContent = ` · ${item.soopId}`;
   const avatar = $('verificationSelectedAvatar');
-  avatar.hidden = !item.avatarUrl;
+  const selectedAvatarUrl = verifyAvatarUrl(item);
+  avatar.hidden = !selectedAvatarUrl;
   avatar.onerror = () => { avatar.hidden = true; };
-  if (item.avatarUrl) avatar.src = item.avatarUrl;
+  if (selectedAvatarUrl) avatar.src = selectedAvatarUrl;
   $('verificationSearchStep').hidden = true;
   $('verificationManualFields').hidden = true;
   $('verificationSelected').hidden = false;
@@ -11157,6 +11158,13 @@ function selectVerifyStreamer(item) {
   setVerifyStatus(`${item.nickname}(${item.soopId}) 님으로 인증을 신청합니다. 맞다면 '인증 신청'을 눌러 주세요.`);
   updateVerifySubmitState();
   $('submitStreamerVerification').focus({ preventScroll: true });
+}
+const VERIFY_AVATAR_PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#475569"/><circle cx="18" cy="14" r="6" fill="#cbd5e1"/><path d="M6 32c2-7 8-9 12-9s10 2 12 9z" fill="#cbd5e1"/></svg>');
+// 서버가 avatarUrl을 비워 보내도 SOOP 프로필 이미지 규칙으로 미리보기를 만든다.
+function verifyAvatarUrl(item) {
+  if (item.avatarUrl) return item.avatarUrl;
+  const id = String(item.soopId || '').toLowerCase();
+  return /^[a-z0-9]{2,20}$/.test(id) ? `https://stimg.sooplive.com/LOGO/${id.slice(0, 2)}/${id}/${id}.jpg` : '';
 }
 function renderVerifyResults(streamers) {
   const list = $('verificationSearchResults');
@@ -11166,9 +11174,21 @@ function renderVerifyResults(streamers) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'verification-search-item';
+    const avatar = document.createElement('img');
+    avatar.className = 'verification-search-avatar';
+    avatar.alt = '';
+    avatar.width = 36; avatar.height = 36;
+    avatar.loading = 'lazy';
+    avatar.referrerPolicy = 'no-referrer';
+    const avatarUrl = verifyAvatarUrl(item);
+    // 이미지가 없는 계정도 목록 정렬이 흐트러지지 않도록 기본 아이콘으로 대체한다.
+    avatar.onerror = () => { avatar.onerror = null; avatar.src = VERIFY_AVATAR_PLACEHOLDER; };
+    avatar.src = avatarUrl || VERIFY_AVATAR_PLACEHOLDER;
+    const text = document.createElement('span'); text.className = 'verification-search-text';
     const strong = document.createElement('strong'); strong.textContent = item.nickname;
     const id = document.createElement('span'); id.textContent = item.soopId;
-    button.append(strong, id);
+    text.append(strong, id);
+    button.append(avatar, text);
     button.addEventListener('click', () => selectVerifyStreamer(item));
     row.append(button);
     return row;
