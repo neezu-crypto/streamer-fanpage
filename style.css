@@ -2010,3 +2010,6 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 .weekly-schedule-image-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start}
 .weekly-schedule-image-heading strong,.weekly-schedule-image-heading small{grid-column:1}
 .weekly-schedule-image-heading .weekly-schedule-image-tools-close{grid-column:2;grid-row:1/span 2;align-self:start;justify-self:end}
+
+/* 대회 이력 카드만 위 여백이 없어 한 열로 쌓일 때 앞 카드(플레이한 게임)와 붙던 문제. 다른 열 카드와 같은 18px 여백. */
+.fanpage-tab-column > .competition-history-section{margin-top:18px}

@@ -205,3 +205,45 @@ test('channel transactions can use a fresh server read when their local starting
   assert.equal(videoLibraryTransactionRecord(null, seed, false), null);
   assert.equal(videoLibraryTransactionRecord(null, null, true), null);
 });
+
+test('접속 시 자동 갱신: 기한이 지난 채널만 우선순위대로 batch 개수만큼 고른다', () => {
+  const {
+    selectVideoLibraryAutoSyncTargets, VIDEO_LIBRARY_AUTO_SYNC_BATCH_SIZE,
+  } = require('../video-library');
+  const now = 1_800_000_000_000;
+  const H = 60 * 60 * 1000;
+  const id = (n) => `UC${String(n).padStart(22, '0')}`;
+  const channels = {
+    [id(1)]: { syncStatus: 'idle', lastSyncAt: now - H, lastFullSyncAt: now - H },            // 최근 → 제외
+    [id(2)]: { syncStatus: 'idle', lastSyncAt: now - 100 * H, lastFullSyncAt: now - 100 * H }, // 증분 기한
+    [id(3)]: { syncStatus: 'idle', lastSyncAt: now - 10 * 24 * H, lastFullSyncAt: now - 10 * 24 * H }, // 전체 기한
+    [id(4)]: { syncStatus: 'syncing', syncStartedAt: now - 10 * 60 * 1000, updatedAt: now - 10 * 60 * 1000 }, // 멈춤
+    [id(5)]: { syncStatus: 'syncing', syncStartedAt: now - 1000, updatedAt: now - 1000 },      // 진행 중 → 제외
+    [id(6)]: { syncStatus: 'error', updatedAt: now - H, lastSyncAt: 0, lastFullSyncAt: 0 },     // 오류 직후 → 제외
+    'not-a-channel': { syncStatus: 'idle', lastSyncAt: 0, lastFullSyncAt: 0 },
+  };
+  const targets = selectVideoLibraryAutoSyncTargets(channels, now);
+  assert.equal(VIDEO_LIBRARY_AUTO_SYNC_BATCH_SIZE, 2);
+  assert.deepEqual(targets.map((t) => [t.channelId, t.mode]), [[id(4), 'full'], [id(3), 'full']]);
+  assert.equal(targets[0].recoverStale, true);
+  const all = selectVideoLibraryAutoSyncTargets(channels, now, 10);
+  assert.deepEqual(all.map((t) => t.channelId), [id(4), id(3), id(2)]);
+  assert.equal(all[2].mode, 'incremental');
+  assert.deepEqual(selectVideoLibraryAutoSyncTargets({}, now), []);
+  assert.deepEqual(selectVideoLibraryAutoSyncTargets(null, now), []);
+});
+
+test('접속 시 자동 갱신: 간격·진행 중 예약은 한 번에 하나만 통과한다', () => {
+  const { reserveVideoLibraryAutoSync, VIDEO_LIBRARY_AUTO_SYNC_INTERVAL_MS } = require('../video-library');
+  const now = 1_800_000_000_000;
+  assert.equal(reserveVideoLibraryAutoSync(null, now).reserved, true);
+  const first = reserveVideoLibraryAutoSync({}, now);
+  assert.equal(first.next.lastRunAt, now);
+  assert.equal(reserveVideoLibraryAutoSync(first.next, now + 1000).reason, 'in-progress');
+  const released = { lastRunAt: now, leaseUntil: 0 };
+  assert.equal(reserveVideoLibraryAutoSync(released, now + VIDEO_LIBRARY_AUTO_SYNC_INTERVAL_MS - 1).reason, 'interval');
+  assert.equal(reserveVideoLibraryAutoSync(released, now + VIDEO_LIBRARY_AUTO_SYNC_INTERVAL_MS).reserved, true);
+  // 처리 중 표시가 풀리지 않고 남아도 임대(2분)가 끝나면 간격(10분) 규칙만 남는다.
+  assert.equal(reserveVideoLibraryAutoSync({ lastRunAt: now, leaseUntil: now + 1000 }, now + 1001).reason, 'interval');
+  assert.equal(reserveVideoLibraryAutoSync({ lastRunAt: now, leaseUntil: now + 1000 }, now + VIDEO_LIBRARY_AUTO_SYNC_INTERVAL_MS).reserved, true);
+});

@@ -113,6 +113,8 @@ const {
   hasVideoLibrarySyncInProgress,
   isBeforeVideoLibraryCursor,
   isStaleVideoLibrarySync,
+  selectVideoLibraryAutoSyncTargets,
+  reserveVideoLibraryAutoSync,
   VIDEO_LIBRARY_TITLE_MAX_LENGTH,
   normalizeVideoLibraryCategory,
   normalizeVideoLibraryCursor,
@@ -7185,6 +7187,39 @@ async function removeVideoLibraryGenerationBatch(channelId, syncId) {
   return true;
 }
 
+async function runVideoLibraryAutoSync() {
+  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return { started: 0, skipped: 'paused' };
+  const now = Date.now();
+  let reservation = null;
+  const stateRef = videoLibraryRef('autoSync');
+  const transaction = await stateRef.transaction((current) => {
+    reservation = reserveVideoLibraryAutoSync(current, now);
+    return reservation.reserved ? reservation.next : undefined;
+  });
+  if (!transaction.committed || !reservation || !reservation.reserved) {
+    return { started: 0, skipped: reservation ? reservation.reason : 'in-progress' };
+  }
+  let started = 0;
+  try {
+    const snapshot = await videoLibraryRef('channels').get();
+    const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
+    const targets = selectVideoLibraryAutoSyncTargets(channels, now);
+    for (const target of targets) {
+      try {
+        if (await startVideoLibraryChannelSync(target.channelId, target.mode, { recoverStale: target.recoverStale === true })) started += 1;
+      } catch (error) {
+        console.warn(`Could not start video library auto-sync for ${target.channelId}:`, error.message || error);
+      }
+    }
+    try { await syncCinetyCatalogs(); }
+    catch (error) { console.warn('Could not refresh Cinety catalogs:', error.message || error); }
+  } finally {
+    // 다음 접속이 간격(10분) 뒤에 이어서 처리할 수 있도록 처리 중 표시만 푼다.
+    await stateRef.update({ leaseUntil: 0 }).catch((error) => console.warn('Could not release the video library auto-sync lease:', error.message || error));
+  }
+  return { started };
+}
+
 exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
   const uid = request.auth && typeof request.auth.uid === 'string' ? request.auth.uid : '';
   const data = request.data && typeof request.data === 'object' ? request.data : {};
@@ -7193,6 +7228,12 @@ exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], 
   const canManage = isAdmin;
   if (action === 'list') return readVideoLibraryPage(data, isAdmin, canManage);
   if (action === 'search') return searchVideoLibraryPage(data, isAdmin, canManage);
+  if (action === 'auto-sync') {
+    // 스케줄 함수 대신 인증 스트리머가 팬페이지에 접속할 때 오래된 채널 일부만 나눠서 갱신한다.
+    if (!uid) throw new HttpsError('unauthenticated', '로그인이 필요합니다.');
+    if (!isAdmin && !(await findVerifiedByUid(uid))) throw new HttpsError('permission-denied', '인증된 스트리머만 자동 갱신을 시작할 수 있습니다.');
+    return runVideoLibraryAutoSync();
+  }
   if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 즐겨찾기를 수정할 수 있습니다.');
 
   if (action === 'cinety-refresh') {
@@ -7673,56 +7714,6 @@ exports.streamerFanPageVideoLibraryCleanupWorker = onTaskDispatched({
   if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(String(channelId)) || !/^[0-9a-f-]{36}$/i.test(String(syncId))) return;
   const hasMore = await removeVideoLibraryGenerationBatch(String(channelId), String(syncId));
   if (hasMore) await enqueueVideoLibraryCleanup(String(channelId), String(syncId));
-});
-
-exports.streamerFanPageVideoLibrarySyncRecovery = onSchedule({
-  schedule: 'every 5 minutes', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
-}, async () => {
-  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
-  const snapshot = await videoLibraryRef('channels').get();
-  const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
-  const now = Date.now();
-  const staleChannels = Object.entries(channels).filter(([, channel]) => isStaleVideoLibrarySync(channel, now));
-  console.info(`Video library sync recovery scanned ${Object.keys(channels).length} channels; ${staleChannels.length} stalled.`);
-  await Promise.all(staleChannels.map(async ([channelId]) => {
-    try {
-      const recovered = await startVideoLibraryChannelSync(channelId, 'full', { recoverStale: true });
-      if (recovered) console.warn(`Restarted stalled video library sync for ${channelId}.`);
-      else console.info(`Skipped recovery because ${channelId} is no longer stalled.`);
-    } catch (error) {
-      console.error(`Could not recover stalled video library sync for ${channelId}:`, error.message || error);
-    }
-  }));
-});
-
-exports.streamerFanPageVideoLibraryIncrementalSync = onSchedule({
-  schedule: 'every 72 hours', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
-}, async () => {
-  // 서비스 일시정지 중에는 외부 목록 갱신과 영상 동기화를 시작하지 않는다(기본 상태: 정상 운영). 이미 진행 중인 동기화·복구 작업은 그대로 끝낸다.
-  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
-  try { await syncCinetyCatalogs(); }
-  catch (error) { console.warn('Could not refresh Cinety catalogs:', error.message || error); }
-  const snapshot = await videoLibraryRef('channels').get();
-  const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
-  await Promise.all(Object.entries(channels).map(async ([channelId, channel]) => {
-    if (!channel || channel.syncStatus === 'syncing') return;
-    try { await startVideoLibraryChannelSync(channelId, 'incremental'); }
-    catch (error) { console.warn(`Could not enqueue incremental video library sync for ${channelId}:`, error.message || error); }
-  }));
-});
-
-exports.streamerFanPageVideoLibraryFullSync = onSchedule({
-  schedule: 'every sunday 03:00', timeZone: 'Asia/Seoul', region: 'us-central1', maxInstances: 1,
-}, async () => {
-  if (await isServicePaused(sharedDb, 'streamerFanPage', false)) return;
-  const snapshot = await videoLibraryRef('channels').get();
-  const channels = snapshot.val() && typeof snapshot.val() === 'object' ? snapshot.val() : {};
-  const dueBefore = Date.now() - 6 * 24 * 60 * 60 * 1000;
-  await Promise.all(Object.entries(channels).map(async ([channelId, channel]) => {
-    if (!channel || channel.syncStatus === 'syncing' || (Number(channel.lastFullSyncAt) || 0) > dueBefore) return;
-    try { await startVideoLibraryChannelSync(channelId, 'full'); }
-    catch (error) { console.warn(`Could not enqueue full video library sync for ${channelId}:`, error.message || error); }
-  }));
 });
 
 exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request) => {
