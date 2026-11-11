@@ -4502,7 +4502,7 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
   list.className = 'design-pass-benefits';
   [
     '디자인 3(손그림 스티커북) 레이아웃',
-    '주간 일정표 고급 템플릿 "별빛 방송국" (디자인 1·2에서도 사용)',
+    '주간 일정표의 모든 고급 템플릿 (어떤 디자인에서도 사용, 지금은 "별빛 방송국")',
     '이 팬페이지에 적용되며 다른 계정·페이지로 옮길 수 없어요',
   ].forEach((text) => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
   const balance = document.createElement('p');
@@ -4759,7 +4759,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     const owned = designPassOwned(currentPage || page);
     const adminOwned = (currentPage || page).designPass?.layout3 === true;
     passPanel.hidden = owned;
-    passText.textContent = '디자인 3과 주간 일정표 고급 템플릿은 이용권 구매자 전용이에요. 지금은 1분 동안 미리볼 수 있어요.';
+    passText.textContent = '디자인 3과 주간 일정표의 모든 고급 템플릿은 유료 디자인 이용권 구매자 전용이에요. 지금은 1분 동안 미리볼 수 있어요.';
     buy.textContent = `이용권 구매 · ${designPassPriceCash(page)}캐시 (영구)`;
     adminPassRow.hidden = isAdminUser !== true;
     adminPassButton.textContent = adminOwned ? '관리자: 이 팬페이지 이용권 회수' : '관리자: 이 팬페이지에 이용권 부여';
@@ -10271,10 +10271,10 @@ function renderWeeklyScheduleDialog(page) {
     templateSelect.options[1].disabled = !state.canUseStarlight && !state.canPreviewStarlight && !locked;
     const passPrice = designPassPriceCash(page);
     templateBuy.hidden = state.canUseStarlight || !state.canPreviewStarlight;
-    templateBuy.textContent = `디자인 3 이용권 구매 · ${passPrice}캐시 (영구)`;
+    templateBuy.textContent = `유료 디자인 이용권 구매 · ${passPrice}캐시 (영구)`;
     if (locked) templateHint.textContent = state.previewRemainingText || '고급 템플릿 미리보기 중이에요.';
-    else if (!state.canUseStarlight && state.canPreviewStarlight) templateHint.textContent = '고급 템플릿은 디자인 3 구매자 전용이에요. 선택하면 1분 동안 미리볼 수 있고, 이용권이 있으면 디자인 1·2에서도 쓸 수 있어요.';
-    else if (!state.canUseStarlight) templateHint.textContent = '고급 템플릿은 디자인 3 구매자 전용이에요.';
+    else if (!state.canUseStarlight && state.canPreviewStarlight) templateHint.textContent = '고급 템플릿은 유료 디자인 이용권 전용이에요. 선택하면 1분 동안 미리볼 수 있고, 이용권이 있으면 어떤 디자인에서도 쓸 수 있어요.';
+    else if (!state.canUseStarlight) templateHint.textContent = '고급 템플릿은 유료 디자인 이용권 전용이에요.';
     else templateHint.textContent = '';
     footerTextInput.disabled = locked; avatarHitArea.disabled = locked; download.disabled = locked;
     chooseImage.disabled = locked; uploadImage.disabled = locked;
