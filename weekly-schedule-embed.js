@@ -1,4 +1,4 @@
-import { weeklyTemplate, isWeeklyTemplateId, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx3';
+import { weeklyTemplate, isWeeklyTemplateId, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx4';
 const params = new URLSearchParams(location.search);
 const streamer = (params.get('streamer') || '').trim().toLowerCase();
 const week = params.get('week') || '';
