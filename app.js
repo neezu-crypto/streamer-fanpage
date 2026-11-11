@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signIn
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
-import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-tg2';
+import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -3611,7 +3611,7 @@ function createRollingPaperComposer(page, topicId, imageActionSlot = null, isDet
   if (state.galleryOpen) {
     const picker = document.createElement('div'); picker.className = 'rolling-paper-gallery-picker';
     if (state.galleryLoading && !state.galleryItems?.length) {
-      const pickerStatus = document.createElement('p'); pickerStatus.className = 'rolling-paper-status';
+      const pickerStatus = document.createElement('p'); pickerStatus.className = 'rolling-paper-status loading-bar';
       pickerStatus.textContent = '갤러리 이미지를 불러오고 있어요.'; picker.append(pickerStatus);
     }
     if (state.galleryError) {
@@ -4313,7 +4313,7 @@ function renderTamagotchiApplication(page, section) {
   const rerender = () => renderTamagotchiApplication(page, section);
   if (state.loading || !state.loaded) {
     const message = document.createElement('p'); message.className = 'tamagotchi-state-message';
-    message.textContent = '다마고치 신청 상태를 확인하고 있어요.'; content.append(message); return;
+    message.classList.add('loading-bar'); message.textContent = '다마고치 신청 상태를 확인하고 있어요.'; content.append(message); return;
   }
   if (state.error) {
     const message = document.createElement('p'); message.className = 'tamagotchi-state-message is-error'; message.textContent = state.error;
@@ -5494,7 +5494,7 @@ function createFanPageQuickRemote(view) {
       action.addEventListener('click', handler); stickerMenu.append(action); return action;
     };
     const addNote = (text, isError = false) => {
-      const note = document.createElement('p'); note.className = `fan-quick-sticker-note${isError ? ' is-error' : ''}`;
+      const note = document.createElement('p'); note.className = `fan-quick-sticker-note${isError ? ' is-error' : ''}${text.includes('불러오고') ? ' loading-bar' : ''}`;
       note.textContent = text; stickerMenu.append(note);
     };
     if (stickerState.stickersLoading && !stickerState.stickersLoaded) {
@@ -6415,7 +6415,7 @@ function renderRouletteData(section, state) {
   if (state.loading) {
     status.textContent = '위플랩에서 최신 룰렛 데이터를 확인하고 있어요.';
     const loading = document.createElement('p');
-    loading.className = 'roulette-empty';
+    loading.className = 'roulette-empty loading-bar';
     loading.textContent = '룰렛 항목을 불러오는 중…';
     list.append(loading);
     return;
@@ -6694,7 +6694,7 @@ function renderLiveSection(page) {
 
   const content = document.createElement('div'); content.className = 'live-content';
   if (!state.hasLoaded && !state.error) {
-    const message = document.createElement('p'); message.className = 'live-state-message';
+    const message = document.createElement('p'); message.className = 'live-state-message loading-bar';
     message.textContent = '현재 방송 상태를 확인하고 있어요.'; content.append(message);
   } else if (!state.hasLoaded) {
     const message = document.createElement('p'); message.className = 'live-state-message is-error';
@@ -8913,7 +8913,7 @@ function renderCafeSection(page) {
   if (editor) section.append(editor.element);
 
   if (state.loading && !state.hasLoaded) {
-    const status = document.createElement('p'); status.className = 'cafe-status';
+    const status = document.createElement('p'); status.className = 'cafe-status loading-bar';
     status.setAttribute('role', 'status'); status.textContent = '카페 글 목록을 불러오고 있어요.';
     section.append(status);
     return section;
@@ -8935,6 +8935,7 @@ function renderCafeSection(page) {
   if (!items.length) {
     const empty = document.createElement('p'); empty.className = 'cafe-status';
     empty.textContent = state.hasLoaded ? '표시할 공개 게시글이 없어요.' : '카페 글 목록을 불러오고 있어요.';
+    if (!state.hasLoaded) empty.classList.add('loading-bar');
     section.append(empty);
     return section;
   }
@@ -9091,6 +9092,7 @@ function renderGallerySection(page) {
       button.classList.toggle('is-active', selected);
     });
     grid.replaceChildren();
+    status.classList.toggle('loading-bar', isLoading);
     if (isLoading) {
       status.textContent = '갤러리 이미지를 불러오고 있어요.';
       status.classList.remove('is-error');
@@ -10266,7 +10268,7 @@ function renderWeeklyScheduleDialog(page) {
 
   async function loadScheduleGallery(append = false) {
     if (state.galleryLoading) return;
-    state.galleryLoading = true; galleryStatus.textContent = '공개 갤러리를 불러오고 있어요.'; galleryGrid.replaceChildren(); galleryMore.hidden = true;
+    state.galleryLoading = true; galleryStatus.classList.add('loading-bar'); galleryStatus.textContent = '공개 갤러리를 불러오고 있어요.'; galleryGrid.replaceChildren(); galleryMore.hidden = true;
     try {
       const offset = append ? state.galleryNextOffset : 0;
       const result = (await callGalleryUploadTarget({ streamerId: page.streamer.id, view: 'rolling-paper-picker', offset })).data;
@@ -10276,11 +10278,13 @@ function renderWeeklyScheduleDialog(page) {
       state.galleryHasMore = result.hasMore === true; state.galleryLoaded = true;
       renderScheduleGalleryItems();
     } catch (error) {
+      galleryStatus.classList.remove('loading-bar');
       galleryStatus.textContent = error.message || '갤러리 이미지를 불러오지 못했어요.';
     } finally { state.galleryLoading = false; galleryMore.disabled = false; }
   }
   function renderScheduleGalleryItems() {
     galleryGrid.replaceChildren();
+    galleryStatus.classList.remove('loading-bar');
     galleryStatus.textContent = state.galleryItems.length ? '' : '선택할 수 있는 공개 갤러리 이미지가 없어요.';
     state.galleryItems.forEach((item) => {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'weekly-schedule-gallery-image';
@@ -11154,7 +11158,7 @@ function renderVodCommentsContents() {
   tabs.append(soopTab, fanTab); root.append(heading, tabs);
   const body = document.createElement('div'); body.className = 'vod-comments-body';
   if (state.loading && !state.soop.items.length && !state.fanpage.items.length) {
-    const loading = document.createElement('p'); loading.className = 'vod-comments-status';
+    const loading = document.createElement('p'); loading.className = 'vod-comments-status loading-bar';
     loading.textContent = '댓글을 불러오고 있어요.'; body.append(loading); root.append(body); return;
   }
   if (state.error) {
