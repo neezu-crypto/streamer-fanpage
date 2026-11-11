@@ -5041,3 +5041,9 @@ body.fanpage-layout-three-active dialog.account-dialog .admin-stat-card::after {
 body.fanpage-layout-three-active dialog.admin-stats-dialog .admin-stats-dialog-card {
   max-height: calc(100dvh - 28px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
 }
+/* 위에서 복사한 밝은 팝업 규칙이 쓰는 색 변수(디자인 1에만 정의돼 있어 디자인 3에서는 값이 무효가 되던 문제) */
+body.fanpage-layout-three-active {
+  --dialog-accent: #e8745f;
+  --dialog-accent-strong: #c75a48;
+  --dialog-accent-soft: #ffd8c7;
+}
