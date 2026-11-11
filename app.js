@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signIn
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
-import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx8';
+import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx10';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -422,6 +422,7 @@ let switchApprovalUnsubscribe = null;
 let switchHandoffInProgress = false;
 const vodRefreshesInProgress = new Set();
 const vodAutoRefreshAttempts = new Set();
+let videoLibraryAutoSyncAttempted = false;
 const vodPageLoadsInProgress = new Set();
 let vodCommentState = null;
 let vodCommentRequestId = 0;
@@ -4920,6 +4921,9 @@ function renderFanPage(page, options = {}) {
   soop.className = 'button'; soop.href = page.streamer.soopUrl; soop.target = '_blank';
   soop.rel = 'noopener noreferrer'; soop.textContent = 'SOOP 방송국 ↗';
   actions.append(soop);
+  // 디자인 3: 프로필 카드에서도 바로 편집 모드를 켜고 끌 수 있게 한다(탭 제목의 버튼과 같은 상태를 공유).
+  const profileEditModeToggle = createFanpageEditModeToggle(page);
+  if (profileEditModeToggle) actions.append(profileEditModeToggle);
   if (profile.rouletteUrl) {
     const roulette = document.createElement('a');
     roulette.id = 'profileRouletteLink';
@@ -5360,7 +5364,10 @@ function renderFanPage(page, options = {}) {
     view.append(editorDialog);
   }
 
-  if (page.isStreamerOwner) void refreshVodsOnStreamerVisit(page);
+  if (page.isStreamerOwner) {
+    void refreshVodsOnStreamerVisit(page);
+    void startVideoLibraryAutoSyncOnVisit();
+  }
 }
 
 function createFanPageQuickRemote(view) {
@@ -11420,6 +11427,15 @@ function replaceVodSectionIfCurrent(streamerId) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const section = $('vodSection');
   if (section) section.replaceWith(renderVodSection(currentPage));
+}
+
+// 즐겨찾기 영상은 스케줄 대신 인증 스트리머가 접속할 때 서버가 오래된 채널 일부만 나눠 갱신한다.
+// 서버가 작업만 대기열에 올리고 바로 돌려주므로 화면은 기다리지 않고, 브라우저 세션당 한 번만 요청한다.
+async function startVideoLibraryAutoSyncOnVisit() {
+  if (videoLibraryAutoSyncAttempted) return;
+  videoLibraryAutoSyncAttempted = true;
+  try { await callVideoLibrary({ action: 'auto-sync' }); }
+  catch (error) { console.warn('Video library auto-sync request failed:', error.message || error); }
 }
 
 async function refreshVodsOnStreamerVisit(page) {

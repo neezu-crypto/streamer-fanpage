@@ -5162,3 +5162,31 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-
 #fanPageView.fanpage-layout-2 .weekly-schedule-gallery-card { background: transparent; color: #f0eaf4; }
 #fanPageView.fanpage-layout-2 .weekly-schedule-image-heading strong { color: #f5eef5; }
 #fanPageView.fanpage-layout-2 :is(.weekly-schedule-image-heading small, .weekly-schedule-selected-image, .weekly-schedule-gallery-status, .weekly-schedule-upload-status, .weekly-schedule-upload-note) { color: #b9b0c2; }
+
+/* 프로필 카드 안의 편집 모드 버튼은 탭 제목처럼 오른쪽 위에 띄우지 않고 다른 프로필 버튼과 한 줄에 둔다. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-actions > .fanpage-edit-mode-toggle {
+  position: static; margin-top: 0; min-height: 40px;
+}
+
+/* 디자인 3 이용권 패널 버튼: 종이 라벨 일러스트 대신 CSS(테두리·그림자)로 그려 글자가 잘리지 않게 한다. */
+body.fanpage-layout-three-active :is(.design-pass-buy, .weekly-template-buy, .design-pass-actions .button, .design-pass-admin-button) {
+  background: var(--doodle-paper-soft, #fffdf8) !important;
+  background-image: none !important;
+  border: 2px solid var(--doodle-ink, #2f2a2c) !important;
+  border-radius: 12px !important;
+  box-shadow: 3px 4px 0 var(--doodle-shadow, #2f2a2c32) !important;
+  filter: none !important;
+  color: var(--doodle-ink, #2f2a2c) !important;
+  min-height: 44px !important;
+  min-width: 0 !important;
+  padding: 10px 18px !important;
+  transform: none !important;
+  white-space: normal !important;
+  text-align: center;
+}
+body.fanpage-layout-three-active :is(.design-pass-buy, .weekly-template-buy, .design-pass-actions .button, .design-pass-admin-button):hover:not(:disabled) {
+  background: #fff3e9 !important; transform: translateY(-1px) !important;
+}
+body.fanpage-layout-three-active :is(.design-pass-buy, .weekly-template-buy) {
+  background: var(--d3-rose, #b13a63) !important; color: #fff !important; border-color: var(--doodle-ink, #2f2a2c) !important;
+}

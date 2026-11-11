@@ -5,6 +5,13 @@ const VIDEO_LIBRARY_CHANNEL_ID_PATTERN = /^UC[A-Za-z0-9_-]{20,30}$/i;
 const VIDEO_LIBRARY_ITEM_ID_PATTERN = /^(?:youtube_[A-Za-z0-9_-]{11}|soop_\d{1,20}|cinety_(?:39|41|43)_\d{1,20}|flashgame_[a-f0-9]{64})$/i;
 const VIDEO_LIBRARY_TITLE_MAX_LENGTH = 120;
 const VIDEO_LIBRARY_SYNC_STALE_MS = 3 * 60 * 1000;
+// 스트리머 접속 때 부분 갱신(스케줄 함수 대체): 접속이 몰려도 한 번에 일부 채널만, 일정 간격으로 나눠 처리한다.
+const VIDEO_LIBRARY_AUTO_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+const VIDEO_LIBRARY_AUTO_SYNC_LEASE_MS = 2 * 60 * 1000;
+const VIDEO_LIBRARY_AUTO_SYNC_BATCH_SIZE = 2;
+const VIDEO_LIBRARY_INCREMENTAL_DUE_MS = 72 * 60 * 60 * 1000;
+const VIDEO_LIBRARY_FULL_DUE_MS = 6 * 24 * 60 * 60 * 1000;
+const VIDEO_LIBRARY_ERROR_RETRY_MS = 6 * 60 * 60 * 1000;
 const CINETY_CATEGORY_DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'cinety-43', categoryNo: 43, name: '시네티 · 애니메이션' }),
   Object.freeze({ id: 'cinety-39', categoryNo: 39, name: '시네티 · 영화' }),
@@ -194,6 +201,37 @@ function isStaleVideoLibrarySync(channel, now = Date.now()) {
   return lastProgressAt > 0 && now - lastProgressAt >= VIDEO_LIBRARY_SYNC_STALE_MS;
 }
 
+// 이번 접속에서 동기화를 시작할 채널을 고른다. 멈춘 동기화 복구 → 전체 동기화 기한 → 증분 동기화 기한 순으로,
+// 같은 단계에서는 가장 오래 갱신 안 된 채널부터 batchSize개만 고른다.
+function selectVideoLibraryAutoSyncTargets(channels, now = Date.now(), batchSize = VIDEO_LIBRARY_AUTO_SYNC_BATCH_SIZE) {
+  const entries = channels && typeof channels === 'object' ? Object.entries(channels) : [];
+  const candidates = [];
+  for (const [channelId, channel] of entries) {
+    if (!VIDEO_LIBRARY_CHANNEL_ID_PATTERN.test(String(channelId)) || !channel || typeof channel !== 'object') continue;
+    const lastSyncAt = Math.max(0, Number(channel.lastSyncAt) || 0);
+    const lastFullSyncAt = Math.max(0, Number(channel.lastFullSyncAt) || 0);
+    if (channel.syncStatus === 'syncing') {
+      if (isStaleVideoLibrarySync(channel, now)) candidates.push({ channelId, mode: 'full', rank: 0, lastSyncAt, recoverStale: true });
+      continue;
+    }
+    if (channel.syncStatus === 'error' && now - Math.max(0, Number(channel.updatedAt) || 0) < VIDEO_LIBRARY_ERROR_RETRY_MS) continue;
+    if (now - lastFullSyncAt >= VIDEO_LIBRARY_FULL_DUE_MS) candidates.push({ channelId, mode: 'full', rank: 1, lastSyncAt });
+    else if (now - lastSyncAt >= VIDEO_LIBRARY_INCREMENTAL_DUE_MS) candidates.push({ channelId, mode: 'incremental', rank: 2, lastSyncAt });
+  }
+  candidates.sort((a, b) => a.rank - b.rank || a.lastSyncAt - b.lastSyncAt || a.channelId.localeCompare(b.channelId));
+  return candidates.slice(0, Math.max(0, batchSize));
+}
+
+// 전역 예약: 최근에 실행했거나 다른 접속이 처리 중이면 건너뛴다. 반환값이 true일 때만 채널 목록을 읽는다.
+function reserveVideoLibraryAutoSync(current, now = Date.now()) {
+  const state = current && typeof current === 'object' ? current : {};
+  const lastRunAt = Math.max(0, Number(state.lastRunAt) || 0);
+  const leaseUntil = Math.max(0, Number(state.leaseUntil) || 0);
+  if (leaseUntil > now) return { reserved: false, reason: 'in-progress' };
+  if (lastRunAt && now - lastRunAt < VIDEO_LIBRARY_AUTO_SYNC_INTERVAL_MS) return { reserved: false, reason: 'interval' };
+  return { reserved: true, next: { lastRunAt: now, leaseUntil: now + VIDEO_LIBRARY_AUTO_SYNC_LEASE_MS } };
+}
+
 function paginateVideoLibraryEntries(sources, cursor, limit = 24) {
   const deduplicated = new Map();
   for (const item of sources.flat()) {
@@ -250,6 +288,10 @@ module.exports = {
   isInitialVideoLibraryImport,
   isBeforeVideoLibraryCursor,
   isStaleVideoLibrarySync,
+  selectVideoLibraryAutoSyncTargets,
+  reserveVideoLibraryAutoSync,
+  VIDEO_LIBRARY_AUTO_SYNC_INTERVAL_MS,
+  VIDEO_LIBRARY_AUTO_SYNC_BATCH_SIZE,
   normalizeVideoLibraryCategory,
   normalizeCinetyCategory,
   normalizeCinetyCatalogItem,
