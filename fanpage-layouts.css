@@ -5064,3 +5064,37 @@ body.fanpage-layout-three-active :is(input, select, textarea):focus-visible {
   outline-offset: 2px !important;
   box-shadow: none !important;
 }
+
+/* 데스크톱 우측 고정 버튼 보정: 가로로 긴(3.3:1) 종이 그림이 정사각 버튼에 들어가 가는 띠로 보이던 문제 */
+@media (min-width: 721px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle {
+    width: 48px !important; height: 48px !important; min-width: 48px !important; min-height: 48px !important;
+    padding: 0 !important; display: grid !important; place-items: center;
+    background: var(--doodle-paper, #fffdf8) none !important;
+    border: 3px solid var(--doodle-ink, #2f2a2c) !important;
+    border-radius: 16px 13px 17px 12px / 13px 17px 12px 16px !important;
+    color: var(--doodle-ink, #2f2a2c) !important;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle svg {
+    display: block !important; width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle circle { fill: var(--doodle-accent, #e87564); stroke: currentColor; }
+  /* 감정표현 버튼은 종이 그림 비율(약 3.3:1)에 맞춰 폭을 키워 글자가 그림 안에 들어오게 한다 */
+  body.fanpage-layout-three-active #game-series-emote-launcher.fanpage-emote-mobile-floating #game-series-emote-button {
+    min-width: 142px; height: 44px; padding: 0 26px; font-size: 15px; font-weight: 800; white-space: nowrap;
+  }
+}
+@media (min-width: 721px) {
+  /* 데스크톱도 우측 하단 고정 버튼(감정표현)이 푸터 문구를 가리지 않게 아래 여백을 둔다 */
+  body.fanpage-layout-three-active .footer { padding-bottom: 76px; }
+}
+
+/* 빠른 이동 패널에 붙은 감정표현 버튼: 남색 상자 대신 다른 버튼과 같은 종이 라벨로 보여 준다(그림 비율 약 3.3:1) */
+body.fanpage-layout-three-active #game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button {
+  width: 100% !important; height: 46px !important; min-height: 46px !important; padding: 0 12px !important;
+  border: 0 !important; border-radius: 0 !important;
+  background: transparent url('assets/fanpage-doodle/button-paper.svg') center / 100% 100% no-repeat !important;
+  color: var(--doodle-ink, #2f2a2c) !important; text-shadow: none !important; box-shadow: none !important;
+  font-size: 14px !important; font-weight: 800 !important;
+  filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
+}
