@@ -212,3 +212,11 @@ test('보유 목록: 공개 전 비관리자는 빈 목록, UID·결제 정보�
   const text = JSON.stringify(fan);
   assert.ok(!/user1|admin1|buyerUidHash|requestId|cashAmount/.test(text));
 });
+
+test('카탈로그 호출자 정보: 인증 스트리머는 id·닉네임만, 그 외는 null, UID 미포함', () => {
+  const v = shop.buildViewer({ isAdmin: false, verified: { uid: 'secret-uid', streamer: { id: 'gmyo0o', nickname: '그묘', soopId: 'gmyo0o' } } });
+  assert.deepEqual(v, { isAdmin: false, isVerifiedStreamer: true, streamer: { id: 'gmyo0o', nickname: '그묘' } });
+  assert.ok(!JSON.stringify(v).includes('secret-uid'));
+  assert.deepEqual(shop.buildViewer({ isAdmin: true, verified: null }), { isAdmin: true, isVerifiedStreamer: false, streamer: null });
+  assert.equal(shop.buildViewer({ isAdmin: false, verified: { streamer: { id: '../x' } } }).streamer, null);
+});
