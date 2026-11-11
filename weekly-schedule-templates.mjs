@@ -29,8 +29,8 @@ const LEGACY_REGIONS = {
 };
 // 새 템플릿은 "보이는 종이 칸" 자체를 기준으로 잡는다(장식 테두리 제외).
 const PAPER_REGIONS = {
-  row1: { time: { left: 0.08, top: 0.07, width: 0.84, height: 0.17 }, content: { left: 0.08, top: 0.27, width: 0.84, height: 0.42 }, linked: { left: 0.08, top: 0.72, width: 0.84, height: 0.09 }, offline: { top: 0.03 }, weekdayY: 0.90 },
-  row2: { time: { left: 0.08, top: 0.06, width: 0.84, height: 0.19 }, content: { left: 0.08, top: 0.28, width: 0.84, height: 0.38 }, linked: { left: 0.08, top: 0.68, width: 0.84, height: 0.10 }, offline: { top: 0.03 }, weekdayY: 0.88 },
+  row1: { time: { left: 0.08, top: 0.07, width: 0.84, height: 0.17 }, content: { left: 0.08, top: 0.27, width: 0.84, height: 0.42 }, linked: { left: 0.08, top: 0.72, width: 0.84, height: 0.09 }, offline: { top: -0.045 }, weekdayY: 0.90 },
+  row2: { time: { left: 0.08, top: 0.06, width: 0.84, height: 0.19 }, content: { left: 0.08, top: 0.28, width: 0.84, height: 0.38 }, linked: { left: 0.08, top: 0.68, width: 0.84, height: 0.10 }, offline: { top: -0.045 }, weekdayY: 0.88 },
 };
 
 function days(cards, regions, fontsFor) {
@@ -229,7 +229,7 @@ export const WEEKLY_TEMPLATES = frozen({
       footer: { centerX: 302, centerY: 822, maxWidth: 360, field: { x: 104, y: 798, w: 396, h: 48 } },
       // 아래 3칸은 낮아서(약 152px) 글자 크기와 영역을 따로 잡는다.
       days: (() => {
-        const row2 = { time: { left: 0.08, top: 0.03, width: 0.84, height: 0.24 }, content: { left: 0.08, top: 0.29, width: 0.84, height: 0.46 }, linked: { left: 0.08, top: 0.74, width: 0.84, height: 0.12 }, offline: { top: 0.02 }, weekdayY: 0.89 };
+        const row2 = { time: { left: 0.08, top: 0.03, width: 0.84, height: 0.24 }, content: { left: 0.08, top: 0.29, width: 0.84, height: 0.46 }, linked: { left: 0.08, top: 0.74, width: 0.84, height: 0.12 }, offline: { top: -0.17 }, weekdayY: 0.89 };
         const short = { time: 26, content: 22, line: 25, weekday: 22, offline: 30, offlineLine: 34, linked: 13 };
         return [
           ...[[564, 228, 224, 308], [832, 228, 224, 308], [1100, 228, 224, 308], [1368, 228, 220, 308]].map(([x, y, w, h]) => ({ x, y, w, h, ...PAPER_REGIONS.row1, font: scaledFonts(w, h) })),
