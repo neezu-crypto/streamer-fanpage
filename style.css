@@ -2015,3 +2015,15 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 
 /* 대회 이력 카드만 위 여백이 없어 한 열로 쌓일 때 앞 카드(플레이한 게임)와 붙던 문제. 다른 열 카드와 같은 18px 여백. */
 .fanpage-tab-column > .competition-history-section{margin-top:18px}
+
+/* 로딩바: 글자만 있던 불러오는 중 안내 아래에 움직이는 막대를 붙인다. 글자색을 따라가서 디자인 1·2·3 어디서나 어울린다. */
+.loading-bar::after,
+.upbo-status.is-loading::after,
+.rolling-paper-status.is-loading::after,
+.youtube-empty-state.is-loading::after,
+.songbook-empty-state.is-loading::after,
+.played-games-empty-state.is-loading::after,
+.memory-moments-empty.is-loading::after{content:"";display:block;flex:0 0 auto;width:min(240px,100%);height:6px;margin:12px auto 0;border-radius:999px;background:linear-gradient(90deg,transparent 0,currentColor 50%,transparent 100%) -70% 0/40% 100% no-repeat,color-mix(in srgb,currentColor 18%,transparent);animation:loading-bar-slide 1.2s ease-in-out infinite}
+@keyframes loading-bar-slide{to{background-position:170% 0,0 0}}
+@media(prefers-reduced-motion:reduce){.loading-bar::after,.upbo-status.is-loading::after,.rolling-paper-status.is-loading::after,.youtube-empty-state.is-loading::after,.songbook-empty-state.is-loading::after,.played-games-empty-state.is-loading::after,.memory-moments-empty.is-loading::after{animation:none;background:color-mix(in srgb,currentColor 45%,transparent)}}
+.cafe-status.loading-bar{flex-direction:column;gap:0}
