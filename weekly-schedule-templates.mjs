@@ -30,7 +30,7 @@ const LEGACY_REGIONS = {
 // 새 템플릿은 "보이는 종이 칸" 자체를 기준으로 잡는다(장식 테두리 제외).
 const PAPER_REGIONS = {
   row1: { time: { left: 0.08, top: 0.07, width: 0.84, height: 0.17 }, content: { left: 0.08, top: 0.27, width: 0.84, height: 0.42 }, linked: { left: 0.08, top: 0.72, width: 0.84, height: 0.09 }, offline: { top: -0.075 }, weekdayY: 0.90 },
-  row2: { time: { left: 0.08, top: 0.06, width: 0.84, height: 0.19 }, content: { left: 0.08, top: 0.28, width: 0.84, height: 0.38 }, linked: { left: 0.08, top: 0.68, width: 0.84, height: 0.10 }, offline: { top: -0.075 }, weekdayY: 0.88 },
+  row2: { time: { left: 0.08, top: 0.06, width: 0.84, height: 0.19 }, content: { left: 0.08, top: 0.28, width: 0.84, height: 0.38 }, linked: { left: 0.08, top: 0.68, width: 0.84, height: 0.10 }, offline: { top: -0.1 }, weekdayY: 0.88 },
 };
 
 function days(cards, regions, fontsFor) {
@@ -150,7 +150,7 @@ export const WEEKLY_TEMPLATES = frozen({
     layout: {
       title: { centerX: 1088, centerY: 98, maxWidth: 470, previousX: 832, nextX: 1346 },
       avatar: { x: 86, y: 178, w: 384, h: 494 },
-      footer: { centerX: 336, centerY: 846, maxWidth: 290, field: { x: 202, y: 820, w: 288, h: 54 } },
+      footer: { centerX: 325, centerY: 846, maxWidth: 310, field: { x: 160, y: 820, w: 330, h: 54 } },
       days: paperDays([[520, 188, 260, 356], [800, 188, 260, 356], [1080, 188, 260, 356], [1360, 188, 264, 356], [520, 568, 348, 224], [892, 568, 344, 224], [1260, 568, 364, 224]]),
     },
   },
