@@ -882,7 +882,7 @@
 .weekly-schedule-stage-previous:focus-visible,.weekly-schedule-stage-next:focus-visible{outline:3px solid #a84d6b;outline-offset:3px}
 .weekly-schedule-stage-previous{left:43.18cqw}.weekly-schedule-stage-next{left:90.61cqw}
 .weekly-schedule-day-edit-grid{position:absolute;inset:0;display:block;pointer-events:none}
-.weekly-schedule-day-edit{position:absolute;display:block;overflow:hidden;padding:0;border:0;background:transparent;pointer-events:none}
+.weekly-schedule-day-edit{position:absolute;display:block;overflow:visible;padding:0;border:0;background:transparent;pointer-events:none}
 .weekly-schedule-day-edit .weekly-schedule-offline-label{position:absolute;top:var(--offline-top);left:50%;z-index:2;display:flex;align-items:center;justify-content:center;gap:clamp(4px,.35cqw,7px);min-height:clamp(22px,1.65cqw,32px);padding:2px clamp(7px,.65cqw,11px);transform:translateX(-50%);border:1px solid #d88ca5;border-radius:999px;background:linear-gradient(180deg,#fff 0%,#fff1f6 100%);box-shadow:0 2px 0 #e4c1ce,0 3px 8px #63344a24;color:#653248;font:800 clamp(13px,1.05cqw,16px)/1.15 'Gowun Dodum',sans-serif;white-space:nowrap;cursor:pointer;pointer-events:auto}
 .weekly-schedule-day-edit .weekly-schedule-offline-label input{flex:none;width:clamp(16px,1.2cqw,20px);height:clamp(16px,1.2cqw,20px);margin:0;accent-color:#c93f70;cursor:pointer}
 .weekly-schedule-day-edit .weekly-schedule-offline-label:focus-within{outline:3px solid #b63767;outline-offset:2px}
