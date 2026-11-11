@@ -1,17 +1,31 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveTemplate, mayUseTemplate } = require('../weekly-schedule-template');
-test('기존 일정과 오래된 클라이언트의 템플릿을 보존한다', () => {
-  assert.equal(resolveTemplate(undefined, null), 'default');
-  assert.equal(resolveTemplate(undefined, 'starlight'), 'starlight');
-  assert.equal(resolveTemplate('default', 'starlight'), 'default');
-  assert.equal(resolveTemplate('unknown', null), null);
-});
-test('별빛 고급 템플릿은 인증 스트리머와 관리자에게 허용한다', () => {
+const { resolveTemplate, mayUseTemplate, isPremiumTemplate } = require('../weekly-schedule-template');
+const { hasPaidDesign } = require('../design-pass');
+
+test('기본 템플릿은 누구나, 고급 템플릿은 유료 디자인 이용권이 있는 인증 스트리머와 관리자만', () => {
   assert.equal(mayUseTemplate('default'), true);
   assert.equal(mayUseTemplate('starlight'), false);
-  assert.equal(mayUseTemplate('starlight', { isVerifiedStreamer: true }), true);
+  assert.equal(mayUseTemplate('starlight', { isVerifiedStreamer: true }), false);
+  assert.equal(mayUseTemplate('starlight', { hasPaidDesign: true }), false); // 인증 스트리머 본인이 아니면 불가
+  assert.equal(mayUseTemplate('starlight', { isVerifiedStreamer: true, hasPaidDesign: true }), true);
   assert.equal(mayUseTemplate('starlight', { isAdmin: true }), true);
-  assert.equal(mayUseTemplate('unknown', { isAdmin: true, isVerifiedStreamer: true }), false);
+});
+
+test('알 수 없는 템플릿은 거절하고 모든 비기본 템플릿은 고급으로 취급한다', () => {
+  assert.equal(resolveTemplate('nope', 'default'), null);
+  assert.equal(resolveTemplate(undefined, 'starlight'), 'starlight');
+  assert.equal(isPremiumTemplate('default'), false);
+  assert.equal(isPremiumTemplate('starlight'), true);
+  assert.equal(mayUseTemplate('nope', { isAdmin: true }), false);
+});
+
+test('유료 디자인 판정은 특정 디자인이 아니라 활성 이용권 하나라도 있으면 참', async () => {
+  const mk = (value) => ({ ref: () => ({ get: async () => ({ val: () => value }) }) });
+  assert.equal(await hasPaidDesign(mk(null), 'gmyo0o'), false);
+  assert.equal(await hasPaidDesign(mk({ layout3: { status: 'active' } }), 'gmyo0o'), true);
+  assert.equal(await hasPaidDesign(mk({ layoutX: { status: 'active' } }), 'gmyo0o'), true);
+  assert.equal(await hasPaidDesign(mk({ layout3: { status: 'refunded' } }), 'gmyo0o'), false);
+  assert.equal(await hasPaidDesign(mk({ layout3: { status: 'active' } }), '../x'), false);
 });

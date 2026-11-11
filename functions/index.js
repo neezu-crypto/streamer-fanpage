@@ -1,6 +1,6 @@
 'use strict';
 
-const { resolveTemplate, mayUseTemplate } = require('./weekly-schedule-template');
+const { resolveTemplate, mayUseTemplate, isPremiumTemplate } = require('./weekly-schedule-template');
 
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase, getDatabaseWithUrl, ServerValue } = require('firebase-admin/database');
@@ -5270,8 +5270,8 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
       uid ? isAdminUid(uid) : false, uid ? findVerifiedByUid(uid) : null,
     ]);
     const isPageStreamer = verifiedViewer?.streamer.id === target.streamer.id;
-    const pageHasPass = await designPass.hasDesignPass(db, target.streamer.id);
-    // 고급 템플릿은 이용권이 있는 팬페이지(또는 관리자)만 쓴다. 이용권이 없으면 미리보기만 가능하다.
+    const pageHasPass = await designPass.hasPaidDesign(db, target.streamer.id);
+    // 고급 템플릿은 유료 디자인 이용권이 있는 팬페이지(또는 관리자)만 쓴다(특정 디자인에 묶이지 않음). 없으면 미리보기만 가능하다.
     const canUseStarlight = viewerAdmin || (isPageStreamer && pageHasPass);
     const canPreviewStarlight = viewerAdmin || isPageStreamer;
     const targetSnapshot = await scheduleRef.get();
@@ -5339,7 +5339,8 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
       avatar,
       avatarUnavailable: Boolean(requestedAvatarImageId && !avatar),
       // 이용권이 없는 팬페이지의 공개·임베드 화면은 저장된 값과 관계없이 기본 템플릿으로 보여 준다(저장값은 보존).
-      templateId: record.templateId === 'starlight' && (pageHasPass || viewerAdmin) ? 'starlight' : 'default',
+      templateId: resolveTemplate(record.templateId, 'default') && (!isPremiumTemplate(record.templateId) || pageHasPass || viewerAdmin)
+        ? resolveTemplate(record.templateId, 'default') : 'default',
       animationEnabled: record.animationEnabled !== false,
       canUseStarlight,
       canPreviewStarlight,
@@ -5362,9 +5363,9 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
   if (!templateId) {
     throw new HttpsError('invalid-argument', '방송표 템플릿을 확인해 주세요.');
   }
-  const hasPass = templateId === 'starlight' && !isAdmin ? await designPass.hasDesignPass(db, target.streamer.id) : false;
-  if (!mayUseTemplate(templateId, { isAdmin, isVerifiedStreamer: Boolean(verified) && hasPass })) {
-    throw new HttpsError('permission-denied', '고급 템플릿은 디자인 3 이용권을 구매한 스트리머만 적용하고 저장할 수 있어요.');
+  const hasPaidDesign = isPremiumTemplate(templateId) && !isAdmin ? await designPass.hasPaidDesign(db, target.streamer.id) : false;
+  if (!mayUseTemplate(templateId, { isAdmin, isVerifiedStreamer: Boolean(verified), hasPaidDesign })) {
+    throw new HttpsError('permission-denied', '고급 템플릿은 유료 디자인 이용권을 구매한 스트리머만 적용하고 저장할 수 있어요.');
   }
   const entries = normalizeWeeklyScheduleEntries(data.entries);
   const footerText = typeof data.footerText === 'string'

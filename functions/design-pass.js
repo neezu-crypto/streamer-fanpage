@@ -56,6 +56,14 @@ async function hasDesignPass(db, streamerId) {
   return isActivePass((await passRef(db, streamerId).get()).val());
 }
 
+// 유료 디자인(현재는 디자인 3)을 하나라도 가진 팬페이지인지. 주간 방송표 고급 템플릿은 특정 디자인이 아니라
+// 유료 디자인 이용권 전체에 묶여 있어, 앞으로 유료 디자인이 늘어도 이 함수 하나로 판정한다.
+async function hasPaidDesign(db, streamerId) {
+  if (!STREAMER_ID_RE.test(String(streamerId || ''))) return false;
+  const passes = (await db.ref(`${PASS_ROOT}/${streamerId}`).get()).val();
+  return !!passes && typeof passes === 'object' && Object.values(passes).some(isActivePass);
+}
+
 async function freshTransaction(ref, update) {
   let listener;
   await new Promise((resolve, reject) => { listener = () => resolve(); ref.on('value', listener, reject); });
@@ -226,6 +234,6 @@ async function revokeDesignPass({ db, streamerId }) {
 
 module.exports = {
   PRODUCT_ID, PRICE_CASH, PASS_ROOT, WALLET_PURCHASES_KEY, DesignPassError,
-  hasDesignPass, isActivePass, purchaseDesignPass, grantDesignPass, revokeDesignPass, cashBalance,
+  hasDesignPass, hasPaidDesign, isActivePass, purchaseDesignPass, grantDesignPass, revokeDesignPass, cashBalance,
   validateStreamerId, validateRequestId,
 };
