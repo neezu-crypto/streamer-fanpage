@@ -29,8 +29,8 @@ const LEGACY_REGIONS = {
 };
 // 새 템플릿은 "보이는 종이 칸" 자체를 기준으로 잡는다(장식 테두리 제외).
 const PAPER_REGIONS = {
-  row1: { time: { left: 0.08, top: 0.07, width: 0.84, height: 0.17 }, content: { left: 0.08, top: 0.27, width: 0.84, height: 0.42 }, linked: { left: 0.08, top: 0.72, width: 0.84, height: 0.09 }, offline: { top: -0.045 }, weekdayY: 0.90 },
-  row2: { time: { left: 0.08, top: 0.06, width: 0.84, height: 0.19 }, content: { left: 0.08, top: 0.28, width: 0.84, height: 0.38 }, linked: { left: 0.08, top: 0.68, width: 0.84, height: 0.10 }, offline: { top: -0.045 }, weekdayY: 0.88 },
+  row1: { time: { left: 0.08, top: 0.07, width: 0.84, height: 0.17 }, content: { left: 0.08, top: 0.27, width: 0.84, height: 0.42 }, linked: { left: 0.08, top: 0.72, width: 0.84, height: 0.09 }, offline: { top: -0.075 }, weekdayY: 0.90 },
+  row2: { time: { left: 0.08, top: 0.06, width: 0.84, height: 0.19 }, content: { left: 0.08, top: 0.28, width: 0.84, height: 0.38 }, linked: { left: 0.08, top: 0.68, width: 0.84, height: 0.10 }, offline: { top: -0.075 }, weekdayY: 0.88 },
 };
 
 function days(cards, regions, fontsFor) {
@@ -212,7 +212,7 @@ export const WEEKLY_TEMPLATES = frozen({
     // 제목판은 어두운 나무라 밝은 글자를 쓴다.
     ink: { title: '#fff3d0', footer: '#6b3d1c', time: '#8c2f1f', weekday: '#4f6224', content: '#4b3320', offlineDisplay: '#8c2f1f', titleShadow: '#3a1f0acc' },
     layout: {
-      title: { centerX: 1072, centerY: 114, maxWidth: 420, previousX: 846, nextX: 1298 },
+      title: { centerX: 1072, centerY: 114, maxWidth: 400, previousX: 812, nextX: 1334 },
       avatar: { x: 102, y: 178, w: 398, h: 550 },
       footer: { centerX: 304, centerY: 816, maxWidth: 280, field: { x: 150, y: 788, w: 308, h: 56 } },
       days: paperDays([[552, 234, 240, 314], [812, 234, 240, 314], [1076, 234, 236, 314], [1336, 234, 240, 314], [548, 614, 328, 202], [900, 610, 320, 206], [1244, 610, 332, 206]]),
