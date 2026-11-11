@@ -4445,6 +4445,12 @@ function startDesignPreviewTimer({ seconds = DESIGN_PASS_PREVIEW_SECONDS, onTick
   onTick?.(seconds);
   return { stop };
 }
+// 같은 결제 요청 번호를 다시 써도 결과가 바뀌지 않는(또는 환불돼 쓸 수 없는) 오류인지 판정한다.
+function shouldDiscardPaymentRequest(error) {
+  const code = String(error && error.code || '').replace(/^functions\//, '');
+  if (['failed-precondition', 'already-exists', 'invalid-argument', 'permission-denied', 'resource-exhausted', 'not-found'].includes(code)) return true;
+  return code === 'aborted' && /자동 환불했어요/.test(String(error && error.message || ''));
+}
 function newDesignPassRequestId(streamerId) {
   // 같은 구매 시도의 재시도는 같은 번호를 쓰도록 sessionStorage에 보관한다(중복 차감 방지).
   const key = `fanpageDesignPassRequest:${streamerId}`;
@@ -4577,6 +4583,8 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
       showToast(data.status === 'owned' ? '이미 이용권이 있어요.' : '디자인 3 이용권을 구매했어요.');
       onPurchased?.({ alreadyOwned: data.status === 'owned' });
     } catch (error) {
+      // 확정 실패(잔액 부족·이미 환불됨 등)면 요청 번호를 버려 다음 시도가 새 번호로 결제되게 한다. 결과 불명(네트워크 등)은 같은 번호를 유지한다.
+      if (shouldDiscardPaymentRequest(error)) { try { sessionStorage.removeItem(request.key); } catch (_) { /* 무시 */ } }
       busy = false; cancel.disabled = false; pay.textContent = `${priceCash}캐시로 구매`;
       pay.disabled = false;
       balance.textContent = error.message || '구매하지 못했어요. 차감된 캐시는 자동으로 확인돼요.';
@@ -5113,7 +5121,8 @@ function renderFanPage(page, options = {}) {
     const description = document.createElement('p');
     description.textContent = tab.description;
     heading.append(eyebrow, title, description);
-    const editModeToggle = createFanpageEditModeToggle(page);
+    // 다마고치 탭은 편집할 항목이 없어 편집 모드 버튼을 숨긴다.
+    const editModeToggle = tab.key === 'tamagotchi' ? null : createFanpageEditModeToggle(page);
     if (editModeToggle) heading.append(editModeToggle);
     const grid = document.createElement('div');
     grid.className = 'fanpage-tab-panel-grid';

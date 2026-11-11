@@ -5459,9 +5459,10 @@ exports.streamerFanPageTamagotchiShop = onCall({ maxInstances: 10 }, async (requ
     const [isAdmin, stage] = await Promise.all([isAdminUid(uid), readTamagotchiStage(db)]);
     if (action === 'catalog') {
       if (!tamagotchiOpenFor(stage, isAdmin)) return { stage: 'preparing', species: [] };
+      const [balanceCash, viewerVerified] = await Promise.all([tamagotchiShop.cashBalance(sharedDb, uid), findVerifiedByUid(uid)]);
       return {
         stage, adminPreview: isAdmin && stage !== 'public', species: tamagotchiPublicCatalog({ isAdmin }),
-        balanceCash: await tamagotchiShop.cashBalance(sharedDb, uid),
+        balanceCash, viewer: tamagotchiShop.buildViewer({ isAdmin, verified: viewerVerified }),
       };
     }
     const streamerId = tamagotchiShop.validateStreamerId(data.streamerId);

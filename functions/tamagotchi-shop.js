@@ -195,8 +195,16 @@ async function listPets({ db, streamerId, isAdmin = false, stage = 'closed' }) {
   return { pets: list };
 }
 
+// 카탈로그 응답에 싣는 호출자 정보. 본인의 인증 스트리머 공개 정보(id·닉네임)만 담고 UID는 넣지 않는다.
+function buildViewer({ isAdmin, verified }) {
+  const streamer = verified && verified.streamer && STREAMER_ID_RE.test(String(verified.streamer.id || ''))
+    ? { id: String(verified.streamer.id), nickname: String(verified.streamer.nickname || '').slice(0, 40) }
+    : null;
+  return { isAdmin: isAdmin === true, isVerifiedStreamer: !!streamer, streamer };
+}
+
 module.exports = {
-  PETS_ROOT, OPERATIONS_ROOT, LIMITS_ROOT, WALLET_PURCHASES_KEY, LEDGER_KIND, TamagotchiShopError,
+  buildViewer, PETS_ROOT, OPERATIONS_ROOT, LIMITS_ROOT, WALLET_PURCHASES_KEY, LEDGER_KIND, TamagotchiShopError,
   petIdFor, normalizeNickname, adoptPet, adminGrantPet, adminClearTestPets, listPets, validateStreamerId,
   cashBalance: (walletDb, uid) => payment.balance(walletDb, uid),
 };
