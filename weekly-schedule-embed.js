@@ -1,3 +1,4 @@
+import { weeklyTemplate, isWeeklyTemplateId, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-tpl1';
 const params = new URLSearchParams(location.search);
 const streamer = (params.get('streamer') || '').trim().toLowerCase();
 const week = params.get('week') || '';
@@ -6,14 +7,10 @@ const stage = document.getElementById('stage');
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const days = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
-const rectangles = [
-  ...Array.from({length: 4}, (_, i) => ({x: 585 + i * 262, y: 171, w: 242, h: 323, time: [.08,.17,.82,.18], content: [.10,.40,.80,.34], weekdayY: .90})),
-  ...Array.from({length: 3}, (_, i) => ({x: 588 + i * 347, y: 525, w: 317, h: 331, time: [.08,.16,.82,.17], content: [.10,.39,.80,.34], weekdayY: .90})),
-];
 function dateAt(offset) { const d = new Date(`${week}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + offset); return d; }
 function dateKey(d) { return d.toISOString().slice(0, 10); }
 function dateLabel(d) { return dateKey(d).replace(/-/g, '.'); }
-function region(r, a) { return {x:r.x+r.w*a[0],y:r.y+r.h*a[1],w:r.w*a[2],h:r.h*a[3]}; }
+function region(r, a) { return {x:r.x+r.w*a.left,y:r.y+r.h*a.top,w:r.w*a.width,h:r.h*a.height}; }
 function linesFor(text, width, maxLines) {
   const result = []; let line = ''; let truncated = false;
   for (const ch of Array.from(String(text || '').replace(/\r/g, ''))) {
@@ -34,34 +31,42 @@ function centeredText(text, x, y, maxWidth, size, minSize, color) {
 async function render(data) {
   await Promise.all([document.fonts.load('30px Jua'), document.fonts.load('30px Gowun')]);
   const image = new Image();
-  image.src = data.templateId === 'starlight' ? 'assets/weekly-schedule-starlight.png' : 'assets/weekly-schedule-template.png';
-  await image.decode(); ctx.drawImage(image, 0, 0, 1672, 941);
-  const starlight = data.templateId === 'starlight';
+  const tpl = weeklyTemplate(isWeeklyTemplateId(data.templateId) ? data.templateId : 'default');
+  image.src = tpl.embedImage;
+  await image.decode(); ctx.drawImage(image, 0, 0, WEEKLY_WIDTH, WEEKLY_HEIGHT);
+  const starlight = tpl.motion;
   stage.classList.toggle('starlight', starlight); stage.classList.toggle('motion', data.animationEnabled !== false);
   const thursday = dateAt(3); const first = new Date(Date.UTC(thursday.getUTCFullYear(), thursday.getUTCMonth(), 1));
   const weekNumber = Math.floor((thursday.getUTCDate() - 1 + (first.getUTCDay()+6)%7) / 7) + 1;
-  const color = starlight ? '#493365' : '#a74464';
-  centeredText(`${data.nickname}의 ${thursday.getUTCMonth()+1}월 ${weekNumber}주차 일정`,1120,99,660,50,25,color);
-  centeredText(data.footerText || `${dateLabel(dateAt(0))} – ${dateLabel(dateAt(6))}`,301,850,408,30,18,color);
+  const ink = tpl.ink; const { title: tl, footer: fl } = tpl.layout;
+  if (ink.titleShadow) { ctx.shadowColor = ink.titleShadow; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2; }
+  centeredText(`${data.nickname}의 ${thursday.getUTCMonth()+1}월 ${weekNumber}주차 일정`,tl.centerX,tl.centerY,tl.maxWidth,50,25,ink.title);
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  centeredText(data.footerText || `${dateLabel(dateAt(0))} – ${dateLabel(dateAt(6))}`,fl.centerX,fl.centerY,fl.maxWidth,30,18,ink.footer);
   const eventMap = new Map((data.linkedDays || []).map(d => [d.date,d.events || []]));
-  rectangles.forEach((r,i) => {
+  tpl.layout.days.forEach((r,i) => {
+    const f = r.font;
     const entry = data.entries?.[i] || {}; const linked = eventMap.get(dateKey(dateAt(i))) || [];
     const isOffline = entry.offline === true;
     const time = isOffline ? '' : linked.some(e => e.typeName === '휴방') ? '휴방' : (entry.time || linked.find(e=>e.time)?.time || '');
     const t = region(r,r.time); const c = region(r,r.content);
-    centeredText(time,t.x+t.w/2,t.y+t.h/2,t.w,r.w<260?36:38,25,color);
+    centeredText(time,t.x+t.w/2,t.y+t.h/2,t.w,f.time,Math.min(25,f.time),ink.time);
     if (isOffline) {
-      centeredText('휴방',c.x+c.w/2,c.y+c.h/2,c.w,r.w<260?42:44,25,color);
-      centeredText(days[i],r.x+r.w/2,r.y+r.h*r.weekdayY,r.w-24,30,25,color);
+      centeredText('휴방',c.x+c.w/2,c.y+c.h/2,c.w,f.offline,Math.min(25,f.offline),ink.offlineDisplay);
+      centeredText(days[i],r.x+r.w/2,r.y+r.h*r.weekdayY,r.w-24,f.weekday,Math.min(25,f.weekday),ink.weekday);
       return;
     }
-    ctx.font = `700 ${r.w<260?29:31}px Gowun, sans-serif`; ctx.fillStyle = starlight ? '#594578' : '#a94d6b'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    const lineHeight=r.w<260?34:36; const limit=Math.floor(c.h/lineHeight);
+    ctx.font = `700 ${f.content}px Gowun, sans-serif`; ctx.fillStyle = ink.content; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const lineHeight=f.line; const limit=Math.floor(c.h/lineHeight);
     const content=[...(!entry.offline && entry.content?[entry.content]:[]),...linked.map(e=>`${e.time?e.time+' ':''}${e.title||e.typeName||'방송 일정'}`)].flatMap(v=>linesFor(v,c.w,limit)).slice(0,limit);
     content.forEach((line,j)=>ctx.fillText(line,c.x+c.w/2,c.y+c.h/2+(j-(content.length-1)/2)*lineHeight,c.w));
-    centeredText(days[i],r.x+r.w/2,r.y+r.h*r.weekdayY,r.w-24,30,25,color);
+    centeredText(days[i],r.x+r.w/2,r.y+r.h*r.weekdayY,r.w-24,f.weekday,Math.min(25,f.weekday),ink.weekday);
   });
   const avatar = document.getElementById('avatar'); const url = data.avatar?.thumbUrl || data.avatar?.imageUrl;
+  const al = tpl.layout.avatar;
+  Object.assign(avatar.style, {left:`${al.x/WEEKLY_WIDTH*100}%`,top:`${al.y/WEEKLY_HEIGHT*100}%`,width:`${al.w/WEEKLY_WIDTH*100}%`,height:`${al.h/WEEKLY_HEIGHT*100}%`,
+    borderRadius: al.radius ? `${al.radius/al.w*100}% / ${al.radius/al.h*100}%` : '',
+    clipPath: al.clip ? `polygon(${al.clip.map(([x,y])=>`${x*100}% ${y*100}%`).join(',')})` : ''});
   if (url) { avatar.src=url; avatar.hidden=false; avatar.onerror=()=>{avatar.hidden=true;}; }
   stage.hidden=false; status.hidden=true;
 }

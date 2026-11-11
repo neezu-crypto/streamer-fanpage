@@ -3,7 +3,10 @@
 // 기본 템플릿만 무료이고, 그 밖의 모든 템플릿은 "고급 템플릿"으로 유료 디자인 이용권이 필요하다.
 // 특정 디자인(레이아웃)에 묶이지 않으므로 디자인 1·2에서도 이용권이 있으면 쓸 수 있다.
 const FREE_TEMPLATES = ['default'];
-const PREMIUM_TEMPLATES = ['starlight'];
+const PREMIUM_TEMPLATES = [
+  'starlight', 'cafe-menu', 'constellation-diary', 'forest-camping', 'kpop-backstage',
+  'minimal-mono', 'quest-board', 'retro-arcade', 'seaside-postcard'
+];
 
 function resolveTemplate(requested, existing) {
   const template = requested == null ? (existing || 'default') : String(requested);
