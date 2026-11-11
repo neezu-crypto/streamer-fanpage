@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signIn
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
-import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx5';
+import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx8';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -4123,7 +4123,7 @@ function renderAffiliatePromoCard() {
 
   const disclosure = document.createElement('p');
   disclosure.className = 'affiliate-promo-disclosure';
-  disclosure.textContent = '이 링크를 통해 구매하면 팬페이지 운영자가 수수료를 받을 수 있습니다.';
+  disclosure.textContent = '이 링크를 통해 구매하면 팬페이지 운영자가 수수료를 받습니다.';
   card.append(adLabel, layout, disclosure);
   return card;
 }

@@ -2005,3 +2005,8 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 .weekly-fx-p-coin{background:#ffe36e;box-shadow:0 0 6px #ffe36e;animation:wfx-p-burst .8s ease-out forwards}
 @keyframes wfx-p-burst{from{opacity:1}to{opacity:0;transform:translate(calc(-50% + var(--fx-dx) * 2),calc(-50% - 36px))}}
 @media(prefers-reduced-motion:reduce){.weekly-fx-layer{display:none}}
+
+/* 갤러리 이미지 선택 창: 닫기 버튼이 제목·설명 아래로 밀리지 않고 모든 디자인에서 오른쪽 위에 오도록 고정 */
+.weekly-schedule-image-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start}
+.weekly-schedule-image-heading strong,.weekly-schedule-image-heading small{grid-column:1}
+.weekly-schedule-image-heading .weekly-schedule-image-tools-close{grid-column:2;grid-row:1/span 2;align-self:start;justify-self:end}

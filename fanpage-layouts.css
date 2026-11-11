@@ -3920,8 +3920,11 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 48px;
-  padding: 12px 28px;
+  min-width: 240px;
+  min-height: 66px;
+  padding: 15px 40px;
+  box-sizing: border-box;
+  white-space: nowrap;
   border: 0;
   background: transparent url('assets/fanpage-doodle/button-paper.svg') center / 100% 100% no-repeat;
 }
@@ -4712,6 +4715,13 @@ body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-s
 body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-schedule-stage-next):active {
   transform:translate(-50%,calc(-50% + 1px)) !important;
 }
+/* SOOP 방송국 보기: 공용 작은 버튼 규칙(button-mini)이 이겨서 그림이 글자보다 작게 보이던 문제.
+   라이브 바로가기 버튼은 종이 라벨 그림을 크게 쓴다. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 a.button.live-station-link {
+  min-width: 240px; min-height: 66px; padding: 15px 40px; box-sizing: border-box; white-space: nowrap;
+  background-image: url('assets/fanpage-doodle/button-paper.svg'); background-size: 100% 100%;
+  background-repeat: no-repeat; background-position: center;
+}
 @media(max-width:720px) {
   body #fanPageView.fanpage-layout-3 .live-station-link {
     width:220px !important; min-width:220px !important; max-width:100%; min-height:66px !important;
@@ -5112,3 +5122,43 @@ body.fanpage-layout-three-active :is(.design-pass-buy, .weekly-template-buy, .de
 }
 body.fanpage-layout-three-active .design-pass-panel { border-color: var(--d3-muted-strong, #665d5b); }
 body.fanpage-layout-three-active .design-pass-actions { justify-content: center; }
+
+/* 주간 일정표 보기 대화상자는 #fanPageView 밖(body)에 붙으므로, 제목 양옆 이전/다음 버튼도
+   body 기준으로 둥근 버튼 모양과 중앙 정렬을 따로 지정한다(공용 대화상자 버튼 규칙이 덮어쓰지 못하게). */
+body.fanpage-layout-three-active dialog.weekly-schedule-view-dialog :is(.weekly-schedule-stage-previous, .weekly-schedule-stage-next) {
+  position: absolute !important; z-index: 8; display: grid; place-items: center;
+  width: 40px !important; height: 40px !important; min-width: 40px !important; min-height: 40px !important; padding: 0 !important;
+  border: 2px solid #fff !important; border-radius: 50% !important;
+  background: linear-gradient(145deg, #fffafd, #f9dbe5) !important; color: #a54265 !important;
+  box-shadow: 0 3px 0 #df9ab0 !important; filter: none !important; transform: translate(-50%, -50%) !important;
+  font: 800 20px/1 'Jua', 'Gowun Dodum', sans-serif !important;
+}
+body.fanpage-layout-three-active dialog.weekly-schedule-view-dialog :is(.weekly-schedule-stage-previous, .weekly-schedule-stage-next)::before,
+body.fanpage-layout-three-active dialog.weekly-schedule-view-dialog :is(.weekly-schedule-stage-previous, .weekly-schedule-stage-next)::after {
+  content: none !important; display: none !important;
+}
+@media (max-width: 720px) {
+  body.fanpage-layout-three-active dialog.weekly-schedule-view-dialog :is(.weekly-schedule-stage-previous, .weekly-schedule-stage-next) {
+    width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important;
+  }
+}
+
+/* 디자인 3 편집 화면: 아바타 칸 클릭 영역이 공용 버튼 규칙(position: relative, 종이 배경)에 밀려
+   미리보기 아래로 빠지던 문제. 항상 아바타 칸 위에 투명하게 겹친다. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-avatar-hit-area {
+  position: absolute !important;
+  background-image: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+}
+
+/* 디자인 2(어두운 화면): 갤러리 이미지 선택 창도 어둡게 맞춰 버튼 글자가 보이게 한다. */
+#fanPageView.fanpage-layout-2 dialog.account-dialog.weekly-schedule-image-tools {
+  background: #26222d; border-color: #514a5b; color: #f0eaf4; box-shadow: 0 24px 80px #000a;
+}
+#fanPageView.fanpage-layout-2 .weekly-schedule-gallery-card { background: transparent; color: #f0eaf4; }
+#fanPageView.fanpage-layout-2 .weekly-schedule-image-heading strong { color: #f5eef5; }
+#fanPageView.fanpage-layout-2 :is(.weekly-schedule-image-heading small, .weekly-schedule-selected-image, .weekly-schedule-gallery-status, .weekly-schedule-upload-status, .weekly-schedule-upload-note) { color: #b9b0c2; }
