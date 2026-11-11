@@ -5098,3 +5098,5 @@ body.fanpage-layout-three-active #game-series-emote-launcher.fanpage-emote-remot
   font-size: 14px !important; font-weight: 800 !important;
   filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
 }
+/* 넓은 화면(1500px 이상)에서는 패널이 항상 열려 있어 앱이 이 버튼을 hidden으로 숨긴다. display 규칙이 그 숨김을 이기지 않게 한다. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle[hidden] { display: none !important; }
