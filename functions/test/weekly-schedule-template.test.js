@@ -29,3 +29,10 @@ test('유료 디자인 판정은 특정 디자인이 아니라 활성 이용권 
   assert.equal(await hasPaidDesign(mk({ layout3: { status: 'refunded' } }), 'gmyo0o'), false);
   assert.equal(await hasPaidDesign(mk({ layout3: { status: 'active' } }), '../x'), false);
 });
+
+test('서버 유료 템플릿 목록이 클라이언트 레지스트리와 일치한다', async () => {
+  const assert = require('node:assert/strict');
+  const { PREMIUM_TEMPLATES } = require('../weekly-schedule-template');
+  const registry = await import('../../weekly-schedule-templates.mjs');
+  assert.deepEqual([...PREMIUM_TEMPLATES].sort(), [...registry.WEEKLY_PREMIUM_TEMPLATE_IDS].sort());
+});
