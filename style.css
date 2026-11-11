@@ -1934,3 +1934,19 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 
 /* hidden 속성이 있는 폼은 display 규칙이 있어도 숨긴다(권한 없는 사용자에게 입력 폼이 보이던 문제) */
 :is(.comment-up-form, .songbook-add-form, .played-games-add-form, .memory-moments-form, .profile-link-editor, .upbo-request-form)[hidden] { display: none !important; }
+
+/* 디자인 3 이용권 */
+.design-pass-dialog-card{display:grid;gap:12px;width:min(92vw,440px)}
+.design-pass-dialog-card h2{margin:0}
+.design-pass-lead{margin:0;font-weight:700}
+.design-pass-benefits{margin:0;padding-left:1.2em;display:grid;gap:4px;font-size:.92rem}
+.design-pass-balance{margin:0;font-weight:700}
+.design-pass-notice{margin:0;font-size:.84rem;opacity:.85;line-height:1.5}
+.design-pass-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+.design-pass-actions .button{min-height:44px}
+.design-pass-panel{display:grid;gap:8px;margin:12px 0 0;padding:12px;border:1px dashed currentColor;border-radius:12px}
+.design-pass-panel[hidden],.design-pass-admin-row[hidden],.weekly-template-buy[hidden]{display:none!important}
+.design-pass-panel-text{margin:0;font-size:.9rem;line-height:1.5}
+.design-pass-buy,.weekly-template-buy{min-height:44px}
+.design-pass-admin-row{margin-top:8px}
+.design-pass-admin-button{min-height:40px;font-size:.84rem}
