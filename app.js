@@ -4439,6 +4439,51 @@ function newDesignPassRequestId(streamerId) {
   }
   return { key, value };
 }
+// 디자인 3 미리보기(이용권 없음). 창을 닫아도 남은 시간 동안 화면에 유지하고, 끝나면 저장된 디자인으로 돌아간다.
+// 서버에는 아무것도 저장하지 않는다. 화면 갱신으로 디자인 창이 다시 만들어져도 저장된 디자인을 잃지 않도록 모듈에 보관한다.
+let designPreview = null; // { streamerId, savedLayout, timer }
+function designPreviewSavedLayout(streamerId) {
+  return designPreview && designPreview.streamerId === streamerId ? designPreview.savedLayout : null;
+}
+function stopDesignPreview() {
+  designPreview?.timer.stop();
+  designPreview = null;
+}
+function designPreviewStatusText(remaining) {
+  return `디자인 3 미리보기 중이에요 (${formatPreviewRemaining(remaining)} 남음). 구매하면 저장할 수 있어요.`;
+}
+function endDesignPreview(message) {
+  const preview = designPreview;
+  if (!preview) return;
+  stopDesignPreview();
+  const page = currentPage;
+  if (!page || page.streamer.id !== preview.streamerId) return;
+  page.profile = { ...(page.profile || {}), layoutDesign: preview.savedLayout };
+  const dialog = document.getElementById('layoutDesignDialog');
+  const wasOpen = !!dialog?.open;
+  if (dialog) {
+    dialog._syncDraft?.(preview.savedLayout, message || '');
+    if (dialog.open) dialog.close();
+  }
+  renderFanPage(page, dialog ? { preservedLayoutDesignDialog: dialog, reopenLayoutDesignDialog: wasOpen } : {});
+  if (message) showToast(message);
+}
+function startDesignPreview(page, savedLayout) {
+  stopDesignPreview();
+  const streamerId = page.streamer.id;
+  designPreview = {
+    streamerId,
+    savedLayout,
+    timer: startDesignPreviewTimer({
+      onTick: (remaining) => {
+        const el = document.querySelector('#layoutDesignDialog .profile-layout-status');
+        if (el) el.textContent = designPreviewStatusText(remaining);
+      },
+      onEnd: () => endDesignPreview('미리보기 시간이 끝나 저장된 디자인으로 돌아왔어요.'),
+    }),
+  };
+}
+
 function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
   const streamerId = page.streamer.id;
   const priceCash = designPassPriceCash(page);
@@ -4552,11 +4597,11 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   status.className = 'profile-layout-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  const initialLayout = [1, 2, 3].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
-  let draftLayout = initialLayout;
+  const displayedLayout = [1, 2, 3].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
+  // 미리보기 중에 창이 다시 만들어진 경우에는 화면에 보이는 디자인이 아니라 마지막으로 저장된 디자인이 기준이다.
+  const initialLayout = designPreviewSavedLayout(page.streamer.id) ?? displayedLayout;
+  let draftLayout = displayedLayout;
   let saving = false;
-  let previewTimer = null;
-  const stopPreviewTimer = () => { previewTimer?.stop(); previewTimer = null; };
 
   const setDisabled = (disabled) => {
     layoutOptions.querySelectorAll('input').forEach((input) => { input.disabled = disabled; });
@@ -4569,7 +4614,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       ? Number(targetPage.profile.layoutDesign)
       : DEFAULT_FANPAGE_LAYOUT;
     draftLayout = selectedLayout;
-    stopPreviewTimer();
+    if (selectedLayout === initialLayout) stopDesignPreview();
     if (selectedLayout === previousLayout) {
       status.textContent = '현재 디자인입니다. 다른 디자인을 선택하면 미리볼 수 있어요.';
       return;
@@ -4578,16 +4623,10 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     targetPage.profile = { ...previousProfile, layoutDesign: selectedLayout };
     const previewOnly = selectedLayout === 3 && !designPassOwned(targetPage);
     status.textContent = previewOnly
-      ? `디자인 3 미리보기 중이에요 (${formatPreviewRemaining(DESIGN_PASS_PREVIEW_SECONDS)} 남음). 구매하면 저장할 수 있어요.`
+      ? designPreviewStatusText(DESIGN_PASS_PREVIEW_SECONDS)
       : '미리보기를 적용했어요. 닫기 버튼을 누르면 저장됩니다.';
-    if (previewOnly) {
-      previewTimer = startDesignPreviewTimer({
-        onTick: (remaining) => {
-          status.textContent = `디자인 3 미리보기 중이에요 (${formatPreviewRemaining(remaining)} 남음). 구매하면 저장할 수 있어요.`;
-        },
-        onEnd: () => revertPreviewToSaved('미리보기 시간이 끝나 저장된 디자인으로 돌아왔어요.'),
-      });
-    }
+    if (previewOnly) startDesignPreview(targetPage, initialLayout);
+    else stopDesignPreview();
     // Re-rendering removes the dialog from the document. Close it first so the
     // preserved instance can be attached and opened again without an
     // InvalidStateError from showModal() on an already-open, detached dialog.
@@ -4597,19 +4636,11 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       reopenLayoutDesignDialog: true,
     });
   };
-  // 미리보기를 끝내고 마지막으로 저장된 디자인(initialLayout)으로 화면을 되돌린다. 서버에는 아무것도 쓰지 않는다.
-  const revertPreviewToSaved = (message) => {
-    stopPreviewTimer();
-    const targetPage = currentPage;
-    draftLayout = initialLayout;
-    if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
-    targetPage.profile = { ...(targetPage.profile || {}), layoutDesign: initialLayout };
-    layoutOptions.querySelectorAll('input').forEach((input) => { input.checked = Number(input.value) === initialLayout; });
+  // 미리보기가 끝났을 때 이 창의 선택 상태를 저장된 디자인으로 맞춘다(모듈의 endDesignPreview가 호출).
+  dialog._syncDraft = (layout, message) => {
+    draftLayout = layout;
+    layoutOptions.querySelectorAll('input').forEach((input) => { input.checked = Number(input.value) === layout; });
     status.textContent = message || '';
-    const wasOpen = dialog.open;
-    if (dialog.open) dialog.close();
-    renderFanPage(targetPage, { preservedLayoutDesignDialog: dialog, reopenLayoutDesignDialog: wasOpen });
-    if (message) showToast(message);
   };
   const saveLayoutAndClose = async () => {
     if (saving) return;
@@ -4621,21 +4652,19 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       return;
     }
     if (requestedLayout === initialLayout) {
-      stopPreviewTimer();
+      stopDesignPreview();
       dialog.close();
       return;
     }
     if (requestedLayout === 3 && !designPassOwned(targetPage)) {
-      // 이용권이 없는 디자인 3은 저장하지 않는다. 미리보기를 끝내고 저장된 디자인으로 되돌린다.
-      stopPreviewTimer();
-      draftLayout = initialLayout;
-      targetPage.profile = { ...(targetPage.profile || {}), layoutDesign: initialLayout };
-      if (dialog.open) dialog.close();
-      renderFanPage(targetPage);
-      showToast('디자인 3은 이용권을 구매하면 저장할 수 있어요. 저장된 디자인으로 돌아왔어요.');
+      // 이용권이 없는 디자인 3은 저장하지 않는다. 창만 닫고, 남은 미리보기 시간 동안은 화면에 유지한다.
+      // 시간이 끝나면 endDesignPreview가 저장된 디자인으로 되돌린다.
+      if (!designPreview) startDesignPreview(targetPage, initialLayout);
+      dialog.close();
+      showToast('미리보기는 남은 시간 동안만 유지돼요. 저장하려면 이용권을 구매해 주세요.');
       return;
     }
-    stopPreviewTimer();
+    stopDesignPreview();
     saving = true;
     setDisabled(true);
     close.disabled = true;
@@ -4738,7 +4767,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   buy.addEventListener('click', () => {
     openDesignPassPurchaseDialog(currentPage || page, {
       onPurchased: () => {
-        stopPreviewTimer();
+        stopDesignPreview();
         syncPassPanel();
         status.textContent = draftLayout === 3
           ? '이용권을 구매했어요. 닫기 버튼을 누르면 디자인 3이 저장됩니다.'
@@ -4787,6 +4816,7 @@ function renderFanPage(page, options = {}) {
   }
   $('calendarSection')?._cleanupWeeklyScheduleViewport?.();
   stockPriceSparklineRequest += 1;
+  if (designPreview && designPreview.streamerId !== String(page.streamer.id)) stopDesignPreview();
   currentPage = page;
   publishFanpageEmoteContext(page);
   const view = $('fanPageView');
@@ -6053,7 +6083,9 @@ function profileForLinkSave(source, field, value) {
     contents: Array.isArray(profile.contents) ? profile.contents.filter((item) => typeof item === 'string').slice(0, 8) : [],
     scheduleText: String(profile.scheduleText || ''), rouletteUrl: String(profile.rouletteUrl || ''),
     ogqEmoticonUrl: String(profile.ogqEmoticonUrl || ''),
-    layoutDesign: [1, 2, 3].includes(Number(profile.layoutDesign)) ? Number(profile.layoutDesign) : DEFAULT_FANPAGE_LAYOUT,
+    // 이용권 없는 디자인 3 미리보기 중에도 다른 설정 저장에는 마지막으로 저장된 디자인을 보낸다.
+    layoutDesign: designPreviewSavedLayout(currentPage?.streamer?.id)
+      ?? ([1, 2, 3].includes(Number(profile.layoutDesign)) ? Number(profile.layoutDesign) : DEFAULT_FANPAGE_LAYOUT),
     topBannerImageUrls: Array.isArray(profile.topBannerImageUrls) ? profile.topBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerImageUrls: Array.isArray(profile.bottomBannerImageUrls) ? profile.bottomBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerLayout: profile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked',
