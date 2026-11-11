@@ -1804,6 +1804,8 @@ dialog[open]{overscroll-behavior:contain}
 #fanPageView .tamagotchi-section-content{display:grid;justify-items:center;gap:13px;min-width:0;margin-top:5px}
 #fanPageView .tamagotchi-empty-state,#fanPageView .tamagotchi-approved-card{display:grid;width:min(100%,620px);min-height:260px;align-content:center;justify-items:center;gap:12px;padding:28px;border:1px solid #ffffff16;border-radius:20px;background:radial-gradient(ellipse at 80% 8%,#b6a3ff12,transparent 42%),linear-gradient(145deg,#ffffff05,#ffffff02);text-align:center}
 #fanPageView .tamagotchi-placeholder-symbol{display:grid;width:52px;height:52px;place-items:center;border:1px solid #b6a3ff35;border-radius:50%;background:#b6a3ff14;color:#b6a3ff;font-size:25px}
+#fanPageView .tamagotchi-preparing strong{font-size:15px;line-height:1.5}
+#fanPageView .tamagotchi-admin-preview{margin:0 0 12px;padding:8px 12px;border:1px dashed currentColor;border-radius:10px;font-size:12px;line-height:1.6;opacity:.85}
 #fanPageView .tamagotchi-empty-state p,#fanPageView .tamagotchi-approved-status{max-width:420px;margin:0;color:var(--muted);font-size:12px;line-height:1.7}
 #fanPageView .tamagotchi-approved-card{min-height:240px}
 #fanPageView .tamagotchi-approved-card h3{margin:0;font:23px var(--display)}

@@ -215,6 +215,7 @@ const CINETY_CATALOG_LOCK_STALE_MS = 10 * 60 * 1000;
 const CINETY_CATALOG_MANUAL_REFRESH_COOLDOWN_MS = 60 * 1000;
 const CINETY_API_BASE = 'https://cinety.sooplive.com/api/page.php';
 let cinetyCatalogRefreshPromise = null;
+const { readTamagotchiStage, tamagotchiOpenFor } = require('./tamagotchi-stage');
 const FANPAGE_TAMAGOTCHI_MAX_APPLICATIONS_PER_STREAMER = 20;
 const FANPAGE_TAMAGOTCHI_INTERACTIONS = new Set(['pet', 'feed', 'play', 'talk', 'live', 'idle', 'sound']);
 const FANPAGE_ROLLING_PAPER_MAX_ITEMS = 300;
@@ -8014,17 +8015,21 @@ exports.streamerFanPageTamagotchiApplications = onCall({ maxInstances: 10 }, asy
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
   if (!SOOP_ID_PATTERN.test(streamerId)) throw new HttpsError('invalid-argument', '스트리머 팬페이지를 확인해 주세요.');
 
-  const [target, verified, isAdmin] = await Promise.all([
+  const [target, verified, isAdmin, tamagotchiStage] = await Promise.all([
     findVerifiedBySoopId(streamerId),
     findVerifiedByUid(uid),
     isAdminUid(uid),
+    readTamagotchiStage(db),
   ]);
   if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
   const isStreamerOwner = !!(verified && verified.streamer.id === target.streamer.id);
+  const tamagotchiOpen = tamagotchiOpenFor(tamagotchiStage, isAdmin);
   const applicationsRef = db.ref(`streamerFanPageTamagotchiApplications/${target.streamer.id}`);
   const profileRef = db.ref(`streamerFanPageTamagotchiProfiles/${target.streamer.id}`);
 
   if (action === 'status') {
+    // 개발 중(공개 전)에는 비관리자에게 신청·프로필 정보를 내려주지 않는다.
+    if (!tamagotchiOpen) return { stage: 'preparing', application: null, profile: null };
     const [applicationsSnapshot, profileSnapshot] = await Promise.all([applicationsRef.get(), profileRef.get()]);
     const applications = Object.entries(applicationsSnapshot.val() || {})
       .map(([id, value]) => normalizeTamagotchiApplication(id, value))
@@ -8041,10 +8046,11 @@ exports.streamerFanPageTamagotchiApplications = onCall({ maxInstances: 10 }, asy
       }
       : null;
     const ownApplication = isStreamerOwner || isAdmin ? applications[0] || null : null;
-    return { application: ownApplication, profile };
+    return { stage: tamagotchiStage, adminPreview: isAdmin && tamagotchiStage !== 'public', application: ownApplication, profile };
   }
 
   if (action === 'submit') {
+    if (!tamagotchiOpen) throw new HttpsError('failed-precondition', '다마고치 분양소를 준비하고 있어요. 열리면 팬페이지에서 안내할게요.');
     if (!isStreamerOwner) {
       throw new HttpsError('permission-denied', '인증된 스트리머 본인만 자신의 팬페이지에 다마고치를 신청할 수 있습니다.');
     }

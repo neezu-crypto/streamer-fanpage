@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signIn
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
-import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx13';
+import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-tg1';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -4322,6 +4322,19 @@ function renderTamagotchiApplication(page, section) {
     content.append(message, retry); return;
   }
 
+  if (state.stage === 'preparing') {
+    // 공개 전: 신청서·승인 카드 대신 준비 중 안내만 보여 준다.
+    const notice = document.createElement('div'); notice.className = 'tamagotchi-empty-state tamagotchi-preparing';
+    const symbol = document.createElement('span'); symbol.className = 'tamagotchi-placeholder-symbol'; symbol.setAttribute('aria-hidden', 'true'); symbol.textContent = '✦';
+    const heading = document.createElement('strong'); heading.textContent = '다마고치 분양소를 준비하고 있어요';
+    const message = document.createElement('p'); message.textContent = '곧 통합 상점에서 다마고치를 분양받아 이곳에서 함께 키울 수 있어요. 문을 열면 팬페이지에서 알려 드릴게요.';
+    notice.append(symbol, heading, message); content.append(notice); return;
+  }
+  if (state.adminPreview) {
+    const badge = document.createElement('p'); badge.className = 'tamagotchi-admin-preview';
+    badge.textContent = `관리자 미리보기 · 공개 전 단계(${state.stage}) · 일반 방문자에게는 "분양소 준비 중" 안내만 보여요.`;
+    content.append(badge);
+  }
   const profile = state.profile;
   const application = state.application;
   const isOwner = page.isStreamerOwner === true && editUiAllowed(page);
@@ -4382,6 +4395,8 @@ async function loadTamagotchiApplication(page, section, force = false) {
     if (currentPage?.streamer.id !== page.streamer.id) return;
     state.application = result.data?.application || null;
     state.profile = result.data?.profile || null;
+    state.stage = result.data?.stage || 'preparing';
+    state.adminPreview = result.data?.adminPreview === true;
     state.loaded = true;
   } catch (error) {
     state.error = error.message || '다마고치 정보를 불러오지 못했어요.';
@@ -5035,7 +5050,7 @@ function renderFanPage(page, options = {}) {
     { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 응원 메시지를 남겨 보세요.' },
     { key: 'memories', label: '기억의 순간', eyebrow: 'MEMORY MOMENTS', title: '기억의 순간', description: '100일·200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아봤어요.' },
     { key: 'comment-up', label: '댓글 UP 체크', eyebrow: 'COMMENT UP', title: '댓글 UP 체크', description: '등록한 게시글에서 남긴 댓글의 UP과 순위를 확인해요.' },
-    { key: 'tamagotchi', label: '다마고치', eyebrow: 'STREAMER TAMAGOTCHI', title: '다마고치', description: '스트리머의 개성을 담은 캐릭터와 원하는 상호작용을 신청해 보세요.' },
+    { key: 'tamagotchi', label: '다마고치', eyebrow: 'STREAMER TAMAGOTCHI', title: '다마고치', description: '스트리머 팬페이지에서 함께 키우는 다마고치를 준비하고 있어요.' },
   ];
   const tabNav = document.createElement('div');
   tabNav.className = 'fanpage-tab-nav';
