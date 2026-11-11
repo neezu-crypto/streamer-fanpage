@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signIn
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
-import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx12';
+import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx13';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -4508,7 +4508,7 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
   list.className = 'design-pass-benefits';
   [
     '디자인 3(손그림 스티커북) 레이아웃',
-    '주간 일정표의 모든 고급 템플릿 (어떤 디자인에서도 사용, 지금은 "별빛 방송국")',
+    '주간 일정표의 고급 템플릿 9종 전체 (어떤 디자인에서도 사용)',
     '이 팬페이지에 적용되며 다른 계정·페이지로 옮길 수 없어요',
   ].forEach((text) => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
   const balance = document.createElement('p');
@@ -4524,7 +4524,12 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
   cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '닫기';
   const pay = document.createElement('button');
   pay.type = 'button'; pay.className = 'button button-primary'; pay.textContent = `${priceCash}캐시로 구매`; pay.disabled = true;
-  actions.append(cancel, pay);
+  const charge = document.createElement('a');
+  charge.className = 'button design-pass-charge-link';
+  charge.href = 'https://neezu-crypto.github.io/streamer-game-series-shop/customer-center.html?open=charge';
+  charge.target = '_blank'; charge.rel = 'noopener noreferrer';
+  charge.textContent = '통합 캐시 충전하기 ↗'; charge.hidden = true;
+  actions.append(cancel, charge, pay);
   card.append(title, lead, list, balance, notice, actions);
   dialog.append(card);
   document.body.append(dialog);
@@ -4539,8 +4544,9 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
     const cash = Number(data.balanceCash) || 0;
     balance.textContent = cash >= priceCash
       ? `현재 통합 캐시 ${cash.toLocaleString('ko-KR')}캐시`
-      : `통합 캐시가 부족해요. (보유 ${cash.toLocaleString('ko-KR')}캐시 / 필요 ${priceCash}캐시) 충전한 뒤 다시 시도해 주세요.`;
+      : `통합 캐시가 부족해요. (보유 ${cash.toLocaleString('ko-KR')}캐시 / 필요 ${priceCash}캐시) 아래 버튼으로 충전한 뒤 다시 시도해 주세요.`;
     pay.disabled = cash < priceCash;
+    charge.hidden = cash >= priceCash;
   }).catch((error) => { balance.textContent = error.message || '잔액을 확인하지 못했어요.'; });
   pay.addEventListener('click', async () => {
     if (busy) return;
