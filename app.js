@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signIn
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
-import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx10';
+import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261111-fx12';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -379,6 +379,10 @@ let fanpageD3EditMode = (() => {
   try { return sessionStorage.getItem(FANPAGE_EDIT_MODE_STORAGE_KEY) === '1'; } catch { return false; }
 })();
 function isFanpageLayoutThree(page) { return Number(page?.profile?.layoutDesign) === 3; }
+// 주간 일정표 모달: 디자인 3은 편집 모드를 켜지 않아도 관리 권한자가 일정표를 열면 바로 편집 화면이 보인다.
+function canOpenWeeklyScheduleEditor(page) {
+  return page.isOwner === true || (isAdminUser && editUiAllowed(page)) || (isFanpageLayoutThree(page) && page.canManage === true);
+}
 function editUiAllowed(page = currentPage) { return !isFanpageLayoutThree(page) || fanpageD3EditMode; }
 // 서버가 준 관리 권한 값(true)을 현재 화면(팬 화면/편집 화면)에 맞게 거른다.
 function uiCan(flag) { return flag === true && editUiAllowed(); }
@@ -5200,7 +5204,7 @@ function renderFanPage(page, options = {}) {
     document.body.classList.add('fanpage-bottom-banner-active');
     view.append(bottomBanner);
   }
-  if (page.isOwner || (isAdminUser && editUiAllowed(page))) view.append(renderWeeklyScheduleDialog(page));
+  if (canOpenWeeklyScheduleEditor(page)) view.append(renderWeeklyScheduleDialog(page));
   view.append(renderVodPlayerDialog());
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
   fanPageQuickNavCleanup = createFanPageQuickRemote(view);
@@ -9560,7 +9564,7 @@ function renderCalendarSection(page) {
     }
   }
   const openSchedule = () => {
-    if (canManage && !mobileScheduleMedia.matches) openWeeklyScheduleDialog(page);
+    if (canOpenWeeklyScheduleEditor(page) && !mobileScheduleMedia.matches) openWeeklyScheduleDialog(page);
     else openWeeklyScheduleViewDialog(page, section);
   };
   imageFrame.addEventListener('click', openSchedule);
