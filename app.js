@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signIn
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
-import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-tg1';
+import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-tg2';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -4409,12 +4409,10 @@ async function loadTamagotchiApplication(page, section, force = false) {
 function renderTamagotchiSection(page) {
   const section = document.createElement('section'); section.className = 'tamagotchi-section content-card';
   section.id = 'tamagotchiSection';
-  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'STREAMER TAMAGOTCHI';
-  const title = document.createElement('h2'); title.textContent = '다마고치';
-  const description = document.createElement('p'); description.className = 'tamagotchi-section-description';
-  description.textContent = '스트리머마다 다른 모습과 상호작용을 가진 다마고치를 준비하고 있어요.';
+  // 제목·설명은 탭 머리말(다마고치)에 한 번만 표시한다.
+  section.setAttribute('aria-label', '다마고치');
   const content = document.createElement('div'); content.className = 'tamagotchi-section-content';
-  section.append(eyebrow, title, description, content);
+  section.append(content);
   page._tamagotchiSection = section;
   renderTamagotchiApplication(page, section);
   return section;
