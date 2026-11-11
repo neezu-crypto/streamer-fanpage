@@ -216,6 +216,8 @@ const CINETY_CATALOG_MANUAL_REFRESH_COOLDOWN_MS = 60 * 1000;
 const CINETY_API_BASE = 'https://cinety.sooplive.com/api/page.php';
 let cinetyCatalogRefreshPromise = null;
 const { readTamagotchiStage, tamagotchiOpenFor } = require('./tamagotchi-stage');
+const tamagotchiShop = require('./tamagotchi-shop');
+const { publicCatalog: tamagotchiPublicCatalog } = require('./tamagotchi-catalog');
 const FANPAGE_TAMAGOTCHI_MAX_APPLICATIONS_PER_STREAMER = 20;
 const FANPAGE_TAMAGOTCHI_INTERACTIONS = new Set(['pet', 'feed', 'play', 'talk', 'live', 'idle', 'sound']);
 const FANPAGE_ROLLING_PAPER_MAX_ITEMS = 300;
@@ -5439,6 +5441,54 @@ exports.streamerFanPageDesignPass = onCall({ maxInstances: 10 }, async (request)
       db, walletDb: sharedDb, uid, streamerId: target.streamer.id, requestId: data.requestId,
     });
     return { ...result, priceCash: designPass.PRICE_CASH };
+  } catch (error) {
+    throw toHttps(error);
+  }
+});
+
+// 다마고치 분양소(분양 결제·관리자 테스트 지급). 공개 단계 게이트와 인증 스트리머 소유권은 서버에서 판정한다.
+exports.streamerFanPageTamagotchiShop = onCall({ maxInstances: 10 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  const action = String(data.action || 'catalog');
+  const toHttps = (error) => {
+    if (error instanceof tamagotchiShop.TamagotchiShopError) return new HttpsError(error.code, error.message);
+    return error;
+  };
+  try {
+    const [isAdmin, stage] = await Promise.all([isAdminUid(uid), readTamagotchiStage(db)]);
+    if (action === 'catalog') {
+      if (!tamagotchiOpenFor(stage, isAdmin)) return { stage: 'preparing', species: [] };
+      return {
+        stage, adminPreview: isAdmin && stage !== 'public', species: tamagotchiPublicCatalog({ isAdmin }),
+        balanceCash: await tamagotchiShop.cashBalance(sharedDb, uid),
+      };
+    }
+    const streamerId = tamagotchiShop.validateStreamerId(data.streamerId);
+    const target = await findVerifiedBySoopId(streamerId);
+    if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+    const verified = await findVerifiedByUid(uid);
+    const isPageStreamer = !!verified && verified.streamer.id === target.streamer.id;
+    const targetId = target.streamer.id;
+    if (action === 'pets') {
+      return tamagotchiShop.listPets({ db, streamerId: targetId, isAdmin, stage });
+    }
+    if (action === 'admin-grant') {
+      return tamagotchiShop.adminGrantPet({
+        db, adminUid: uid, isAdmin, streamerId: targetId, speciesId: data.speciesId, color: data.color,
+        nickname: data.nickname, requestId: data.requestId,
+      });
+    }
+    if (action === 'admin-clear-tests') {
+      return tamagotchiShop.adminClearTestPets({ db, isAdmin, streamerId: targetId });
+    }
+    if (action !== 'adopt') throw new HttpsError('invalid-argument', '요청 종류를 확인해 주세요.');
+    if (!isPageStreamer) throw new HttpsError('permission-denied', '분양은 해당 팬페이지의 인증 스트리머 계정으로만 할 수 있어요.');
+    if (await isServicePaused(sharedDb, 'streamerFanPage', false)) throw new HttpsError('unavailable', '서비스 점검 중에는 구매할 수 없어요.');
+    return await tamagotchiShop.adoptPet({
+      db, walletDb: sharedDb, uid, streamerId: targetId, speciesId: data.speciesId, color: data.color,
+      nickname: data.nickname, requestId: data.requestId, isAdmin, stage,
+    });
   } catch (error) {
     throw toHttps(error);
   }
