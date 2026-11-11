@@ -5047,3 +5047,20 @@ body.fanpage-layout-three-active {
   --dialog-accent-strong: #c75a48;
   --dialog-accent-soft: #ffd8c7;
 }
+
+/* 디자인 3 포커스 표시 통일: 파란 기본 외곽선·주황 실선 외곽선·종이 그림 위 사각형 그림자를
+   손으로 그린 듯한 굵은 점선 하나로 바꾼다. 평상시에 그림자가 있는 요소는 그림자를 그대로 둔다. */
+body.fanpage-layout-three-active :is(button, a[href], summary, [role="tab"], [tabindex="0"]):focus-visible {
+  outline: 3px dashed var(--doodle-ink, #2f2a2c) !important;
+  outline-offset: 4px !important;
+}
+body.fanpage-layout-three-active :is(button, a[href], summary, [role="tab"], [tabindex="0"]):focus-visible:not(
+  .affiliate-promo-button, .auth-button, .profile-stock-attendance, .profile-stock-card,
+  .streamer-edit-verification-prompt, .video-library-category, .weekly-schedule-arrow, #profileActions .button
+) { box-shadow: none !important; }
+body.fanpage-layout-three-active :is(input, select, textarea):focus,
+body.fanpage-layout-three-active :is(input, select, textarea):focus-visible {
+  outline: 3px dashed var(--doodle-ink, #2f2a2c) !important;
+  outline-offset: 2px !important;
+  box-shadow: none !important;
+}
