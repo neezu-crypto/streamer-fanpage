@@ -100,6 +100,7 @@ const {
   validateAdminStatsSnapshot,
 } = require('./admin-stats-snapshot');
 const { attachLayoutDesigns } = require('./design-usage');
+const designPass = require('./design-pass');
 const {
   CINETY_CATEGORY_DEFINITIONS,
   isCinetyCategoryId,
@@ -4722,6 +4723,11 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
     db.ref(`streamerFanPageEmotes/${target.streamer.id}`).get(),
   ]);
   const stock = findStockForStreamer(target.streamer, stockNamesSnap.val());
+  // 이용권 여부는 해당 팬페이지의 인증 스트리머와 관리자에게만 알린다.
+  const canSeeDesignPass = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
+  const designPassInfo = canSeeDesignPass
+    ? { layout3: await designPass.hasDesignPass(db, target.streamer.id), priceCash: designPass.PRICE_CASH }
+    : null;
   return {
     verifiedStreamer: verified ? verified.streamer : null,
     isAdmin,
@@ -4730,6 +4736,7 @@ exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) 
       vods,
       stock,
       decorations: normalizeFanpageEmotes(fanpageEmotesSnap.val()),
+      ...(designPassInfo ? { designPass: designPassInfo } : {}),
     },
   };
 });
@@ -5262,7 +5269,11 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
     const [viewerAdmin, verifiedViewer] = await Promise.all([
       uid ? isAdminUid(uid) : false, uid ? findVerifiedByUid(uid) : null,
     ]);
-    const canUseStarlight = viewerAdmin || verifiedViewer?.streamer.id === target.streamer.id;
+    const isPageStreamer = verifiedViewer?.streamer.id === target.streamer.id;
+    const pageHasPass = await designPass.hasDesignPass(db, target.streamer.id);
+    // 고급 템플릿은 이용권이 있는 팬페이지(또는 관리자)만 쓴다. 이용권이 없으면 미리보기만 가능하다.
+    const canUseStarlight = viewerAdmin || (isPageStreamer && pageHasPass);
+    const canPreviewStarlight = viewerAdmin || isPageStreamer;
     const targetSnapshot = await scheduleRef.get();
     if (isEmbed && !targetSnapshot.exists()) throw new HttpsError('not-found', '저장된 주간 일정표가 없습니다.');
     let record = targetSnapshot.val() || {};
@@ -5327,9 +5338,12 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
       avatarImageId: avatar ? avatar.id : '',
       avatar,
       avatarUnavailable: Boolean(requestedAvatarImageId && !avatar),
-      templateId: record.templateId === 'starlight' ? 'starlight' : 'default',
+      // 이용권이 없는 팬페이지의 공개·임베드 화면은 저장된 값과 관계없이 기본 템플릿으로 보여 준다(저장값은 보존).
+      templateId: record.templateId === 'starlight' && (pageHasPass || viewerAdmin) ? 'starlight' : 'default',
       animationEnabled: record.animationEnabled !== false,
       canUseStarlight,
+      canPreviewStarlight,
+      designPassPriceCash: designPass.PRICE_CASH,
       updatedAt: carriedForwardFrom ? 0 : (Number(record.updatedAt) || 0),
       carriedForwardFrom,
     };
@@ -5348,8 +5362,9 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
   if (!templateId) {
     throw new HttpsError('invalid-argument', '방송표 템플릿을 확인해 주세요.');
   }
-  if (!mayUseTemplate(templateId, { isAdmin, isVerifiedStreamer: Boolean(verified) })) {
-    throw new HttpsError('permission-denied', '고급 템플릿은 인증 스트리머와 관리자만 적용하고 수정할 수 있습니다.');
+  const hasPass = templateId === 'starlight' && !isAdmin ? await designPass.hasDesignPass(db, target.streamer.id) : false;
+  if (!mayUseTemplate(templateId, { isAdmin, isVerifiedStreamer: Boolean(verified) && hasPass })) {
+    throw new HttpsError('permission-denied', '고급 템플릿은 디자인 3 이용권을 구매한 스트리머만 적용하고 저장할 수 있어요.');
   }
   const entries = normalizeWeeklyScheduleEntries(data.entries);
   const footerText = typeof data.footerText === 'string'
@@ -5379,6 +5394,50 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
     throw new HttpsError('aborted', '저장 중 충돌이 발생했습니다. 최신 내용을 불러와 다시 시도해 주세요.');
   }
   return { weekStart, entries, footerText, avatarImageId, templateId, animationEnabled, updatedAt };
+});
+
+exports.streamerFanPageDesignPass = onCall({ maxInstances: 10 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  const action = String(data.action || 'status');
+  const toHttps = (error) => {
+    if (error instanceof designPass.DesignPassError) return new HttpsError(error.code, error.message);
+    return error;
+  };
+  try {
+    const streamerId = designPass.validateStreamerId(data.streamerId);
+    const target = await findVerifiedBySoopId(streamerId);
+    if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+    const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
+    const isPageStreamer = !!verified && verified.streamer.id === target.streamer.id;
+    if (action === 'admin-grant' || action === 'admin-revoke') {
+      if (!isAdmin) throw new HttpsError('permission-denied', '관리자만 사용할 수 있습니다.');
+      if (action === 'admin-grant') {
+        await designPass.grantDesignPass({ db, streamerId: target.streamer.id, adminUid: uid });
+      } else {
+        await designPass.revokeDesignPass({ db, streamerId: target.streamer.id });
+      }
+      return { owned: await designPass.hasDesignPass(db, target.streamer.id) };
+    }
+    if (!isAdmin && !isPageStreamer) throw new HttpsError('permission-denied', '해당 팬페이지의 인증 스트리머와 관리자만 이용할 수 있습니다.');
+    if (action === 'status') {
+      return {
+        owned: await designPass.hasDesignPass(db, target.streamer.id),
+        priceCash: designPass.PRICE_CASH,
+        balanceCash: await designPass.cashBalance(sharedDb, uid),
+        isAdmin,
+      };
+    }
+    if (action !== 'purchase') throw new HttpsError('invalid-argument', '요청 종류를 확인해 주세요.');
+    if (!isPageStreamer) throw new HttpsError('permission-denied', '이용권은 해당 팬페이지의 인증 스트리머 계정으로 구매해 주세요.');
+    if (await isServicePaused(sharedDb, 'streamerFanPage', false)) throw new HttpsError('unavailable', '서비스 점검 중에는 구매할 수 없어요.');
+    const result = await designPass.purchaseDesignPass({
+      db, walletDb: sharedDb, uid, streamerId: target.streamer.id, requestId: data.requestId,
+    });
+    return { ...result, priceCash: designPass.PRICE_CASH };
+  } catch (error) {
+    throw toHttps(error);
+  }
 });
 
 exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {
@@ -6534,8 +6593,9 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
     const requestedLayoutDesign = Object.prototype.hasOwnProperty.call(profile, 'layoutDesign')
       ? Number(profile.layoutDesign)
       : previousLayoutDesign;
-    if (!isAdmin && requestedLayoutDesign === 3 && previousLayoutDesign !== 3) {
-      throw new HttpsError('permission-denied', '디자인 3은 관리자만 사용할 수 있습니다.');
+    if (!isAdmin && requestedLayoutDesign === 3 && previousLayoutDesign !== 3
+      && !await designPass.hasDesignPass(db, targetStreamer.streamer.id)) {
+      throw new HttpsError('permission-denied', '디자인 3은 이용권을 구매한 스트리머만 저장할 수 있습니다.');
     }
     const previousRouletteUrl = parseWeFlabRouletteUrl(previousProfile.rouletteUrl) || '';
     let rouletteUrl = profile.rouletteUrl.trim();

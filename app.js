@@ -49,6 +49,7 @@ const callCommentProfileSave = authenticatedCallable('streamerFanPageCommentProf
 const callVodRefresh = authenticatedCallable('streamerFanPageVodRefresh', { timeout: 3600000 });
 const callCalendar = authenticatedCallable('streamerFanPageCalendar');
 const callWeeklySchedule = authenticatedCallable('streamerFanPageWeeklySchedule');
+const callDesignPass = authenticatedCallable('streamerFanPageDesignPass');
 const callLiveStatus = authenticatedCallable('streamerFanPageLiveStatus');
 const callGalleryUploadTarget = authenticatedCallable('streamerFanPageGallery');
 const callGalleryUploadPrepare = authenticatedCallable('requestImageUpload');
@@ -4398,6 +4399,123 @@ function renderTamagotchiSection(page) {
   return section;
 }
 
+// ---- 디자인 3 이용권(영구제, 100캐시) 공용 도우미 ----
+const DESIGN_PASS_PREVIEW_SECONDS = 60;
+function designPassOwned(page) {
+  return isAdminUser === true || page?.designPass?.layout3 === true;
+}
+function designPassPriceCash(page) {
+  return Number(page?.designPass?.priceCash) > 0 ? Number(page.designPass.priceCash) : 100;
+}
+function formatPreviewRemaining(totalSeconds) {
+  const seconds = Math.max(0, Math.ceil(totalSeconds));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+// 1분 미리보기 타이머. 화면에서만 적용하며 서버에 아무것도 저장하지 않는다.
+function startDesignPreviewTimer({ seconds = DESIGN_PASS_PREVIEW_SECONDS, onTick, onEnd }) {
+  const endAt = Date.now() + seconds * 1000;
+  let stopped = false;
+  const tick = () => {
+    if (stopped) return;
+    const remaining = (endAt - Date.now()) / 1000;
+    if (remaining <= 0) { stop(); onEnd?.(); return; }
+    onTick?.(remaining);
+  };
+  const handle = window.setInterval(tick, 500);
+  function stop() { stopped = true; window.clearInterval(handle); }
+  onTick?.(seconds);
+  return { stop };
+}
+function newDesignPassRequestId(streamerId) {
+  // 같은 구매 시도의 재시도는 같은 번호를 쓰도록 sessionStorage에 보관한다(중복 차감 방지).
+  const key = `fanpageDesignPassRequest:${streamerId}`;
+  let value = '';
+  try { value = sessionStorage.getItem(key) || ''; } catch (_) { value = ''; }
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(value)) {
+    const bytes = new Uint8Array(18);
+    crypto.getRandomValues(bytes);
+    value = `dp_${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+    try { sessionStorage.setItem(key, value); } catch (_) { /* 저장 불가 시 이번 시도에만 사용 */ }
+  }
+  return { key, value };
+}
+function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
+  const streamerId = page.streamer.id;
+  const priceCash = designPassPriceCash(page);
+  document.getElementById('designPassDialog')?.remove();
+  const dialog = document.createElement('dialog');
+  dialog.id = 'designPassDialog';
+  dialog.className = 'account-dialog design-pass-dialog';
+  const card = document.createElement('div');
+  card.className = 'account-dialog-card design-pass-dialog-card';
+  const title = document.createElement('h2');
+  title.textContent = '디자인 3 이용권';
+  const lead = document.createElement('p');
+  lead.className = 'design-pass-lead';
+  lead.textContent = `${priceCash}캐시로 한 번 구매하면 계속 쓸 수 있어요.`;
+  const list = document.createElement('ul');
+  list.className = 'design-pass-benefits';
+  [
+    '디자인 3(손그림 스티커북) 레이아웃',
+    '주간 일정표 고급 템플릿 "별빛 방송국" (디자인 1·2에서도 사용)',
+    '이 팬페이지에 적용되며 다른 계정·페이지로 옮길 수 없어요',
+  ].forEach((text) => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
+  const balance = document.createElement('p');
+  balance.className = 'design-pass-balance';
+  balance.setAttribute('role', 'status');
+  balance.textContent = '통합 캐시 잔액을 확인하고 있어요.';
+  const notice = document.createElement('p');
+  notice.className = 'design-pass-notice';
+  notice.textContent = '구매 즉시 적용되며 일반 취소·환불은 되지 않아요. 결제 오류나 이중 차감은 자동으로 환불돼요. 통합 캐시는 별풍선 1개 = 1캐시예요.';
+  const actions = document.createElement('div');
+  actions.className = 'design-pass-actions';
+  const cancel = document.createElement('button');
+  cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '닫기';
+  const pay = document.createElement('button');
+  pay.type = 'button'; pay.className = 'button button-primary'; pay.textContent = `${priceCash}캐시로 구매`; pay.disabled = true;
+  actions.append(cancel, pay);
+  card.append(title, lead, list, balance, notice, actions);
+  dialog.append(card);
+  document.body.append(dialog);
+  let busy = false;
+  const closeDialog = () => { if (!busy && dialog.open) dialog.close(); };
+  cancel.addEventListener('click', closeDialog);
+  dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(); });
+  dialog.addEventListener('close', () => dialog.remove());
+  callDesignPass({ action: 'status', streamerId }).then((result) => {
+    const data = result.data || {};
+    if (data.owned) { balance.textContent = '이미 이용권이 있어요.'; pay.disabled = true; onPurchased?.({ alreadyOwned: true }); return; }
+    const cash = Number(data.balanceCash) || 0;
+    balance.textContent = cash >= priceCash
+      ? `현재 통합 캐시 ${cash.toLocaleString('ko-KR')}캐시`
+      : `통합 캐시가 부족해요. (보유 ${cash.toLocaleString('ko-KR')}캐시 / 필요 ${priceCash}캐시) 충전한 뒤 다시 시도해 주세요.`;
+    pay.disabled = cash < priceCash;
+  }).catch((error) => { balance.textContent = error.message || '잔액을 확인하지 못했어요.'; });
+  pay.addEventListener('click', async () => {
+    if (busy) return;
+    busy = true; pay.disabled = true; cancel.disabled = true; pay.textContent = '결제 중…';
+    const request = newDesignPassRequestId(streamerId);
+    try {
+      const result = await callDesignPass({ action: 'purchase', streamerId, requestId: request.value });
+      try { sessionStorage.removeItem(request.key); } catch (_) { /* 무시 */ }
+      const data = result.data || {};
+      if (data.status !== 'activated' && data.status !== 'owned') throw new Error('결제 결과를 확인하지 못했어요. 잠시 후 다시 확인해 주세요.');
+      if (currentPage?.streamer.id === streamerId) currentPage.designPass = { ...(currentPage.designPass || {}), layout3: true, priceCash };
+      page.designPass = { ...(page.designPass || {}), layout3: true, priceCash };
+      busy = false;
+      dialog.close();
+      showToast(data.status === 'owned' ? '이미 이용권이 있어요.' : '디자인 3 이용권을 구매했어요.');
+      onPurchased?.({ alreadyOwned: data.status === 'owned' });
+    } catch (error) {
+      busy = false; cancel.disabled = false; pay.textContent = `${priceCash}캐시로 구매`;
+      pay.disabled = false;
+      balance.textContent = error.message || '구매하지 못했어요. 차감된 캐시는 자동으로 확인돼요.';
+    }
+  });
+  showFanPageModal(dialog);
+  return dialog;
+}
+
 function renderFanPageLayoutDesignDialog(page, activeLayout) {
   const dialog = document.createElement('dialog');
   dialog.id = 'layoutDesignDialog';
@@ -4435,9 +4553,10 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   const initialLayout = [1, 2, 3].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
-  const canUseLayoutThree = isAdminUser === true;
   let draftLayout = initialLayout;
   let saving = false;
+  let previewTimer = null;
+  const stopPreviewTimer = () => { previewTimer?.stop(); previewTimer = null; };
 
   const setDisabled = (disabled) => {
     layoutOptions.querySelectorAll('input').forEach((input) => { input.disabled = disabled; });
@@ -4450,13 +4569,25 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       ? Number(targetPage.profile.layoutDesign)
       : DEFAULT_FANPAGE_LAYOUT;
     draftLayout = selectedLayout;
+    stopPreviewTimer();
     if (selectedLayout === previousLayout) {
       status.textContent = '현재 디자인입니다. 다른 디자인을 선택하면 미리볼 수 있어요.';
       return;
     }
     const previousProfile = { ...(targetPage.profile || {}) };
     targetPage.profile = { ...previousProfile, layoutDesign: selectedLayout };
-    status.textContent = '미리보기를 적용했어요. 닫기 버튼을 누르면 저장됩니다.';
+    const previewOnly = selectedLayout === 3 && !designPassOwned(targetPage);
+    status.textContent = previewOnly
+      ? `디자인 3 미리보기 중이에요 (${formatPreviewRemaining(DESIGN_PASS_PREVIEW_SECONDS)} 남음). 구매하면 저장할 수 있어요.`
+      : '미리보기를 적용했어요. 닫기 버튼을 누르면 저장됩니다.';
+    if (previewOnly) {
+      previewTimer = startDesignPreviewTimer({
+        onTick: (remaining) => {
+          status.textContent = `디자인 3 미리보기 중이에요 (${formatPreviewRemaining(remaining)} 남음). 구매하면 저장할 수 있어요.`;
+        },
+        onEnd: () => revertPreviewToSaved('미리보기 시간이 끝나 저장된 디자인으로 돌아왔어요.'),
+      });
+    }
     // Re-rendering removes the dialog from the document. Close it first so the
     // preserved instance can be attached and opened again without an
     // InvalidStateError from showModal() on an already-open, detached dialog.
@@ -4465,6 +4596,20 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       preservedLayoutDesignDialog: dialog,
       reopenLayoutDesignDialog: true,
     });
+  };
+  // 미리보기를 끝내고 마지막으로 저장된 디자인(initialLayout)으로 화면을 되돌린다. 서버에는 아무것도 쓰지 않는다.
+  const revertPreviewToSaved = (message) => {
+    stopPreviewTimer();
+    const targetPage = currentPage;
+    draftLayout = initialLayout;
+    if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
+    targetPage.profile = { ...(targetPage.profile || {}), layoutDesign: initialLayout };
+    layoutOptions.querySelectorAll('input').forEach((input) => { input.checked = Number(input.value) === initialLayout; });
+    status.textContent = message || '';
+    const wasOpen = dialog.open;
+    if (dialog.open) dialog.close();
+    renderFanPage(targetPage, { preservedLayoutDesignDialog: dialog, reopenLayoutDesignDialog: wasOpen });
+    if (message) showToast(message);
   };
   const saveLayoutAndClose = async () => {
     if (saving) return;
@@ -4476,9 +4621,21 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       return;
     }
     if (requestedLayout === initialLayout) {
+      stopPreviewTimer();
       dialog.close();
       return;
     }
+    if (requestedLayout === 3 && !designPassOwned(targetPage)) {
+      // 이용권이 없는 디자인 3은 저장하지 않는다. 미리보기를 끝내고 저장된 디자인으로 되돌린다.
+      stopPreviewTimer();
+      draftLayout = initialLayout;
+      targetPage.profile = { ...(targetPage.profile || {}), layoutDesign: initialLayout };
+      if (dialog.open) dialog.close();
+      renderFanPage(targetPage);
+      showToast('디자인 3은 이용권을 구매하면 저장할 수 있어요. 저장된 디자인으로 돌아왔어요.');
+      return;
+    }
+    stopPreviewTimer();
     saving = true;
     setDisabled(true);
     close.disabled = true;
@@ -4527,7 +4684,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     [1, '디자인 1 · 파스텔 만화풍', '포근한 파스텔 컬러와 캐릭터가 있는 디자인'],
     [2, '디자인 2 · 기존 팬페이지', '차분한 어두운 톤의 기존 팬페이지 디자인'],
     [3, '디자인 3 · 손그림 스티커북', '단색 종이 바탕과 굵은 손그림 테두리'],
-  ].filter(([value]) => canUseLayoutThree || value !== 3 || initialLayout === 3);
+  ];
   layoutOptionsData.forEach(([value, titleText, descriptionText]) => {
     const option = document.createElement('label');
     option.className = 'profile-layout-option';
@@ -4546,10 +4703,8 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     optionTitle.textContent = titleText;
     const optionDescription = document.createElement('small');
     optionDescription.textContent = descriptionText;
-    if (value === 3 && !canUseLayoutThree) {
-      radio.disabled = true;
-      option.title = '디자인 3은 관리자 전용입니다.';
-      optionDescription.textContent = '관리자 전용 · 현재 적용 중인 디자인';
+    if (value === 3 && !designPassOwned(page)) {
+      optionDescription.textContent = '디자인 3 구매자 전용 · 1분 미리보기 가능 · 100캐시 영구 이용';
     }
     copy.append(optionTitle, optionDescription);
     const thumb = document.createElement('span');
@@ -4559,13 +4714,62 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     option.append(radio, thumb, copy);
     layoutOptions.append(option);
   });
-  if (!canUseLayoutThree) {
-    status.textContent = initialLayout === 3
-      ? '현재 디자인 3은 관리자 전용입니다. 다른 디자인으로 변경할 수 있어요.'
-      : '디자인 3은 관리자 전용이며 관리자 계정에서만 선택할 수 있어요.';
+  const passPanel = document.createElement('div');
+  passPanel.className = 'design-pass-panel';
+  const passText = document.createElement('p');
+  passText.className = 'design-pass-panel-text';
+  const buy = document.createElement('button');
+  buy.type = 'button'; buy.className = 'button button-primary design-pass-buy';
+  passPanel.append(passText, buy);
+  const adminPassRow = document.createElement('div');
+  adminPassRow.className = 'design-pass-admin-row';
+  const adminPassButton = document.createElement('button');
+  adminPassButton.type = 'button'; adminPassButton.className = 'button design-pass-admin-button';
+  adminPassRow.append(adminPassButton);
+  const syncPassPanel = () => {
+    const owned = designPassOwned(currentPage || page);
+    const adminOwned = (currentPage || page).designPass?.layout3 === true;
+    passPanel.hidden = owned;
+    passText.textContent = '디자인 3과 주간 일정표 고급 템플릿은 이용권 구매자 전용이에요. 지금은 1분 동안 미리볼 수 있어요.';
+    buy.textContent = `이용권 구매 · ${designPassPriceCash(page)}캐시 (영구)`;
+    adminPassRow.hidden = isAdminUser !== true;
+    adminPassButton.textContent = adminOwned ? '관리자: 이 팬페이지 이용권 회수' : '관리자: 이 팬페이지에 이용권 부여';
+  };
+  buy.addEventListener('click', () => {
+    openDesignPassPurchaseDialog(currentPage || page, {
+      onPurchased: () => {
+        stopPreviewTimer();
+        syncPassPanel();
+        status.textContent = draftLayout === 3
+          ? '이용권을 구매했어요. 닫기 버튼을 누르면 디자인 3이 저장됩니다.'
+          : '이용권을 구매했어요. 이제 디자인 3을 선택해 저장할 수 있어요.';
+        layoutOptions.querySelectorAll('.profile-layout-option-copy small').forEach((small, index) => {
+          if (layoutOptionsData[index]?.[0] === 3) small.textContent = layoutOptionsData[index][2];
+        });
+      },
+    });
+  });
+  adminPassButton.addEventListener('click', async () => {
+    const target = currentPage || page;
+    const grant = target.designPass?.layout3 !== true;
+    adminPassButton.disabled = true;
+    try {
+      const result = await callDesignPass({ action: grant ? 'admin-grant' : 'admin-revoke', streamerId: target.streamer.id });
+      target.designPass = { ...(target.designPass || {}), layout3: result.data?.owned === true, priceCash: designPassPriceCash(target) };
+      showToast(grant ? '이 팬페이지에 이용권을 부여했어요.' : '이 팬페이지의 이용권을 회수했어요.');
+    } catch (error) {
+      showToast(error.message || '이용권 상태를 바꾸지 못했어요.');
+    } finally {
+      adminPassButton.disabled = false;
+      syncPassPanel();
+    }
+  });
+  syncPassPanel();
+  if (!designPassOwned(page) && initialLayout !== 3) {
+    status.textContent = '디자인 3은 구매자 전용이에요. 선택하면 1분 동안 미리볼 수 있어요.';
   }
   layoutChoice.append(layoutLegend, layoutOptions);
-  card.append(headingRow, intro, layoutChoice, status);
+  card.append(headingRow, intro, layoutChoice, passPanel, adminPassRow, status);
   dialog.append(card);
   return dialog;
 }
@@ -4968,7 +5172,8 @@ function renderFanPage(page, options = {}) {
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
 
-  if (page.isOwner && options.preservedLayoutDesignDialog) {
+  // 디자인 3 미리보기는 팬 화면(편집 UI 없음)으로 다시 그려지므로, 열려 있던 디자인 창은 실제 관리 권한만 있으면 유지한다.
+  if ((page.isOwner || page.canManage === true) && options.preservedLayoutDesignDialog) {
     view.append(options.preservedLayoutDesignDialog);
     if (options.reopenLayoutDesignDialog) options.preservedLayoutDesignDialog.showModal();
   } else if (page.isOwner) {
@@ -9132,6 +9337,8 @@ async function loadWeeklySchedulePageData(page, weekStart, board, options = {}) 
     state.footerText = typeof saved.data.footerText === 'string' ? saved.data.footerText.slice(0, 48) : '';
     state.templateId = saved.data.templateId === 'starlight' ? 'starlight' : 'default';
     state.canUseStarlight = saved.data.canUseStarlight === true;
+    state.canPreviewStarlight = saved.data.canPreviewStarlight === true;
+    state.previewingStarlight = false;
     state.animationEnabled = saved.data.animationEnabled !== false;
     state.avatarImageId = savedAvatarId;
     state.updatedAt = Number(saved.data.updatedAt) || 0;
@@ -9566,6 +9773,8 @@ function weeklyScheduleGraphicStateFor(streamerId) {
       footerText: '',
       templateId: 'default',
       canUseStarlight: false,
+      canPreviewStarlight: false,
+      previewingStarlight: false,
       animationEnabled: true,
       selectedImage: null,
       avatarImageId: '',
@@ -9744,7 +9953,8 @@ function renderWeeklyScheduleDialog(page) {
   const syncMotionToggle = () => { const enabled = state.animationEnabled !== false; motionToggle.textContent = enabled ? '특수효과 끄기' : '특수효과 켜기'; motionToggle.setAttribute('aria-pressed', String(enabled)); motionToggle.disabled = state.templateId !== 'starlight' || !state.canUseStarlight; };
   motionToggle.addEventListener('click', () => { if (!state.canUseStarlight || state.templateId !== 'starlight') return; state.animationEnabled = !state.animationEnabled; syncMotionToggle(); markWeeklyDirty(); });
   const templateHint = document.createElement('small'); templateHint.setAttribute('role', 'status');
-  templateLabel.append(templateSelect); templateControls.append(templateLabel, motionToggle, templateHint);
+  const templateBuy = document.createElement('button'); templateBuy.type = 'button'; templateBuy.className = 'button button-primary weekly-template-buy'; templateBuy.hidden = true;
+  templateLabel.append(templateSelect); templateControls.append(templateLabel, motionToggle, templateBuy, templateHint);
   const previewHeading = document.createElement('div'); previewHeading.className = 'weekly-schedule-preview-heading';
   const previewTitle = document.createElement('h3'); previewTitle.textContent = '미리보기';
   const previewNote = document.createElement('small'); previewNote.textContent = '템플릿 이미지는 새로 제작한 팬페이지 전용 배경입니다.';
@@ -10026,8 +10236,14 @@ function renderWeeklyScheduleDialog(page) {
   function syncWeeklyFields() {
     const locked = state.templateId === 'starlight' && !state.canUseStarlight;
     templateSelect.value = state.templateId; syncMotionToggle();
-    templateSelect.options[1].disabled = !state.canUseStarlight && !locked;
-    templateHint.textContent = locked ? '고급 템플릿은 인증 스트리머와 관리자만 사용할 수 있어요. 기본 템플릿을 선택하면 일정을 수정할 수 있어요.' : (!state.canUseStarlight ? '고급 템플릿은 인증 스트리머와 관리자만 선택할 수 있어요.' : '');
+    templateSelect.options[1].disabled = !state.canUseStarlight && !state.canPreviewStarlight && !locked;
+    const passPrice = designPassPriceCash(page);
+    templateBuy.hidden = state.canUseStarlight || !state.canPreviewStarlight;
+    templateBuy.textContent = `디자인 3 이용권 구매 · ${passPrice}캐시 (영구)`;
+    if (locked) templateHint.textContent = state.previewRemainingText || '고급 템플릿 미리보기 중이에요.';
+    else if (!state.canUseStarlight && state.canPreviewStarlight) templateHint.textContent = '고급 템플릿은 디자인 3 구매자 전용이에요. 선택하면 1분 동안 미리볼 수 있고, 이용권이 있으면 디자인 1·2에서도 쓸 수 있어요.';
+    else if (!state.canUseStarlight) templateHint.textContent = '고급 템플릿은 디자인 3 구매자 전용이에요.';
+    else templateHint.textContent = '';
     footerTextInput.disabled = locked; avatarHitArea.disabled = locked; download.disabled = locked;
     chooseImage.disabled = locked; uploadImage.disabled = locked;
     clearImage.disabled = locked || !(state.selectedImage || state.savedAvatar); uploadSubmit.disabled = locked;
@@ -10074,8 +10290,49 @@ function renderWeeklyScheduleDialog(page) {
     drawPreview(false);
   }
 
+  let starlightPreviewTimer = null;
+  function endStarlightPreview(message) {
+    starlightPreviewTimer?.stop(); starlightPreviewTimer = null;
+    if (!state.previewingStarlight) return;
+    state.previewingStarlight = false; state.previewRemainingText = '';
+    state.templateId = 'default';
+    syncWeeklyFields();
+    $('calendarSection')?._drawWeeklyBoard?.();
+    if (message) showToast(message);
+  }
+  function beginStarlightPreview() {
+    try { state.entries = collectWeeklyEntries(); } catch (error) { templateSelect.value = state.templateId; saveStatus.textContent = error.message; return; }
+    starlightPreviewTimer?.stop();
+    state.previewingStarlight = true; state.templateId = 'starlight';
+    const text = (remaining) => `"별빛 방송국" 미리보기 중이에요 (${formatPreviewRemaining(remaining)} 남음). 저장과 이미지 저장은 이용권 구매 후 가능해요.`;
+    starlightPreviewTimer = startDesignPreviewTimer({
+      onTick: (remaining) => {
+        if (!state.previewingStarlight) { starlightPreviewTimer?.stop(); return; }
+        state.previewRemainingText = text(remaining); templateHint.textContent = state.previewRemainingText;
+      },
+      onEnd: () => endStarlightPreview('미리보기 시간이 끝나 기본 템플릿으로 돌아왔어요.'),
+    });
+    syncWeeklyFields();
+    $('calendarSection')?._drawWeeklyBoard?.();
+  }
+  templateBuy.addEventListener('click', () => {
+    openDesignPassPurchaseDialog(page, {
+      onPurchased: () => {
+        const wasPreviewing = state.previewingStarlight;
+        starlightPreviewTimer?.stop(); starlightPreviewTimer = null;
+        state.previewingStarlight = false; state.previewRemainingText = '';
+        state.canUseStarlight = true;
+        syncWeeklyFields();
+        if (wasPreviewing) markWeeklyDirty();
+      },
+    });
+  });
   templateSelect.addEventListener('change', () => {
-    if (templateSelect.value === 'starlight' && !state.canUseStarlight) { templateSelect.value = state.templateId; return; }
+    if (state.previewingStarlight && templateSelect.value !== 'starlight') { endStarlightPreview(''); return; }
+    if (templateSelect.value === 'starlight' && !state.canUseStarlight) {
+      if (state.canPreviewStarlight) { beginStarlightPreview(); return; }
+      templateSelect.value = state.templateId; return;
+    }
     try { state.entries = collectWeeklyEntries(); } catch (error) { templateSelect.value = state.templateId; saveStatus.textContent = error.message; return; }
     state.templateId = templateSelect.value; syncWeeklyFields(); markWeeklyDirty();
   });
@@ -10103,7 +10360,7 @@ function renderWeeklyScheduleDialog(page) {
         const savingWeekStart = state.weekStart;
         const savingAvatarImageId = state.avatarImageId || '';
         const savingFooterText = state.footerText || '';
-        const savingTemplateId = state.templateId;
+        const savingTemplateId = state.previewingStarlight ? 'default' : state.templateId;
         const savingAnimationEnabled = state.animationEnabled;
         const expectedUpdatedAt = state.updatedAt;
         state.saveStatus = '저장 중…'; saveStatus.textContent = state.saveStatus;
@@ -10162,6 +10419,7 @@ function renderWeeklyScheduleDialog(page) {
 
   async function moveEditorWeek(offset) {
     if (state.weekNavigationBusy || state.uploadBusy) return;
+    endStarlightPreview('');
     let entries;
     try { entries = collectWeeklyEntries(); }
     catch (error) { state.saveStatus = error.message; saveStatus.textContent = error.message; return; }
@@ -10353,6 +10611,7 @@ function renderWeeklyScheduleDialog(page) {
   nextWeek.addEventListener('click', () => { void moveEditorWeek(1); });
   const closeAndSave = async () => {
     if (state.uploadBusy) { showToast('이미지 등록이 끝난 뒤 방송표를 닫을 수 있어요.'); return; }
+    endStarlightPreview('');
     if (await saveCurrentWeek()) dialog.close();
   };
   close.addEventListener('click', closeAndSave);
@@ -10366,6 +10625,7 @@ function renderWeeklyScheduleDialog(page) {
     if (dialog.open && avatarHitArea.isConnected) avatarHitArea.focus({ preventScroll: true });
   });
   dialog.addEventListener('close', () => {
+    endStarlightPreview('');
     if (imageTools.open) imageTools.close();
     state.weekStart = weekInput.value || state.weekStart;
   });
