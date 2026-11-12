@@ -1,0 +1,25 @@
+/* 방송 오버레이: 배경 투명. 브라우저 소스 크기 안에서 모서리에 붙는다 */
+html, body.tgo-body { margin: 0; background: transparent !important; overflow: hidden; font-family: 'Jua', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+.tgo { position: fixed; display: grid; justify-items: center; gap: 6px; --size: 200px; --accent: #f58cac; }
+.tgo[hidden] { display: none; }
+.tgo.pos-br { right: 16px; bottom: 16px; } .tgo.pos-bl { left: 16px; bottom: 16px; } .tgo.pos-tr { right: 16px; top: 16px; } .tgo.pos-tl { left: 16px; top: 16px; }
+.tgo.size-s { --size: 140px; } .tgo.size-m { --size: 200px; } .tgo.size-l { --size: 280px; }
+.tgo-stage { position: relative; display: grid; place-items: end center; width: calc(var(--size) * 1.5); height: calc(var(--size) * 1.05); }
+.tgo-stage.tg-stage { min-height: 0; padding: 0 0 4px; border: 0; box-shadow: 0 6px 20px #0003; }
+.tgo-stage:not(.tg-stage) { background: transparent; }
+.tgo-pet { position: relative; z-index: 1; width: var(--size); }
+.tgo-stage.tg-stage .tgo-pet { width: auto; }
+.tgo-bubble { position: absolute; left: 50%; top: -6px; z-index: 3; transform: translate(-50%, -100%); padding: 6px 14px; border-radius: 999px; background: #fff; color: #3a2f3f; font-size: calc(var(--size) * .085); white-space: nowrap; box-shadow: 0 3px 12px #0003; opacity: 0; transition: opacity .25s, transform .25s; }
+.tgo-bubble.is-on { opacity: 1; transform: translate(-50%, -110%); }
+.tgo-badge { position: absolute; left: 50%; bottom: 6px; z-index: 3; transform: translateX(-50%); padding: 3px 10px; border-radius: 999px; background: #fffffff0; color: #3a2f3f; font-size: calc(var(--size) * .07); box-shadow: 0 2px 8px #0002; }
+.tgo-info { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: #1b1924cc; color: #fff; font-size: calc(var(--size) * .075); }
+.tgo-name { font-weight: 700; } .tgo-gems { opacity: .95; }
+.tgo-stats { display: flex; gap: 5px; padding: 5px 8px; border-radius: 999px; background: #1b1924cc; }
+.tgo-ring { --p: 0; --ring: var(--accent); position: relative; display: grid; place-items: center; width: calc(var(--size) * .17); height: calc(var(--size) * .17); border-radius: 50%; }
+.tgo-ring::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(var(--ring) calc(var(--p) * 1%), #ffffff2a 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); transition: --p .6s; }
+.tgo-ring span { position: relative; font-size: calc(var(--size) * .075); line-height: 1; }
+.tgo-ring[data-band=mid] { --ring: #f2b33a; } .tgo-ring[data-band=bad] { --ring: #e0566b; }
+.tgo.hide-stats .tgo-stats { display: none; }
+/* 목욕 물줄기(상점 .tg-water 재사용, 오버레이에서는 is-on일 때만) */
+.tgo-water { z-index: 2; }
+.tgo-water.is-on { display: block; }

@@ -168,6 +168,7 @@ async function adminClearTestPets({ db, isAdmin, streamerId }) {
     if (pet && pet.source === 'admin-test') {
       await petRef(db, streamerId, petId).remove();
       await db.ref(`streamerFanPageTamagotchiFans/${streamerId}/${petId}`).remove(); // 돌봄 팬 기록도 함께 정리
+      await require('./tamagotchi-overlay').removeForPet(db, streamerId, petId); // 방송 오버레이도 정리
       removed.push(petId);
     }
   }

@@ -70,7 +70,7 @@ function loadShopModules() {
 
 // mountCareView: 탭 패널 안에 돌봄 화면을 그린다. 반환값 destroy()로 정리.
 export function mountCareView(container, {
-  page, callShop, callCare, isAdmin = false, canManage = false, hasAccount = () => false, openLogin = () => {}, openApplication = null,
+  page, callShop, callCare, isAdmin = false, canManage = false, hasAccount = () => false, openLogin = () => {}, openApplication = null, callOverlay = null,
 }) {
   const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const root = el('div', 'tg-care'); container.replaceChildren(root);
@@ -91,6 +91,10 @@ export function mountCareView(container, {
     refs.bond = el('span', 'tg-care-chip'); refs.gems = el('span', 'tg-care-chip');
     const meta = el('div', 'tg-care-meta'); meta.append(refs.name, refs.bond, refs.gems);
     head.append(refs.picker, meta);
+    if (callOverlay && canManage) {
+      const tv = el('button', 'tg-care-icon-btn', '📺'); tv.type = 'button'; tv.title = '방송 오버레이'; tv.setAttribute('aria-label', '방송 오버레이');
+      tv.addEventListener('click', () => openOverlayDialog()); head.append(tv);
+    }
     if (openApplication) {
       const app = el('button', 'tg-care-icon-btn', '✎'); app.type = 'button'; app.title = '다마고치 디자인 신청'; app.setAttribute('aria-label', '다마고치 디자인 신청');
       app.addEventListener('click', () => openApplication()); head.append(app);
@@ -117,6 +121,73 @@ export function mountCareView(container, {
     }
     if (withShopLink) { const a = el('a', 'button button-primary', '분양소 가기 ↗'); a.href = `${SHOP_BASE}tamagotchi.html`; a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
     root.append(box);
+  }
+
+  // ---------- 방송 오버레이(📺): 발급·재발급·끄기, 옵션, 미리보기 ----------
+  const OVERLAY_PAGE = new URL('overlay.html', location.origin + location.pathname).href;
+  function openOverlayDialog() {
+    let token = '';
+    const dlg = el('dialog', 'tg-overlay-dialog');
+    const close = el('button', 'tg-overlay-close', '✕'); close.type = 'button'; close.setAttribute('aria-label', '닫기'); close.addEventListener('click', () => dlg.close());
+    const title = el('h3', '', '📺 방송 오버레이');
+    const desc = el('p', 'tg-overlay-desc', 'OBS·PRISM 같은 방송 프로그램의 "브라우저 소스"에 아래 주소를 넣으면 방송 화면에 펫이 떠요. 팬이 돌보면 실시간으로 반응해요(누가 했는지는 표시하지 않아요).');
+    const state = el('p', 'tg-overlay-state'); state.setAttribute('role', 'status');
+    const actions = el('div', 'tg-overlay-actions');
+    const make = el('button', 'button button-primary', '주소 만들기'); make.type = 'button';
+    const off = el('button', 'button', '오버레이 끄기'); off.type = 'button';
+    actions.append(make, off);
+    const opts = el('div', 'tg-overlay-opts');
+    const sel = (label, key, choices, def) => {
+      const lab = el('label', '', label); const s = el('select'); s.dataset.key = key;
+      for (const [v, t] of choices) { const o = el('option', '', t); o.value = v; if (v === def) o.selected = true; s.append(o); }
+      s.addEventListener('change', updateUrl); lab.append(s); opts.append(lab); return s;
+    };
+    sel('크기', 'size', [['s', '작게'], ['m', '보통'], ['l', '크게']], 'm');
+    sel('배경', 'bg', [['none', '투명'], ['room', '방 그림']], 'none');
+    sel('위치', 'pos', [['br', '오른쪽 아래'], ['bl', '왼쪽 아래'], ['tr', '오른쪽 위'], ['tl', '왼쪽 위']], 'br');
+    sel('상태 고리', 'stats', [['1', '보이기'], ['0', '숨기기']], '1');
+    sel('반응 말풍선', 'feed', [['1', '보이기'], ['0', '숨기기']], '1');
+    sel('소리', 'sound', [['0', '끄기'], ['1', '켜기']], '0');
+    const urlRow = el('div', 'tg-overlay-url');
+    const url = el('input'); url.readOnly = true; url.type = 'text'; url.setAttribute('aria-label', '오버레이 주소');
+    const copy = el('button', 'button', '복사'); copy.type = 'button';
+    copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(url.value); state.textContent = '주소를 복사했어요. 다른 사람에게 보여 주지 마세요.'; } catch (_) { url.select(); } });
+    urlRow.append(url, copy);
+    const warn = el('p', 'tg-overlay-warn', '주소에 비밀 키가 들어 있어요. 방송 화면에 주소가 보이지 않게 해 주세요. 새로 만들면 예전 주소는 바로 꺼져요.');
+    const preview = el('iframe', 'tg-overlay-preview'); preview.title = '오버레이 미리보기';
+    dlg.append(close, title, desc, state, actions, opts, urlRow, warn, preview);
+    container.append(dlg);
+    dlg.addEventListener('close', () => dlg.remove());
+    function updateUrl() {
+      const q = new URLSearchParams({ t: token });
+      opts.querySelectorAll('select').forEach((s) => q.set(s.dataset.key, s.value));
+      url.value = token ? `${OVERLAY_PAGE}#${q}` : '';
+      urlRow.hidden = !token; warn.hidden = !token; opts.hidden = !token; preview.hidden = !token;
+      if (token) preview.src = url.value.replace('#', `?p=${Date.now()}#`);
+    }
+    async function call(action) {
+      const r = (await callOverlay({ action, streamerId: page.streamer.id, petId: pet.petId })).data; return r;
+    }
+    make.addEventListener('click', async () => {
+      if (token || make.dataset.active === '1') { if (!window.confirm('새 주소를 만들면 지금 방송에 쓰는 주소는 바로 꺼져요. 계속할까요?')) return; }
+      make.disabled = true;
+      try { token = (await call('issue')).token; make.dataset.active = '1'; make.textContent = '새 주소 만들기'; off.hidden = false; state.textContent = '주소를 만들었어요. 이 창을 닫으면 다시 볼 수 없으니 지금 복사해 주세요.'; updateUrl(); }
+      catch (error) { state.textContent = error.message || '주소를 만들지 못했어요.'; }
+      finally { make.disabled = false; }
+    });
+    off.addEventListener('click', async () => {
+      if (!window.confirm('오버레이를 끌까요? 방송 화면에서 펫이 사라져요.')) return;
+      off.disabled = true;
+      try { await call('revoke'); token = ''; make.dataset.active = ''; make.textContent = '주소 만들기'; off.hidden = true; state.textContent = '오버레이를 껐어요.'; updateUrl(); }
+      catch (error) { state.textContent = error.message || '끄지 못했어요.'; }
+      finally { off.disabled = false; }
+    });
+    updateUrl(); off.hidden = true;
+    dlg.showModal();
+    call('info').then((r) => {
+      if (r.active) { make.dataset.active = '1'; make.textContent = '새 주소 만들기'; off.hidden = false; state.textContent = '오버레이가 켜져 있어요. 주소는 만들 때 한 번만 보여 줘요 — 잃어버렸으면 새로 만들어 주세요.'; }
+      else state.textContent = '아직 오버레이 주소가 없어요.';
+    }).catch((error) => { state.textContent = error.message || '오버레이 정보를 불러오지 못했어요.'; });
   }
 
   // ---------- 막대: 예측값 → 서버 값 부드럽게 ----------

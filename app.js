@@ -43,6 +43,7 @@ const callVideoLibrary = authenticatedCallable('streamerFanPageVideoLibrary');
 const callTamagotchiApplications = authenticatedCallable('streamerFanPageTamagotchiApplications');
 const callTamagotchiShop = authenticatedCallable('streamerFanPageTamagotchiShop');
 const callTamagotchiCare = authenticatedCallable('streamerFanPageTamagotchiCare');
+const callTamagotchiOverlay = authenticatedCallable('streamerFanPageTamagotchiOverlay');
 let currentTamagotchiCare = null;
 const callRollingPaper = authenticatedCallable('streamerFanPageRollingPaper');
 const callVodPage = authenticatedCallable('streamerFanPageVodPage');
@@ -4433,7 +4434,7 @@ function renderTamagotchiSection(page) {
     // ?tgpreview=1: 관리자 전용 미리보기(메모리 DB, 운영 저장 없음)
     const preview = isAdminUser === true && new URLSearchParams(location.search).get('tgpreview') === '1';
     Promise.all([
-      import('./tamagotchi-care-view.js?v=20261113-tg-mobile1'),
+      import('./tamagotchi-care-view.js?v=20261113-tg-overlay1'),
       preview ? import('./tamagotchi-care-preview.js?v=20261113-tg-preview1').then((m) => m.createCarePreview(page)) : null,
     ]).then(([{ mountCareView }, mock]) => {
       if (currentPage?.streamer.id !== page.streamer.id) return;
@@ -4444,6 +4445,7 @@ function renderTamagotchiSection(page) {
         canManage: canApply, hasAccount: () => hasRecognizedFanpageAccount(),
         openLogin: () => showFanPageModal($('loginChoiceDialog')),
         openApplication: canApply ? () => showFanPageModal(dialog) : null,
+        callOverlay: mock ? null : callTamagotchiOverlay, // 미리보기(메모리 DB)에서는 오버레이 발급 불가 — overlay.html#demo=1 로 확인
       });
     }).catch((error) => { section._care = false; careHost.textContent = error.message || '다마고치를 불러오지 못했어요.'; });
   };
