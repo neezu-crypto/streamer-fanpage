@@ -201,6 +201,50 @@ function applyOne(s, fan, kind, { now, owner = false, meters = 0, rng = Math.ran
   return { applied: true, gem };
 }
 
+// ---------- 누르고 있는 동안의 천천히 변화(3-C 설계 8-1) ----------
+// 움직이지 않는 톡 도구만. 초당 1회 효과의 25%(4초 = 1회). 연타 감소 없음, 1분 횟수·보석 확률은 4초를 1회로 센다.
+const HOLDABLE = ['feed', 'play', 'talk', 'sing', 'dance'];
+const HOLD_UNIT_MS = 4000;
+const HOLD_MAX_MS = 20000;
+function applyHold(s, fan, kind, holdMs, { now, owner = false, rng = Math.random }) {
+  const eff = EFFECTS[kind];
+  if (!eff || !HOLDABLE.includes(kind) || !(holdMs > 0)) return { applied: false, reason: 'unknown' };
+  const cond = conditionOf(s, now);
+  if (ALLOWED[cond] && !ALLOWED[cond].includes(kind)) return { applied: false, reason: 'condition' };
+  if (s.sleepAt > 0) s.sleepAt = 0;
+  const w = fan.win[kind] || { m: 0, mc: 0, r: 0, rc: 0 };
+  if (now - w.m >= MIN) { w.m = now; w.mc = 0; }
+  let units = Math.min(holdMs, HOLD_MAX_MS) / HOLD_UNIT_MS;
+  if (eff.perMin) units = Math.min(units, Math.max(0, eff.perMin - w.mc));
+  if (units <= 0) { fan.win[kind] = w; return { applied: false, reason: 'cooldown' }; }
+  if (eff.refuse && eff.refuse(s)) return { applied: false, reason: 'full' };
+  w.mc += units; fan.win[kind] = w;
+  fan.daily[kind] = (fan.daily[kind] || 0) + units;
+  if (cond === 'hospital') { fan.bond += (eff.bond || 1) * units; return { applied: true, visit: true }; }
+  let mult = units;
+  if (eff.halfTired && s.fatigue >= 80) mult *= 0.5;
+  if (eff.lowCut && cond === 'low') mult *= 0.7;
+  for (const [stat, v] of Object.entries(eff.gain)) {
+    let delta = v * mult;
+    if (POSITIVE(stat, v)) {
+      const before = fan.contrib[stat] || 0;
+      delta *= softCapFactor(before, owner);
+      fan.contrib[stat] = round1(before + Math.abs(delta));
+    }
+    s[stat] = round1(clamp(s[stat] + delta));
+  }
+  if (eff.bond) fan.bond += eff.bond * units;
+  if (!fan.variety && Object.keys(fan.daily).length >= 4) { fan.variety = true; fan.bond += 5; }
+  let gem = false;
+  const level = bondLevel(fan.bond);
+  const dailyCap = level >= 7 ? 4 : 3;
+  if (s.health >= 30 && fan.gemsToday < dailyCap && rng() < (0.03 + 0.002 * (level - 1)) * units) {
+    fan.gemsToday += 1; fan.bond += 2; gem = true;
+    if (s.gems < GEM_POOL_MAX) s.gems += 1;
+  }
+  return { applied: true, gem };
+}
+
 // 경고 단계: 건강이 30·10 아래로 처음 내려갈 때 한 번씩
 function warnLevel(s) { return s.health < 10 ? 2 : s.health < 30 ? 1 : 0; }
 
@@ -251,15 +295,16 @@ function validateTarget(streamerId, petId) {
   if (!STREAMER_ID_RE.test(sid) || !PET_ID_RE.test(pid)) throw new TamagotchiCareError('invalid-argument', '펫을 확인해 주세요.');
   return { sid, pid };
 }
-// 묶음: [{ kind, n, meters? }] 최대 12종, 종류당 n 1~10, 산책은 1회
+// 묶음: [{ kind, n, meters?, holdMs? }] 최대 12종, 종류당 n 0~10(누르기만 있으면 0), 산책은 1회
 function validateBatch(batch) {
   if (!Array.isArray(batch) || !batch.length || batch.length > 12) throw new TamagotchiCareError('invalid-argument', '상호작용 묶음을 확인해 주세요.');
   return batch.map((item) => {
     const kind = String(item && item.kind || '');
     if (!EFFECTS[kind]) throw new TamagotchiCareError('invalid-argument', '상호작용 종류를 확인해 주세요.');
-    const n = kind === 'walk' || kind === 'nap' ? 1 : Math.floor(Number(item.n));
-    if (!(n >= 1 && n <= 10)) throw new TamagotchiCareError('invalid-argument', '상호작용 횟수를 확인해 주세요.');
-    return { kind, n, meters: kind === 'walk' ? clamp(Number(item.meters) || 0, 0, 300) : 0 };
+    const holdMs = HOLDABLE.includes(kind) ? clamp(Math.floor(Number(item.holdMs) || 0), 0, HOLD_MAX_MS) : 0;
+    const n = kind === 'walk' || kind === 'nap' ? 1 : Math.floor(Number(item.n) || 0);
+    if (!(n >= 0 && n <= 10) || (n === 0 && holdMs === 0)) throw new TamagotchiCareError('invalid-argument', '상호작용 횟수를 확인해 주세요.');
+    return { kind, n, holdMs, meters: kind === 'walk' ? clamp(Number(item.meters) || 0, 0, 300) : 0 };
   });
 }
 
@@ -288,6 +333,10 @@ async function interact({ db, uid, streamerId, petId, batch, owner = false, now 
   const fanRef = db.ref(`${FANS_ROOT}/${sid}/${pid}/${fanKey(uid, sid)}`);
   const fanBefore = normalizeFan((await fanRef.get()).val(), dayKey(now));
   if (now - fanBefore.lastAt < 1500) throw new TamagotchiCareError('resource-exhausted', '조금 천천히 보내 주세요.');
+  // 누른 시간 합계는 지난 전송 이후 흐른 시간(+1초 여유)을 넘을 수 없다
+  const holdBudget = Math.min(HOLD_MAX_MS, fanBefore.lastAt ? now - fanBefore.lastAt + 1000 : HOLD_MAX_MS);
+  let holdLeft = holdBudget;
+  for (const item of items) { const use = Math.min(item.holdMs, holdLeft); item.holdMs = use; holdLeft -= use; }
   let fan = null; let results = null; let warning = 0;
   const statsRef = db.ref(`${PETS_ROOT}/${sid}/${pid}/stats`);
   const tx = await statsRef.transaction((raw) => {
@@ -297,6 +346,11 @@ async function interact({ db, uid, streamerId, petId, batch, owner = false, now 
     for (const item of items) {
       for (let i = 0; i < item.n; i += 1) {
         const r = applyOne(s, fan, item.kind, { now, owner, meters: item.meters, rng });
+        if (r.applied) results.applied += 1; else results.blocked[item.kind] = r.reason;
+        if (r.gem) results.gems += 1;
+      }
+      if (item.holdMs > 0) {
+        const r = applyHold(s, fan, item.kind, item.holdMs, { now, owner, rng });
         if (r.applied) results.applied += 1; else results.blocked[item.kind] = r.reason;
         if (r.gem) results.gems += 1;
       }
@@ -340,6 +394,12 @@ async function treat({ db, uid, streamerId, petId, kind, now = Date.now() }) {
   return { ...publicStats(tx.snapshot.val(), now), spent: cost };
 }
 
+// 관리자가 아니면 스탯 숫자를 지우고 단계(band)만 남긴다(3-C 결정: 숫자는 관리자만)
+function hideValues(out) {
+  if (out && out.stats) for (const k of Object.keys(out.stats)) delete out.stats[k].value;
+  return out;
+}
+
 // 펫 정리 시 팬 기록도 함께 지운다(관리자 테스트 펫 정리 등).
 async function removeFanRecords(db, streamerId, petId) {
   const { sid, pid } = validateTarget(streamerId, petId);
@@ -348,6 +408,7 @@ async function removeFanRecords(db, streamerId, petId) {
 
 module.exports = {
   TamagotchiCareError, PETS_ROOT, FANS_ROOT, EFFECTS, KINDS, ALLOWED, GEM_POOL_MAX,
+  HOLDABLE, HOLD_UNIT_MS, HOLD_MAX_MS, hideValues, applyHold,
   freshStats, advance, conditionOf, applyOne, normalizeFan, bondLevel, softCapFactor, warnLevel,
   treatmentQuote, applyTreatment, publicStats, validateBatch, dayKey, fanKey,
   readStatus, interact, treat, removeFanRecords,
