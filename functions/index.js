@@ -218,6 +218,7 @@ let cinetyCatalogRefreshPromise = null;
 const { readTamagotchiStage, tamagotchiOpenFor } = require('./tamagotchi-stage');
 const tamagotchiShop = require('./tamagotchi-shop');
 const tamagotchiCare = require('./tamagotchi-care');
+const tamagotchiOverlay = require('./tamagotchi-overlay');
 const { publicCatalog: tamagotchiPublicCatalog } = require('./tamagotchi-catalog');
 const FANPAGE_TAMAGOTCHI_MAX_APPLICATIONS_PER_STREAMER = 20;
 const FANPAGE_TAMAGOTCHI_INTERACTIONS = new Set(['pet', 'feed', 'play', 'talk', 'live', 'idle', 'sound']);
@@ -5496,6 +5497,37 @@ exports.streamerFanPageTamagotchiShop = onCall({ maxInstances: 10 }, async (requ
   }
 });
 
+// 다마고치 방송 오버레이: 발급·해제·정보(스트리머·관리자), 상태 보정(state, 로그인 없이 토큰으로)
+exports.streamerFanPageTamagotchiOverlay = onCall({ maxInstances: 10 }, async (request) => {
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  const action = String(data.action || '');
+  try {
+    if (action === 'state') {
+      const out = await tamagotchiOverlay.state({ db, token: data.token });
+      delete out.tokenHash;
+      return out;
+    }
+    const uid = requireAuth(request);
+    const [isAdmin, stage] = await Promise.all([isAdminUid(uid), readTamagotchiStage(db)]);
+    if (!tamagotchiOpenFor(stage, isAdmin)) throw new HttpsError('failed-precondition', '다마고치를 준비하고 있어요.');
+    const streamerId = tamagotchiShop.validateStreamerId(data.streamerId);
+    const target = await findVerifiedBySoopId(streamerId);
+    if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+    const verified = await findVerifiedByUid(uid);
+    if (!isAdmin && !(verified && verified.streamer.id === target.streamer.id)) throw new HttpsError('permission-denied', '스트리머 본인 또는 관리자만 오버레이를 관리할 수 있어요.');
+    const petId = String(data.petId || '');
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(petId)) throw new HttpsError('invalid-argument', '펫을 확인해 주세요.');
+    const args = { db, streamerId: target.streamer.id, petId };
+    if (action === 'info') return await tamagotchiOverlay.info(args);
+    if (action === 'issue') return await tamagotchiOverlay.issue(args);
+    if (action === 'revoke') return await tamagotchiOverlay.revoke(args);
+    throw new HttpsError('invalid-argument', '요청 종류를 확인해 주세요.');
+  } catch (error) {
+    if (error instanceof tamagotchiOverlay.TamagotchiOverlayError || error instanceof tamagotchiShop.TamagotchiShopError) throw new HttpsError(error.code, error.message);
+    throw error;
+  }
+});
+
 // 다마고치 돌봄(스탯): 상태 조회·상호작용 묶음·하트 보석 치료. 스탯은 서버만 계산하고 공개 응답에 UID를 넣지 않는다.
 exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
@@ -5520,9 +5552,19 @@ exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (requ
       const verified = await findVerifiedByUid(uid);
       const owner = !!verified && verified.streamer.id === targetId;
       const out = await tamagotchiCare.interact({ db, uid, streamerId: targetId, petId: data.petId, batch: data.batch, owner });
+      if (out.result && out.result.applied > 0) {
+        // 방송 오버레이 반응(종류별 횟수만, 누가 했는지 없음). 실패해도 돌봄 응답은 그대로 돌려준다.
+        const counts = {};
+        for (const item of Array.isArray(data.batch) ? data.batch : []) {
+          const kind = String(item && item.kind || ''); if (!kind || (out.result.blocked || {})[kind]) continue;
+          counts[kind] = (counts[kind] || 0) + Math.max(0, Math.floor(Number(item.n) || 0)) + Math.round((Number(item.holdMs) || 0) / tamagotchiCare.HOLD_UNIT_MS);
+        }
+        await tamagotchiOverlay.publish({ db, streamerId: targetId, petId: data.petId, counts }).catch((error) => console.warn('다마고치 오버레이 갱신 실패', error.message));
+      }
       return isAdmin ? out : tamagotchiCare.hideValues(out);
     }
     const out = await tamagotchiCare.treat({ db, uid, streamerId: targetId, petId: data.petId, kind: data.kind });
+    await tamagotchiOverlay.publish({ db, streamerId: targetId, petId: data.petId, counts: { [data.kind === 'discharge' ? 'discharge' : 'outpatient']: 1 } }).catch(() => {});
     return isAdmin ? out : tamagotchiCare.hideValues(out);
   } catch (error) {
     if (error instanceof tamagotchiCare.TamagotchiCareError || error instanceof tamagotchiShop.TamagotchiShopError) throw new HttpsError(error.code, error.message);
