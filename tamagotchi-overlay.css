@@ -23,3 +23,8 @@ html, body.tgo-body { margin: 0; background: transparent !important; overflow: h
 /* 목욕 물줄기(상점 .tg-water 재사용, 오버레이에서는 is-on일 때만) */
 .tgo-water { z-index: 2; }
 .tgo-water.is-on { display: block; }
+/* 말풍선 위치: 투명 배경은 펫 바로 위, 방 배경은 무대 안쪽 위(무대 밖은 잘리므로) */
+.tgo-stage:not(.tg-stage) { height: auto; padding-top: calc(var(--size) * .12); }
+.tgo-stage.tg-stage .tgo-bubble { top: 8px; transform: translate(-50%, -6px); }
+.tgo-stage.tg-stage .tgo-bubble.is-on { transform: translate(-50%, 0); }
+.tgo-stage:not(.tg-stage) .tgo-bubble { top: 0; }
