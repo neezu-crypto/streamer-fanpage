@@ -1,7 +1,7 @@
 // 팬페이지 다마고치 탭: 돌봄 화면(3-C). 펫·도구·소리·무대 배치는 상점 모듈을 그대로 불러 쓰고, 스탯은 서버(Care)가 계산한다.
 // 설계: docs/다마고치_3C_팬페이지_돌봄_화면_설계.md
 export const SHOP_BASE = 'https://neezu-crypto.github.io/streamer-game-series-shop/';
-const SHOP_V = '?v=20261112-tg-care1';
+const SHOP_V = '?v=20261113-tg-care2';
 export const SEND_EVERY_MS = 6000; // 서버 전송 간격(화면은 예측값으로 바로 반응)
 const REFRESH_MS = 60000; // 다른 팬이 돌본 결과 반영
 const BLOCK_DIM_MS = 10000;
@@ -318,7 +318,7 @@ export function mountCareView(container, {
     }) : []));
     refs.pet.replaceChildren(); refs.pet.style.width = ''; refs.pet.style.transform = '';
     petApi = mods.createMongsil(refs.pet, { color: pet.color || 'cream', reduced });
-    scene = mods.createScene({ stage: refs.stage, pet: refs.pet, reduced });
+    scene = mods.createScene({ stage: refs.stage, pet: refs.pet, reduced, maxPetRatio: window.matchMedia('(max-width: 560px)').matches ? 0.56 : Infinity });
     toolCtl = mods.createToolController({ stage: refs.stage, petApi, petEl: refs.pet, ignoreOutside: [refs.tools], reduced, sound, onChange: onTool });
     refs.stage.classList.add('has-home'); requestAnimationFrame(() => scene.alignHome());
     try {
