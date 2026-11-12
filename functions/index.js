@@ -5509,7 +5509,8 @@ exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (requ
     if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
     const targetId = target.streamer.id;
     if (action === 'status') {
-      return await tamagotchiCare.readStatus({ db, uid, streamerId: targetId, petId: data.petId });
+      const out = await tamagotchiCare.readStatus({ db, uid, streamerId: targetId, petId: data.petId });
+      return isAdmin ? out : tamagotchiCare.hideValues(out);
     }
     if (action !== 'interact' && action !== 'treat') throw new HttpsError('invalid-argument', '요청 종류를 확인해 주세요.');
     // 돌봄은 로그인(Google·카카오·스트리머 인증) 계정만. 익명 방문자는 보기만 한다.
@@ -5518,9 +5519,11 @@ exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (requ
     if (action === 'interact') {
       const verified = await findVerifiedByUid(uid);
       const owner = !!verified && verified.streamer.id === targetId;
-      return await tamagotchiCare.interact({ db, uid, streamerId: targetId, petId: data.petId, batch: data.batch, owner });
+      const out = await tamagotchiCare.interact({ db, uid, streamerId: targetId, petId: data.petId, batch: data.batch, owner });
+      return isAdmin ? out : tamagotchiCare.hideValues(out);
     }
-    return await tamagotchiCare.treat({ db, uid, streamerId: targetId, petId: data.petId, kind: data.kind });
+    const out = await tamagotchiCare.treat({ db, uid, streamerId: targetId, petId: data.petId, kind: data.kind });
+    return isAdmin ? out : tamagotchiCare.hideValues(out);
   } catch (error) {
     if (error instanceof tamagotchiCare.TamagotchiCareError || error instanceof tamagotchiShop.TamagotchiShopError) throw new HttpsError(error.code, error.message);
     throw error;

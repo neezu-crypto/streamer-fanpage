@@ -41,6 +41,9 @@ const callMemories = authenticatedCallable('streamerFanPageMemories');
 const callCommentUp = authenticatedCallable('streamerFanPageCommentUp', { timeout: 120000 });
 const callVideoLibrary = authenticatedCallable('streamerFanPageVideoLibrary');
 const callTamagotchiApplications = authenticatedCallable('streamerFanPageTamagotchiApplications');
+const callTamagotchiShop = authenticatedCallable('streamerFanPageTamagotchiShop');
+const callTamagotchiCare = authenticatedCallable('streamerFanPageTamagotchiCare');
+let currentTamagotchiCare = null;
 const callRollingPaper = authenticatedCallable('streamerFanPageRollingPaper');
 const callVodPage = authenticatedCallable('streamerFanPageVodPage');
 const callVodComments = authenticatedCallable('streamerFanPageVodComments');
@@ -524,6 +527,7 @@ function renderAuthControls() {
   $('choiceKakaoLogin').textContent = user && !user.isAnonymous ? '카카오 계정 연결' : '카카오로 로그인';
   $('logoutButton').classList.toggle('hidden', !user || (user.isAnonymous && !kakaoLinked && !streamerVerified));
   updateDesignFeedbackEligibility();
+  currentTamagotchiCare?.refreshAuth?.();
 }
 
 function hasRecognizedFanpageAccount(user = auth.currentUser) {
@@ -4411,10 +4415,39 @@ function renderTamagotchiSection(page) {
   section.id = 'tamagotchiSection';
   // 제목·설명은 탭 머리말(다마고치)에 한 번만 표시한다.
   section.setAttribute('aria-label', '다마고치');
+  // 돌봄 화면(3-C). 디자인 신청서는 ✎ 아이콘 버튼 → 대화상자(스트리머·관리자만)
+  const careHost = document.createElement('div'); careHost.className = 'tamagotchi-care-host';
+  const dialog = document.createElement('dialog'); dialog.className = 'tamagotchi-application-dialog';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'tamagotchi-application-dialog-close'; close.textContent = '✕'; close.setAttribute('aria-label', '닫기');
+  close.addEventListener('click', () => dialog.close());
+  const applicationSection = document.createElement('div'); applicationSection.className = 'tamagotchi-section-application';
   const content = document.createElement('div'); content.className = 'tamagotchi-section-content';
-  section.append(content);
-  page._tamagotchiSection = section;
-  renderTamagotchiApplication(page, section);
+  applicationSection.append(content); dialog.append(close, applicationSection);
+  section.append(careHost, dialog);
+  page._tamagotchiSection = applicationSection;
+  section._loadCare = () => {
+    loadTamagotchiApplication(page, applicationSection);
+    if (section._care) return;
+    section._care = true;
+    const canApply = page.isStreamerOwner === true || isAdminUser === true;
+    // ?tgpreview=1: 관리자 전용 미리보기(메모리 DB, 운영 저장 없음)
+    const preview = isAdminUser === true && new URLSearchParams(location.search).get('tgpreview') === '1';
+    Promise.all([
+      import('./tamagotchi-care-view.js?v=20261113-tg-preview1'),
+      preview ? import('./tamagotchi-care-preview.js?v=20261113-tg-preview1').then((m) => m.createCarePreview(page)) : null,
+    ]).then(([{ mountCareView }, mock]) => {
+      if (currentPage?.streamer.id !== page.streamer.id) return;
+      currentTamagotchiCare?.destroy();
+      if (mock) section.prepend(mock.panel(() => currentTamagotchiCare?.reload()));
+      currentTamagotchiCare = mountCareView(careHost, {
+        page, callShop: mock ? mock.callShop : callTamagotchiShop, callCare: mock ? mock.callCare : callTamagotchiCare, isAdmin: isAdminUser === true,
+        canManage: canApply, hasAccount: () => hasRecognizedFanpageAccount(),
+        openLogin: () => showFanPageModal($('loginChoiceDialog')),
+        openApplication: canApply ? () => showFanPageModal(dialog) : null,
+      });
+    }).catch((error) => { section._care = false; careHost.textContent = error.message || '다마고치를 불러오지 못했어요.'; });
+  };
+  renderTamagotchiApplication(page, applicationSection);
   return section;
 }
 
@@ -5229,7 +5262,7 @@ function renderFanPage(page, options = {}) {
     }
     if (tabKey === 'memories') loadFanPageMemories(page);
     if (tabKey === 'comment-up') view.querySelector('#commentUpSection')?._load?.();
-    if (tabKey === 'tamagotchi') loadTamagotchiApplication(page, tamagotchiSection);
+    if (tabKey === 'tamagotchi') tamagotchiSection._loadCare();
     // 디자인 3 모바일은 탭 바가 한 줄 가로 스크롤이므로 선택한 탭이 항상 보이도록 가운데로 맞춘다.
     if (view.classList.contains('fanpage-layout-3') && tabNav.scrollWidth > tabNav.clientWidth + 1) {
       const activeButton = tabButtons.get(tabKey);

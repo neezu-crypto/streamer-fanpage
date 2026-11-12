@@ -144,3 +144,29 @@ test('treat: 금고에서 차감·내역(누가 썼는지 없음)·부족하면 
 test('경고 단계: 30·10 아래', () => {
   assert.equal(care.warnLevel({ health: 31 }), 0); assert.equal(care.warnLevel({ health: 29 }), 1); assert.equal(care.warnLevel({ health: 9 }), 2);
 });
+
+test('누르고 있기: 초당 25%(4초=1회), 대상 도구만, 1분 횟수에 4초=1회', () => {
+  const s = { ...care.freshStats(T0), full: 50 }; const fan = care.normalizeFan(null, care.dayKey(T0));
+  assert.equal(care.applyHold(s, fan, 'feed', 4000, { now: T0, rng: never }).applied, true);
+  assert.equal(s.full, 58);
+  assert.equal(care.applyHold(s, fan, 'pet', 4000, { now: T0, rng: never }).applied, false);
+  const t = { ...care.freshStats(T0) }; const f2 = care.normalizeFan(null, care.dayKey(T0));
+  care.applyHold(t, f2, 'sing', 20000, { now: T0, rng: never }); // 5회분 → 1분 4회 상한
+  assert.equal(f2.win.sing.mc, 4);
+  assert.equal(care.applyHold(t, f2, 'sing', 4000, { now: T0 + 1, rng: never }).reason, 'cooldown');
+});
+
+test('interact: holdMs 검증·지난 전송 이후 시간으로 상한', async () => {
+  assert.throws(() => care.validateBatch([{ kind: 'pet', n: 0, holdMs: 3000 }]), { code: 'invalid-argument' });
+  assert.equal(care.validateBatch([{ kind: 'feed', n: 0, holdMs: 99999 }])[0].holdMs, 20000);
+  const db = petDb({ ...care.freshStats(T0), full: 20 });
+  await care.interact({ db, uid: 'u1', streamerId: 's1', petId: 'p1', batch: [{ kind: 'feed', n: 1 }], now: T0, rng: never });
+  const out = await care.interact({ db, uid: 'u1', streamerId: 's1', petId: 'p1', batch: [{ kind: 'feed', n: 0, holdMs: 20000 }], now: T0 + 3000, rng: never });
+  // 3초+1초 여유 = 4000ms → 1회분(+8)만 인정
+  assert.ok(Math.abs(out.stats.full.value - 36) <= 1);
+});
+
+test('hideValues: 숫자 제거, band 유지', () => {
+  const out = care.hideValues(care.publicStats(care.freshStats(T0), T0));
+  assert.equal(out.stats.full.value, undefined); assert.equal(out.stats.full.band, 'good');
+});
