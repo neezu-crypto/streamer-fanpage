@@ -217,6 +217,7 @@ const CINETY_API_BASE = 'https://cinety.sooplive.com/api/page.php';
 let cinetyCatalogRefreshPromise = null;
 const { readTamagotchiStage, tamagotchiOpenFor } = require('./tamagotchi-stage');
 const tamagotchiShop = require('./tamagotchi-shop');
+const tamagotchiCare = require('./tamagotchi-care');
 const { publicCatalog: tamagotchiPublicCatalog } = require('./tamagotchi-catalog');
 const FANPAGE_TAMAGOTCHI_MAX_APPLICATIONS_PER_STREAMER = 20;
 const FANPAGE_TAMAGOTCHI_INTERACTIONS = new Set(['pet', 'feed', 'play', 'talk', 'live', 'idle', 'sound']);
@@ -5492,6 +5493,37 @@ exports.streamerFanPageTamagotchiShop = onCall({ maxInstances: 10 }, async (requ
     });
   } catch (error) {
     throw toHttps(error);
+  }
+});
+
+// 다마고치 돌봄(스탯): 상태 조회·상호작용 묶음·하트 보석 치료. 스탯은 서버만 계산하고 공개 응답에 UID를 넣지 않는다.
+exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  const action = String(data.action || 'status');
+  try {
+    const [isAdmin, stage] = await Promise.all([isAdminUid(uid), readTamagotchiStage(db)]);
+    if (!tamagotchiOpenFor(stage, isAdmin)) throw new HttpsError('failed-precondition', '다마고치를 준비하고 있어요.');
+    const streamerId = tamagotchiShop.validateStreamerId(data.streamerId);
+    const target = await findVerifiedBySoopId(streamerId);
+    if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
+    const targetId = target.streamer.id;
+    if (action === 'status') {
+      return await tamagotchiCare.readStatus({ db, uid, streamerId: targetId, petId: data.petId });
+    }
+    if (action !== 'interact' && action !== 'treat') throw new HttpsError('invalid-argument', '요청 종류를 확인해 주세요.');
+    // 돌봄은 로그인(Google·카카오·스트리머 인증) 계정만. 익명 방문자는 보기만 한다.
+    if (!(await hasProtectedAccount(request, uid))) throw new HttpsError('permission-denied', '로그인하면 펫을 돌볼 수 있어요.');
+    if (await isServicePaused(sharedDb, 'streamerFanPage', false)) throw new HttpsError('unavailable', '서비스 점검 중이에요.');
+    if (action === 'interact') {
+      const verified = await findVerifiedByUid(uid);
+      const owner = !!verified && verified.streamer.id === targetId;
+      return await tamagotchiCare.interact({ db, uid, streamerId: targetId, petId: data.petId, batch: data.batch, owner });
+    }
+    return await tamagotchiCare.treat({ db, uid, streamerId: targetId, petId: data.petId, kind: data.kind });
+  } catch (error) {
+    if (error instanceof tamagotchiCare.TamagotchiCareError || error instanceof tamagotchiShop.TamagotchiShopError) throw new HttpsError(error.code, error.message);
+    throw error;
   }
 });
 
