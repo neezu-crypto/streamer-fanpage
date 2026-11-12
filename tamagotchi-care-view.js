@@ -21,6 +21,8 @@ const REASON_TEXT = { full: '지금은 충분해요!', cooldown: '조금 쉬었�
 // 훈련소(상점 다마고치 마을). 분양 때 배우는 기본 재주 4종은 서버 기록이 없을 때의 기본값
 export const TRAIN_URL = `${SHOP_BASE}tamagotchi-world.html#train`;
 const BASE_SKILLS = ['pet', 'feed', 'groom', 'gem'];
+// 받침 유무로 은/는
+function josa(word) { const c = String(word || '').slice(-1).charCodeAt(0); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? '은' : '는'; }
 const PENDING_KEY = 'tgCarePendingTool';
 
 // ---------- 묶어 보내기 큐(순수 함수: 테스트 대상) ----------
@@ -303,10 +305,10 @@ export function mountCareView(container, {
   function showLocked(id) {
     const label = mods.TOOLS[id]?.label || '';
     if (canManage) {
-      say(`${label}은(는) 아직 배우지 않았어요. 훈련소에서 가르칠 수 있어요.`);
+      say(`${label}${josa(label)} 아직 배우지 않았어요. 훈련소에서 가르칠 수 있어요.`);
       const a = el('a', 'tg-care-train-link', '🎓 훈련소에서 가르치기 →'); a.href = TRAIN_URL; a.target = '_blank'; a.rel = 'noopener';
       refs.note.replaceChildren(a);
-    } else say(`${label}은(는) 아직 배우지 않은 재주예요.`);
+    } else say(`${label}${josa(label)} 아직 배우지 않은 재주예요.`);
   }
   // 도구 버튼은 한 번만 만들고, 이후에는 선택·흐림 표시만 바꾼다
   function renderTools() {
