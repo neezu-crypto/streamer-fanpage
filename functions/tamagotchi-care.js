@@ -329,7 +329,7 @@ async function readStatus({ db, uid, streamerId, petId, now = Date.now() }) {
 async function interact({ db, uid, streamerId, petId, batch, owner = false, now = Date.now(), rng = Math.random }) {
   const { sid, pid } = validateTarget(streamerId, petId);
   const items = validateBatch(batch);
-  await loadActivePet(db, sid, pid);
+  const petInfo = await loadActivePet(db, sid, pid);
   const fanRef = db.ref(`${FANS_ROOT}/${sid}/${pid}/${fanKey(uid, sid)}`);
   const fanBefore = normalizeFan((await fanRef.get()).val(), dayKey(now));
   if (now - fanBefore.lastAt < 1500) throw new TamagotchiCareError('resource-exhausted', '조금 천천히 보내 주세요.');
@@ -364,7 +364,10 @@ async function interact({ db, uid, streamerId, petId, batch, owner = false, now 
   fan.lastAt = now;
   await fanRef.set(fan);
   const s = tx.snapshot.val();
-  return { ...publicStats(s, now), result: results, warning, me: { bondLevel: bondLevel(fan.bond), gemsToday: fan.gemsToday } };
+  const out = { ...publicStats(s, now), result: results, warning, me: { bondLevel: bondLevel(fan.bond), gemsToday: fan.gemsToday } };
+  // 오버레이 갱신용(응답에는 싣지 않음): 이름·색만, 스탯은 방금 계산한 값
+  Object.defineProperty(out, 'pet', { value: { ...petInfo, stats: s }, enumerable: false });
+  return out;
 }
 
 async function treat({ db, uid, streamerId, petId, kind, now = Date.now() }) {

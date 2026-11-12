@@ -68,10 +68,10 @@ async function info({ db, streamerId, petId }) {
 }
 
 // 상호작용·치료 뒤 공개 요약 갱신(오버레이가 없으면 아무것도 하지 않음). counts: { kind: n }
-async function publish({ db, streamerId, petId, stats, counts = null, now = Date.now() }) {
+async function publish({ db, streamerId, petId, stats, counts = null, pet: knownPet = null, now = Date.now() }) {
   const cur = (await db.ref(`${OVERLAY_ROOT}/${streamerId}/${petId}`).get()).val();
   if (!cur || !cur.tokenHash) return false;
-  const pet = await readPet(db, streamerId, petId);
+  const pet = knownPet || await readPet(db, streamerId, petId); // 돌봄 처리에서 이미 읽은 펫 정보가 있으면 다시 읽지 않는다
   const liveRef = db.ref(`${LIVE_ROOT}/${cur.tokenHash}`);
   const base = summary(pet, care.advance(stats || pet.stats, now), now);
   await liveRef.transaction((raw) => {

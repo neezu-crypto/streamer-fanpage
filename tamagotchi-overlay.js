@@ -4,9 +4,10 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
-import { SHOP_BASE } from './tamagotchi-care-view.js?v=20261113-tg-overlay1';
 
-const SHOP_V = '?v=20261113-tg-care2';
+// 상점 모듈 위치(돌봄 화면 파일을 통째로 불러오지 않도록 직접 적는다)
+const SHOP_BASE = 'https://neezu-crypto.github.io/streamer-game-series-shop/';
+const SHOP_V = '?v=20261113-tg-opt1';
 const app = initializeApp({
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54', authDomain: 'soop-stock-market.firebaseapp.com',
   databaseURL: 'https://soop-stock-market-default-rtdb.firebaseio.com', projectId: 'soop-stock-market',
@@ -77,6 +78,7 @@ async function main() {
     if (pet && c === color) return;
     pet?.destroy(); petEl.replaceChildren(); color = c;
     pet = createMongsil(petEl, { color: c || 'cream', reduced });
+    pet.setLowPower?.(true); // 방송 PC 부담을 줄이려고 초당 30번만 그린다
     if (opt.bg === 'room') { scene = createScene({ stage, pet: petEl, reduced }); requestAnimationFrame(() => scene.alignHome()); }
   }
   function render(live) {

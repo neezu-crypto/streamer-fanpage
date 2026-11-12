@@ -5534,10 +5534,9 @@ exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (requ
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const action = String(data.action || 'status');
   try {
-    const [isAdmin, stage] = await Promise.all([isAdminUid(uid), readTamagotchiStage(db)]);
-    if (!tamagotchiOpenFor(stage, isAdmin)) throw new HttpsError('failed-precondition', '다마고치를 준비하고 있어요.');
     const streamerId = tamagotchiShop.validateStreamerId(data.streamerId);
-    const target = await findVerifiedBySoopId(streamerId);
+    const [isAdmin, stage, target] = await Promise.all([isAdminUid(uid), readTamagotchiStage(db), findVerifiedBySoopId(streamerId)]);
+    if (!tamagotchiOpenFor(stage, isAdmin)) throw new HttpsError('failed-precondition', '다마고치를 준비하고 있어요.');
     if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
     const targetId = target.streamer.id;
     if (action === 'status') {
@@ -5545,11 +5544,13 @@ exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (requ
       return isAdmin ? out : tamagotchiCare.hideValues(out);
     }
     if (action !== 'interact' && action !== 'treat') throw new HttpsError('invalid-argument', '요청 종류를 확인해 주세요.');
-    // 돌봄은 로그인(Google·카카오·스트리머 인증) 계정만. 익명 방문자는 보기만 한다.
-    if (!(await hasProtectedAccount(request, uid))) throw new HttpsError('permission-denied', '로그인하면 펫을 돌볼 수 있어요.');
-    if (await isServicePaused(sharedDb, 'streamerFanPage', false)) throw new HttpsError('unavailable', '서비스 점검 중이에요.');
+    // 돌봄은 로그인(Google·카카오·스트리머 인증) 계정만. 익명 방문자는 보기만 한다. 서로 기다릴 필요 없는 확인은 한 번에.
+    const [isProtected, paused, verified] = await Promise.all([
+      hasProtectedAccount(request, uid), isServicePaused(sharedDb, 'streamerFanPage', false), action === 'interact' ? findVerifiedByUid(uid) : null,
+    ]);
+    if (!isProtected) throw new HttpsError('permission-denied', '로그인하면 펫을 돌볼 수 있어요.');
+    if (paused) throw new HttpsError('unavailable', '서비스 점검 중이에요.');
     if (action === 'interact') {
-      const verified = await findVerifiedByUid(uid);
       const owner = !!verified && verified.streamer.id === targetId;
       const out = await tamagotchiCare.interact({ db, uid, streamerId: targetId, petId: data.petId, batch: data.batch, owner });
       if (out.result && out.result.applied > 0) {
@@ -5559,7 +5560,7 @@ exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (requ
           const kind = String(item && item.kind || ''); if (!kind || (out.result.blocked || {})[kind]) continue;
           counts[kind] = (counts[kind] || 0) + Math.max(0, Math.floor(Number(item.n) || 0)) + Math.round((Number(item.holdMs) || 0) / tamagotchiCare.HOLD_UNIT_MS);
         }
-        await tamagotchiOverlay.publish({ db, streamerId: targetId, petId: data.petId, counts }).catch((error) => console.warn('다마고치 오버레이 갱신 실패', error.message));
+        await tamagotchiOverlay.publish({ db, streamerId: targetId, petId: data.petId, counts, pet: out.pet }).catch((error) => console.warn('다마고치 오버레이 갱신 실패', error.message));
       }
       return isAdmin ? out : tamagotchiCare.hideValues(out);
     }
