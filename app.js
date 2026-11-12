@@ -7814,13 +7814,57 @@ function fanPageMemoryStateFor(streamerId) {
   return state;
 }
 
+function commentUpGoalInputs(entry = {}) {
+  return [['goalRank', '목표 등수(선택)', 500, '예: 1'], ['goalUp', '목표 UP(선택)', 100000, '예: 500']].map(([key, label, max, hint]) => {
+    const field = document.createElement('input'); field.type = 'number'; field.min = '1'; field.max = String(max); field.step = '1'; field.inputMode = 'numeric';
+    field.className = 'comment-up-goal-input'; field.placeholder = `${label.replace('(선택)', '')} ${hint}`; field.setAttribute('aria-label', `${label}, 1~${max.toLocaleString('ko-KR')}`);
+    if (entry[key]) field.value = String(entry[key]);
+    return field;
+  });
+}
+
+// 목표 게이지: UP은 현재/목표, 등수는 목표 안이면 100%, 아니면 목표/현재
+function renderCommentUpGauge(kind, comment, goal, prev) {
+  const wrap = document.createElement('div'); wrap.className = 'comment-up-gauge';
+  const name = document.createElement('span'); name.className = 'comment-up-gauge-name'; name.textContent = kind === 'up' ? 'UP' : '등수';
+  const track = document.createElement('div'); track.className = 'comment-up-gauge-track'; track.setAttribute('role', 'meter');
+  const fill = document.createElement('div'); fill.className = 'comment-up-gauge-fill'; track.append(fill);
+  const label = document.createElement('span'); label.className = 'comment-up-gauge-label';
+  let ratio = 0; let text; let remain = '';
+  if (!comment) { text = '아직 스트리머 댓글이 없어요'; wrap.classList.add('is-empty'); }
+  else if (kind === 'up') {
+    ratio = Math.min(comment.likes / goal, 1);
+    text = `UP ${comment.likes.toLocaleString('ko-KR')} / ${goal.toLocaleString('ko-KR')} · ${Math.floor(ratio * 100)}%`;
+    if (ratio < 1) remain = `${goal.toLocaleString('ko-KR')}까지 ${(goal - comment.likes).toLocaleString('ko-KR')} UP 남음`;
+  } else {
+    ratio = comment.rank <= goal ? 1 : goal / comment.rank;
+    text = `현재 ${comment.rank}위 · 목표 ${goal}위`;
+    if (ratio < 1) remain = `${comment.rank - goal}계단 더 올라가면 달성`;
+  }
+  const pct = Math.round(ratio * 1000) / 10;
+  track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100'); track.setAttribute('aria-valuenow', String(pct));
+  track.setAttribute('aria-valuetext', [text, remain || (ratio >= 1 ? '달성' : '')].filter(Boolean).join(', '));
+  track.setAttribute('aria-label', kind === 'up' ? '목표 UP 진행도' : '목표 등수 진행도');
+  wrap.classList.toggle('is-high', ratio >= 0.5 && ratio < 1); wrap.classList.toggle('is-done', ratio >= 1);
+  label.textContent = text;
+  wrap.append(name, track, label);
+  if (ratio >= 1) { const badge = document.createElement('span'); badge.className = 'comment-up-gauge-badge'; badge.textContent = '달성!'; wrap.append(badge); }
+  else if (remain) { const small = document.createElement('small'); small.className = 'comment-up-gauge-remain'; small.textContent = remain; wrap.append(small); }
+  // 이전 값에서 새 값으로 차오르기(모션 줄이기는 CSS에서 전환 제거)
+  fill.style.width = `${(prev[kind] ?? 0) * 100}%`;
+  requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = `${ratio * 100}%`; }));
+  prev[kind] = ratio;
+  return wrap;
+}
+
 function renderCommentUpSection(page) {
   const section = document.createElement('section'); section.id = 'commentUpSection'; section.className = 'content-card comment-up-section';
   const note = document.createElement('p'); note.textContent = '공개·애청자 공개 게시글의 댓글을 확인합니다. 같은 UP 수는 공동 순위로 표시해요.';
   const form = document.createElement('form'); form.className = 'comment-up-form';
   const input = document.createElement('input'); input.type = 'url'; input.required = true; input.maxLength = 500; input.placeholder = 'SOOP 게시글 링크'; input.setAttribute('aria-label', 'SOOP 게시글 링크');
   const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary'; add.textContent = '게시글 추가';
-  form.append(input, add); form.hidden = !page.isOwner;
+  const [rankInput, upInput] = commentUpGoalInputs();
+  form.append(input, rankInput, upInput, add); form.hidden = !page.isOwner;
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const list = document.createElement('div'); list.className = 'comment-up-list';
   section.append(note, form, status, list);
@@ -7837,6 +7881,25 @@ function renderCommentUpSection(page) {
         const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = entry.visibility === 'fan' ? '애청자 게시글 원본 보기 ↗' : '게시글 원본 보기 ↗';
         const check = document.createElement('button'); check.type = 'button'; check.className = 'button'; check.textContent = '새로고침';
         const resultText = document.createElement('div'); resultText.setAttribute('role', 'status');
+        const gauges = document.createElement('div'); gauges.className = 'comment-up-gauges';
+        let lastComments = null; const prev = {};
+        // 게이지는 UP이 가장 많은 스트리머 댓글 하나 기준, 나머지 댓글은 글자 줄
+        function renderResult() {
+          resultText.replaceChildren(); gauges.replaceChildren();
+          const comments = Array.isArray(lastComments) ? [...lastComments].sort((a, b) => b.likes - a.likes) : null;
+          const hasGoal = entry.goalRank || entry.goalUp;
+          if (comments && !comments.length) resultText.textContent = '이 스트리머가 작성한 댓글을 찾지 못했어요.';
+          const best = comments?.[0];
+          if (hasGoal && comments) {
+            if (entry.goalUp) gauges.append(renderCommentUpGauge('up', best, entry.goalUp, prev));
+            if (entry.goalRank) gauges.append(renderCommentUpGauge('rank', best, entry.goalRank, prev));
+          }
+          (comments || []).forEach((comment, index) => {
+            const row = document.createElement('p');
+            row.textContent = `${hasGoal && index > 0 ? '(그 밖의 댓글) ' : ''}UP ${comment.likes} · 공동 ${comment.rank}위 / 댓글 ${comment.total}개`;
+            resultText.append(row);
+          });
+        }
         check.addEventListener('click', async () => {
           check.disabled = true; resultText.textContent = '전체 댓글을 확인하고 있어요.';
           try {
@@ -7844,16 +7907,32 @@ function renderCommentUpSection(page) {
             link.textContent = result.title
               ? `${result.title} ↗`
               : result.visibility === 'fan' ? '애청자 게시글 원본 보기 ↗' : '게시글 원본 보기 ↗';
-            resultText.replaceChildren();
-            if (!result.comments.length) resultText.textContent = '이 스트리머가 작성한 댓글을 찾지 못했어요.';
-            result.comments.forEach(comment => {
-              const row = document.createElement('p'); row.textContent = `UP ${comment.likes} · 공동 ${comment.rank}위 / 댓글 ${comment.total}개`; resultText.append(row);
-            });
+            lastComments = result.comments; renderResult();
           } catch (error) { resultText.textContent = error.message || '댓글을 확인하지 못했어요.'; }
           finally { check.disabled = false; }
         });
-        card.append(link, check, resultText);
+        card.append(link, check, gauges, resultText);
         if (uiCan(result.canManage)) {
+          const goalButton = document.createElement('button'); goalButton.type = 'button'; goalButton.className = 'button'; goalButton.textContent = '목표 수정';
+          const goalForm = document.createElement('form'); goalForm.className = 'comment-up-goal-form'; goalForm.hidden = true;
+          const [goalRank, goalUp] = commentUpGoalInputs(entry);
+          const goalSave = document.createElement('button'); goalSave.type = 'submit'; goalSave.className = 'button button-primary'; goalSave.textContent = '목표 저장';
+          const goalStatus = document.createElement('span'); goalStatus.setAttribute('role', 'status');
+          goalForm.append(goalRank, goalUp, goalSave, goalStatus);
+          goalButton.addEventListener('click', () => { goalForm.hidden = !goalForm.hidden; goalButton.setAttribute('aria-expanded', String(!goalForm.hidden)); if (!goalForm.hidden) goalRank.focus(); });
+          goalButton.setAttribute('aria-expanded', 'false');
+          goalForm.addEventListener('submit', async event => {
+            event.preventDefault(); if (!goalForm.reportValidity()) return;
+            goalSave.disabled = true; goalStatus.textContent = '저장하고 있어요.';
+            try {
+              const saved = (await callCommentUp({ action: 'goal', streamerId: page.streamer.id, id: entry.id, goalRank: goalRank.value || null, goalUp: goalUp.value || null })).data;
+              entry.goalRank = saved.goalRank; entry.goalUp = saved.goalUp;
+              goalStatus.textContent = saved.goalRank || saved.goalUp ? '목표를 저장했어요.' : '목표를 해제했어요.';
+              goalForm.hidden = true; goalButton.setAttribute('aria-expanded', 'false'); renderResult();
+            } catch (error) { goalStatus.textContent = error.message || '목표를 저장하지 못했어요.'; }
+            finally { goalSave.disabled = false; }
+          });
+          card.append(goalButton, goalForm);
           const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button'; remove.textContent = '삭제';
           remove.addEventListener('click', async () => {
             if (!window.confirm('이 게시글을 목록에서 삭제할까요?')) return;
@@ -7872,7 +7951,10 @@ function renderCommentUpSection(page) {
   form.addEventListener('submit', async event => {
     event.preventDefault(); if (!form.reportValidity()) return;
     add.disabled = true; status.textContent = '게시글을 확인하고 있어요.';
-    try { await callCommentUp({ action: 'add', streamerId: page.streamer.id, url: input.value }); input.value = ''; loaded = false; await load(); }
+    try {
+      await callCommentUp({ action: 'add', streamerId: page.streamer.id, url: input.value, goalRank: rankInput.value || null, goalUp: upInput.value || null });
+      input.value = ''; rankInput.value = ''; upInput.value = ''; loaded = false; await load();
+    }
     catch (error) { status.textContent = error.message || '게시글을 추가하지 못했어요.'; }
     finally { add.disabled = false; }
   });

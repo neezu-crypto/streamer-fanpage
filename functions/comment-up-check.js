@@ -60,4 +60,17 @@ async function lookupPost(target, fetchImpl = fetch) {
   return { available: false, visibility: '', title: '' };
 }
 
-module.exports = { parsePostUrl, fetchComments, lookupPost };
+// 목표(선택): 빈 값은 없음, 범위 밖이면 null(거절)
+function parseGoals(data) {
+  const out = {};
+  for (const [key, max] of [['goalRank', 500], ['goalUp', 100000]]) {
+    const raw = data?.[key];
+    if (raw === undefined || raw === null || raw === '') continue;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > max) return null;
+    out[key] = n;
+  }
+  return out;
+}
+
+module.exports = { parsePostUrl, fetchComments, lookupPost, parseGoals };

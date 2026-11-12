@@ -31,3 +31,14 @@ test('다른 실패 응답은 비공개 또는 삭제된 게시글로 유지한�
   const result = await lookupPost({ stationId: 'fan', postId: '3' }, async () => response(403, { code: 'CHA0010' }));
   assert.deepEqual(result, { available: false, visibility: '', title: '' });
 });
+
+test('목표 입력: 등수 1~500, UP 1~100000, 빈 값은 생략', () => {
+  const { parseGoals } = require('../comment-up-check');
+  assert.deepEqual(parseGoals({}), {});
+  assert.deepEqual(parseGoals({ goalRank: '', goalUp: null }), {});
+  assert.deepEqual(parseGoals({ goalRank: 500, goalUp: '100000' }), { goalRank: 500, goalUp: 100000 });
+  assert.equal(parseGoals({ goalRank: 501 }), null);
+  assert.equal(parseGoals({ goalRank: 0 }), null);
+  assert.equal(parseGoals({ goalUp: 1.5 }), null);
+  assert.equal(parseGoals({ goalUp: 100001 }), null);
+});
