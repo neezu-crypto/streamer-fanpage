@@ -6,6 +6,8 @@ export const SEND_EVERY_MS = 6000; // 서버 전송 간격(화면은 예측값�
 const REFRESH_MS = 60000; // 다른 팬이 돌본 결과 반영
 const BLOCK_DIM_MS = 10000;
 const STAT_ORDER = [['full', '배부름'], ['mood', '기분'], ['clean', '청결'], ['fatigue', '피로'], ['health', '건강']];
+// 스탯 이모지(링 가운데). 링은 '좋은 정도'로 찬다 → 피로는 쉴수록(피로가 낮을수록) 꽉 찬다
+const STAT_EMOJI = { full: '🍚', mood: '😊', clean: '🫧', fatigue: '💤', health: '❤️' };
 const BAND_WORD = { good: '좋음', mid: '보통', bad: '나쁨' };
 // 예측용 대략적인 효과(서버 EFFECTS와 같은 값, 보정은 응답으로)
 export const CARE_HINT = {
@@ -123,20 +125,20 @@ export function mountCareView(container, {
       refs.statRows = {};
       refs.stats.replaceChildren(...STAT_ORDER.map(([key, label]) => {
         const row = el('div', 'tg-care-stat');
-        const name = el('span', 'tg-care-stat-name', label);
-        const bar = el('span', 'tg-care-stat-bar'); bar.setAttribute('role', 'meter'); bar.setAttribute('aria-label', label);
+        const bar = el('span', 'tg-care-ring'); bar.setAttribute('role', 'meter'); bar.setAttribute('aria-label', label);
         bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '100');
-        const fill = el('i'); bar.append(fill);
+        const fill = bar; const face = el('span', 'tg-care-ring-emoji', STAT_EMOJI[key]); face.setAttribute('aria-hidden', 'true'); bar.append(face);
+        const name = el('span', 'tg-care-stat-name', label); name.setAttribute('aria-hidden', 'true');
         const num = el('span', 'tg-care-stat-num'); num.hidden = !isAdmin;
-        row.append(name, bar, num); refs.statRows[key] = { row, bar, fill, num };
+        row.append(bar, name, num); refs.statRows[key] = { row, bar, fill, num };
         return row;
       }));
     }
     for (const [key] of STAT_ORDER) {
       const r = refs.statRows[key]; const info = server?.stats?.[key]; if (!info) continue;
       const v = shown[key] ?? 50;
-      r.fill.style.width = `${Math.max(0, Math.min(100, v))}%`;
       const good = key === 'fatigue' ? 100 - v : v;
+      r.fill.style.setProperty('--p', String(Math.max(0, Math.min(100, good))));
       const level = isAdmin ? (good >= 60 ? 'good' : good >= 30 ? 'mid' : 'bad') : info.band; // 관리자 외에는 서버 단계만
       r.fill.dataset.level = level;
       r.bar.setAttribute('aria-valuenow', String(Math.round(good)));
