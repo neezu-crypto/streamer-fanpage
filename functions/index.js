@@ -8262,12 +8262,16 @@ exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 12
       id,
       url: row.url,
       visibility: row.visibility === 'fan' ? 'fan' : 'public',
+      ...(Number.isInteger(row.goalRank) ? { goalRank: row.goalRank } : {}),
+      ...(Number.isInteger(row.goalUp) ? { goalUp: row.goalUp } : {}),
     })), canManage };
   }
   if (!canManage && action !== 'check') throw new HttpsError('permission-denied', '스트리머 또는 관리자만 관리할 수 있어요.');
   if (action === 'add') {
     const parsed = require('./comment-up-check').parsePostUrl(data.url);
     if (!parsed) throw new HttpsError('invalid-argument', 'SOOP 방송국 게시글 링크를 입력해 주세요.');
+    const goals = require('./comment-up-check').parseGoals(data);
+    if (!goals) throw new HttpsError('invalid-argument', '목표 등수는 1~500, 목표 UP은 1~100000 사이 정수로 입력해 주세요.');
     const canonical = `https://www.sooplive.com/station/${parsed.stationId}/post/${parsed.postId}`;
     const post = await require('./comment-up-check').lookupPost(parsed);
     if (!post.available) throw new HttpsError('failed-precondition', '공개 또는 애청자 공개 게시글만 등록할 수 있어요.');
@@ -8275,7 +8279,7 @@ exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 12
     const result = await root.transaction(current => {
       const items = current && typeof current === 'object' ? current : {};
       if (!items[id] && Object.keys(items).length >= 20) return;
-      items[id] = { url: canonical, visibility: post.visibility, createdAt: Date.now() }; return items;
+      items[id] = { url: canonical, visibility: post.visibility, createdAt: Date.now(), ...goals }; return items;
     });
     if (!result.committed) throw new HttpsError('resource-exhausted', '게시글은 최대 20개까지 등록할 수 있어요.');
     return { ok: true };
@@ -8284,6 +8288,20 @@ exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 12
     const id = String(data.id || '');
     if (!/^[a-z0-9_-]{1,30}_\d{1,20}$/.test(id)) throw new HttpsError('invalid-argument', '게시글을 확인해 주세요.');
     await root.child(id).remove(); return { ok: true };
+  }
+  if (action === 'goal') {
+    const id = String(data.id || '');
+    if (!/^[a-z0-9_-]{1,30}_\d{1,20}$/.test(id)) throw new HttpsError('invalid-argument', '게시글을 확인해 주세요.');
+    const goals = require('./comment-up-check').parseGoals(data);
+    if (!goals) throw new HttpsError('invalid-argument', '목표 등수는 1~500, 목표 UP은 1~100000 사이 정수로 입력해 주세요.');
+    const result = await root.child(id).transaction(current => {
+      if (current === null) return null; // 첫 호출은 빈 캐시 — 서버 값으로 다시 호출됨
+      if (typeof current !== 'object') return;
+      const next = { ...current }; delete next.goalRank; delete next.goalUp;
+      return { ...next, ...goals };
+    });
+    if (!result.committed || !result.snapshot.exists()) throw new HttpsError('not-found', '등록된 게시글을 찾을 수 없어요.');
+    return { ok: true, ...goals };
   }
   if (action === 'check') {
     const id = String(data.id || '');
