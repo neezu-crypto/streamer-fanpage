@@ -158,6 +158,106 @@ async function adminGrantPet({ db, adminUid, isAdmin, streamerId, speciesId, col
   return { status: 'granted', petId };
 }
 
+// ---------- 훈련소(3-B): 마리별로 상호작용을 배운다(상호작용당 카탈로그 가격, 환불 없음) ----------
+const TRAIN_MAX = 8;
+
+function petLearnedIds(pet) {
+  const species = getSpecies(pet && pet.speciesId);
+  const learned = pet && pet.learned && typeof pet.learned === 'object' ? Object.keys(pet.learned) : [];
+  return learned.length ? learned : (species ? [...species.baseInteractions] : []);
+}
+
+// 고른 상호작용 검증: 카탈로그의 trainable만, 중복 없이 1~8개. 정렬해서 돌려준다(요청 지문 고정).
+function validateTrainItems(species, value) {
+  const list = Array.isArray(value) ? value.map((v) => String(v || '')) : [];
+  const unique = [...new Set(list)].sort();
+  if (!unique.length || unique.length > TRAIN_MAX || unique.length !== list.length) {
+    throw new TamagotchiShopError('invalid-argument', '배울 상호작용을 다시 골라 주세요.');
+  }
+  for (const id of unique) {
+    if (!Object.prototype.hasOwnProperty.call(species.trainable, id)) throw new TamagotchiShopError('invalid-argument', '배울 수 없는 상호작용이 있어요.');
+  }
+  return unique;
+}
+
+async function loadTrainPet(db, streamerId, petId) {
+  if (typeof petId !== 'string' || !/^p_[0-9a-f]{20}$/.test(petId)) throw new TamagotchiShopError('invalid-argument', '다마고치를 확인해 주세요.');
+  const pet = (await petRef(db, streamerId, petId).get()).val();
+  if (!pet || pet.status !== 'active') throw new TamagotchiShopError('not-found', '다마고치를 찾을 수 없어요.');
+  const species = getSpecies(pet.speciesId);
+  if (!species) throw new TamagotchiShopError('failed-precondition', '이 다마고치는 훈련할 수 없어요.');
+  return { pet, species };
+}
+
+// 펫 learned에 원자적으로 추가. 같은 요청의 재시도는 그대로 인정, 다른 요청으로 이미 배운 것이 있으면 실패(→ 자동 환불).
+async function addLearned({ db, streamerId, petId, items, species, requestId, now, source }) {
+  let conflict = false;
+  const result = await freshTransaction(petRef(db, streamerId, petId), (current) => {
+    conflict = false;
+    if (!current || current.status !== 'active') { conflict = true; return; }
+    const learned = { ...(current.learned && typeof current.learned === 'object' ? current.learned : {}) };
+    if (!Object.keys(learned).length) species.baseInteractions.forEach((id) => { learned[id] = { learnedAt: Number(current.adoptedAt) || now, requestId: String(current.requestId || ''), cashAmount: 0 }; });
+    for (const id of items) {
+      if (learned[id]) { if (learned[id].requestId !== requestId) { conflict = true; return; } continue; }
+      learned[id] = { learnedAt: now, requestId, cashAmount: source === 'admin-test' ? 0 : species.trainable[id], ...(source ? { source } : {}) };
+    }
+    return { ...current, learned };
+  });
+  if (conflict || !result.committed) return null;
+  return Object.keys(result.snapshot.val().learned || {});
+}
+
+function trainFingerprint({ streamerId, petId, items, cashAmount }) {
+  return sha(JSON.stringify({ product: PRODUCT_ID, kind: 'train', streamerId, petId, items, cashAmount }));
+}
+
+async function trainPet({ db, walletDb, uid, streamerId, petId, interactions, requestId, isAdmin = false, stage = 'closed', now = Date.now() }) {
+  validateUid(uid);
+  streamerId = validateStreamerId(streamerId);
+  requestId = validateRequestId(requestId);
+  assertOpen(stage, isAdmin);
+  const { pet, species } = await loadTrainPet(db, streamerId, petId);
+  const items = validateTrainItems(species, interactions);
+  const already = items.filter((id) => petLearnedIds(pet).includes(id));
+  // 같은 요청의 재시도(이미 이 요청으로 배운 것)는 결제 모듈이 멱등 처리하므로 여기서 막지 않는다.
+  const learnedByOther = already.filter((id) => !(pet.learned && pet.learned[id] && pet.learned[id].requestId === requestId));
+  if (learnedByOther.length) {
+    const err = new TamagotchiShopError('already-exists', '이미 배운 상호작용이 있어요. 다시 골라 주세요.'); err.details = { learned: learnedByOther }; throw err;
+  }
+  const cashAmount = items.reduce((sum, id) => sum + species.trainable[id], 0);
+  let learnedAfter = null;
+  const result = await payment.runPurchase({
+    db, walletDb, uid, requestId, now,
+    opMeta: { kind: 'train', streamerId, petId, items: items.join(',') },
+    cashAmount,
+    fingerprint: trainFingerprint({ streamerId, petId, items, cashAmount }),
+    messages: {
+      refundPending: '결제 후 훈련을 마치지 못했고 환불을 확인 중이에요. 관리자에게 문의해 주세요.',
+      refunded: '훈련을 마치지 못해 자동 환불했어요. 다시 시도해 주세요.',
+    },
+    activate: async () => {
+      learnedAfter = await addLearned({ db, streamerId, petId, items, species, requestId, now });
+      return learnedAfter ? { activated: true } : { activated: false, failureCode: 'learn-conflict' };
+    },
+  });
+  if (!result.activated) throw new TamagotchiShopError('aborted', '훈련을 마치지 못해 자동 환불했어요. 다시 시도해 주세요.');
+  return { status: 'trained', petId, items, learned: learnedAfter, remainingCash: result.remainingCash };
+}
+
+// 관리자 테스트 훈련: 캐시 없이, 관리자 테스트 펫에만.
+async function adminTrainPet({ db, isAdmin, streamerId, petId, interactions, requestId, now = Date.now() }) {
+  if (isAdmin !== true) throw new TamagotchiShopError('permission-denied', '관리자만 사용할 수 있습니다.');
+  streamerId = validateStreamerId(streamerId);
+  requestId = validateRequestId(requestId);
+  const { pet, species } = await loadTrainPet(db, streamerId, petId);
+  if (pet.source !== 'admin-test') throw new TamagotchiShopError('permission-denied', '테스트 다마고치에만 테스트 훈련을 할 수 있어요.');
+  const items = validateTrainItems(species, interactions).filter((id) => !petLearnedIds(pet).includes(id));
+  if (!items.length) return { status: 'trained', petId, items: [], learned: petLearnedIds(pet) };
+  const learned = await addLearned({ db, streamerId, petId, items, species, requestId, now, source: 'admin-test' });
+  if (!learned) throw new TamagotchiShopError('aborted', '테스트 훈련을 마치지 못했어요. 다시 시도해 주세요.');
+  return { status: 'trained', petId, items, learned };
+}
+
 // 판매 개시 전 정리: admin-test 펫만 지운다. 구매 펫은 건드리지 않는다.
 async function adminClearTestPets({ db, isAdmin, streamerId }) {
   if (isAdmin !== true) throw new TamagotchiShopError('permission-denied', '관리자만 사용할 수 있습니다.');
@@ -177,7 +277,7 @@ async function adminClearTestPets({ db, isAdmin, streamerId }) {
 
 // 공개용 펫 목록: UID·요청 ID·결제 내역은 제외한다.
 function publicPet(petId, pet, { isAdmin }) {
-  const learned = pet && pet.learned && typeof pet.learned === 'object' ? Object.keys(pet.learned) : [];
+  const learned = petLearnedIds(pet);
   const out = {
     petId, speciesId: String(pet.speciesId || ''), color: String(pet.color || ''), nickname: String(pet.nickname || ''),
     adoptedAt: Number(pet.adoptedAt) || 0, learned,
@@ -208,5 +308,6 @@ function buildViewer({ isAdmin, verified }) {
 module.exports = {
   buildViewer, PETS_ROOT, OPERATIONS_ROOT, LIMITS_ROOT, WALLET_PURCHASES_KEY, LEDGER_KIND, TamagotchiShopError,
   petIdFor, normalizeNickname, adoptPet, adminGrantPet, adminClearTestPets, listPets, validateStreamerId,
+  trainPet, adminTrainPet, petLearnedIds, validateTrainItems, TRAIN_MAX,
   cashBalance: (walletDb, uid) => payment.balance(walletDb, uid),
 };

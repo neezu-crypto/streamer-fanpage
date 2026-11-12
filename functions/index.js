@@ -5454,7 +5454,7 @@ exports.streamerFanPageTamagotchiShop = onCall({ maxInstances: 10 }, async (requ
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const action = String(data.action || 'catalog');
   const toHttps = (error) => {
-    if (error instanceof tamagotchiShop.TamagotchiShopError) return new HttpsError(error.code, error.message);
+    if (error instanceof tamagotchiShop.TamagotchiShopError) return new HttpsError(error.code, error.message, error.details);
     return error;
   };
   try {
@@ -5484,6 +5484,17 @@ exports.streamerFanPageTamagotchiShop = onCall({ maxInstances: 10 }, async (requ
     }
     if (action === 'admin-clear-tests') {
       return tamagotchiShop.adminClearTestPets({ db, isAdmin, streamerId: targetId });
+    }
+    if (action === 'admin-train') {
+      return tamagotchiShop.adminTrainPet({ db, isAdmin, streamerId: targetId, petId: data.petId, interactions: data.interactions, requestId: data.requestId });
+    }
+    if (action === 'train') {
+      if (!isPageStreamer) throw new HttpsError('permission-denied', '훈련은 펫을 분양받은 인증 스트리머만 할 수 있어요.');
+      if (await isServicePaused(sharedDb, 'streamerFanPage', false)) throw new HttpsError('unavailable', '서비스 점검 중에는 구매할 수 없어요.');
+      return await tamagotchiShop.trainPet({
+        db, walletDb: sharedDb, uid, streamerId: targetId, petId: data.petId, interactions: data.interactions,
+        requestId: data.requestId, isAdmin, stage,
+      });
     }
     if (action !== 'adopt') throw new HttpsError('invalid-argument', '요청 종류를 확인해 주세요.');
     if (!isPageStreamer) throw new HttpsError('permission-denied', '분양은 해당 팬페이지의 인증 스트리머 계정으로만 할 수 있어요.');

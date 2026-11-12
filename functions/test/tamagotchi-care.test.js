@@ -170,3 +170,22 @@ test('hideValues: 숫자 제거, band 유지', () => {
   const out = care.hideValues(care.publicStats(care.freshStats(T0), T0));
   assert.equal(out.stats.full.value, undefined); assert.equal(out.stats.full.band, 'good');
 });
+
+test('훈련소: 배우지 않은 재주는 not-learned로 막고 나머지는 반영, 상태 응답에 learned', async () => {
+  const db = petDb();
+  const out = await care.interact({ db, uid: 'u1', streamerId: 's1', petId: 'p1', batch: [{ kind: 'feed', n: 1 }, { kind: 'dance', n: 2 }, { kind: 'sing', n: 0, holdMs: 4000 }], now: T0, rng: never });
+  assert.equal(out.result.blocked.dance, 'not-learned');
+  assert.equal(out.result.blocked.sing, 'not-learned');
+  assert.equal(out.result.applied, 1);
+  assert.deepEqual(out.learned, ['pet', 'feed', 'groom', 'gem']);
+  const st = await care.readStatus({ db, uid: 'u1', streamerId: 's1', petId: 'p1', now: T0 + 1000 });
+  assert.deepEqual(st.learned, ['pet', 'feed', 'groom', 'gem']);
+});
+
+test('훈련소: 배운 재주는 정상 반영', async () => {
+  const db = database({ streamerFanPageTamagotchis: { s1: { p1: { status: 'active', speciesId: 'mongsil', learned: { pet: {}, feed: {}, groom: {}, gem: {}, dance: {} } } } } });
+  const out = await care.interact({ db, uid: 'u1', streamerId: 's1', petId: 'p1', batch: [{ kind: 'dance', n: 1 }], now: T0, rng: never });
+  assert.equal(out.result.blocked.dance, undefined);
+  assert.equal(out.result.applied, 1);
+  assert.ok(out.learned.includes('dance'));
+});
