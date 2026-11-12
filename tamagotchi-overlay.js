@@ -150,7 +150,7 @@ async function main() {
   if (demo) {
     const live = { nickname: '체험 몽실이', color: 'cream', condition: 'ok', bands: { full: 'good', mood: 'good', clean: 'mid', fatigue: 'good', health: 'good' }, sleeping: false, hospitalUntil: 0, gems: 12, gemMax: 60, recent: {} };
     render(live);
-    const kinds = ['feed', 'pet', 'dance', 'talk', 'cheer', 'sing'];
+    const kinds = ['bath', 'gem', 'play', 'feed', 'pet', 'groom', 'talk', 'sing', 'dance', 'cheer'];
     let i = 0;
     setInterval(() => { const k = kinds[i % kinds.length]; i += 1; live.recent = { ...live.recent, 1: { ...(live.recent[1] || {}), [k]: ((live.recent[1] || {})[k] || 0) + 1 + (i % 3) } }; render(live); }, 4000);
     return;
