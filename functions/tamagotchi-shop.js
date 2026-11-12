@@ -167,6 +167,7 @@ async function adminClearTestPets({ db, isAdmin, streamerId }) {
   for (const [petId, pet] of Object.entries(pets && typeof pets === 'object' ? pets : {})) {
     if (pet && pet.source === 'admin-test') {
       await petRef(db, streamerId, petId).remove();
+      await db.ref(`streamerFanPageTamagotchiFans/${streamerId}/${petId}`).remove(); // 돌봄 팬 기록도 함께 정리
       removed.push(petId);
     }
   }
