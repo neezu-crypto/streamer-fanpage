@@ -1,7 +1,7 @@
 // 팬페이지 다마고치 탭: 돌봄 화면(3-C). 펫·도구·소리·무대 배치는 상점 모듈을 그대로 불러 쓰고, 스탯은 서버(Care)가 계산한다.
 // 설계: docs/다마고치_3C_팬페이지_돌봄_화면_설계.md
 export const SHOP_BASE = 'https://neezu-crypto.github.io/streamer-game-series-shop/';
-const SHOP_V = '?v=20261113-tg-care2';
+const SHOP_V = '?v=20261113-tg-opt1';
 export const SEND_EVERY_MS = 6000; // 서버 전송 간격(화면은 예측값으로 바로 반응)
 const REFRESH_MS = 60000; // 다른 팬이 돌본 결과 반영
 const BLOCK_DIM_MS = 10000;
@@ -292,26 +292,34 @@ export function mountCareView(container, {
 
   // ---------- 도구 ----------
   function allowed(id) { const a = ALLOWED[server?.condition]; return !a || a.includes(id); }
+  // 도구 버튼은 한 번만 만들고, 이후에는 선택·흐림 표시만 바꾼다
   function renderTools() {
     if (!mods) return;
-    const sel = toolCtl?.selected?.() || '';
-    refs.tools.replaceChildren(...Object.entries(mods.TOOLS).map(([id, tool]) => {
-      const b = el('button', 'tg-action tg-care-tool'); b.type = 'button'; b.dataset.tool = id;
-      const img = el('img'); img.src = tool.src; img.alt = ''; img.draggable = false;
-      b.append(img, el('span', '', tool.label));
-      const off = !allowed(id) || (dimmed.get(id) || 0) > Date.now();
-      b.classList.toggle('is-dim', off); b.classList.toggle('is-selected', sel === id);
+    if (!refs.toolBtns) {
+      refs.toolBtns = new Map();
+      refs.tools.replaceChildren(...Object.entries(mods.TOOLS).map(([id, tool]) => {
+        const b = el('button', 'tg-action tg-care-tool'); b.type = 'button'; b.dataset.tool = id;
+        const img = el('img'); img.src = tool.src; img.alt = ''; img.draggable = false; img.decoding = 'async';
+        b.append(img, el('span', '', tool.label));
+        b.addEventListener('click', () => {
+          if (!hasAccount()) { remember(id); openLogin(); return; }
+          if (toolCtl.selected() === id) { toolCtl.clear(); return; }
+          void flush();
+          toolCtl.select(id);
+        });
+        refs.toolBtns.set(id, b);
+        return b;
+      }));
+    }
+    const sel = toolCtl?.selected?.() || ''; const now = Date.now();
+    for (const [id, b] of refs.toolBtns) {
+      const ok = allowed(id);
+      b.classList.toggle('is-dim', !ok || (dimmed.get(id) || 0) > now); b.classList.toggle('is-selected', sel === id);
       b.setAttribute('aria-pressed', String(sel === id));
-      if (!allowed(id)) b.title = BLOCK_TEXT[server?.condition] || '';
-      b.addEventListener('click', () => {
-        if (!hasAccount()) { remember(id); openLogin(); return; }
-        if (toolCtl.selected() === id) { toolCtl.clear(); return; }
-        void flush();
-        toolCtl.select(id);
-      });
-      return b;
-    }));
+      b.title = ok ? '' : BLOCK_TEXT[server?.condition] || '';
+    }
   }
+
   function remember(id) { try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ sid: page.streamer.id, id })); } catch (_) { /* 무시 */ } }
   function resumePending() {
     try {
@@ -370,6 +378,7 @@ export function mountCareView(container, {
 
   async function refresh() {
     if (!container.isConnected) { api.destroy(); return; } // 다른 팬페이지로 이동함
+    if (!onScreen) return; // 다른 탭을 보고 있으면 부르지 않는다(돌아오면 바로 갱신)
     if (!pet || document.hidden || sending || queue.size()) return;
     try { apply((await callCare({ action: 'status', streamerId: page.streamer.id, petId: pet.petId })).data); } catch (_) { /* 다음 주기 */ }
   }
@@ -380,6 +389,7 @@ export function mountCareView(container, {
   async function choose(next) {
     await flush();
     toolCtl?.destroy(); petApi?.destroy(); scene?.destroy();
+    refs.toolBtns = null;
     pet = next; shown = {}; target = {}; refs.statRows = null; lastWarn = 0;
     refs.name.textContent = pet.nickname || '이름 없는 다마고치';
     refs.picker.replaceChildren(...(pets.length > 1 ? pets.map((p) => {
@@ -418,6 +428,15 @@ export function mountCareView(container, {
       if (!destroyed) { status.classList.remove('loading-bar'); status.textContent = error.message || '다마고치를 불러오지 못했어요.'; root.replaceChildren(status); }
     }
   })();
+  // 화면에 보일 때만 펫을 그리고 상태를 갱신한다(다른 탭으로 옮기면 멈춤)
+  let onScreen = true;
+  const io = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
+    const vis = entries.some((e) => e.isIntersecting);
+    if (vis === onScreen) return;
+    onScreen = vis; petApi?.setPaused?.(!vis);
+    if (vis) void refresh(); else { void flush(); toolCtl?.clear(); }
+  }) : null;
+  io?.observe(root);
   let resizeTimer = 0;
   function onResize() { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => scene?.relayout(), 200); }
 
@@ -426,7 +445,7 @@ export function mountCareView(container, {
     async reload() { if (!pet) return; await flush(); try { apply((await callCare({ action: 'status', streamerId: page.streamer.id, petId: pet.petId })).data); } catch (error) { refs.note.textContent = error.message || ''; } },
     refreshAuth() { if (!toolCtl || destroyed) return; renderTools(); resumePending(); },
     destroy() {
-      destroyed = true; void flush();
+      destroyed = true; void flush(); io?.disconnect();
       clearInterval(refreshTimer); clearTimeout(sendTimer); cancelAnimationFrame(animFrame);
       document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('pagehide', onPageHide); window.removeEventListener('resize', onResize);
       sound?.stopAll(); toolCtl?.destroy(); petApi?.destroy(); scene?.destroy();
