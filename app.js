@@ -4557,16 +4557,34 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
   cancel.addEventListener('click', closeDialog);
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(); });
   dialog.addEventListener('close', () => dialog.remove());
-  callDesignPass({ action: 'status', streamerId }).then((result) => {
-    const data = result.data || {};
-    if (data.owned) { balance.textContent = '이미 이용권이 있어요.'; pay.disabled = true; onPurchased?.({ alreadyOwned: true }); return; }
-    const cash = Number(data.balanceCash) || 0;
-    balance.textContent = cash >= priceCash
-      ? `현재 통합 캐시 ${cash.toLocaleString('ko-KR')}캐시`
-      : `통합 캐시가 부족해요. (보유 ${cash.toLocaleString('ko-KR')}캐시 / 필요 ${priceCash}캐시) 아래 버튼으로 충전한 뒤 다시 시도해 주세요.`;
-    pay.disabled = cash < priceCash;
-    charge.hidden = cash >= priceCash;
-  }).catch((error) => { balance.textContent = error.message || '잔액을 확인하지 못했어요.'; });
+  // 잔액 조회: 창을 열 때, 충전 탭에서 돌아왔을 때(포커스·화면 복귀), 창이 열려 있는 동안 15초마다 다시 확인한다.
+  let checking = false; let firstCheck = true;
+  const refreshBalance = () => {
+    if (checking || busy || !dialog.isConnected) return;
+    checking = true;
+    callDesignPass({ action: 'status', streamerId }).then((result) => {
+      if (busy || !dialog.isConnected) return;
+      const data = result.data || {};
+      if (data.owned) { balance.textContent = '이미 이용권이 있어요.'; pay.disabled = true; charge.hidden = true; onPurchased?.({ alreadyOwned: true }); return; }
+      const cash = Number(data.balanceCash) || 0;
+      balance.textContent = cash >= priceCash
+        ? `현재 통합 캐시 ${cash.toLocaleString('ko-KR')}캐시`
+        : `통합 캐시가 부족해요. (보유 ${cash.toLocaleString('ko-KR')}캐시 / 필요 ${priceCash}캐시) 충전하면 이 창에 바로 반영돼요.`;
+      pay.disabled = cash < priceCash;
+      charge.hidden = cash >= priceCash;
+    }).catch((error) => { if (firstCheck) balance.textContent = error.message || '잔액을 확인하지 못했어요.'; })
+      .finally(() => { checking = false; firstCheck = false; });
+  };
+  refreshBalance();
+  const onReturn = () => { if (!document.hidden) refreshBalance(); };
+  const balanceTimer = window.setInterval(() => { if (!document.hidden) refreshBalance(); }, 15000);
+  window.addEventListener('focus', onReturn);
+  document.addEventListener('visibilitychange', onReturn);
+  dialog.addEventListener('close', () => {
+    window.clearInterval(balanceTimer);
+    window.removeEventListener('focus', onReturn);
+    document.removeEventListener('visibilitychange', onReturn);
+  });
   pay.addEventListener('click', async () => {
     if (busy) return;
     busy = true; pay.disabled = true; cancel.disabled = true; pay.textContent = '결제 중…';
