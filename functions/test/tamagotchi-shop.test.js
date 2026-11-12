@@ -220,3 +220,94 @@ test('카탈로그 호출자 정보: 인증 스트리머는 id·닉네임만, �
   assert.deepEqual(shop.buildViewer({ isAdmin: true, verified: null }), { isAdmin: true, isVerifiedStreamer: false, streamer: null });
   assert.equal(shop.buildViewer({ isAdmin: false, verified: { streamer: { id: '../x' } } }).streamer, null);
 });
+
+// ---------- 훈련소(3-B) ----------
+async function adopted(balance = 200) {
+  const db = database(); const w = wallet(balance);
+  const r = await shop.adoptPet(base(db, w));
+  return { db, w, petId: r.petId };
+}
+const trainArgs = (db, w, petId, extra = {}) => ({
+  db, walletDb: w, uid, streamerId, petId, interactions: ['walk', 'play'], requestId: 'train_request_123456789',
+  isAdmin: false, stage: 'public', now: 30_000_000, ...extra,
+});
+
+test('훈련: 고른 개수×10캐시 차감, learned에 추가, 응답은 정렬된 목록', async () => {
+  const { db, w, petId } = await adopted(200);
+  const r = await shop.trainPet(trainArgs(db, w, petId));
+  assert.equal(r.status, 'trained');
+  assert.deepEqual(r.items, ['play', 'walk']);
+  assert.equal(bal(w), 200 - 50 - 20);
+  const learned = pets(db)[petId].learned;
+  assert.ok(learned.walk && learned.play && learned.pet);
+  assert.equal(learned.walk.cashAmount, 10);
+  assert.equal(r.remainingCash, 130);
+});
+
+test('훈련: 같은 요청 번호 재시도는 다시 차감하지 않는다', async () => {
+  const { db, w, petId } = await adopted(200);
+  await shop.trainPet(trainArgs(db, w, petId));
+  const again = await shop.trainPet(trainArgs(db, w, petId, { now: 30_010_000 }));
+  assert.equal(again.status, 'trained');
+  assert.equal(bal(w), 130);
+});
+
+test('훈련: 이미 배운 것(다른 요청)·기본 상호작용·없는 id·중복·빈 목록은 결제 전에 거절', async () => {
+  const { db, w, petId } = await adopted(200);
+  await shop.trainPet(trainArgs(db, w, petId));
+  await assert.rejects(shop.trainPet(trainArgs(db, w, petId, { interactions: ['walk', 'sing'], requestId: 'train_request_other_0001', now: 30_020_000 })), (e) => e.code === 'already-exists' && e.details.learned.includes('walk'));
+  await assert.rejects(shop.trainPet(trainArgs(db, w, petId, { interactions: ['feed'], requestId: 'train_request_other_0002', now: 30_030_000 })), { code: 'invalid-argument' });
+  await assert.rejects(shop.trainPet(trainArgs(db, w, petId, { interactions: ['fly'], requestId: 'train_request_other_0003', now: 30_040_000 })), { code: 'invalid-argument' });
+  await assert.rejects(shop.trainPet(trainArgs(db, w, petId, { interactions: ['sing', 'sing'], requestId: 'train_request_other_0004', now: 30_050_000 })), { code: 'invalid-argument' });
+  await assert.rejects(shop.trainPet(trainArgs(db, w, petId, { interactions: [], requestId: 'train_request_other_0005', now: 30_060_000 })), { code: 'invalid-argument' });
+  assert.equal(bal(w), 130);
+});
+
+test('훈련: 캐시 부족이면 차감·학습 없음', async () => {
+  const { db, w, petId } = await adopted(60);
+  await assert.rejects(shop.trainPet(trainArgs(db, w, petId)));
+  assert.equal(bal(w), 10);
+  assert.equal(pets(db)[petId].learned.walk, undefined);
+});
+
+test('훈련: 결제 사이 다른 요청이 먼저 배웠으면 자동 환불', async () => {
+  const { db, w, petId } = await adopted(200);
+  const real = db.ref.bind(db);
+  // 결제 직후(learned 트랜잭션 직전) 다른 요청이 walk를 배운 상황을 흉내 낸다
+  db.ref = (path) => {
+    const r = real(path);
+    if (path === `streamerFanPageTamagotchis/${streamerId}/${petId}`) {
+      return { ...r, transaction: async (fn) => { const cur = db.read(path); cur.learned.walk = { requestId: 'someone_else', learnedAt: 1, cashAmount: 10 }; return real(path).transaction(() => fn(cur)); } };
+    }
+    return r;
+  };
+  await assert.rejects(shop.trainPet(trainArgs(db, w, petId)), { code: 'aborted' });
+  db.ref = real;
+  assert.equal(bal(w), 150);
+});
+
+test('훈련: 공개 전 단계에서는 비관리자 거절, 없는 펫 거절', async () => {
+  const { db, w, petId } = await adopted(200);
+  await assert.rejects(shop.trainPet(trainArgs(db, w, petId, { stage: 'closed' })), { code: 'failed-precondition' });
+  await assert.rejects(shop.trainPet(trainArgs(db, w, 'p_0123456789abcdef0123')), { code: 'not-found' });
+  await assert.rejects(shop.trainPet(trainArgs(db, w, '../x')), { code: 'invalid-argument' });
+});
+
+test('관리자 테스트 훈련: 테스트 펫만, 캐시 없이, 이미 배운 것은 건너뜀', async () => {
+  const db = database();
+  const g = await shop.adminGrantPet({ db, adminUid: 'admin1', isAdmin: true, streamerId, speciesId: 'mongsil', color: 'cream', nickname: '', requestId: 'grant_request_123456789' });
+  const r = await shop.adminTrainPet({ db, isAdmin: true, streamerId, petId: g.petId, interactions: ['bath', 'nap'], requestId: 'admintrain_req_12345678' });
+  assert.deepEqual(r.items, ['bath', 'nap']);
+  assert.equal(pets(db)[g.petId].learned.bath.source, 'admin-test');
+  const again = await shop.adminTrainPet({ db, isAdmin: true, streamerId, petId: g.petId, interactions: ['bath'], requestId: 'admintrain_req_99999999' });
+  assert.deepEqual(again.items, []);
+  await assert.rejects(shop.adminTrainPet({ db, isAdmin: false, streamerId, petId: g.petId, interactions: ['bath'], requestId: 'admintrain_req_12345678' }), { code: 'permission-denied' });
+  const { db: db2, petId } = await adopted(200);
+  await assert.rejects(shop.adminTrainPet({ db: db2, isAdmin: true, streamerId, petId, interactions: ['bath'], requestId: 'admintrain_req_12345678' }), { code: 'permission-denied' });
+});
+
+test('목록: learned 기록이 없는 예전 펫은 기본 4종으로 보인다', async () => {
+  const db = database({ streamerFanPageTamagotchis: { [streamerId]: { p_0123456789abcdef0123: { status: 'active', speciesId: 'mongsil', color: 'cream', nickname: 'a', adoptedAt: 1 } } } });
+  const { pets: list } = await shop.listPets({ db, streamerId, isAdmin: true, stage: 'closed' });
+  assert.deepEqual(list[0].learned, ['pet', 'feed', 'groom', 'gem']);
+});

@@ -314,11 +314,19 @@ async function loadActivePet(db, sid, pid) {
   return pet;
 }
 
+// 배운 상호작용(훈련소). 미리보기에서도 이 파일만 불러 쓰므로 카탈로그를 require하지 않고 기본 4종을 여기 둔다.
+const BASE_INTERACTIONS = Object.freeze(['pet', 'feed', 'groom', 'gem']);
+function learnedSet(pet) {
+  const keys = pet && pet.learned && typeof pet.learned === 'object' ? Object.keys(pet.learned) : [];
+  return new Set(keys.length ? keys : BASE_INTERACTIONS);
+}
+
 async function readStatus({ db, uid, streamerId, petId, now = Date.now() }) {
   const { sid, pid } = validateTarget(streamerId, petId);
   const pet = await loadActivePet(db, sid, pid);
   const s = advance(pet.stats, now);
   const out = publicStats(s, now);
+  out.learned = [...learnedSet(pet)];
   if (uid) {
     const fan = normalizeFan((await db.ref(`${FANS_ROOT}/${sid}/${pid}/${fanKey(uid, sid)}`).get()).val(), dayKey(now));
     out.me = { bondLevel: bondLevel(fan.bond), gemsToday: fan.gemsToday };
@@ -330,6 +338,7 @@ async function interact({ db, uid, streamerId, petId, batch, owner = false, now 
   const { sid, pid } = validateTarget(streamerId, petId);
   const items = validateBatch(batch);
   const petInfo = await loadActivePet(db, sid, pid);
+  const learned = learnedSet(petInfo);
   const fanRef = db.ref(`${FANS_ROOT}/${sid}/${pid}/${fanKey(uid, sid)}`);
   const fanBefore = normalizeFan((await fanRef.get()).val(), dayKey(now));
   if (now - fanBefore.lastAt < 1500) throw new TamagotchiCareError('resource-exhausted', '조금 천천히 보내 주세요.');
@@ -344,6 +353,7 @@ async function interact({ db, uid, streamerId, petId, batch, owner = false, now 
     fan = normalizeFan(JSON.parse(JSON.stringify(fanBefore)), dayKey(now));
     results = { applied: 0, gems: 0, blocked: {} };
     for (const item of items) {
+      if (!learned.has(item.kind)) { results.blocked[item.kind] = 'not-learned'; continue; } // 훈련소에서 배우지 않은 재주
       for (let i = 0; i < item.n; i += 1) {
         const r = applyOne(s, fan, item.kind, { now, owner, meters: item.meters, rng });
         if (r.applied) results.applied += 1; else results.blocked[item.kind] = r.reason;
@@ -364,7 +374,7 @@ async function interact({ db, uid, streamerId, petId, batch, owner = false, now 
   fan.lastAt = now;
   await fanRef.set(fan);
   const s = tx.snapshot.val();
-  const out = { ...publicStats(s, now), result: results, warning, me: { bondLevel: bondLevel(fan.bond), gemsToday: fan.gemsToday } };
+  const out = { ...publicStats(s, now), learned: [...learned], result: results, warning, me: { bondLevel: bondLevel(fan.bond), gemsToday: fan.gemsToday } };
   // 오버레이 갱신용(응답에는 싣지 않음): 이름·색만, 스탯은 방금 계산한 값
   Object.defineProperty(out, 'pet', { value: { ...petInfo, stats: s }, enumerable: false });
   return out;
@@ -410,6 +420,7 @@ async function removeFanRecords(db, streamerId, petId) {
 }
 
 module.exports = {
+  BASE_INTERACTIONS, learnedSet,
   TamagotchiCareError, PETS_ROOT, FANS_ROOT, EFFECTS, KINDS, ALLOWED, GEM_POOL_MAX,
   HOLDABLE, HOLD_UNIT_MS, HOLD_MAX_MS, hideValues, applyHold,
   freshStats, advance, conditionOf, applyOne, normalizeFan, bondLevel, softCapFactor, warnLevel,

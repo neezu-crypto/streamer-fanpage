@@ -1,8 +1,9 @@
 // 다마고치 돌봄 미리보기(?tgpreview=1, 관리자 전용). 운영 DB에 아무것도 쓰지 않는다.
 // 실제 서버 엔진(functions/tamagotchi-care.js)을 그대로 불러와 브라우저 메모리 DB 위에서 돌린다 → 계산 규칙이 서버와 같다.
-const ENGINE_URL = 'functions/tamagotchi-care.js?v=20261113-tg-preview1';
+const ENGINE_URL = 'functions/tamagotchi-care.js?v=20261113-tg-train1';
 const UID = 'preview-admin';
 const PET_ID = 'preview-mongsil';
+const ALL_SKILLS = ['pet', 'feed', 'groom', 'gem', 'play', 'bath', 'nap', 'walk', 'talk', 'sing', 'dance', 'cheer'];
 
 async function loadEngine() {
   const src = await (await fetch(ENGINE_URL, { cache: 'no-store' })).text();
@@ -52,7 +53,7 @@ export async function createCarePreview(page) {
   const callShop = (data) => wrap(async () => {
     if (data.action !== 'pets') throw Object.assign(new Error('미리보기에서는 목록만 지원해요.'), { code: 'invalid-argument' });
     const pet = db.read(`${care.PETS_ROOT}/${sid}/${PET_ID}`);
-    return { pets: [{ petId: PET_ID, speciesId: pet.speciesId, color: pet.color, nickname: pet.nickname, adoptedAt: pet.adoptedAt, learned: [], test: true }] };
+    return { pets: [{ petId: PET_ID, speciesId: pet.speciesId, color: pet.color, nickname: pet.nickname, adoptedAt: pet.adoptedAt, learned: Object.keys(pet.learned || {}), test: true }] };
   });
   const callCare = (data) => wrap(async () => {
     const base = { db, uid: UID, streamerId: sid, petId: data.petId };
@@ -85,6 +86,9 @@ export async function createCarePreview(page) {
     add('+1일', () => { const s = db.read(statsPath) || care.freshStats(Date.now()); const d = 86400 * 1000; save({ ...s, at: (s.at || Date.now()) - d, ...(s.hospitalUntil ? { hospitalUntil: s.hospitalUntil - d } : {}), ...(s.sleepAt ? { sleepAt: s.sleepAt - d } : {}) }); });
     add('💎 금고 채우기', () => save({ ...current(), gems: care.GEM_POOL_MAX }));
     add('팬 기록 초기화', () => db.write(`${care.FANS_ROOT}/${sid}/${PET_ID}`, null));
+    // 훈련소: 배운 재주 전환(기본 4종 ↔ 12종 전부)
+    add('🎓 훈련 전부', () => db.write(`${care.PETS_ROOT}/${sid}/${PET_ID}/learned`, Object.fromEntries(ALL_SKILLS.map((k) => [k, { learnedAt: Date.now() }]))));
+    add('🎓 기본만', () => db.write(`${care.PETS_ROOT}/${sid}/${PET_ID}/learned`, Object.fromEntries(care.BASE_INTERACTIONS.map((k) => [k, { learnedAt: Date.now() }]))));
     box.append(title, row);
     return box;
   }

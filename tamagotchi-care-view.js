@@ -17,7 +17,10 @@ export const CARE_HINT = {
 const HOLD_UNIT_MS = 4000;
 const ALLOWED = { sick: ['pet', 'feed', 'nap', 'talk'], down: ['pet'], hospital: ['pet', 'talk', 'cheer'] };
 const BLOCK_TEXT = { sick: '아파서 쉬어야 해요. 쓰다듬기·밥주기·낮잠·수다만 할 수 있어요.', down: '쓰러졌어요… 쓰다듬기만 할 수 있어요.', hospital: '입원 중이에요. 병문안(쓰다듬기·수다·응원)만 할 수 있어요.' };
-const REASON_TEXT = { full: '지금은 충분해요!', cooldown: '조금 쉬었다가 해 주세요.', daily: '오늘은 여기까지예요.', condition: '지금은 할 수 없어요.' };
+const REASON_TEXT = { full: '지금은 충분해요!', cooldown: '조금 쉬었다가 해 주세요.', daily: '오늘은 여기까지예요.', condition: '지금은 할 수 없어요.', 'not-learned': '아직 배우지 않은 재주예요.' };
+// 훈련소(상점 다마고치 마을). 분양 때 배우는 기본 재주 4종은 서버 기록이 없을 때의 기본값
+export const TRAIN_URL = `${SHOP_BASE}tamagotchi-world.html#train`;
+const BASE_SKILLS = ['pet', 'feed', 'groom', 'gem'];
 const PENDING_KEY = 'tgCarePendingTool';
 
 // ---------- 묶어 보내기 큐(순수 함수: 테스트 대상) ----------
@@ -259,7 +262,7 @@ export function mountCareView(container, {
       const h = Math.max(1, Math.ceil((data.hospitalUntil - Date.now()) / 3600000));
       refs.hospital.textContent = `🏥 입원 중 · ${h}시간 뒤 퇴원해요`; refs.hospital.hidden = false;
     } else refs.hospital.hidden = true;
-    const sel = toolCtl?.selected?.(); if (sel && !allowed(sel)) toolCtl.clear(); // 상태가 바뀌어 못 쓰게 된 도구는 내려놓는다
+    const sel = toolCtl?.selected?.(); if (sel && (!allowed(sel) || !learned(sel))) toolCtl.clear(); // 상태가 바뀌어 못 쓰게 된 도구는 내려놓는다
     renderTreat(); renderTools(); renderBanner();
   }
   function renderBanner() {
@@ -292,6 +295,19 @@ export function mountCareView(container, {
 
   // ---------- 도구 ----------
   function allowed(id) { const a = ALLOWED[server?.condition]; return !a || a.includes(id); }
+  // 배운 재주: 서버 상태 응답 → 목록 응답 → 기본 4종 순으로 믿는다
+  function learned(id) {
+    const list = Array.isArray(server?.learned) ? server.learned : Array.isArray(pet?.learned) && pet.learned.length ? pet.learned : BASE_SKILLS;
+    return list.includes(id);
+  }
+  function showLocked(id) {
+    const label = mods.TOOLS[id]?.label || '';
+    if (canManage) {
+      say(`${label}은(는) 아직 배우지 않았어요. 훈련소에서 가르칠 수 있어요.`);
+      const a = el('a', 'tg-care-train-link', '🎓 훈련소에서 가르치기 →'); a.href = TRAIN_URL; a.target = '_blank'; a.rel = 'noopener';
+      refs.note.replaceChildren(a);
+    } else say(`${label}은(는) 아직 배우지 않은 재주예요.`);
+  }
   // 도구 버튼은 한 번만 만들고, 이후에는 선택·흐림 표시만 바꾼다
   function renderTools() {
     if (!mods) return;
@@ -300,8 +316,10 @@ export function mountCareView(container, {
       refs.tools.replaceChildren(...Object.entries(mods.TOOLS).map(([id, tool]) => {
         const b = el('button', 'tg-action tg-care-tool'); b.type = 'button'; b.dataset.tool = id;
         const img = el('img'); img.src = tool.src; img.alt = ''; img.draggable = false; img.decoding = 'async';
-        b.append(img, el('span', '', tool.label));
+        const lock = el('span', 'tg-care-lock', '🔒'); lock.setAttribute('aria-hidden', 'true'); lock.hidden = true;
+        b.append(img, el('span', '', tool.label), lock);
         b.addEventListener('click', () => {
+          if (!learned(id)) { toolCtl?.clear(); showLocked(id); return; }
           if (!hasAccount()) { remember(id); openLogin(); return; }
           if (toolCtl.selected() === id) { toolCtl.clear(); return; }
           void flush();
@@ -313,10 +331,12 @@ export function mountCareView(container, {
     }
     const sel = toolCtl?.selected?.() || ''; const now = Date.now();
     for (const [id, b] of refs.toolBtns) {
-      const ok = allowed(id);
-      b.classList.toggle('is-dim', !ok || (dimmed.get(id) || 0) > now); b.classList.toggle('is-selected', sel === id);
+      const ok = allowed(id); const has = learned(id);
+      b.classList.toggle('is-locked', !has); b.querySelector('.tg-care-lock').hidden = has;
+      b.classList.toggle('is-dim', has && (!ok || (dimmed.get(id) || 0) > now)); b.classList.toggle('is-selected', sel === id);
       b.setAttribute('aria-pressed', String(sel === id));
-      b.title = ok ? '' : BLOCK_TEXT[server?.condition] || '';
+      b.setAttribute('aria-label', has ? mods.TOOLS[id]?.label || id : `${mods.TOOLS[id]?.label || id} (아직 배우지 않음)`);
+      b.title = !has ? '아직 배우지 않은 재주예요' : ok ? '' : BLOCK_TEXT[server?.condition] || '';
     }
   }
 
@@ -326,7 +346,7 @@ export function mountCareView(container, {
       const raw = JSON.parse(sessionStorage.getItem(PENDING_KEY) || 'null');
       if (!raw || raw.sid !== page.streamer.id || !hasAccount()) return;
       sessionStorage.removeItem(PENDING_KEY);
-      if (raw.id && allowed(raw.id)) toolCtl.select(raw.id);
+      if (raw.id && allowed(raw.id) && learned(raw.id)) toolCtl.select(raw.id);
     } catch (_) { /* 무시 */ }
   }
   function say(text) { refs.bubble.textContent = text; }
