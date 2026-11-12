@@ -186,6 +186,7 @@ export function mountCareView(container, {
       const h = Math.max(1, Math.ceil((data.hospitalUntil - Date.now()) / 3600000));
       refs.hospital.textContent = `🏥 입원 중 · ${h}시간 뒤 퇴원해요`; refs.hospital.hidden = false;
     } else refs.hospital.hidden = true;
+    const sel = toolCtl?.selected?.(); if (sel && !allowed(sel)) toolCtl.clear(); // 상태가 바뀌어 못 쓰게 된 도구는 내려놓는다
     renderTreat(); renderTools(); renderBanner();
   }
   function renderBanner() {
