@@ -50,7 +50,7 @@ async function issue({ db, streamerId, petId, now = Date.now() }) {
   if (prev && prev.tokenHash) await Promise.all([db.ref(`${LIVE_ROOT}/${prev.tokenHash}`).remove(), db.ref(`${INDEX_ROOT}/${prev.tokenHash}`).remove()]);
   await ref.set({ tokenHash, createdAt: now });
   await db.ref(`${INDEX_ROOT}/${tokenHash}`).set({ sid: streamerId, pid: petId });
-  await db.ref(`${LIVE_ROOT}/${tokenHash}`).set({ ...summary(pet, care.advance(pet.stats, now), now), recent: {} });
+  await db.ref(`${LIVE_ROOT}/${tokenHash}`).set({ ...summary(pet, care.advance(pet.stats, now, care.napOpts(pet, now)), now), recent: {} });
   return { token, createdAt: now };
 }
 
@@ -73,7 +73,7 @@ async function publish({ db, streamerId, petId, stats, counts = null, pet: known
   if (!cur || !cur.tokenHash) return false;
   const pet = knownPet || await readPet(db, streamerId, petId); // 돌봄 처리에서 이미 읽은 펫 정보가 있으면 다시 읽지 않는다
   const liveRef = db.ref(`${LIVE_ROOT}/${cur.tokenHash}`);
-  const base = summary(pet, care.advance(stats || pet.stats, now), now);
+  const base = summary(pet, care.advance(stats || pet.stats, now, care.napOpts(pet, now)), now);
   await liveRef.transaction((raw) => {
     const recent = pruneRecent(raw && raw.recent, now);
     if (counts) {
