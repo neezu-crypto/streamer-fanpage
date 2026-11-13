@@ -311,3 +311,31 @@ test('목록: learned 기록이 없는 예전 펫은 기본 4종으로 보인다
   const { pets: list } = await shop.listPets({ db, streamerId, isAdmin: true, stage: 'closed' });
   assert.deepEqual(list[0].learned, ['pet', 'feed', 'groom', 'gem']);
 });
+
+test('훈련 시간: 재주당 5분씩 차례로, 끝나기 전엔 training, 끝나면 learned', async () => {
+  const { db, w, petId } = await adopted(200);
+  const t0 = 30_000_000; const M = shop.TRAIN_MS;
+  const r = await shop.trainPet(trainArgs(db, w, petId));
+  assert.equal(M, 5 * 60 * 1000);
+  assert.deepEqual(r.training, { play: { startAt: t0, endAt: t0 + M }, walk: { startAt: t0 + M, endAt: t0 + 2 * M } });
+  assert.ok(!r.learned.includes('play') && r.learned.includes('pet'));
+  const mid = await shop.listPets({ db, streamerId, isAdmin: false, stage: 'public', now: t0 + M });
+  assert.ok(mid.pets[0].learned.includes('play') && !mid.pets[0].learned.includes('walk'));
+  assert.deepEqual(Object.keys(mid.pets[0].training), ['walk']);
+  const done = await shop.listPets({ db, streamerId, isAdmin: false, stage: 'public', now: t0 + 2 * M });
+  assert.ok(done.pets[0].learned.includes('walk'));
+  assert.deepEqual(done.pets[0].training, {});
+  // 훈련 중인 재주는 다시 살 수 없고, 새 훈련은 진행 중인 훈련 뒤에 줄을 선다
+  await assert.rejects(shop.trainPet(trainArgs(db, w, petId, { interactions: ['walk'], requestId: 'train_request_other_0010', now: t0 + 1000 })), (e) => e.code === 'already-exists');
+  const q = await shop.trainPet(trainArgs(db, w, petId, { interactions: ['sing'], requestId: 'train_request_other_0011', now: t0 + 10_000 }));
+  assert.deepEqual(q.training.sing, { startAt: t0 + 2 * M, endAt: t0 + 3 * M });
+});
+
+test('돌봄: 훈련 중인 재주는 끝날 때까지 not-learned로 막힌다', () => {
+  const care = require('../tamagotchi-care');
+  const pet = { learned: { pet: { learnedAt: 1 }, dance: { trainStartAt: 100, learnedAt: 400 } } };
+  assert.ok(!care.learnedSet(pet, 399).has('dance'));
+  assert.ok(care.learnedSet(pet, 400).has('dance'));
+  assert.deepEqual(care.trainingMap(pet, 399), { dance: { startAt: 100, endAt: 400 } });
+  assert.deepEqual(care.trainingMap(pet, 400), {});
+});
