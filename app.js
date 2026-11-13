@@ -1511,7 +1511,7 @@ function setVisibleView(page) {
   if (!page) publishFanpageEmoteContext(null);
   document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-account-banner-hidden');
   $('siteShell').classList.remove('has-bottom-banner');
-  document.body.classList.remove('fanpage-bottom-banner-active');
+  document.body.classList.remove('fanpage-bottom-banner-active', 'fanpage-tamagotchi-tab');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
   const pageLayoutDesign = page && [1, 2, 3].includes(Number(page.profile?.layoutDesign))
     ? Number(page.profile.layoutDesign)
@@ -5265,8 +5265,10 @@ function renderFanPage(page, options = {}) {
     if (tabKey === 'memories') loadFanPageMemories(page);
     if (tabKey === 'comment-up') view.querySelector('#commentUpSection')?._load?.();
     if (tabKey === 'tamagotchi') tamagotchiSection._loadCare();
-    // 디자인 3 모바일은 탭 바가 한 줄 가로 스크롤이므로 선택한 탭이 항상 보이도록 가운데로 맞춘다.
-    if (view.classList.contains('fanpage-layout-3') && tabNav.scrollWidth > tabNav.clientWidth + 1) {
+    // 다마고치 탭에서는 모바일 떠 있는 버튼을 작게 줄여 아래쪽 줄에 모은다(fanpage-mobile-actions.css).
+    document.body.classList.toggle('fanpage-tamagotchi-tab', tabKey === 'tamagotchi');
+    // 모바일은 모든 디자인에서 탭 바가 한 줄 가로 스크롤이므로 선택한 탭이 항상 보이도록 가운데로 맞춘다.
+    if (tabNav.scrollWidth > tabNav.clientWidth + 1) {
       const activeButton = tabButtons.get(tabKey);
       if (activeButton) {
         const targetLeft = activeButton.offsetLeft - (tabNav.clientWidth - activeButton.offsetWidth) / 2;

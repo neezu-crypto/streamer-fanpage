@@ -75,3 +75,51 @@
     display: none !important;
   }
 }
+
+/* ===== 모바일 탭 바·다마고치 탭 떠 있는 버튼 (2026-11-13) =====
+   디자인 1·2도 디자인 3처럼 탭 바를 한 줄 가로 스크롤로 둔다(3줄 약 144px → 한 줄).
+   선택한 탭 가운데 정렬은 app.js selectFanPageTab이 모든 디자인에서 맡는다. */
+@media (max-width: 560px) {
+  #fanPageView:not(.fanpage-layout-3) .fanpage-tab-nav {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  #fanPageView:not(.fanpage-layout-3) .fanpage-tab-nav::-webkit-scrollbar { display: none; }
+  #fanPageView:not(.fanpage-layout-3) .fanpage-tab-nav .fanpage-tab-button {
+    flex: 0 0 auto;
+    min-width: 84px;
+    padding-inline: 12px;
+    scroll-snap-align: center;
+  }
+}
+
+/* 다마고치 탭(디자인 1·2, 디자인 3은 이미 아래쪽 줄): 감정표현 버튼은 작게, 빠른 이동·전체화면 버튼은 화면 가운데 오른쪽(돌봄 장면 위)에서
+   아래쪽 줄 감정표현 버튼 왼쪽으로 옮겨 도구·수치를 덮지 않게 한다. */
+@media (max-width: 720px) {
+  body.fanpage-tamagotchi-tab #fanPageView > #game-series-emote-launcher.fanpage-emote-mobile-floating {
+    bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+  }
+  body.fanpage-tamagotchi-tab #fanPageView > #game-series-emote-launcher.fanpage-emote-mobile-floating #game-series-emote-button {
+    min-width: 0 !important;
+    min-height: 36px !important;
+    padding: 0 12px !important;
+    font-size: 12px !important;
+  }
+  body.fanpage-tamagotchi-tab #fanPageView:not(.fanpage-layout-3) .fan-quick-remote {
+    top: auto !important;
+    right: calc(112px + env(safe-area-inset-right)) !important;
+    bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+    transform: none !important;
+  }
+  body.fanpage-tamagotchi-tab #fanPageView:not(.fanpage-layout-3) .fan-quick-remote .fan-quick-mobile-actions {
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+}
