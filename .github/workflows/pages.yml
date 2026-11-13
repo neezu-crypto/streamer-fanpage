@@ -58,11 +58,11 @@ jobs:
         with:
           node-version: 22
       - name: Install export dependencies
-        run: npm ci --prefix functions
+        run: npm ci --prefix ci
       - name: Export analyzed VOD summaries
         shell: bash
         run: |
-          node functions/export-viewer-stats.js
+          node ci/export-viewer-stats.js
         env:
           VIEWER_STATS_USAGE_REPORT_URL: ${{ steps.usage-reporter.outputs.url }}
           VIEWER_STATS_USAGE_REPORT_TOKEN: ${{ steps.usage-reporter-auth.outputs.id_token }}
@@ -74,13 +74,8 @@ jobs:
           git ls-files -z | tar --exclude='database.fanpage.rules.json' --exclude='AGENTS.md' --exclude='CLAUDE.md' --exclude='.github/copilot-instructions.md' --null -T - -cf - | tar -xf - -C _site
           mkdir -p _site/static-data/viewer-stats
           cp -a static-data/viewer-stats/. _site/static-data/viewer-stats/
-          # 서버 코드는 공개 사이트에 올리지 않는다(2026-11-14). 관리자 다마고치 미리보기가 불러오는 계산 엔진 2개만 남긴다.
-          mkdir -p _site_keep
-          cp _site/functions/tamagotchi-care.js _site/functions/tamagotchi-wardrobe.js _site_keep/
-          rm -rf _site/functions
-          mkdir -p _site/functions
-          mv _site_keep/* _site/functions/
-          rmdir _site_keep
+          # 서버 코드는 비공개 저장소 streamer-fanpage-functions에 있다. 내보내기 스크립트(ci/)는 사이트에 올리지 않는다.
+          rm -rf _site/ci
       - name: Guard private admin snapshots
         run: |
           if find _site -type f -path '*/admin-stats/*.json' -print -quit | grep -q .; then
