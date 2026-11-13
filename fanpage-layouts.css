@@ -5209,3 +5209,35 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticke
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticker-button:active {
   box-shadow: 1px 1px 0 var(--doodle-shadow, #2f2a2c32) !important; transform: translateY(2px) !important;
 }
+
+/* 다마고치 창(보석 상점·방송 오버레이)도 디자인 1·3의 창 모양을 따른다(2026-11-14).
+   창은 document.body에 붙으므로 body 클래스로 고른다. 디자인 2는 style.css 기본(어두운 창). */
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .tg-overlay-dialog {
+  color-scheme: light;
+  color: #51465d;
+  border: 1px solid #eadfeb;
+  border-radius: 23px;
+  background: linear-gradient(145deg, #fffefd, #fff8fc);
+  box-shadow: 0 9px 0 #dcc9df88, 0 26px 72px #44344e30;
+}
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .tg-overlay-dialog::backdrop { background: #51465d55; backdrop-filter: blur(6px); }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .tg-overlay-dialog .tg-shop-card { background: #fff3f8; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .tg-overlay-dialog .tg-shop-card.is-on { border-color: #ee86aa; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .tg-overlay-dialog .tg-shop-card .tg-button:not(.tg-button-primary) { border-color: #eadfeb; }
+body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .tg-overlay-dialog .tg-overlay-warn { color: #c0703a; }
+body.fanpage-layout-three-active .tg-overlay-dialog {
+  color-scheme: light;
+  color: var(--doodle-ink, #2f2a2c);
+  border: 2px solid var(--doodle-ink, #2f2a2c);
+  border-radius: 20px;
+  background-color: var(--doodle-paper, #fffdf8);
+  background-image: repeating-linear-gradient(0deg, transparent 0 30px, #e8756415 31px 32px);
+  box-shadow: 6px 7px 0 var(--doodle-shadow, #2f2a2c32);
+}
+body.fanpage-layout-three-active .tg-overlay-dialog::backdrop { background: #2f2a2c66; backdrop-filter: blur(4px); }
+body.fanpage-layout-three-active .tg-overlay-dialog .tg-shop-card { border: 2px solid var(--doodle-ink, #2f2a2c); border-radius: 16px; background: #fffaf0; box-shadow: 3px 3px 0 var(--doodle-shadow, #2f2a2c32); }
+body.fanpage-layout-three-active .tg-overlay-dialog .tg-shop-card.is-on { background: #ffe9ef; }
+body.fanpage-layout-three-active .tg-overlay-dialog .tg-shop-card .tg-button { border: 2px solid var(--doodle-ink, #2f2a2c); }
+body.fanpage-layout-three-active .tg-overlay-dialog .tg-overlay-close { color: var(--doodle-ink, #2f2a2c); }
+/* 디자인 3: 상점 버튼이 다른 칩(유대감·금고)과 같은 모양이 되게 전역 버튼 손그림 테두리를 덜어 낸다 */
+body.fanpage-layout-three-active .tg-care-meta .tg-care-shop-btn { min-height: 0; padding: 3px 10px; border: 1px solid color-mix(in srgb, var(--tg-accent) 35%, transparent); border-radius: 999px; box-shadow: none; background: color-mix(in srgb, var(--tg-accent) 16%, transparent); color: inherit; font: inherit; font-size: .85rem; transform: none; }
