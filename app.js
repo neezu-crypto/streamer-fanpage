@@ -1,4 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signInWithCustomToken, linkWithPopup, signOut, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
@@ -16,6 +17,9 @@ const firebaseConfig = {
 };
 // 다른 시리즈 앱과 같은 origin·apiKey·기본 Firebase 앱 세션을 공유해 기존 UID를 이어받는다.
 const app = initializeApp(firebaseConfig);
+// App Check: 이 사이트(github.io)에서 온 요청만 서버가 받도록 토큰을 붙인다(고점체크와 같은 키). 2026-11-14
+// 같은 페이지의 다른 모듈(감정표현·점검 게이트)이 다시 초기화하지 않게 표시해 둔다.
+try { initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('6Ld0AfAtAAAAABcCio4_5AoiCdrjfM7_4riWiYXR'), isTokenAutoRefreshEnabled: true }); window.__seriesAppCheck = true; } catch (error) { console.warn('App Check 초기화 실패', error); }
 const auth = getAuth(app);
 const db = getDatabase(app);
 // 주식 시세·스파크라인 전용 참조. 이전 데이터 대조가 끝나는 전환 배포 전까지

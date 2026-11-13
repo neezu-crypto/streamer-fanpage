@@ -2098,3 +2098,6 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .tg-care .tg-care
 .tg-shop-dialog{width:min(620px,94vw);overflow:auto}
 .tg-shop-dialog .tg-gem-shop-gems,.tg-shop-dialog .tg-gem-shop-state,.tg-shop-dialog .tg-gem-shop-foot{font-size:13px;line-height:1.6;margin:6px 0}
 .tg-shop-dialog .tg-shop-world{font-size:13px}
+
+/* 하단 저작권 표시(2026-11-14) */
+.footer-copyright{display:inline-block;margin-top:4px;font-size:9px;letter-spacing:.02em;opacity:.7}
