@@ -7,7 +7,7 @@ import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/
 
 // 상점 모듈 위치(돌봄 화면 파일을 통째로 불러오지 않도록 직접 적는다)
 const SHOP_BASE = 'https://neezu-crypto.github.io/streamer-game-series-shop/';
-const SHOP_V = '?v=20261113-tg-walkfix1';
+const SHOP_V = '?v=20261113-tg-walkfix2';
 const app = initializeApp({
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54', authDomain: 'soop-stock-market.firebaseapp.com',
   databaseURL: 'https://soop-stock-market-default-rtdb.firebaseio.com', projectId: 'soop-stock-market',
