@@ -190,6 +190,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
   }
 
   if (action === 'request') {
+    throw new HttpsError('failed-precondition', '통합 구독 인증은 종료됐어요. 각 서비스에서 통합 캐시로 이용해 주세요.');
     await requireProtectedAccount(request);
     const soopId = normalizedSoopId(data.soopId);
     if (!SOOP_ID_RE.test(soopId)) {
@@ -255,6 +256,7 @@ exports.streamerFanPageViewerSubscription = onCall({ maxInstances: 20, enforceAp
   }
 
   if (action === 'renewCode') {
+    throw new HttpsError('failed-precondition', '통합 구독 인증은 종료됐어요. 각 서비스에서 통합 캐시로 이용해 주세요.');
     await requireProtectedAccount(request);
     const requestId = typeof data.requestId === 'string' ? data.requestId.trim() : '';
     if (!REQUEST_ID_RE.test(requestId)) throw new HttpsError('invalid-argument', '신청 번호를 확인해 주세요.');

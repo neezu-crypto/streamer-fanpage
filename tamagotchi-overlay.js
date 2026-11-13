@@ -1,5 +1,5 @@
 // 다마고치 방송 오버레이(OBS 등 브라우저 소스). 설계: docs/다마고치_방송_오버레이_설계.md
-// URL: overlay.html#t=<토큰>&size=s|m|l&bg=none|room&stats=1&feed=1&sound=0&pos=br
+// URL: overlay.html#t=<토큰>&size=s|m|l&bg=none|room&stats=1&feed=1&sound=0&pos=br&cu=1(댓글 UP, 팬페이지에서 고른 게시글)
 // 토큰 원문은 # 뒤에만 있다(서버 기록·Referer에 남지 않음). 브라우저가 SHA-256으로 공개 경로를 계산해 실시간 구독한다.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
@@ -32,7 +32,7 @@ function params() {
   const pick = (k, ok, d) => (ok.includes(p.get(k)) ? p.get(k) : d);
   return {
     token: p.get('t') || '', size: pick('size', ['s', 'm', 'l'], 'm'), bg: pick('bg', ['none', 'room'], 'none'),
-    stats: p.get('stats') !== '0', feed: p.get('feed') !== '0', sound: p.get('sound') === '1', pos: pick('pos', ['bl', 'br', 'tl', 'tr'], 'br'),
+    stats: p.get('stats') !== '0', cu: p.get('cu') !== '0', feed: p.get('feed') !== '0', sound: p.get('sound') === '1', pos: pick('pos', ['bl', 'br', 'tl', 'tr'], 'br'),
   };
 }
 async function sha256Hex(text) {
@@ -65,10 +65,11 @@ async function main() {
   const steam = el('div', 'tg-steam'); steam.setAttribute('aria-hidden', 'true');
   stage.append(steam, petEl, water, bubble, badge);
   const info = el('div', 'tgo-info'); const name = el('span', 'tgo-name'); const gems = el('span', 'tgo-gems'); info.append(name, gems);
+  const commentUp = el('div', 'tgo-cu'); commentUp.hidden = true;
   const stats = el('div', 'tgo-stats');
   const rings = {};
   for (const [k, e] of STAT_EMOJI) { const r = el('span', 'tgo-ring'); r.append(el('span', '', e)); stats.append(r); rings[k] = r; }
-  root.append(stage, info, stats);
+  root.append(stage, info, commentUp, stats);
 
   let pet = null; let scene = null; let color = '';
   const sound = opt.sound ? createSound() : null;
@@ -95,8 +96,25 @@ async function main() {
     if (cond === 'hospital' && live.hospitalUntil) {
       badge.textContent = `🏥 ${Math.max(1, Math.ceil((live.hospitalUntil - Date.now()) / 3600000))}시간 뒤 퇴원`; badge.hidden = false;
     } else badge.hidden = true;
+    renderCommentUp(live.commentUp);
     collect(live.recent || {});
   }
+  // 댓글 UP: 팬페이지 댓글 UP 체크에서 새로고침한 값과 그 시각(오버레이는 SOOP를 직접 부르지 않는다)
+  let cuAt = 0;
+  function ago(at) {
+    const min = Math.max(0, Math.floor((Date.now() - at) / 60000));
+    if (min < 1) return '방금 갱신'; if (min < 60) return `${min}분 전 갱신`;
+    const h = Math.floor(min / 60); return h < 24 ? `${h}시간 전 갱신` : `${Math.floor(h / 24)}일 전 갱신`;
+  }
+  function renderCommentUp(cu) {
+    if (!opt.cu || !cu || !cu.checkedAt || !cu.found || (cu.up == null && cu.rank == null)) { commentUp.hidden = true; cuAt = 0; return; }
+    const parts = [];
+    if (cu.up != null) parts.push(`UP ${Number(cu.up).toLocaleString('ko-KR')}`);
+    if (cu.rank != null) parts.push(`${cu.rank}위${cu.total ? `/${cu.total}` : ''}`);
+    commentUp.replaceChildren(el('span', 'tgo-cu-main', `💬 댓글 ${parts.join(' · ')}`), el('span', 'tgo-cu-at', ago(cu.checkedAt)));
+    commentUp.hidden = false; cuAt = cu.checkedAt;
+  }
+  setInterval(() => { if (cuAt) commentUp.lastChild.textContent = ago(cuAt); }, 30000);
   // 새로 늘어난 횟수만 반응으로(처음 불러올 때 이미 있던 기록은 건너뜀)
   function collect(recent) {
     const totals = new Map();
@@ -150,7 +168,7 @@ async function main() {
   }
 
   if (demo) {
-    const live = { nickname: '체험 몽실이', color: 'cream', condition: 'ok', bands: { full: 'good', mood: 'good', clean: 'mid', fatigue: 'good', health: 'good' }, sleeping: false, hospitalUntil: 0, gems: 12, gemMax: 60, recent: {} };
+    const live = { nickname: '체험 몽실이', color: 'cream', condition: 'ok', bands: { full: 'good', mood: 'good', clean: 'mid', fatigue: 'good', health: 'good' }, sleeping: false, hospitalUntil: 0, gems: 12, gemMax: 60, recent: {}, commentUp: { checkedAt: Date.now() - 12 * 60000, found: true, up: 120, rank: 3, total: 245 } };
     render(live);
     const kinds = ['bath', 'gem', 'play', 'feed', 'pet', 'groom', 'talk', 'sing', 'dance', 'cheer'];
     let i = 0;

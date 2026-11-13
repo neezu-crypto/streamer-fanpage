@@ -191,6 +191,7 @@ export function mountCareView(container, {
     sel('위치', 'pos', [['br', '오른쪽 아래'], ['bl', '왼쪽 아래'], ['tr', '오른쪽 위'], ['tl', '왼쪽 위']], 'br');
     sel('상태 고리', 'stats', [['1', '보이기'], ['0', '숨기기']], '1');
     sel('반응 말풍선', 'feed', [['1', '보이기'], ['0', '숨기기']], '1');
+    sel('댓글 UP', 'cu', [['1', '보이기'], ['0', '숨기기']], '1'); // 팬페이지 댓글 UP 체크에서 고른 게시글
     sel('소리', 'sound', [['0', '끄기'], ['1', '켜기']], '0');
     const urlRow = el('div', 'tg-overlay-url');
     const url = el('input'); url.readOnly = true; url.type = 'text'; url.setAttribute('aria-label', '오버레이 주소');

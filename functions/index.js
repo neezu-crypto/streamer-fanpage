@@ -8312,10 +8312,23 @@ exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 12
   if (!target) throw new HttpsError('not-found', '스트리머 팬페이지를 찾을 수 없습니다.');
   const canManage = isAdmin || !!(verified && verified.streamer.id === target.streamer.id);
   const root = db.ref(`streamerFanPageCommentUp/${target.streamer.id}`);
+  const overlayRef = db.ref(`${tamagotchiOverlay.COMMENT_UP_ROOT}/${target.streamer.id}`);
+  // 방송 오버레이 표시: 다마고치가 열려 있고 이 스트리머가 분양받은 펫이 있을 때만
+  const overlayAvailable = async () => {
+    const [stage, pets] = await Promise.all([readTamagotchiStage(db), db.ref(`${tamagotchiCare.PETS_ROOT}/${target.streamer.id}`).get()]);
+    return tamagotchiOpenFor(stage, isAdmin) && Object.values(pets.val() || {}).some((pet) => pet && pet.status === 'active');
+  };
   const action = String(data.action || 'list');
   if (action === 'list') {
     const value = (await root.get()).val() || {};
-    return { entries: Object.entries(value).map(([id, row]) => ({
+    let overlay = null;
+    if (canManage && await overlayAvailable()) {
+      const cur = (await overlayRef.get()).val();
+      overlay = cur && value[cur.id]
+        ? { id: cur.id, showRank: cur.showRank === true, showUp: cur.showUp === true, checkedAt: Number(cur.checkedAt) || 0 }
+        : { id: '', showRank: true, showUp: true, checkedAt: 0 };
+    }
+    return { overlay, entries: Object.entries(value).map(([id, row]) => ({
       id,
       url: row.url,
       visibility: row.visibility === 'fan' ? 'fan' : 'public',
@@ -8344,7 +8357,28 @@ exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 12
   if (action === 'delete') {
     const id = String(data.id || '');
     if (!/^[a-z0-9_-]{1,30}_\d{1,20}$/.test(id)) throw new HttpsError('invalid-argument', '게시글을 확인해 주세요.');
-    await root.child(id).remove(); return { ok: true };
+    await root.child(id).remove();
+    const cur = (await overlayRef.get()).val();
+    if (cur && cur.id === id) { await overlayRef.remove(); await tamagotchiOverlay.publishCommentUp(db, target.streamer.id); }
+    return { ok: true };
+  }
+  if (action === 'overlay') {
+    if (!await overlayAvailable()) throw new HttpsError('failed-precondition', '다마고치를 분양받으면 방송 오버레이에 표시할 수 있어요.');
+    const id = String(data.id || '');
+    const showRank = data.showRank === true; const showUp = data.showUp === true;
+    if (!id || (!showRank && !showUp)) {
+      await overlayRef.remove();
+    } else {
+      if (!/^[a-z0-9_-]{1,30}_\d{1,20}$/.test(id)) throw new HttpsError('invalid-argument', '게시글을 확인해 주세요.');
+      if (!(await root.child(id).get()).exists()) throw new HttpsError('not-found', '등록된 게시글을 찾을 수 없어요.');
+      await overlayRef.transaction((cur) => {
+        const same = cur && typeof cur === 'object' && cur.id === id; // 같은 게시글이면 마지막 확인 값 유지
+        return { ...(same ? cur : {}), id, showRank, showUp };
+      });
+    }
+    await tamagotchiOverlay.publishCommentUp(db, target.streamer.id);
+    const cur = (await overlayRef.get()).val();
+    return { overlay: cur ? { id: cur.id, showRank: cur.showRank === true, showUp: cur.showUp === true, checkedAt: Number(cur.checkedAt) || 0 } : { id: '', showRank, showUp, checkedAt: 0 } };
   }
   if (action === 'goal') {
     const id = String(data.id || '');
@@ -8368,14 +8402,16 @@ exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 12
     if (!parsed) throw new HttpsError('not-found', '등록된 게시글을 찾을 수 없어요.');
     const post = await require('./comment-up-check').lookupPost(parsed);
     if (!post.available) throw new HttpsError('failed-precondition', '공개 또는 애청자 공개 게시글을 확인할 수 없어요. 원본 게시글에서 확인해 주세요.');
-    try {
-      return {
-        title: post.title,
-        visibility: post.visibility,
-        comments: await require('./comment-up-check').fetchComments(parsed, target.streamer.soopId || target.streamer.id),
-      };
-    }
+    let comments;
+    try { comments = await require('./comment-up-check').fetchComments(parsed, target.streamer.soopId || target.streamer.id); }
     catch (_) { throw new HttpsError('unavailable', '전체 댓글을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'); }
+    // 방송 오버레이에 고른 게시글이면 이번 확인 결과를 오버레이에도 반영(실패해도 확인 결과는 돌려준다)
+    let overlayCheckedAt = 0;
+    try {
+      const now = Date.now();
+      if (await tamagotchiOverlay.saveCommentUp({ db, streamerId: target.streamer.id, id, comments, now })) overlayCheckedAt = now;
+    } catch (error) { console.warn('comment-up overlay save failed', error?.message || error); }
+    return { title: post.title, visibility: post.visibility, comments, ...(overlayCheckedAt ? { overlayCheckedAt } : {}) };
   }
   throw new HttpsError('invalid-argument', '요청을 확인해 주세요.');
 });

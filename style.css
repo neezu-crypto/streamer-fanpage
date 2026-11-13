@@ -2086,3 +2086,9 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .tg-care .tg-care
 .tg-care-train-link{font-weight:800;color:var(--accent,#7b5cf0);text-decoration:none}
 .tg-care-train-link:hover{text-decoration:underline}
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .tg-care .tg-care-tool.is-locked{background-color:color-mix(in srgb,var(--doodle-paper,#fffdf8) 70%,#ddd)!important}
+/* 댓글 UP 체크 → 다마고치 방송 오버레이 표시 */
+.comment-up-overlay{display:grid;gap:8px;min-width:0;padding:12px 14px;border:1px dashed #d9cad6;border-radius:14px}
+.comment-up-overlay-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.comment-up-overlay select{flex:1 1 200px;min-width:0;padding:9px 10px;border:1px solid #cbbdcc;border-radius:10px;background:#fff;color:#302735}
+.comment-up-overlay label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.comment-up-overlay-note{margin:0;font-size:12px;line-height:1.6;opacity:.85}
