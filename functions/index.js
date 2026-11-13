@@ -5405,7 +5405,7 @@ exports.streamerFanPageWeeklySchedule = onCall({ maxInstances: 20 }, async (requ
   return { weekStart, entries, footerText, avatarImageId, templateId, animationEnabled, updatedAt };
 });
 
-exports.streamerFanPageDesignPass = onCall({ maxInstances: 10 }, async (request) => {
+exports.streamerFanPageDesignPass = onCall({ maxInstances: 10, enforceAppCheck: true }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const action = String(data.action || 'status');
@@ -5450,7 +5450,7 @@ exports.streamerFanPageDesignPass = onCall({ maxInstances: 10 }, async (request)
 });
 
 // 다마고치 분양소(분양 결제·관리자 테스트 지급). 공개 단계 게이트와 인증 스트리머 소유권은 서버에서 판정한다.
-exports.streamerFanPageTamagotchiShop = onCall({ maxInstances: 10 }, async (request) => {
+exports.streamerFanPageTamagotchiShop = onCall({ maxInstances: 10, enforceAppCheck: true }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const action = String(data.action || 'catalog');
@@ -5541,7 +5541,7 @@ exports.streamerFanPageTamagotchiOverlay = onCall({ maxInstances: 10 }, async (r
 });
 
 // 다마고치 돌봄(스탯): 상태 조회·상호작용 묶음·하트 보석 치료. 스탯은 서버만 계산하고 공개 응답에 UID를 넣지 않는다.
-exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20, enforceAppCheck: true }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const action = String(data.action || 'status');
