@@ -144,6 +144,7 @@ function normalizeFan(raw, today) {
     contrib: sameDay && f.contrib && typeof f.contrib === 'object' ? { ...f.contrib } : {},
     daily: sameDay && f.daily && typeof f.daily === 'object' ? { ...f.daily } : {},
     gemsToday: sameDay ? Number(f.gemsToday) || 0 : 0,
+    gemAt: Number(f.gemAt) || 0, // 마지막 보석 시각(다음 보석까지 GEM_GAP_MS 대기)
     variety: sameDay ? Boolean(f.variety) : false,
     win: f.win && typeof f.win === 'object' ? { ...f.win } : {}, // kind → { m: 분 시작, mc, r: 10초 시작, rc }
     lastAt: Number(f.lastAt) || 0,
@@ -207,8 +208,8 @@ function applyOne(s, fan, kind, { now, owner = false, meters = 0, rng = Math.ran
   let gem = false;
   const level = bondLevel(fan.bond);
   const dailyCap = level >= 7 ? 4 : 3;
-  if (s.health >= 30 && fan.gemsToday < dailyCap && rng() < 0.03 + 0.002 * (level - 1)) {
-    fan.gemsToday += 1; fan.bond += 2; gem = true;
+  if (s.health >= 30 && fan.gemsToday < dailyCap && now - fan.gemAt >= GEM_GAP_MS && rng() < 0.03 + 0.002 * (level - 1)) {
+    fan.gemsToday += 1; fan.gemAt = now; fan.bond += 2; gem = true;
     if (s.gems < GEM_POOL_MAX) s.gems += 1;
   }
   return { applied: true, gem };
@@ -217,6 +218,8 @@ function applyOne(s, fan, kind, { now, owner = false, meters = 0, rng = Math.ran
 // ---------- 누르고 있는 동안의 천천히 변화(3-C 설계 8-1) ----------
 // 움직이지 않는 톡 도구만. 초당 1회 효과의 25%(4초 = 1회). 연타 감소 없음, 1분 횟수·보석 확률은 4초를 1회로 센다.
 const HOLDABLE = ['feed', 'play', 'talk', 'sing', 'dance'];
+// 하트 보석: 한 번 나오면 그 팬은 10분 동안 다음 보석이 나오지 않는다(확률 3%는 그대로)
+const GEM_GAP_MS = 10 * MIN;
 // 톡 도구 연타 방지: 화면은 한 번 누르면 1초 쉬고, 서버는 지난 전송 이후 흐른 시간(+1초 여유)만큼만 톡을 인정한다.
 const TAP_KINDS = ['feed', 'gem', 'play', 'talk', 'sing', 'dance', 'cheer'];
 const TAP_GAP_MS = 1000;
@@ -254,8 +257,8 @@ function applyHold(s, fan, kind, holdMs, { now, owner = false, rng = Math.random
   let gem = false;
   const level = bondLevel(fan.bond);
   const dailyCap = level >= 7 ? 4 : 3;
-  if (s.health >= 30 && fan.gemsToday < dailyCap && rng() < (0.03 + 0.002 * (level - 1)) * units) {
-    fan.gemsToday += 1; fan.bond += 2; gem = true;
+  if (s.health >= 30 && fan.gemsToday < dailyCap && now - fan.gemAt >= GEM_GAP_MS && rng() < (0.03 + 0.002 * (level - 1)) * units) {
+    fan.gemsToday += 1; fan.gemAt = now; fan.bond += 2; gem = true;
     if (s.gems < GEM_POOL_MAX) s.gems += 1;
   }
   return { applied: true, gem };
@@ -470,7 +473,7 @@ async function removeFanRecords(db, streamerId, petId) {
 }
 
 module.exports = {
-  BASE_INTERACTIONS, learnedSet, napOpts, AUTO_SLEEP_AT, NAP_RECOVER, WATCH_GRACE_MS, SEEN_WRITE_MS, trainingMap, TAP_GAP_MS, TAP_KINDS,
+  BASE_INTERACTIONS, learnedSet, napOpts, AUTO_SLEEP_AT, NAP_RECOVER, WATCH_GRACE_MS, SEEN_WRITE_MS, GEM_GAP_MS, trainingMap, TAP_GAP_MS, TAP_KINDS,
   TamagotchiCareError, PETS_ROOT, FANS_ROOT, EFFECTS, KINDS, ALLOWED, GEM_POOL_MAX,
   HOLDABLE, HOLD_UNIT_MS, HOLD_MAX_MS, hideValues, applyHold,
   freshStats, advance, conditionOf, applyOne, normalizeFan, bondLevel, softCapFactor, warnLevel,
