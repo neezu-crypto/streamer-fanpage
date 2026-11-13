@@ -454,7 +454,7 @@ async function treat({ db, uid, streamerId, petId, kind, now = Date.now() }) {
   // 누른 팬 유대감 +5
   const fanRef = db.ref(`${FANS_ROOT}/${sid}/${pid}/${fanKey(uid, sid)}`);
   await fanRef.transaction((raw) => { const f = normalizeFan(raw, dayKey(now)); f.bond += 5; return f; });
-  return { ...publicStats(tx.snapshot.val(), now), spent: cost };
+  return { ...publicStats(tx.snapshot.val(), now), learned: [...learnedSet(petInfo, now)], training: trainingMap(petInfo, now), serverNow: now, spent: cost };
 }
 
 // 관리자가 아니면 스탯 숫자를 지우고 단계(band)만 남긴다(3-C 결정: 숫자는 관리자만)

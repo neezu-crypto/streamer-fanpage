@@ -236,3 +236,10 @@ test('보는 중엔 스스로 잠들지 않고, 안 보면 2분 뒤부터 잠든
   assert.equal(st3.sleeping, true, '안 보면 잠듦');
   void H;
 });
+
+test('치료 응답도 배운 재주·훈련 정보를 돌려준다', async () => {
+  const db = database({ streamerFanPageTamagotchis: { s1: { p1: { status: 'active', speciesId: 'mongsil', learned: { pet: {}, feed: {}, groom: {}, gem: {}, walk: {} }, stats: { ...care.freshStats(T0), health: 20, gems: 10 } } } } });
+  const out = await care.treat({ db, uid: 'u1', streamerId: 's1', petId: 'p1', kind: 'outpatient', now: T0 + 1000 });
+  assert.ok(out.learned.includes('walk'));
+  assert.equal(typeof out.serverNow, 'number');
+});
