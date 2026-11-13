@@ -1,7 +1,7 @@
 // 팬페이지 다마고치 탭: 돌봄 화면(3-C). 펫·도구·소리·무대 배치는 상점 모듈을 그대로 불러 쓰고, 스탯은 서버(Care)가 계산한다.
 // 설계: docs/다마고치_3C_팬페이지_돌봄_화면_설계.md
 export const SHOP_BASE = 'https://neezu-crypto.github.io/streamer-game-series-shop/';
-const SHOP_V = '?v=20261113-tg-opt1';
+const SHOP_V = '?v=20261113-tg-rate1';
 export const SEND_EVERY_MS = 6000; // 서버 전송 간격(화면은 예측값으로 바로 반응)
 const REFRESH_MS = 60000; // 다른 팬이 돌본 결과 반영
 const BLOCK_DIM_MS = 10000;
@@ -15,9 +15,48 @@ export const CARE_HINT = {
   bath: { clean: 6, fatigue: -1 }, nap: {}, walk: {}, talk: { mood: 1 }, sing: { mood: 3 }, dance: { mood: 4, fatigue: 2 }, cheer: { mood: 2 },
 };
 const HOLD_UNIT_MS = 4000;
+
+// ---------- 서버 적용 속도 맞추기(순수 함수: 테스트 대상) ----------
+// 서버 applyOne과 같은 규칙: 1분 횟수(perMin), 하루 횟수(perDay), 거절 조건, 10초 안 연타 감소.
+// 서버는 묶음을 받은 시각에 세므로 1분 창은 전송 지연(SEND_EVERY_MS)만큼 넉넉히 잡는다.
+export const RATE_RULES = {
+  pet: { perMin: 5 }, talk: { perMin: 6 }, sing: { perMin: 4 }, gem: { perDay: 5 }, cheer: { perDay: 10 },
+  feed: { refuse: (s) => s.full >= 95 }, groom: { refuse: (s) => s.clean >= 100 }, bath: { refuse: (s) => s.clean >= 90 },
+};
+const REPEAT_MULT = [1, 0.7, 0.4];
+export function createRateMirror({ windowMs = 60000 + SEND_EVERY_MS } = {}) {
+  const win = new Map(); // kind → { m, mc, r, rc }
+  let daily = {}; let dayStamp = '';
+  function cur(kind, now) {
+    const w = win.get(kind) || { m: 0, mc: 0, r: 0, rc: 0 };
+    if (now - w.m >= windowMs) { w.m = now; w.mc = 0; }
+    if (now - w.r >= 10000) { w.r = now; w.rc = 0; }
+    win.set(kind, w); return w;
+  }
+  return {
+    // 서버가 알려 준 오늘 횟수로 맞춘다(날짜가 바뀌면 새로 받는다)
+    syncDaily(serverDaily, day) { if (day !== dayStamp) daily = {}; dayStamp = day; for (const [k, v] of Object.entries(serverDaily || {})) daily[k] = Math.max(daily[k] || 0, Number(v) || 0); },
+    // 막을 이유(서버 REASON 코드) 또는 null
+    check(kind, units, stats, now) {
+      const rule = RATE_RULES[kind]; if (!rule) return null;
+      const w = cur(kind, now);
+      if (rule.perMin && w.mc + units > rule.perMin + 1e-9) return 'cooldown';
+      if (rule.perDay && (daily[kind] || 0) + units > rule.perDay) return 'daily';
+      if (rule.refuse && stats && rule.refuse(stats)) return 'full';
+      return null;
+    },
+    // 실제로 보낼 때 센다. 돌려주는 값은 연타 감소를 반영한 효과 배율(누르기는 감소 없음)
+    use(kind, units, now, { hold = false } = {}) {
+      const w = cur(kind, now);
+      w.mc += units; daily[kind] = (daily[kind] || 0) + units;
+      if (hold) return units;
+      w.rc += 1; return REPEAT_MULT[Math.min(2, w.rc - 1)];
+    },
+  };
+}
 const ALLOWED = { sick: ['pet', 'feed', 'nap', 'talk'], down: ['pet'], hospital: ['pet', 'talk', 'cheer'] };
 const BLOCK_TEXT = { sick: '아파서 쉬어야 해요. 쓰다듬기·밥주기·낮잠·수다만 할 수 있어요.', down: '쓰러졌어요… 쓰다듬기만 할 수 있어요.', hospital: '입원 중이에요. 병문안(쓰다듬기·수다·응원)만 할 수 있어요.' };
-const REASON_TEXT = { full: '지금은 충분해요!', cooldown: '조금 쉬었다가 해 주세요.', daily: '오늘은 여기까지예요.', condition: '지금은 할 수 없어요.', 'not-learned': '아직 배우지 않은 재주예요.' };
+const REASON_TEXT = { full: '지금은 충분해요!', cooldown: '조금 쉬었다가 해 주세요.', daily: '오늘은 여기까지예요.', condition: '지금은 할 수 없어요.', 'not-learned': '아직 배우지 않은 재주예요.', 'too-fast': '조금 천천히 눌러 주세요.' };
 // 훈련소(상점 다마고치 마을). 분양 때 배우는 기본 재주 4종은 서버 기록이 없을 때의 기본값
 export const TRAIN_URL = `${SHOP_BASE}tamagotchi-world.html#train`;
 const BASE_SKILLS = ['pet', 'feed', 'groom', 'gem'];
@@ -84,7 +123,7 @@ export function mountCareView(container, {
   let destroyed = false; let mods = null; let petApi = null; let toolCtl = null; let scene = null; let sound = null;
   let pets = []; let pet = null; let server = null; let shown = {}; let target = {};
   let sending = false; let sendTimer = 0; let refreshTimer = 0; let animFrame = 0; let lastWarn = 0;
-  const queue = createQueue(); const dimmed = new Map();
+  const queue = createQueue(); const dimmed = new Map(); const rate = createRateMirror();
   const refs = {};
 
   // ---------- 화면 뼈대 ----------
@@ -241,15 +280,17 @@ export function mountCareView(container, {
     };
     animFrame = requestAnimationFrame(step);
   }
-  function predict(kind, units) {
+  function predict(kind, units, mult = units) {
     const hint = CARE_HINT[kind]; if (!hint || server?.condition === 'hospital') return;
-    for (const [stat, v] of Object.entries(hint)) target[stat] = Math.max(0, Math.min(100, (target[stat] ?? 50) + v * units));
+    const tired = (target.fatigue ?? 0) >= 80 && (kind === 'play' || kind === 'dance') ? 0.5 : 1;
+    for (const [stat, v] of Object.entries(hint)) target[stat] = Math.max(0, Math.min(100, (target[stat] ?? 50) + v * mult * tired));
     tween(reduced ? 0 : 350);
   }
 
   // ---------- 서버 응답 반영 ----------
   function apply(data) {
     server = data; if (server) server.receivedAt = Date.now();
+    if (data?.me?.daily) rate.syncDaily(data.me.daily, data.me.day || '');
     for (const [key] of STAT_ORDER) target[key] = serverValue(key);
     if (!Object.keys(shown).length) shown = { ...target };
     tween(800);
@@ -376,10 +417,12 @@ export function mountCareView(container, {
     if (event.type === 'clear') { scene?.setBath(false); say('도구를 골라 돌봐 주세요'); void flush(); }
     if (event.type === 'blocked') say(BLOCK_TEXT[event.condition] || '지금은 할 수 없어요.');
     if (event.type === 'act') {
-      if (event.tool === 'nap') queue.add('nap', { n: 1 }); else { queue.add(event.tool, { n: 1 }); predict(event.tool, 1); }
+      const mult = rate.use(event.tool, 1, Date.now());
+      if (event.tool === 'nap') queue.add('nap', { n: 1 }); else { queue.add(event.tool, { n: 1 }); predict(event.tool, 1, mult); }
       say(mods.TOOLS[event.tool]?.done || label); schedule();
     }
-    if (event.type === 'hold') { queue.add(event.tool, { holdMs: event.ms }); predict(event.tool, event.ms / HOLD_UNIT_MS); schedule(); }
+    if (event.type === 'hold') { rate.use(event.tool, event.ms / HOLD_UNIT_MS, Date.now(), { hold: true }); queue.add(event.tool, { holdMs: event.ms }); predict(event.tool, event.ms / HOLD_UNIT_MS); schedule(); }
+    if (event.type === 'limited') say(REASON_TEXT[event.reason] || '지금은 할 수 없어요.');
     if (event.type === 'walk' && event.meters > 0) { lastMeters = event.meters; say(`산책 중… ${event.meters}m 걸었어요`); }
     if (event.type === 'select' || event.type === 'clear') {
       if (event.type === 'clear' && event.tool === 'walk' && lastMeters > 0) { queue.add('walk', { meters: lastMeters }); lastMeters = 0; void flush(); }
@@ -440,7 +483,8 @@ export function mountCareView(container, {
     refs.pet.replaceChildren(); refs.pet.style.width = ''; refs.pet.style.transform = '';
     petApi = mods.createMongsil(refs.pet, { color: pet.color || 'cream', reduced });
     scene = mods.createScene({ stage: refs.stage, pet: refs.pet, reduced, maxPetRatio: window.matchMedia('(max-width: 560px)').matches ? 0.56 : Infinity });
-    toolCtl = mods.createToolController({ stage: refs.stage, petApi, petEl: refs.pet, ignoreOutside: [refs.tools], reduced, sound, onChange: onTool });
+    toolCtl = mods.createToolController({ stage: refs.stage, petApi, petEl: refs.pet, ignoreOutside: [refs.tools], reduced, sound, onChange: onTool,
+      gate: (kind, units) => rate.check(kind, units, target, Date.now()) });
     refs.stage.classList.add('has-home'); requestAnimationFrame(() => scene.alignHome());
     try {
       apply((await callCare({ action: 'status', streamerId: page.streamer.id, petId: pet.petId })).data);

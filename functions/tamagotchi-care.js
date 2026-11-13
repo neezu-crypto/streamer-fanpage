@@ -29,7 +29,7 @@ const sha = (text) => createHash('sha256').update(String(text)).digest('hex');
 const fanKey = (uid, streamerId) => sha(`tg-fan:${streamerId}:${uid}`).slice(0, 32);
 
 function freshStats(now) {
-  return { full: 80, mood: 80, clean: 80, fatigue: 20, health: 100, at: now, sleepAt: 0, hospitalUntil: 0, softUntil: 0, outpatientDay: '', gems: 0, warned: 0 };
+  return { full: 80, mood: 80, clean: 80, fatigue: 20, health: 100, at: now, sleepAt: 0, hospitalUntil: 0, softUntil: 0, outpatientDay: '', gems: 0, warned: 0, seenAt: 0 };
 }
 
 function normalizeStats(raw, now) {
@@ -37,7 +37,7 @@ function normalizeStats(raw, now) {
   if (!raw || typeof raw !== 'object') return base;
   const out = { ...base };
   for (const k of STAT_KEYS) if (Number.isFinite(Number(raw[k]))) out[k] = clamp(Number(raw[k]));
-  for (const k of ['at', 'sleepAt', 'hospitalUntil', 'softUntil', 'gems', 'warned']) if (Number.isFinite(Number(raw[k]))) out[k] = Number(raw[k]);
+  for (const k of ['at', 'sleepAt', 'hospitalUntil', 'softUntil', 'gems', 'warned', 'seenAt']) if (Number.isFinite(Number(raw[k]))) out[k] = Number(raw[k]);
   out.outpatientDay = typeof raw.outpatientDay === 'string' ? raw.outpatientDay : '';
   out.gems = clamp(Math.floor(out.gems), 0, GEM_POOL_MAX);
   if (!(out.at > 0) || out.at > now) out.at = now;
@@ -59,7 +59,13 @@ function discharge(s, at) {
 }
 
 // ---------- 시간 변화: 마지막 계산 시각부터 now까지 1시간(마지막은 남은 분) 단위로 진행 ----------
-function advance(raw, now) {
+// 낮잠: 배우지 않아도 피로가 AUTO_SLEEP_AT에 닿으면 스스로 잠든다. 배우면 원할 때 재울 수 있고 회복이 조금 빠르다.
+const AUTO_SLEEP_AT = 75;
+const NAP_RECOVER = { learned: 5, self: 4 }; // 잠든 동안 분당 피로 감소
+// 누군가 돌봄 화면을 보고 있으면(마지막 확인 뒤 WATCH_GRACE_MS 안) 스스로 잠들지 않는다. 보는 사람은 기록하지 않고 시각만 남긴다.
+const WATCH_GRACE_MS = 2 * MIN;
+const SEEN_WRITE_MS = 30 * 1000; // 상태 조회로 '보는 중' 시각을 남기는 최소 간격
+function advance(raw, now, { napLearned = false } = {}) {
   const s = normalizeStats(raw, now);
   let t = s.at;
   let steps = 0;
@@ -69,15 +75,21 @@ function advance(raw, now) {
       if (s.hospitalUntil > now) { t = now; break; }
       t = s.hospitalUntil; discharge(s, t); continue;
     }
-    const dt = Math.min(HOUR, now - t);
-    const h = dt / HOUR;
+    let dt = Math.min(HOUR, now - t);
     const soft = s.softUntil > t ? 0.5 : 1; // 퇴원 후 24시간 감소 절반
     const asleep = s.sleepAt > 0;
+    let dozeOff = false;
+    if (!asleep) { // 깨어 있다 기준치에 닿는 시각에서 구간을 끊고 잠든다
+      const tired = s.fatigue >= AUTO_SLEEP_AT ? 0 : ((AUTO_SLEEP_AT - s.fatigue) / (3 * soft)) * HOUR;
+      const toSleep = Math.max(tired, s.seenAt + WATCH_GRACE_MS - t); // 보는 동안은 미룬다
+      if (toSleep < dt) { dt = Math.max(0, Math.ceil(toSleep)); dozeOff = true; }
+    }
+    const h = dt / HOUR;
     s.full = clamp(s.full - 4 * h * soft * (asleep ? 0.5 : 1));
     s.mood = clamp(s.mood - 2 * h * soft);
     s.clean = clamp(s.clean - 1.5 * h * soft);
     if (asleep) {
-      s.fatigue = clamp(s.fatigue - 5 * (dt / MIN));
+      s.fatigue = clamp(s.fatigue - (napLearned ? NAP_RECOVER.learned : NAP_RECOVER.self) * (dt / MIN));
       if (s.fatigue <= 0) s.sleepAt = 0; // 피로 0이면 자동 기상
     } else s.fatigue = clamp(s.fatigue + 3 * h * soft);
     // 건강(설계 2-1): 원인 합산, 아무 원인이 없고 잘 돌봐졌으면 80까지 자연 회복
@@ -89,6 +101,7 @@ function advance(raw, now) {
     if (dh === 0 && s.full >= 50 && s.fatigue <= 50 && s.clean >= 50 && s.health < 80) s.health = Math.min(80, s.health + h);
     else s.health = clamp(s.health + dh * h);
     t += dt;
+    if (dozeOff && s.fatigue >= AUTO_SLEEP_AT - 0.01) s.sleepAt = t;
     if (s.health <= 0) { s.health = 0; s.hospitalUntil = t + DAY; s.sleepAt = 0; } // 쓰러짐 → 자동 입원 24시간
   }
   if (t < now) t = now; // 계산량 제한에 걸린 경우
@@ -204,6 +217,9 @@ function applyOne(s, fan, kind, { now, owner = false, meters = 0, rng = Math.ran
 // ---------- 누르고 있는 동안의 천천히 변화(3-C 설계 8-1) ----------
 // 움직이지 않는 톡 도구만. 초당 1회 효과의 25%(4초 = 1회). 연타 감소 없음, 1분 횟수·보석 확률은 4초를 1회로 센다.
 const HOLDABLE = ['feed', 'play', 'talk', 'sing', 'dance'];
+// 톡 도구 연타 방지: 화면은 한 번 누르면 1초 쉬고, 서버는 지난 전송 이후 흐른 시간(+1초 여유)만큼만 톡을 인정한다.
+const TAP_KINDS = ['feed', 'gem', 'play', 'talk', 'sing', 'dance', 'cheer'];
+const TAP_GAP_MS = 1000;
 const HOLD_UNIT_MS = 4000;
 const HOLD_MAX_MS = 20000;
 function applyHold(s, fan, kind, holdMs, { now, owner = false, rng = Math.random }) {
@@ -318,6 +334,7 @@ async function loadActivePet(db, sid, pid) {
 const BASE_INTERACTIONS = Object.freeze(['pet', 'feed', 'groom', 'gem']);
 // learned[id].learnedAt이 미래면 훈련 중(재주당 5분), 지나면 배운 것. 예약 작업 없이 시간이 지나면 풀린다.
 function learnedEntries(pet) { return pet && pet.learned && typeof pet.learned === 'object' ? pet.learned : {}; }
+function napOpts(pet, now = Date.now()) { return { napLearned: learnedSet(pet, now).has('nap') }; }
 function learnedSet(pet, now = Date.now()) {
   const entries = learnedEntries(pet); const keys = Object.keys(entries);
   if (!keys.length) return new Set(BASE_INTERACTIONS);
@@ -332,15 +349,29 @@ function trainingMap(pet, now = Date.now()) {
   return out;
 }
 
+// 내 오늘 횟수 중 하루 제한이 있는 것만(화면이 서버와 같은 속도로 막도록)
+function fanSummary(fan, now) {
+  const daily = {};
+  for (const [kind, eff] of Object.entries(EFFECTS)) if (eff.perDay) daily[kind] = fan.daily[kind] || 0;
+  return { bondLevel: bondLevel(fan.bond), gemsToday: fan.gemsToday, daily, day: dayKey(now) };
+}
+
 async function readStatus({ db, uid, streamerId, petId, now = Date.now() }) {
   const { sid, pid } = validateTarget(streamerId, petId);
   const pet = await loadActivePet(db, sid, pid);
-  const s = advance(pet.stats, now);
+  let s = advance(pet.stats, now, napOpts(pet, now));
+  if (now - s.seenAt >= SEEN_WRITE_MS) { // 보는 중 표시: 지금까지의 변화를 저장하고 시각을 남긴다(30초에 한 번)
+    const tx = await db.ref(`${PETS_ROOT}/${sid}/${pid}/stats`).transaction((raw) => {
+      if (raw === null) return null;
+      const next = advance(raw, now, napOpts(pet, now)); next.seenAt = now; return next;
+    });
+    if (tx.committed && tx.snapshot.val()) s = normalizeStats(tx.snapshot.val(), now);
+  }
   const out = publicStats(s, now);
   out.learned = [...learnedSet(pet, now)]; out.training = trainingMap(pet, now); out.serverNow = now;
   if (uid) {
     const fan = normalizeFan((await db.ref(`${FANS_ROOT}/${sid}/${pid}/${fanKey(uid, sid)}`).get()).val(), dayKey(now));
-    out.me = { bondLevel: bondLevel(fan.bond), gemsToday: fan.gemsToday };
+    out.me = fanSummary(fan, now);
   }
   return out;
 }
@@ -357,12 +388,20 @@ async function interact({ db, uid, streamerId, petId, batch, owner = false, now 
   const holdBudget = Math.min(HOLD_MAX_MS, fanBefore.lastAt ? now - fanBefore.lastAt + 1000 : HOLD_MAX_MS);
   let holdLeft = holdBudget;
   for (const item of items) { const use = Math.min(item.holdMs, holdLeft); item.holdMs = use; holdLeft -= use; }
+  let tapLeft = fanBefore.lastAt ? Math.min(10, Math.floor((now - fanBefore.lastAt + 1000) / TAP_GAP_MS)) : 10;
+  const tooFast = {};
+  for (const item of items) {
+    if (!TAP_KINDS.includes(item.kind)) continue;
+    const use = Math.min(item.n, tapLeft); if (use < item.n) tooFast[item.kind] = true;
+    item.n = use; tapLeft -= use;
+  }
   let fan = null; let results = null; let warning = 0;
   const statsRef = db.ref(`${PETS_ROOT}/${sid}/${pid}/stats`);
   const tx = await statsRef.transaction((raw) => {
-    const s = advance(raw, now);
+    const s = advance(raw, now, { napLearned: learned.has('nap') }); s.seenAt = now;
     fan = normalizeFan(JSON.parse(JSON.stringify(fanBefore)), dayKey(now));
     results = { applied: 0, gems: 0, blocked: {} };
+    for (const kind of Object.keys(tooFast)) results.blocked[kind] = 'too-fast';
     for (const item of items) {
       if (!learned.has(item.kind)) { results.blocked[item.kind] = 'not-learned'; continue; } // 훈련소에서 배우지 않은 재주
       for (let i = 0; i < item.n; i += 1) {
@@ -385,7 +424,7 @@ async function interact({ db, uid, streamerId, petId, batch, owner = false, now 
   fan.lastAt = now;
   await fanRef.set(fan);
   const s = tx.snapshot.val();
-  const out = { ...publicStats(s, now), learned: [...learned], training: trainingMap(petInfo, now), serverNow: now, result: results, warning, me: { bondLevel: bondLevel(fan.bond), gemsToday: fan.gemsToday } };
+  const out = { ...publicStats(s, now), learned: [...learned], training: trainingMap(petInfo, now), serverNow: now, result: results, warning, me: fanSummary(fan, now) };
   // 오버레이 갱신용(응답에는 싣지 않음): 이름·색만, 스탯은 방금 계산한 값
   Object.defineProperty(out, 'pet', { value: { ...petInfo, stats: s }, enumerable: false });
   return out;
@@ -394,12 +433,12 @@ async function interact({ db, uid, streamerId, petId, batch, owner = false, now 
 async function treat({ db, uid, streamerId, petId, kind, now = Date.now() }) {
   const { sid, pid } = validateTarget(streamerId, petId);
   if (kind !== 'outpatient' && kind !== 'discharge') throw new TamagotchiCareError('invalid-argument', '치료 종류를 확인해 주세요.');
-  await loadActivePet(db, sid, pid);
+  const petInfo = await loadActivePet(db, sid, pid);
   let cost = 0; let failure = null;
   const tx = await db.ref(`${PETS_ROOT}/${sid}/${pid}/stats`).transaction((raw) => {
     failure = null;
     if (raw === null) return null; // 캐시가 비어 있는 첫 시도: 서버 값으로 다시 호출된다(실제로 없으면 아래에서 거절)
-    const s = advance(raw, now);
+    const s = advance(raw, now, napOpts(petInfo, now)); s.seenAt = now;
     try { cost = applyTreatment(s, kind, now); } catch (error) { failure = error; return; }
     return s;
   });
@@ -431,7 +470,7 @@ async function removeFanRecords(db, streamerId, petId) {
 }
 
 module.exports = {
-  BASE_INTERACTIONS, learnedSet, trainingMap,
+  BASE_INTERACTIONS, learnedSet, napOpts, AUTO_SLEEP_AT, NAP_RECOVER, WATCH_GRACE_MS, SEEN_WRITE_MS, trainingMap, TAP_GAP_MS, TAP_KINDS,
   TamagotchiCareError, PETS_ROOT, FANS_ROOT, EFFECTS, KINDS, ALLOWED, GEM_POOL_MAX,
   HOLDABLE, HOLD_UNIT_MS, HOLD_MAX_MS, hideValues, applyHold,
   freshStats, advance, conditionOf, applyOne, normalizeFan, bondLevel, softCapFactor, warnLevel,

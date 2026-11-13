@@ -45,8 +45,8 @@ test('시간 변화: 1시간에 배부름 -4, 기분 -2, 청결 -1.5, 피로 +3'
 });
 
 test('방치하면 건강이 떨어져 0에서 24시간 입원, 입원 중엔 정지, 퇴원 값', () => {
-  let s = care.advance(care.freshStats(T0), T0 + 45 * H);
-  assert.equal(care.conditionOf(s, T0 + 45 * H), 'hospital');
+  let s = care.advance(care.freshStats(T0), T0 + 50 * H);
+  assert.equal(care.conditionOf(s, T0 + 50 * H), 'hospital');
   const until = s.hospitalUntil;
   const frozen = care.advance(s, until - H);
   assert.equal(frozen.full, s.full);
@@ -188,4 +188,51 @@ test('훈련소: 배운 재주는 정상 반영', async () => {
   assert.equal(out.result.blocked.dance, undefined);
   assert.equal(out.result.applied, 1);
   assert.ok(out.learned.includes('dance'));
+});
+
+test('연타 방지: 지난 전송 이후 흐른 시간(+1초)만큼만 톡을 인정하고 넘친 것은 too-fast', async () => {
+  const db = database({ streamerFanPageTamagotchis: { s1: { p1: { status: 'active', speciesId: 'mongsil', learned: { pet: { learnedAt: 1 }, dance: { learnedAt: 1 } } } } } });
+  const first = await care.interact({ db, uid: 'u1', streamerId: 's1', petId: 'p1', batch: [{ kind: 'dance', n: 3 }], now: T0, rng: never });
+  assert.equal(first.result.blocked.dance, undefined); // 첫 전송은 최대 10회
+  const fast = await care.interact({ db, uid: 'u1', streamerId: 's1', petId: 'p1', batch: [{ kind: 'dance', n: 10 }, { kind: 'pet', n: 3 }], now: T0 + 2000, rng: never });
+  assert.equal(fast.result.blocked.dance, 'too-fast'); // 2초+1초 여유 → 톡 3회만
+  assert.equal(fast.result.blocked.pet, undefined); // 문지르기 도구는 세지 않는다
+  assert.equal(fast.result.applied, 3 + 3);
+  assert.equal(care.TAP_GAP_MS, 1000);
+});
+
+test('낮잠: 배우지 않아도 기준 피로에서 스스로 잠들고, 배우면 회복이 더 빠르다', () => {
+  const { advance, AUTO_SLEEP_AT } = require('../tamagotchi-care');
+  const T0 = 1_800_000_000_000; const H = 3600_000; const M = 60_000;
+  const base = { full: 90, mood: 90, clean: 90, fatigue: 70, health: 100, at: T0, sleepAt: 0, hospitalUntil: 0, softUntil: 0, gems: 0, warned: 0 };
+  const a = advance(base, T0 + 110 * M); // 70→75까지 100분, 이후 10분 잠
+  assert.ok(a.sleepAt > 0, '스스로 잠듦');
+  assert.equal(a.sleepAt, T0 + Math.ceil((5 / 3) * H));
+  assert.ok(a.fatigue < AUTO_SLEEP_AT);
+  const asleep = { ...base, fatigue: 60, sleepAt: T0 };
+  const self = advance(asleep, T0 + 10 * M);
+  const nap = advance(asleep, T0 + 10 * M, { napLearned: true });
+  assert.equal(self.fatigue, 20); // 분당 4
+  assert.equal(nap.fatigue, 10); // 분당 5
+  const woke = advance({ ...asleep, fatigue: 8 }, T0 + 10 * M);
+  assert.equal(woke.sleepAt, 0, '피로 0이면 기상');
+});
+
+test('보는 중엔 스스로 잠들지 않고, 안 보면 2분 뒤부터 잠든다', async () => {
+  const H = 3600_000; const M = 60_000;
+  const tired = { ...care.freshStats(T0), fatigue: 74 };
+  const watched = care.advance({ ...tired, seenAt: T0 + 30 * M }, T0 + 31 * M);
+  assert.equal(watched.sleepAt, 0, '1분 전 본 펫은 깨어 있음');
+  const later = care.advance({ ...tired, seenAt: T0 + 30 * M }, T0 + 40 * M);
+  assert.equal(later.sleepAt, T0 + 32 * M, '본 뒤 2분이 지나면 잠듦');
+  // 상태 조회가 보는 중 시각을 남긴다(30초 간격)
+  const db = petDb({ ...care.freshStats(T0), fatigue: 76, seenAt: T0 }); // 방금 누가 보고 있던 펫
+  const st = await care.readStatus({ db, uid: 'u1', streamerId: 's1', petId: 'p1', now: T0 + 30 * 1000 });
+  assert.equal(st.sleeping, false);
+  const st2 = await care.readStatus({ db, uid: 'u1', streamerId: 's1', petId: 'p1', now: T0 + 90 * 1000 });
+  assert.equal(st2.sleeping, false, '계속 보는 동안 깨어 있음');
+  assert.deepEqual(st2.me.daily, { gem: 0, cheer: 0 });
+  const st3 = await care.readStatus({ db, uid: 'u1', streamerId: 's1', petId: 'p1', now: T0 + 10 * M });
+  assert.equal(st3.sleeping, true, '안 보면 잠듦');
+  void H;
 });
