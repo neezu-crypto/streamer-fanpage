@@ -123,3 +123,31 @@
     align-items: center !important;
   }
 }
+
+/* 한 줄 탭 바(모든 디자인·모든 폭): 탭이 화면에 딱 맞게 잘려 보이면 그게 전부인 줄 알 수 있다.
+   실제로 넘칠 때만 app.js가 can-scroll-left/right를 붙이고, 그쪽 끝에 탭 바 배경을 이어받은
+   화살표를 붙여 둔다(폭과 무관하게 넘침 여부로만 판단). 누르면 그 방향으로 넘긴다.
+   디자인 3이 탭 바 안 버튼 모양을 !important로 덮어써서 여기도 !important로 맞선다. */
+body #fanPageView.fanpage-view .fanpage-tab-nav button.fanpage-tab-more {
+  position: sticky !important;
+  z-index: 2 !important;
+  flex: 0 0 34px !important;
+  align-self: stretch !important;
+  display: none !important;
+  place-items: center !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: inherit !important;
+  color: inherit !important;
+  font: 700 20px/1 var(--font, sans-serif) !important;
+  cursor: pointer !important;
+  backdrop-filter: none !important;
+}
+body #fanPageView.fanpage-view .fanpage-tab-nav button.fanpage-tab-more[data-dir=left] { left: 0 !important; order: -1 !important; margin-right: -34px !important; box-shadow: 8px 0 10px -6px #0003 !important; }
+body #fanPageView.fanpage-view .fanpage-tab-nav button.fanpage-tab-more[data-dir=right] { right: 0 !important; order: 99 !important; margin-left: -34px !important; box-shadow: -8px 0 10px -6px #0003 !important; }
+body #fanPageView.fanpage-view .fanpage-tab-nav.can-scroll-left button.fanpage-tab-more[data-dir=left],
+body #fanPageView.fanpage-view .fanpage-tab-nav.can-scroll-right button.fanpage-tab-more[data-dir=right] { display: grid !important; }
