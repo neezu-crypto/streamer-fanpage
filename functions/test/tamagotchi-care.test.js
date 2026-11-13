@@ -91,7 +91,7 @@ test('유대감 레벨: 50·150·300 …', () => {
 
 test('하트 보석: 공동 금고, 팬 하루 3개, 건강 30 미만이면 없음, 금고 60 상한', () => {
   const s = { ...care.freshStats(T0) }; const fan = care.normalizeFan(null, care.dayKey(T0));
-  for (let i = 0; i < 10; i += 1) care.applyOne(s, fan, 'talk', { now: T0 + i * 11000, rng: always });
+  for (let i = 0; i < 10; i += 1) care.applyOne(s, fan, 'talk', { now: T0 + i * 11 * 60000, rng: always });
   assert.equal(s.gems, 3); assert.equal(fan.gemsToday, 3);
   const sick = { ...care.freshStats(T0), health: 20 }; const f2 = care.normalizeFan(null, care.dayKey(T0));
   care.applyOne(sick, f2, 'talk', { now: T0, rng: always }); assert.equal(sick.gems, 0);
@@ -242,4 +242,14 @@ test('치료 응답도 배운 재주·훈련 정보를 돌려준다', async () =
   const out = await care.treat({ db, uid: 'u1', streamerId: 's1', petId: 'p1', kind: 'outpatient', now: T0 + 1000 });
   assert.ok(out.learned.includes('walk'));
   assert.equal(typeof out.serverNow, 'number');
+});
+
+test('하트 보석: 나온 뒤 10분 동안은 다시 나오지 않는다', () => {
+  const s = { ...care.freshStats(T0), full: 50 };
+  const fan = care.normalizeFan(null, '2026-11-12');
+  const always = () => 0;
+  assert.equal(care.applyOne(s, fan, 'dance', { now: T0, rng: always }).gem, true);
+  assert.equal(care.applyOne(s, fan, 'dance', { now: T0 + 9 * 60_000, rng: always }).gem, false);
+  assert.equal(care.applyOne(s, fan, 'dance', { now: T0 + 10 * 60_000, rng: always }).gem, true);
+  assert.equal(fan.gemsToday, 2);
 });
