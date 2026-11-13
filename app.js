@@ -4435,7 +4435,7 @@ function renderTamagotchiSection(page) {
     const preview = isAdminUser === true && new URLSearchParams(location.search).get('tgpreview') === '1';
     Promise.all([
       import('./tamagotchi-care-view.js?v=20261113-tg-traintime1'),
-      preview ? import('./tamagotchi-care-preview.js?v=20261113-tg-traintime1').then((m) => m.createCarePreview(page)) : null,
+      preview ? import('./tamagotchi-care-preview.js?v=20261113-tg-traintime2').then((m) => m.createCarePreview(page)) : null,
     ]).then(([{ mountCareView }, mock]) => {
       if (currentPage?.streamer.id !== page.streamer.id) return;
       currentTamagotchiCare?.destroy();

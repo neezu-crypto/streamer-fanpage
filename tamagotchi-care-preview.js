@@ -88,7 +88,11 @@ export async function createCarePreview(page) {
     add('팬 기록 초기화', () => db.write(`${care.FANS_ROOT}/${sid}/${PET_ID}`, null));
     // 훈련소: 배운 재주 전환(기본 4종 ↔ 12종 전부)
     add('🎓 훈련 전부', () => db.write(`${care.PETS_ROOT}/${sid}/${PET_ID}/learned`, Object.fromEntries(ALL_SKILLS.map((k) => [k, { learnedAt: Date.now() }]))));
-    add('⏳ 춤 훈련(1분)', () => db.write(`${care.PETS_ROOT}/${sid}/${PET_ID}/learned/dance`, { trainStartAt: Date.now(), learnedAt: Date.now() + 60_000 }));
+    // 실제 서버처럼 기본 4종을 먼저 채우고 춤만 1분 훈련 중으로 둔다
+    add('⏳ 춤 훈련(1분)', () => db.write(`${care.PETS_ROOT}/${sid}/${PET_ID}/learned`, {
+      ...Object.fromEntries(care.BASE_INTERACTIONS.map((k) => [k, { learnedAt: 1 }])),
+      dance: { trainStartAt: Date.now(), learnedAt: Date.now() + 60_000 },
+    }));
     add('🎓 기본만', () => db.write(`${care.PETS_ROOT}/${sid}/${PET_ID}/learned`, Object.fromEntries(care.BASE_INTERACTIONS.map((k) => [k, { learnedAt: Date.now() }]))));
     box.append(title, row);
     return box;
