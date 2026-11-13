@@ -5279,6 +5279,27 @@ function renderFanPage(page, options = {}) {
   }
   view._selectFanPageTab = selectFanPageTab;
   view.append(tabNav, ...tabPanels.values());
+  // 한 줄 탭 바가 넘칠 때만 끝에 화살표를 보여 옆에 탭이 더 있다는 걸 알린다(폭과 무관).
+  ['left', 'right'].forEach((dir) => {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'fanpage-tab-more';
+    more.dataset.dir = dir;
+    more.tabIndex = -1;
+    more.setAttribute('aria-hidden', 'true');
+    more.textContent = dir === 'left' ? '‹' : '›';
+    more.addEventListener('click', () => tabNav.scrollBy({ left: (dir === 'left' ? -1 : 1) * tabNav.clientWidth * 0.7, behavior: 'smooth' }));
+    tabNav.append(more);
+  });
+  const updateTabNavEdges = () => {
+    const max = tabNav.scrollWidth - tabNav.clientWidth;
+    const scrollable = max > 1 && getComputedStyle(tabNav).overflowX !== 'visible' && getComputedStyle(tabNav).display === 'flex';
+    tabNav.classList.toggle('can-scroll-left', scrollable && tabNav.scrollLeft > 2);
+    tabNav.classList.toggle('can-scroll-right', scrollable && tabNav.scrollLeft < max - 2);
+  };
+  tabNav.addEventListener('scroll', updateTabNavEdges, { passive: true });
+  if (typeof ResizeObserver === 'function') new ResizeObserver(updateTabNavEdges).observe(tabNav);
+  requestAnimationFrame(updateTabNavEdges);
   selectFanPageTab(tabPanels.has(preferredTab) ? preferredTab : 'home');
   const bottomBanner = renderBannerSection(page, 'bottom');
   if (bottomBanner) {
