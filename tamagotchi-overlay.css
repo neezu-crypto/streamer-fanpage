@@ -28,3 +28,14 @@ html, body.tgo-body { margin: 0; background: transparent !important; overflow: h
 .tgo-stage.tg-stage .tgo-bubble { top: 8px; transform: translate(-50%, -6px); }
 .tgo-stage.tg-stage .tgo-bubble.is-on { transform: translate(-50%, 0); }
 .tgo-stage:not(.tg-stage) .tgo-bubble { top: 0; }
+/* 댓글 UP(팬페이지 댓글 UP 체크에서 고른 게시글) */
+.tgo-cu { display: flex; align-items: baseline; gap: 6px; padding: 5px 12px; border-radius: 999px; background: #1b1924cc; color: #fff; font-size: calc(var(--size) * .075); white-space: nowrap; }
+.tgo-cu[hidden] { display: none; }
+.tgo-cu-main { font-weight: 700; }
+.tgo-cu-at { opacity: .7; font-size: .82em; }
+
+/* 아래쪽 배치(bl·br): 이름·댓글 UP·수치를 펫 위에 두고, 말풍선은 무대 안쪽 위로 내려 글자와 겹치지 않게 한다. 위쪽 배치는 펫 아래(기본 순서). */
+.tgo.pos-bl .tgo-stage, .tgo.pos-br .tgo-stage { order: 1; }
+.tgo.pos-bl .tgo-stage:not(.tg-stage), .tgo.pos-br .tgo-stage:not(.tg-stage) { padding-top: calc(var(--size) * .2); }
+.tgo.pos-bl .tgo-stage:not(.tg-stage) .tgo-bubble, .tgo.pos-br .tgo-stage:not(.tg-stage) .tgo-bubble { top: 0; transform: translate(-50%, -6px); }
+.tgo.pos-bl .tgo-stage:not(.tg-stage) .tgo-bubble.is-on, .tgo.pos-br .tgo-stage:not(.tg-stage) .tgo-bubble.is-on { transform: translate(-50%, 0); }

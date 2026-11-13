@@ -4434,7 +4434,7 @@ function renderTamagotchiSection(page) {
     // ?tgpreview=1: 관리자 전용 미리보기(메모리 DB, 운영 저장 없음)
     const preview = isAdminUser === true && new URLSearchParams(location.search).get('tgpreview') === '1';
     Promise.all([
-      import('./tamagotchi-care-view.js?v=20261113-tg-treatfix1'),
+      import('./tamagotchi-care-view.js?v=20261113-cu1'),
       preview ? import('./tamagotchi-care-preview.js?v=20261113-tg-treatfix1').then((m) => m.createCarePreview(page)) : null,
     ]).then(([{ mountCareView }, mock]) => {
       if (currentPage?.streamer.id !== page.streamer.id) return;
@@ -7915,6 +7915,53 @@ function renderCommentUpGauge(kind, comment, goal, prev) {
   return wrap;
 }
 
+// 댓글 UP 체크 → 다마고치 방송 오버레이 표시(게시글 하나, 순위·UP 선택). 오버레이 값은 이 화면에서 새로고침할 때만 바뀐다.
+function renderCommentUpOverlayPanel(page, entries, overlay) {
+  const panel = document.createElement('form'); panel.className = 'comment-up-overlay';
+  const title = document.createElement('strong'); title.textContent = '방송 오버레이에 표시';
+  const select = document.createElement('select'); select.setAttribute('aria-label', '오버레이에 표시할 게시글');
+  const none = document.createElement('option'); none.value = ''; none.textContent = '표시 안 함'; select.append(none);
+  const options = new Map();
+  entries.forEach((entry, index) => {
+    const option = document.createElement('option'); option.value = entry.id; option.textContent = `게시글 ${index + 1}`;
+    select.append(option); options.set(entry.id, option);
+  });
+  select.value = overlay.id && options.has(overlay.id) ? overlay.id : '';
+  const check = (label, on) => {
+    const wrap = document.createElement('label'); const box = document.createElement('input'); box.type = 'checkbox'; box.checked = on;
+    wrap.append(box, ` ${label}`); return [wrap, box];
+  };
+  const [rankLabel, rankBox] = check('순위', overlay.showRank !== false);
+  const [upLabel, upBox] = check('UP 수', overlay.showUp !== false);
+  const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = '저장';
+  const note = document.createElement('p'); note.className = 'comment-up-overlay-note'; note.setAttribute('role', 'status');
+  let checkedAt = Number(overlay.checkedAt) || 0;
+  const describe = () => {
+    if (!select.value) { note.textContent = '다마고치 방송 오버레이에 댓글 UP을 띄우지 않아요.'; return; }
+    note.textContent = checkedAt
+      ? `마지막 갱신 ${new Date(checkedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · 이 화면에서 새로고침할 때만 오버레이도 바뀌어요.`
+      : '아직 확인한 값이 없어요. 아래에서 그 게시글을 새로고침하면 오버레이에 나타나요.';
+  };
+  const sync = () => { rankBox.disabled = upBox.disabled = !select.value; };
+  select.addEventListener('change', sync); sync(); describe();
+  panel.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (select.value && !rankBox.checked && !upBox.checked) { note.textContent = '순위와 UP 수 중 하나 이상 골라 주세요.'; return; }
+    save.disabled = true; note.textContent = '저장하고 있어요.';
+    try {
+      const saved = (await callCommentUp({ action: 'overlay', streamerId: page.streamer.id, id: select.value, showRank: rankBox.checked, showUp: upBox.checked })).data.overlay;
+      select.value = saved.id || ''; checkedAt = Number(saved.checkedAt) || 0; sync(); describe();
+    } catch (error) { note.textContent = error.message || '저장하지 못했어요.'; }
+    finally { save.disabled = false; }
+  });
+  panel._titled = (id, text) => { const option = options.get(id); if (option && text) option.textContent = text.slice(0, 40); };
+  panel._checked = (at) => { if (select.value) { checkedAt = at; describe(); } };
+  const row = document.createElement('div'); row.className = 'comment-up-overlay-row';
+  row.append(select, rankLabel, upLabel, save);
+  panel.append(title, row, note);
+  return panel;
+}
+
 function renderCommentUpSection(page) {
   const section = document.createElement('section'); section.id = 'commentUpSection'; section.className = 'content-card comment-up-section';
   const note = document.createElement('p'); note.textContent = '공개·애청자 공개 게시글의 댓글을 확인합니다. 같은 UP 수는 공동 순위로 표시해요.';
@@ -7934,6 +7981,8 @@ function renderCommentUpSection(page) {
       form.hidden = !uiCan(result.canManage); list.replaceChildren();
       const entries = Array.isArray(result.entries) ? result.entries : [];
       status.textContent = entries.length ? '' : '등록된 게시글이 없어요.';
+      const overlayPanel = uiCan(result.canManage) && result.overlay && entries.length ? renderCommentUpOverlayPanel(page, entries, result.overlay) : null;
+      if (overlayPanel) list.append(overlayPanel);
       for (const entry of entries) {
         const card = document.createElement('article'); card.className = 'comment-up-card';
         const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = entry.visibility === 'fan' ? '애청자 게시글 원본 보기 ↗' : '게시글 원본 보기 ↗';
@@ -7966,6 +8015,8 @@ function renderCommentUpSection(page) {
               ? `${result.title} ↗`
               : result.visibility === 'fan' ? '애청자 게시글 원본 보기 ↗' : '게시글 원본 보기 ↗';
             lastComments = result.comments; renderResult();
+            overlayPanel?._titled(entry.id, result.title);
+            if (result.overlayCheckedAt) overlayPanel?._checked(result.overlayCheckedAt);
           } catch (error) { resultText.textContent = error.message || '댓글을 확인하지 못했어요.'; }
           finally { check.disabled = false; }
         });
