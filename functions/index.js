@@ -4703,7 +4703,7 @@ function normalizeFanpageVodComment(value, id) {
   };
 }
 
-exports.streamerFanPageBootstrap = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageBootstrap = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const requestedId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
   const uid = request.auth && typeof request.auth.uid === 'string' ? request.auth.uid : '';
   // Public fanpages can render while the browser restores its anonymous Auth session.
@@ -4756,7 +4756,7 @@ exports.streamerFanPageMaintenanceAccess = onCall({ maxInstances: 10 }, async (r
   return { isAdmin: await isAdminUid(uid) };
 });
 
-exports.streamerFanPageRoulette = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageRoulette = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   requireAuth(request);
   const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
   const target = await findVerifiedBySoopId(streamerId);
@@ -4774,7 +4774,7 @@ exports.streamerFanPageRoulette = onCall({ maxInstances: 20 }, async (request) =
   return await loadWeFlabRouletteData(target.streamer.id, sourceUrl, forceRefresh);
 });
 
-exports.streamerFanPageYouTubeVideos = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
+exports.streamerFanPageYouTubeVideos = onCall({ enforceAppCheck: true, secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
@@ -4830,7 +4830,7 @@ exports.streamerFanPageYouTubeVideos = onCall({ secrets: [YOUTUBE_DATA_API_KEY],
   }
 });
 
-exports.streamerFanPageCafePosts = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageCafePosts = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   requireAuth(request);
   const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
   const target = await findVerifiedBySoopId(streamerId);
@@ -4871,7 +4871,7 @@ exports.streamerFanPageCafePosts = onCall({ maxInstances: 20 }, async (request) 
   }
 });
 
-exports.streamerFanPageVodPage = onCall({ maxInstances: 30 }, async (request) => {
+exports.streamerFanPageVodPage = onCall({ enforceAppCheck: true, maxInstances: 30 }, async (request) => {
   requireAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
@@ -4887,7 +4887,7 @@ exports.streamerFanPageVodPage = onCall({ maxInstances: 30 }, async (request) =>
   return { vods: await readVodPage(target.streamer.id, offset, generation) };
 });
 
-exports.streamerFanPageCommentProfileSave = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageCommentProfileSave = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = await requireProtectedCommentProfileAuth(request);
   const data = request.data || {};
   const nickname = typeof data.nickname === 'string' ? data.nickname.trim() : '';
@@ -4903,7 +4903,7 @@ exports.streamerFanPageCommentProfileSave = onCall({ maxInstances: 20 }, async (
   return { profile: { nickname, soopId, avatarUrl: profile.avatarUrl } };
 });
 
-exports.streamerFanPageVodComments = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageVodComments = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
@@ -4983,7 +4983,7 @@ exports.streamerFanPageVodComments = onCall({ maxInstances: 20 }, async (request
   };
 });
 
-exports.streamerFanPageVodCommentAdd = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageVodCommentAdd = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = await requireProtectedCommentProfileAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
@@ -5031,7 +5031,7 @@ exports.streamerFanPageVodCommentAdd = onCall({ maxInstances: 20 }, async (reque
   return { comment: { id, ...publicComment } };
 });
 
-exports.streamerFanPageVodCommentDelete = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageVodCommentDelete = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
@@ -5057,7 +5057,7 @@ exports.streamerFanPageVodCommentDelete = onCall({ maxInstances: 20 }, async (re
   return { deleted: true, commentId };
 });
 
-exports.streamerFanPageLiveStatus = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageLiveStatus = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   requireAuth(request);
   const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
   const target = await findVerifiedBySoopId(streamerId);
@@ -5075,7 +5075,7 @@ exports.streamerFanPageLiveStatus = onCall({ maxInstances: 20 }, async (request)
   return await fetchSoopLiveStatus(streamerId);
 });
 
-exports.streamerFanPageGallery = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageGallery = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
@@ -5118,7 +5118,7 @@ exports.streamerFanPageGallery = onCall({ maxInstances: 20 }, async (request) =>
   return await readStreamerGallery(target);
 });
 
-exports.streamerFanPageCalendar = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageCalendar = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   requireAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
@@ -5186,7 +5186,7 @@ exports.streamerFanPageCalendar = onCall({ maxInstances: 20 }, async (request) =
   };
 });
 
-exports.streamerFanPageScheduleAdd = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageScheduleAdd = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   const data = request.data || {};
@@ -5231,7 +5231,7 @@ exports.streamerFanPageScheduleAdd = onCall({ maxInstances: 20 }, async (request
   return { event: { id, ...event, source: 'fanpage', type: 0 } };
 });
 
-exports.streamerFanPageScheduleDelete = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageScheduleDelete = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   const data = request.data || {};
@@ -5613,7 +5613,7 @@ exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20, enforceAppChe
   }
 });
 
-exports.streamerFanPageSearch = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageSearch = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   requireAuth(request);
   const data = request.data || {};
   const query = String(data.query || '').trim().toLocaleLowerCase();
@@ -5888,7 +5888,7 @@ exports.streamerFanPageViewerStatsJobCleanup = onSchedule({
   await cleanupVerifiedStreamerVisitDedup(fanPageStatsDateKey());
 });
 
-exports.streamerFanPageRecent = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageRecent = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const streamerId = String((request.data && request.data.streamerId) || '').trim().toLowerCase();
   let verified = null;
@@ -6070,7 +6070,7 @@ async function readPrivateAdminStatsSnapshot() {
   }
 }
 
-exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request) => {
+exports.streamerFanPageAdminStats = onCall({ enforceAppCheck: true, maxInstances: 10 }, async (request) => {
   const uid = requireAuth(request);
   if (!await isAdminUid(uid)) {
     throw new HttpsError('permission-denied', '관리자만 팬페이지 통계를 볼 수 있습니다.');
@@ -6084,7 +6084,7 @@ exports.streamerFanPageAdminStats = onCall({ maxInstances: 10 }, async (request)
   return { ...snapshot, streamers };
 });
 
-exports.streamerFanPageDesignFeedback = onCall({ maxInstances: 10 }, async (request) => {
+exports.streamerFanPageDesignFeedback = onCall({ enforceAppCheck: true, maxInstances: 10 }, async (request) => {
   const uid = requireAuth(request);
   const payload = request.data && typeof request.data === 'object' ? request.data : {};
   const action = String(payload.action || 'submit');
@@ -6198,7 +6198,7 @@ exports.streamerFanPageDesignFeedback = onCall({ maxInstances: 10 }, async (requ
   throw new HttpsError('invalid-argument', '요청을 처리할 수 없습니다.');
 });
 
-exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageUpbo = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const action = typeof data.action === 'string' ? data.action : 'listTopics';
@@ -6707,7 +6707,7 @@ exports.streamerFanPageUpbo = onCall({ maxInstances: 20 }, async (request) => {
   throw new HttpsError('invalid-argument', '업보 정리 요청을 확인해 주세요.');
 });
 
-exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageSave = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
   const data = request.data || {};
@@ -6865,7 +6865,7 @@ exports.streamerFanPageSave = onCall({ maxInstances: 20 }, async (request) => {
   return { page: normalizePage(targetStreamer.streamer, saved.val()) };
 });
 
-exports.streamerFanPageSongbook = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
+exports.streamerFanPageSongbook = onCall({ enforceAppCheck: true, secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const action = String(data.action || '');
@@ -7390,7 +7390,7 @@ async function runVideoLibraryAutoSync() {
   return { started };
 }
 
-exports.streamerFanPageVideoLibrary = onCall({ secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
+exports.streamerFanPageVideoLibrary = onCall({ enforceAppCheck: true, secrets: [YOUTUBE_DATA_API_KEY], maxInstances: 20 }, async (request) => {
   const uid = request.auth && typeof request.auth.uid === 'string' ? request.auth.uid : '';
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const action = String(data.action || 'list');
@@ -7886,7 +7886,7 @@ exports.streamerFanPageVideoLibraryCleanupWorker = onTaskDispatched({
   if (hasMore) await enqueueVideoLibraryCleanup(String(channelId), String(syncId));
 });
 
-exports.streamerFanPagePlayedGames = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPagePlayedGames = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const action = String(data.action || '');
@@ -8177,7 +8177,7 @@ function normalizeTamagotchiApplicationInput(payload, streamer) {
   return { requestMode, characterName, visualConcept, interactionPreferences, referenceImageUrl, notes };
 }
 
-exports.streamerFanPageTamagotchiApplications = onCall({ maxInstances: 10 }, async (request) => {
+exports.streamerFanPageTamagotchiApplications = onCall({ enforceAppCheck: true, maxInstances: 10 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const action = String(data.action || 'status');
@@ -8333,7 +8333,7 @@ exports.streamerFanPageTamagotchiApplications = onCall({ maxInstances: 10 }, asy
   throw new HttpsError('invalid-argument', '다마고치 신청 요청을 확인해 주세요.');
 });
 
-exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 120 }, async (request) => {
+exports.streamerFanPageCommentUp = onCall({ enforceAppCheck: true, maxInstances: 10, timeoutSeconds: 120 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
@@ -8445,7 +8445,7 @@ exports.streamerFanPageCommentUp = onCall({ maxInstances: 10, timeoutSeconds: 12
   throw new HttpsError('invalid-argument', '요청을 확인해 주세요.');
 });
 
-exports.streamerFanPageMemories = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageMemories = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const streamerId = String(data.streamerId || '').trim().toLowerCase();
@@ -8510,7 +8510,7 @@ exports.streamerFanPageMemories = onCall({ maxInstances: 20 }, async (request) =
   throw new HttpsError('invalid-argument', '기억의 순간 요청을 확인해 주세요.');
 });
 
-exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (request) => {
+exports.streamerFanPageRollingPaper = onCall({ enforceAppCheck: true, maxInstances: 20 }, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const action = String(data.action || '');
@@ -8775,7 +8775,7 @@ exports.streamerFanPageRollingPaper = onCall({ maxInstances: 20 }, async (reques
   throw new HttpsError('invalid-argument', '롤링페이퍼 요청을 확인해 주세요.');
 });
 
-exports.streamerFanPageVodRefresh = onCall({ maxInstances: 10, timeoutSeconds: 3600, memory: '1GiB' }, async (request) => {
+exports.streamerFanPageVodRefresh = onCall({ enforceAppCheck: true, maxInstances: 10, timeoutSeconds: 3600, memory: '1GiB' }, async (request) => {
   const uid = requireAuth(request);
   const automatic = !!(request.data && request.data.automatic === true);
   const [verified, isAdmin] = await Promise.all([findVerifiedByUid(uid), isAdminUid(uid)]);
