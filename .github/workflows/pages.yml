@@ -75,7 +75,7 @@ jobs:
           mkdir -p _site/static-data/viewer-stats
           cp -a static-data/viewer-stats/. _site/static-data/viewer-stats/
           # 서버 코드는 비공개 저장소 streamer-fanpage-functions에 있다. 내보내기 스크립트(ci/)는 사이트에 올리지 않는다.
-          rm -rf _site/ci
+          rm -rf _site/ci _site/functions
       - name: Guard private admin snapshots
         run: |
           if find _site -type f -path '*/admin-stats/*.json' -print -quit | grep -q .; then
