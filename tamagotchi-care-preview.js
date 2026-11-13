@@ -1,17 +1,18 @@
 // 다마고치 돌봄 미리보기(?tgpreview=1, 관리자 전용). 운영 DB에 아무것도 쓰지 않는다.
 // 실제 서버 엔진(functions/tamagotchi-care.js)을 그대로 불러와 브라우저 메모리 DB 위에서 돌린다 → 계산 규칙이 서버와 같다.
-const ENGINE_URL = 'functions/tamagotchi-care.js?v=20261113-tg-treatfix1';
+const ENGINE_URL = 'functions/tamagotchi-care.js?v=20261114-wear1';
+const WARDROBE_URL = 'functions/tamagotchi-wardrobe.js?v=20261114-wear1';
 const UID = 'preview-admin';
 const PET_ID = 'preview-mongsil';
 const ALL_SKILLS = ['pet', 'feed', 'groom', 'gem', 'play', 'bath', 'nap', 'walk', 'talk', 'sing', 'dance', 'cheer'];
 
-async function loadEngine() {
-  const src = await (await fetch(ENGINE_URL, { cache: 'no-store' })).text();
+async function loadEngine(url = ENGINE_URL, deps = {}) {
+  const src = await (await fetch(url, { cache: 'no-store' })).text();
   // node:crypto 대역: 미리보기에서는 팬 키가 겹치지만 않으면 되므로 간단한 해시로 충분하다
   const crypto = { createHash: () => ({ t: '', update(x) { this.t += x; return this; }, digest() { let h = 2166136261; for (const c of this.t) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0').repeat(8); } }) };
   const module = { exports: {} };
   // eslint-disable-next-line no-new-func
-  new Function('module', 'exports', 'require', src)(module, module.exports, (name) => { if (name === 'node:crypto' || name === 'crypto') return crypto; throw new Error(`미리보기에서 지원하지 않는 모듈: ${name}`); });
+  new Function('module', 'exports', 'require', src)(module, module.exports, (name) => { if (name === 'node:crypto' || name === 'crypto') return crypto; if (deps[name]) return deps[name]; throw new Error(`미리보기에서 지원하지 않는 모듈: ${name}`); });
   return module.exports;
 }
 
@@ -42,6 +43,7 @@ function memoryDb(initial) {
 
 export async function createCarePreview(page) {
   const care = await loadEngine();
+  const wardrobe = await loadEngine(WARDROBE_URL, { './tamagotchi-care': care });
   const sid = page.streamer.id;
   const db = memoryDb({ [care.PETS_ROOT]: { [sid]: { [PET_ID]: { status: 'active', speciesId: 'mongsil', color: 'cream', nickname: '미리보기 몽실이', adoptedAt: Date.now() } } } });
   const statsPath = `${care.PETS_ROOT}/${sid}/${PET_ID}/stats`;
@@ -53,11 +55,15 @@ export async function createCarePreview(page) {
   const callShop = (data) => wrap(async () => {
     if (data.action !== 'pets') throw Object.assign(new Error('미리보기에서는 목록만 지원해요.'), { code: 'invalid-argument' });
     const pet = db.read(`${care.PETS_ROOT}/${sid}/${PET_ID}`);
-    return { pets: [{ petId: PET_ID, speciesId: pet.speciesId, color: pet.color, nickname: pet.nickname, adoptedAt: pet.adoptedAt, learned: [...care.learnedSet(pet, Date.now())], training: care.trainingMap(pet, Date.now()), test: true }], serverNow: Date.now() };
+    return { pets: [{ petId: PET_ID, speciesId: pet.speciesId, color: pet.color, nickname: pet.nickname, wear: wardrobe.equippedOf(pet), adoptedAt: pet.adoptedAt, learned: [...care.learnedSet(pet, Date.now())], training: care.trainingMap(pet, Date.now()), test: true }], serverNow: Date.now() };
   });
   const callCare = (data) => wrap(async () => {
     const base = { db, uid: UID, streamerId: sid, petId: data.petId };
-    if (data.action === 'status') return care.readStatus(base);
+    const withShop = (out) => { const p = db.read(`${care.PETS_ROOT}/${sid}/${PET_ID}`); out.shop = wardrobe.shopView(p, p.stats, Date.now(), { manage: true }); return out; };
+    if (data.action === 'status') return withShop(await care.readStatus(base));
+    if (data.action === 'buy') { await wardrobe.buy({ ...base, itemId: data.itemId }); return withShop(await care.readStatus(base)); }
+    if (data.action === 'equip') { await wardrobe.equip({ ...base, slot: data.slot, itemId: data.itemId }); return withShop(await care.readStatus(base)); }
+    if (data.action === 'snack') { await wardrobe.snack(base); return withShop(await care.readStatus(base)); }
     if (data.action === 'interact') return care.interact({ ...base, batch: data.batch, owner: true });
     if (data.action === 'treat') return care.treat({ ...base, kind: data.kind });
     throw Object.assign(new Error('요청 종류를 확인해 주세요.'), { code: 'invalid-argument' });

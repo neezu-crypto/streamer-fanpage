@@ -290,6 +290,7 @@ function publicPet(petId, pet, { isAdmin, now = Date.now() }) {
   const out = {
     petId, speciesId: String(pet.speciesId || ''), color: String(pet.color || ''), nickname: String(pet.nickname || ''),
     adoptedAt: Number(pet.adoptedAt) || 0, learned: petLearnedIds(pet, now), training: trainingMap(pet, now),
+    wear: require('./tamagotchi-wardrobe').equippedOf(pet), // 보석 상점 꾸미기(착용 중인 것만)
   };
   if (isAdmin && pet.source === 'admin-test') out.test = true;
   return out;

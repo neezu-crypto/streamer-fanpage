@@ -218,6 +218,7 @@ let cinetyCatalogRefreshPromise = null;
 const { readTamagotchiStage, tamagotchiOpenFor } = require('./tamagotchi-stage');
 const tamagotchiShop = require('./tamagotchi-shop');
 const tamagotchiCare = require('./tamagotchi-care');
+const tamagotchiWardrobe = require('./tamagotchi-wardrobe');
 const tamagotchiOverlay = require('./tamagotchi-overlay');
 const { publicCatalog: tamagotchiPublicCatalog } = require('./tamagotchi-catalog');
 const FANPAGE_TAMAGOTCHI_MAX_APPLICATIONS_PER_STREAMER = 20;
@@ -5551,7 +5552,35 @@ exports.streamerFanPageTamagotchiCare = onCall({ maxInstances: 20 }, async (requ
     if (!target) throw new HttpsError('not-found', '인증된 스트리머 팬페이지를 찾을 수 없습니다.');
     const targetId = target.streamer.id;
     if (action === 'status') {
-      const out = await tamagotchiCare.readStatus({ db, uid, streamerId: targetId, petId: data.petId });
+      const [out, verifiedMe, petSnap] = await Promise.all([
+        tamagotchiCare.readStatus({ db, uid, streamerId: targetId, petId: data.petId }),
+        findVerifiedByUid(uid),
+        db.ref(`${tamagotchiCare.PETS_ROOT}/${targetId}/${tamagotchiCare.validateTarget(targetId, data.petId).pid}`).get(),
+      ]);
+      // 보석 상점: 꾸미기 사기·입히기는 주인·관리자만(보유 목록도 그들에게만), 간식은 로그인 팬도
+      const manage = isAdmin || (!!verifiedMe && verifiedMe.streamer.id === targetId);
+      const petNow = petSnap.val() || {};
+      out.shop = tamagotchiWardrobe.shopView(petNow, petNow.stats, Date.now(), { manage });
+      return isAdmin ? out : tamagotchiCare.hideValues(out);
+    }
+    if (action === 'buy' || action === 'equip' || action === 'snack') {
+      const [isProtected, paused, verifiedMe] = await Promise.all([
+        hasProtectedAccount(request, uid), isServicePaused(sharedDb, 'streamerFanPage', false), findVerifiedByUid(uid),
+      ]);
+      if (!isProtected) throw new HttpsError('permission-denied', '로그인하면 이용할 수 있어요.');
+      if (paused) throw new HttpsError('unavailable', '서비스 점검 중이에요.');
+      const manage = isAdmin || (!!verifiedMe && verifiedMe.streamer.id === targetId);
+      if (action !== 'snack' && !manage) throw new HttpsError('permission-denied', '꾸미기는 스트리머가 고를 수 있어요.');
+      const now = Date.now();
+      const res = action === 'buy'
+        ? await tamagotchiWardrobe.buy({ db, streamerId: targetId, petId: data.petId, itemId: data.itemId, now })
+        : action === 'equip'
+          ? await tamagotchiWardrobe.equip({ db, streamerId: targetId, petId: data.petId, slot: String(data.slot || ''), itemId: data.itemId ? String(data.itemId) : '', now })
+          : await tamagotchiWardrobe.snack({ db, uid, streamerId: targetId, petId: data.petId, now });
+      await tamagotchiOverlay.publish({ db, streamerId: targetId, petId: data.petId, pet: res.pet, stats: res.pet.stats, counts: action === 'snack' ? { feed: 1 } : null, now })
+        .catch((error) => console.warn('다마고치 오버레이 갱신 실패', error.message));
+      const out = { ...tamagotchiCare.publicStats(res.pet.stats, now), learned: [...tamagotchiCare.learnedSet(res.pet, now)], training: tamagotchiCare.trainingMap(res.pet, now), serverNow: now, spent: res.spent || 0 };
+      out.shop = tamagotchiWardrobe.shopView(res.pet, res.pet.stats, now, { manage });
       return isAdmin ? out : tamagotchiCare.hideValues(out);
     }
     if (action !== 'interact' && action !== 'treat') throw new HttpsError('invalid-argument', '요청 종류를 확인해 주세요.');
