@@ -1,0 +1,7 @@
+{
+  "name": "streamer-fanpage-ci",
+  "private": true,
+  "description": "GitHub Actions 전용 내보내기 스크립트(서버 코드는 비공개 저장소 streamer-fanpage-functions). 원본은 functions/에 있으며 고칠 때 함께 고친다.",
+  "engines": { "node": "22" },
+  "dependencies": { "firebase-admin": "^14.5.0" }
+}

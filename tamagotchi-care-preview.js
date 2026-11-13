@@ -1,7 +1,7 @@
 // 다마고치 돌봄 미리보기(?tgpreview=1, 관리자 전용). 운영 DB에 아무것도 쓰지 않는다.
-// 실제 서버 엔진(functions/tamagotchi-care.js)을 그대로 불러와 브라우저 메모리 DB 위에서 돌린다 → 계산 규칙이 서버와 같다.
-const ENGINE_URL = 'functions/tamagotchi-care.js?v=20261114-wear1';
-const WARDROBE_URL = 'functions/tamagotchi-wardrobe.js?v=20261114-wear1';
+// 서버 엔진 사본(tamagotchi-engine/, 원본은 비공개 functions/tamagotchi-care.js — 서버를 고치면 함께 복사)을 불러와 브라우저 메모리 DB 위에서 돌린다 → 계산 규칙이 서버와 같다.
+const ENGINE_URL = 'tamagotchi-engine/tamagotchi-care.js?v=20261114-split1';
+const WARDROBE_URL = 'tamagotchi-engine/tamagotchi-wardrobe.js?v=20261114-split1';
 const UID = 'preview-admin';
 const PET_ID = 'preview-mongsil';
 const ALL_SKILLS = ['pet', 'feed', 'groom', 'gem', 'play', 'bath', 'nap', 'walk', 'talk', 'sing', 'dance', 'cheer'];
