@@ -249,7 +249,7 @@ export function mountCareView(container, {
 
   // ---------- 서버 응답 반영 ----------
   function apply(data) {
-    server = data;
+    server = data; if (server) server.receivedAt = Date.now();
     for (const [key] of STAT_ORDER) target[key] = serverValue(key);
     if (!Object.keys(shown).length) shown = { ...target };
     tween(800);
@@ -298,12 +298,24 @@ export function mountCareView(container, {
   // ---------- 도구 ----------
   function allowed(id) { const a = ALLOWED[server?.condition]; return !a || a.includes(id); }
   // 배운 재주: 서버 상태 응답 → 목록 응답 → 기본 4종 순으로 믿는다
+  // 훈련 중(재주당 5분)인 재주: 끝나는 시각이 지나면 화면에서도 바로 풀어 준다(서버도 같은 시각에 허용)
+  function trainingEnd(id) {
+    const t = (server?.training || pet?.training || {})[id];
+    if (!t) return 0;
+    const skew = Number(server?.serverNow) > 0 && server.training ? Number(server.serverNow) - (server.receivedAt || Date.now()) : 0;
+    return (Number(t.endAt) || 0) - skew;
+  }
   function learned(id) {
     const list = Array.isArray(server?.learned) ? server.learned : Array.isArray(pet?.learned) && pet.learned.length ? pet.learned : BASE_SKILLS;
-    return list.includes(id);
+    if (list.includes(id)) return true;
+    const end = trainingEnd(id); return end > 0 && end <= Date.now();
   }
+  const mmss = (ms) => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+  let unlockTimer = 0;
   function showLocked(id) {
     const label = mods.TOOLS[id]?.label || '';
+    const end = trainingEnd(id);
+    if (end > Date.now()) { say(`${label} 훈련 중이에요 · ${mmss(end - Date.now())} 뒤에 함께할 수 있어요.`); refs.note.replaceChildren(); return; }
     if (canManage) {
       say(`${label}${josa(label)} 아직 배우지 않았어요. 훈련소에서 가르칠 수 있어요.`);
       const a = el('a', 'tg-care-train-link', '🎓 훈련소에서 가르치기 →'); a.href = TRAIN_URL; a.target = '_blank'; a.rel = 'noopener';
@@ -334,12 +346,18 @@ export function mountCareView(container, {
     const sel = toolCtl?.selected?.() || ''; const now = Date.now();
     for (const [id, b] of refs.toolBtns) {
       const ok = allowed(id); const has = learned(id);
-      b.classList.toggle('is-locked', !has); b.querySelector('.tg-care-lock').hidden = has;
+      const training = !has && trainingEnd(id) > now;
+      b.classList.toggle('is-locked', !has); b.classList.toggle('is-training', training);
+      const lockEl = b.querySelector('.tg-care-lock'); lockEl.hidden = has; lockEl.textContent = training ? '⏳' : '🔒';
       b.classList.toggle('is-dim', has && (!ok || (dimmed.get(id) || 0) > now)); b.classList.toggle('is-selected', sel === id);
       b.setAttribute('aria-pressed', String(sel === id));
-      b.setAttribute('aria-label', has ? mods.TOOLS[id]?.label || id : `${mods.TOOLS[id]?.label || id} (아직 배우지 않음)`);
-      b.title = !has ? '아직 배우지 않은 재주예요' : ok ? '' : BLOCK_TEXT[server?.condition] || '';
+      b.setAttribute('aria-label', has ? mods.TOOLS[id]?.label || id : `${mods.TOOLS[id]?.label || id} (${training ? '훈련 중' : '아직 배우지 않음'})`);
+      b.title = training ? '훈련 중이에요' : !has ? '아직 배우지 않은 재주예요' : ok ? '' : BLOCK_TEXT[server?.condition] || '';
     }
+    // 가장 먼저 끝나는 훈련 시각에 다시 그려 잠금을 푼다
+    clearTimeout(unlockTimer);
+    const ends = [...refs.toolBtns.keys()].map(trainingEnd).filter((e) => e > now);
+    if (ends.length) unlockTimer = setTimeout(() => { if (!destroyed) renderTools(); }, Math.min(...ends) - now + 300);
   }
 
   function remember(id) { try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ sid: page.streamer.id, id })); } catch (_) { /* 무시 */ } }
@@ -467,7 +485,7 @@ export function mountCareView(container, {
     async reload() { if (!pet) return; await flush(); try { apply((await callCare({ action: 'status', streamerId: page.streamer.id, petId: pet.petId })).data); } catch (error) { refs.note.textContent = error.message || ''; } },
     refreshAuth() { if (!toolCtl || destroyed) return; renderTools(); resumePending(); },
     destroy() {
-      destroyed = true; void flush(); io?.disconnect();
+      destroyed = true; clearTimeout(unlockTimer); void flush(); io?.disconnect();
       clearInterval(refreshTimer); clearTimeout(sendTimer); cancelAnimationFrame(animFrame);
       document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('pagehide', onPageHide); window.removeEventListener('resize', onResize);
       sound?.stopAll(); toolCtl?.destroy(); petApi?.destroy(); scene?.destroy();
