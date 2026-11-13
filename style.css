@@ -2092,3 +2092,9 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .tg-care .tg-care
 .comment-up-overlay select{flex:1 1 200px;min-width:0;padding:9px 10px;border:1px solid #cbbdcc;border-radius:10px;background:#fff;color:#302735}
 .comment-up-overlay label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .comment-up-overlay-note{margin:0;font-size:12px;line-height:1.6;opacity:.85}
+
+/* 다마고치 보석 상점 창 틀(2026-11-14). 카드·미리보기는 상점 저장소 tamagotchi.css(공용) */
+.tg-care-shop-btn{cursor:pointer;border:0;font:inherit}
+.tg-shop-dialog{width:min(620px,94vw);overflow:auto}
+.tg-shop-dialog .tg-gem-shop-gems,.tg-shop-dialog .tg-gem-shop-state,.tg-shop-dialog .tg-gem-shop-foot{font-size:13px;line-height:1.6;margin:6px 0}
+.tg-shop-dialog .tg-shop-world{font-size:13px}

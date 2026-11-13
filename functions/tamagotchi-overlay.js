@@ -5,6 +5,7 @@
 // - 누가 돌봤는지는 저장하지 않는다(종류별 횟수만, 1분 단위·10분 보관).
 const { createHash, randomBytes } = require('node:crypto');
 const care = require('./tamagotchi-care');
+const wardrobe = require('./tamagotchi-wardrobe');
 
 const OVERLAY_ROOT = 'streamerFanPageTamagotchiOverlay'; // {sid}/{pid}: { tokenHash, createdAt } (서버 전용)
 const INDEX_ROOT = 'streamerFanPageTamagotchiOverlayIndex'; // {tokenHash}: { sid, pid } (서버 전용)
@@ -28,7 +29,7 @@ function summary(pet, stats, now) {
   for (const [k, v] of Object.entries(pub.stats)) bands[k] = v.band;
   return {
     nickname: String(pet.nickname || '').slice(0, 30), color: String(pet.color || 'cream'), speciesId: String(pet.speciesId || 'mongsil'),
-    condition: pub.condition, bands, sleeping: pub.sleeping, hospitalUntil: pub.hospitalUntil, gems: pub.gems, gemMax: pub.gemMax, at: now,
+    condition: pub.condition, bands, sleeping: pub.sleeping, hospitalUntil: pub.hospitalUntil, gems: pub.gems, gemMax: pub.gemMax, wear: wardrobe.equippedOf(pet), at: now,
   };
 }
 function pruneRecent(recent, now) {

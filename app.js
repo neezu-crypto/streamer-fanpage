@@ -4434,8 +4434,8 @@ function renderTamagotchiSection(page) {
     // ?tgpreview=1: 관리자 전용 미리보기(메모리 DB, 운영 저장 없음)
     const preview = isAdminUser === true && new URLSearchParams(location.search).get('tgpreview') === '1';
     Promise.all([
-      import('./tamagotchi-care-view.js?v=20261113-cu1'),
-      preview ? import('./tamagotchi-care-preview.js?v=20261113-tg-treatfix1').then((m) => m.createCarePreview(page)) : null,
+      import('./tamagotchi-care-view.js?v=20261114-wear1'),
+      preview ? import('./tamagotchi-care-preview.js?v=20261114-wear1').then((m) => m.createCarePreview(page)) : null,
     ]).then(([{ mountCareView }, mock]) => {
       if (currentPage?.streamer.id !== page.streamer.id) return;
       currentTamagotchiCare?.destroy();

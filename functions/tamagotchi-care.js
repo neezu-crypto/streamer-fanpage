@@ -39,6 +39,8 @@ function normalizeStats(raw, now) {
   for (const k of STAT_KEYS) if (Number.isFinite(Number(raw[k]))) out[k] = clamp(Number(raw[k]));
   for (const k of ['at', 'sleepAt', 'hospitalUntil', 'softUntil', 'gems', 'warned', 'seenAt']) if (Number.isFinite(Number(raw[k]))) out[k] = Number(raw[k]);
   out.outpatientDay = typeof raw.outpatientDay === 'string' ? raw.outpatientDay : '';
+  // 달콤 간식 하루 횟수(보석 상점, tamagotchi-wardrobe.js)
+  if (typeof raw.snackDay === 'string' && raw.snackDay) { out.snackDay = raw.snackDay; out.snackCount = Math.max(0, Math.floor(Number(raw.snackCount) || 0)); }
   out.gems = clamp(Math.floor(out.gems), 0, GEM_POOL_MAX);
   if (!(out.at > 0) || out.at > now) out.at = now;
   return out;
@@ -478,5 +480,5 @@ module.exports = {
   HOLDABLE, HOLD_UNIT_MS, HOLD_MAX_MS, hideValues, applyHold,
   freshStats, advance, conditionOf, applyOne, normalizeFan, bondLevel, softCapFactor, warnLevel,
   treatmentQuote, applyTreatment, publicStats, validateBatch, dayKey, fanKey,
-  readStatus, interact, treat, removeFanRecords,
+  readStatus, interact, treat, removeFanRecords, validateTarget, loadActivePet,
 };

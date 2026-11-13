@@ -7,7 +7,7 @@ import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/
 
 // 상점 모듈 위치(돌봄 화면 파일을 통째로 불러오지 않도록 직접 적는다)
 const SHOP_BASE = 'https://neezu-crypto.github.io/streamer-game-series-shop/';
-const SHOP_V = '?v=20261113-tg-walkfix2';
+const SHOP_V = '?v=20261114-tg-wear1';
 const app = initializeApp({
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54', authDomain: 'soop-stock-market.firebaseapp.com',
   databaseURL: 'https://soop-stock-market-default-rtdb.firebaseio.com', projectId: 'soop-stock-market',
@@ -88,6 +88,7 @@ async function main() {
     name.textContent = live.nickname || '다마고치';
     gems.textContent = `💎 ${live.gems ?? 0}/${live.gemMax ?? 60}`;
     for (const [k] of STAT_EMOJI) { const b = live.bands?.[k] || 'mid'; rings[k].dataset.band = b; rings[k].style.setProperty('--p', String(BAND_FILL[b] ?? 50)); }
+    pet.setWear?.(live.wear || {});
     const cond = live.condition || 'ok';
     pet.setCondition?.(cond);
     scene?.setHospital(cond === 'hospital');

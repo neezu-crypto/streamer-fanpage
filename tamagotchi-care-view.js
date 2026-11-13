@@ -1,7 +1,7 @@
 // 팬페이지 다마고치 탭: 돌봄 화면(3-C). 펫·도구·소리·무대 배치는 상점 모듈을 그대로 불러 쓰고, 스탯은 서버(Care)가 계산한다.
 // 설계: docs/다마고치_3C_팬페이지_돌봄_화면_설계.md
 export const SHOP_BASE = 'https://neezu-crypto.github.io/streamer-game-series-shop/';
-const SHOP_V = '?v=20261113-tg-treatfix1';
+const SHOP_V = '?v=20261114-tg-wear1';
 export const SEND_EVERY_MS = 6000; // 서버 전송 간격(화면은 예측값으로 바로 반응)
 const REFRESH_MS = 60000; // 다른 팬이 돌본 결과 반영
 const BLOCK_DIM_MS = 10000;
@@ -106,7 +106,8 @@ function loadShopModules() {
     modulesPromise = Promise.all([
       import(`${SHOP_BASE}tamagotchi-pet.js${SHOP_V}`), import(`${SHOP_BASE}tamagotchi-tools.js${SHOP_V}`),
       import(`${SHOP_BASE}tamagotchi-sound.js${SHOP_V}`), import(`${SHOP_BASE}tamagotchi-scene.js${SHOP_V}`),
-    ]).then(([pet, tools, snd, scene]) => ({ ...pet, ...tools, ...snd, ...scene }))
+      import(`${SHOP_BASE}tamagotchi-gem-shop-ui.js${SHOP_V}`),
+    ]).then(([pet, tools, snd, scene, gemShop]) => ({ ...pet, ...tools, ...snd, ...scene, ...gemShop }))
       .catch((error) => { modulesPromise = null; throw error; });
   }
   return modulesPromise;
@@ -133,7 +134,9 @@ export function mountCareView(container, {
     refs.picker = el('div', 'tg-care-picker'); refs.picker.setAttribute('role', 'radiogroup'); refs.picker.setAttribute('aria-label', '펫 선택');
     refs.name = el('strong', 'tg-care-name');
     refs.bond = el('span', 'tg-care-chip'); refs.gems = el('span', 'tg-care-chip');
-    const meta = el('div', 'tg-care-meta'); meta.append(refs.name, refs.bond, refs.gems);
+    refs.shopBtn = el('button', 'tg-care-chip tg-care-shop-btn', '🛍️ 보석 상점'); refs.shopBtn.type = 'button';
+    refs.shopBtn.addEventListener('click', () => openGemShop());
+    const meta = el('div', 'tg-care-meta'); meta.append(refs.name, refs.bond, refs.gems, refs.shopBtn);
     head.append(refs.picker, meta);
     if (callOverlay && canManage) {
       const tv = el('button', 'tg-care-icon-btn', '📺'); tv.type = 'button'; tv.title = '방송 오버레이'; tv.setAttribute('aria-label', '방송 오버레이');
@@ -235,6 +238,32 @@ export function mountCareView(container, {
     }).catch((error) => { state.textContent = error.message || '오버레이 정보를 불러오지 못했어요.'; });
   }
 
+  // ---------- 보석 상점·꾸미기(설계: docs/다마고치_보석상점_꾸미기_설계.md) ----------
+  // 창 안쪽은 상점 저장소 공용 모듈(tamagotchi-gem-shop-ui.js). 월드맵 보석 상점에서도 같은 펫으로 열 수 있다.
+  let shopRender = null;
+  function openGemShop() {
+    if (!server?.shop || !pet) return;
+    const dlg = el('dialog', 'tg-overlay-dialog tg-shop-dialog');
+    const close = el('button', 'tg-overlay-close', '✕'); close.type = 'button'; close.setAttribute('aria-label', '닫기'); close.addEventListener('click', () => dlg.close());
+    const body = el('div');
+    const world = el('a', 'tg-shop-world', '🗺️ 월드맵 보석 상점에서 보기');
+    world.href = `${SHOP_BASE}tamagotchi-world.html?s=${encodeURIComponent(page.streamer.id)}&p=${encodeURIComponent(pet.petId)}#gem-shop`;
+    dlg.append(close, el('h3', '', '🛍️ 보석 상점'), body, world);
+    document.body.append(dlg);
+    const ui = mods.mountGemShop(body, {
+      getServer: () => server, petColor: pet.color || 'cream',
+      call: async (payload) => { await flush(); return (await callCare({ streamerId: page.streamer.id, petId: pet.petId, ...payload })).data; },
+      onApplied: (data) => apply(data),
+      hasAccount, openLogin: () => { dlg.close(); remember(null); openLogin(); },
+      onSnack: () => petApi?.play?.('먹기'),
+      footer: '금고의 하트 보석은 팬들이 돌보며 함께 모아요. 산 꾸미기는 이 펫이 계속 가지며 되돌릴 수 없어요. 누가 샀는지는 남지 않아요.',
+    });
+    shopRender = () => ui.render();
+    dlg.addEventListener('cancel', (e) => { if (ui.busy()) e.preventDefault(); });
+    dlg.addEventListener('close', () => { shopRender = null; ui.destroy(); dlg.remove(); });
+    dlg.showModal();
+  }
+
   // ---------- 막대: 예측값 → 서버 값 부드럽게 ----------
   function renderStats() {
     if (!refs.statRows) {
@@ -293,6 +322,7 @@ export function mountCareView(container, {
     const prev = server;
     server = data; if (server) server.receivedAt = Date.now();
     // 배운 재주·훈련 정보가 없는 응답(예: 이전 버전 서버)은 직전 값을 유지한다
+    if (server && prev && !server.shop && prev.shop) server.shop = prev.shop; // 돌봄 응답에는 상점 정보가 없다
     if (server && prev && !Array.isArray(server.learned) && Array.isArray(prev.learned)) { server.learned = prev.learned; server.training = server.training || prev.training; }
     if (data?.me?.daily) rate.syncDaily(data.me.daily, data.me.day || '');
     for (const [key] of STAT_ORDER) target[key] = serverValue(key);
@@ -300,6 +330,7 @@ export function mountCareView(container, {
     tween(800);
     refs.bond.textContent = `♥ 유대감 Lv.${data.me?.bondLevel || 1}`;
     refs.gems.textContent = `💎 금고 ${data.gems ?? 0}/${data.gemMax ?? 60}`;
+    if (data.shop) { petApi?.setWear?.(data.shop.equipped || {}); shopRender?.(); }
     const cond = data.condition || 'ok';
     petApi?.setCondition?.(cond === 'hospital' ? 'hospital' : cond);
     scene?.setHospital(cond === 'hospital');
