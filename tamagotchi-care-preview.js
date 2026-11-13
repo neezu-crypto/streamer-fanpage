@@ -1,6 +1,6 @@
 // 다마고치 돌봄 미리보기(?tgpreview=1, 관리자 전용). 운영 DB에 아무것도 쓰지 않는다.
 // 실제 서버 엔진(functions/tamagotchi-care.js)을 그대로 불러와 브라우저 메모리 DB 위에서 돌린다 → 계산 규칙이 서버와 같다.
-const ENGINE_URL = 'functions/tamagotchi-care.js?v=20261113-tg-rate1';
+const ENGINE_URL = 'functions/tamagotchi-care.js?v=20261113-tg-walkfix1';
 const UID = 'preview-admin';
 const PET_ID = 'preview-mongsil';
 const ALL_SKILLS = ['pet', 'feed', 'groom', 'gem', 'play', 'bath', 'nap', 'walk', 'talk', 'sing', 'dance', 'cheer'];
