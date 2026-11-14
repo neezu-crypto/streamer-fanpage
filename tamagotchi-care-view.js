@@ -182,7 +182,7 @@ export function mountCareView(container, {
     [
       '아래 도구 중 하나를 눌러 골라요.',
       '펫을 누르거나 펫 위에서 문질러 줘요. 도구마다 방법이 달라서, 고르면 말풍선으로 알려 줘요.',
-      '돌볼수록 아래 상태 막대가 채워지고, 다시 누르면 도구 선택이 풀려요.',
+      '돌볼수록 아래 동그란 상태 표시가 채워져요. 같은 도구를 다시 누르면 선택이 풀려요.',
     ].forEach((text) => steps.append(el('li', '', text)));
     const ok = el('button', 'button button-primary tg-first-guide-ok', '알겠어요'); ok.type = 'button';
     ok.addEventListener('click', () => { try { localStorage.setItem(GUIDE_KEY, '1'); } catch { /* 무시 */ } card.remove(); });
