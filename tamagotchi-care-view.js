@@ -199,7 +199,14 @@ export function mountCareView(container, {
     const urlRow = el('div', 'tg-overlay-url');
     const url = el('input'); url.readOnly = true; url.type = 'text'; url.setAttribute('aria-label', '오버레이 주소');
     const copy = el('button', 'button', '복사'); copy.type = 'button';
-    copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(url.value); state.textContent = '주소를 복사했어요. 다른 사람에게 보여 주지 마세요.'; } catch (_) { url.select(); } });
+    let fullUrl = ''; // 화면에는 비밀 키 일부만 보이고, 복사는 전체 주소로 한다(방송 화면 노출 대비)
+    const copied = () => { state.textContent = '주소를 복사했어요. 다른 사람에게 보여 주지 마세요.'; };
+    copy.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(fullUrl); copied(); } catch (_) {
+        const ta = el('textarea'); ta.value = fullUrl; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;opacity:0'; dlg.append(ta); ta.select();
+        try { document.execCommand('copy') ? copied() : (state.textContent = '복사하지 못했어요. 다시 눌러 주세요.'); } finally { ta.remove(); }
+      }
+    });
     urlRow.append(url, copy);
     const warn = el('p', 'tg-overlay-warn', '주소에 비밀 키가 들어 있어요. 방송 화면에 주소가 보이지 않게 해 주세요. 새로 만들면 예전 주소는 바로 꺼져요.');
     const preview = el('iframe', 'tg-overlay-preview'); preview.title = '오버레이 미리보기';
@@ -209,9 +216,10 @@ export function mountCareView(container, {
     function updateUrl() {
       const q = new URLSearchParams({ t: token });
       opts.querySelectorAll('select').forEach((s) => q.set(s.dataset.key, s.value));
-      url.value = token ? `${OVERLAY_PAGE}#${q}` : '';
+      fullUrl = token ? `${OVERLAY_PAGE}#${q}` : '';
+      url.value = token ? fullUrl.replace(/([#&]t=)([^&]*)/, (m, k, v) => k + (v.length > 8 ? `${v.slice(0, 4)}••••••••${v.slice(-2)}` : '••••••••')) : '';
       urlRow.hidden = !token; warn.hidden = !token; opts.hidden = !token; preview.hidden = !token;
-      if (token) preview.src = url.value.replace('#', `?p=${Date.now()}#`);
+      if (token) preview.src = fullUrl.replace('#', `?p=${Date.now()}#`);
     }
     async function call(action) {
       const r = (await callOverlay({ action, streamerId: page.streamer.id, petId: pet.petId })).data; return r;
