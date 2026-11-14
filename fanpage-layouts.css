@@ -1,4 +1,4 @@
-/* Layout 1: a soft, pastel comic-book inspired fanpage. Layout 2 keeps style.css as-is. */
+/*  Layout 1: a soft, pastel comic-book inspired fanpage. Layout 2 keeps style.css as-is. */
 body.fanpage-layout-one-active,
 body.fanpage-home-kawaii-active {
   color-scheme: light;
@@ -54,7 +54,7 @@ body.fanpage-home-kawaii-active .devbar-links a:hover { color: #51465d; }
 .main-content.has-fanpage-layout-one,
 .main-content.has-fanpage-home-kawaii { width: min(1220px, calc(100% - 48px)); }
 
-/* The initial search page shares the friendly pastel language of layout 1. */
+/*  The initial search page shares the friendly pastel language of layout 1. */
 body.fanpage-home-kawaii-active .home-view { padding: clamp(38px, 6vw, 78px) 0 66px; }
 body.fanpage-home-kawaii-active .hero-copy {
   position: relative;
@@ -138,7 +138,7 @@ body.fanpage-home-kawaii-active .section-heading h2 { color: #51465d; }
 body.fanpage-home-kawaii-active .section-heading .eyebrow { color: #d86f98; }
 body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: linear-gradient(135deg, #ffe3ed, #e3edff); }
 
-/* Keep the initial loading and recovery screen in the same pastel world. */
+/*  Keep the initial loading and recovery screen in the same pastel world. */
 .startup-cover {
   color-scheme: light;
   color: #51465d;
@@ -568,7 +568,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
 #fanPageView.fanpage-layout-1 .fan-character-ogq-pair + .fanpage-design-one-grid { margin-top: 22px; }
 #fanPageView.fanpage-layout-1 .fan-character-ogq-pair > .fan-character-card { border: 0; border-radius: 0; box-shadow: none; }
 #fanPageView.fanpage-layout-1 .fan-character-ogq-pair > .fan-feature-ogq-panel { border: 0; border-radius: 0; background: #fffefd; box-shadow: none; }
-/* In the bright blue layout, keep the mascot surface as light as the nearby cards. */
+/*  In the bright blue layout, keep the mascot surface as light as the nearby cards. */
 #fanPageView.fanpage-layout-1.fanpage-theme-sora .fan-character-card {
   border-color: color-mix(in srgb, var(--kawaii-accent) 38%, white);
   background:
@@ -695,7 +695,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
   body.fanpage-home-kawaii-active .home-mascot img { transition: none; }
 }
 
-/* Player dialogs follow the selected pastel fanpage theme. The embedded players
+/*  Player dialogs follow the selected pastel fanpage theme. The embedded players
    remain their providers' own UI, while the surrounding modal and comments match. */
 #fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog) {
   --text: #51465d;
@@ -798,7 +798,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .competition-hi
   #fanPageView.fanpage-layout-1 :is(#vodPlayerDialog, #youtubePlayerDialog) .vod-player-card { padding: 15px; }
 }
 
-/* Keep every fanpage account/editor modal in the active layout's visual system,
+/*  Keep every fanpage account/editor modal in the active layout's visual system,
    including dialogs appended to document.body rather than #fanPageView. */
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog {
   --text: #51465d;
@@ -1041,7 +1041,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .button-primary
   box-shadow: 0 1px 0 color-mix(in srgb, var(--jelly-accent-deep), white 22%), 0 3px 7px #75608018, inset 0 3px 7px #6d42501c;
 }
 
-/* Keep the jelly styles above older, more specific layout and dialog button rules. */
+/*  Keep the jelly styles above older, more specific layout and dialog button rules. */
 body.fanpage-layout-one-active #fanPageView.fanpage-layout-1 .button:not(.button-primary):not(.profile-settings-close),
 body.fanpage-layout-one-active .account-dialog .button:not(.button-primary):not(.profile-settings-close),
 body.fanpage-home-kawaii-active .account-dialog .button:not(.button-primary):not(.profile-settings-close) {
@@ -1184,7 +1184,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView :i
   box-shadow: 0 4px 0 color-mix(in srgb, var(--jelly-accent-deep), white 22%), inset 0 2px 0 #ffffffdc;
 }
 
-/* Replace the modal × with the paw jelly art on layout 1 only. The X remains in the SVG for clarity. */
+/*  Replace the modal × with the paw jelly art on layout 1 only. The X remains in the SVG for clarity. */
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .profile-settings-close {
   position: relative;
   z-index: 2;
@@ -1401,7 +1401,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-butt
   text-shadow: 0 1px 0 #2f2a2c55 !important;
 }
 
-/* This must be the last action-rail declaration.  Generic layout-three
+/*  This must be the last action-rail declaration.  Generic layout-three
    button decoration appears earlier in this file and otherwise paints a
    pale rectangle over the square action artwork on phones. */
 @media (max-width: 720px) {
@@ -1540,7 +1540,7 @@ body.fanpage-layout-three-active
   transform: translateY(2px) rotate(-1deg) scale(.98) !important;
 }
 
-/* Design 3 quick navigation is label-first: hide the decorative section
+/*  Design 3 quick navigation is label-first: hide the decorative section
    numbers so the hand-drawn tickets read cleanly at every desktop width. */
 #fanPageView.fanpage-layout-3 .fan-quick-link {
   gap: 0 !important;
@@ -1759,7 +1759,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   }
 }
 
-/* Final mobile action artwork contract. Keep the square illustration buttons
+/*  Final mobile action artwork contract. Keep the square illustration buttons
    after the broad design-3 button rules so no legacy doodle sprite or ribbon
    gradient can change their geometry. */
 @media (max-width: 720px) {
@@ -1894,7 +1894,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   }
 }
 
-/* The legacy design-3 rules carry a body-level selector, so repeat the
+/*  The legacy design-3 rules carry a body-level selector, so repeat the
    selected-tab reset at that specificity to guarantee the old ribbon cannot
    leak through as a second fragment. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-button[aria-selected='true'] {
@@ -2090,7 +2090,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-en
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog { border-radius: 20px; }
 }
 
-/* Keep the fanpage tabs in the pastel jelly language. */
+/*  Keep the fanpage tabs in the pastel jelly language. */
 #fanPageView.fanpage-layout-1 .fanpage-tab-nav{border-color:#eadfeb;background:#fffefd;box-shadow:0 5px 0 #e7dce8,0 10px 24px #7560800d}
 #fanPageView.fanpage-layout-1 .fanpage-tab-button{color:#71647b}
 #fanPageView.fanpage-layout-1 .fanpage-tab-button:hover{border-color:color-mix(in srgb,var(--kawaii-accent),white 68%);background:#fff5f9;color:#51465d}
@@ -2315,7 +2315,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-en
   body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) #fanPageView .fan-quick-remote>#game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button:hover{border-color:color-mix(in srgb,var(--jelly-accent),white 38%);box-shadow:0 6px 0 #dfd8e8,0 9px 14px #75608018,inset 0 2px 0 #fff}
 }
 
-/* Rolling paper sticker tools stay beside the quick remote while that tab is active. */
+/*  Rolling paper sticker tools stay beside the quick remote while that tab is active. */
 #fanPageView[data-fanpage-active-tab="rolling-paper"] .fan-quick-sticker-control{display:flex}
 #fanPageView.fanpage-layout-1 .fan-quick-sticker-button{border-color:#eadfeb;background:linear-gradient(180deg,#fffdf6,#fff6d9);color:#655733;box-shadow:0 3px 0 #ead99d,0 6px 12px #75608016,inset 0 2px 0 #fff}
 #fanPageView.fanpage-layout-1 .fan-quick-sticker-button:hover,
@@ -2338,7 +2338,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-en
 #fanPageView.fanpage-layout-1 .rolling-paper-sticker-context-action.is-primary{background:#edf2ff;color:#4c659d}
 @media(prefers-reduced-motion:reduce){#fanPageView.fanpage-layout-1 .fan-quick-sticker-button{transition-duration:.01ms}}
 
-/* Layout 3: a monochrome hand-drawn stickerbook. The illustration asset frames
+/*  Layout 3: a monochrome hand-drawn stickerbook. The illustration asset frames
    the page while live data, controls and accessibility remain HTML/CSS. */
 body.fanpage-layout-three-active {
   color-scheme: light;
@@ -2638,7 +2638,7 @@ body.fanpage-layout-three-active .footer-feedback-link { border-bottom-color: #2
 #fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-option { border-color: var(--doodle-ink); background: var(--doodle-paper-soft); }
 #fanPageView.fanpage-layout-3 .profile-layout-dialog .profile-layout-option:has(input:checked) { border-color: var(--doodle-accent); background: #fff1e6; }
 
-/* Layout 3 dialogs are mounted at body level, outside #fanPageView. */
+/*  Layout 3 dialogs are mounted at body level, outside #fanPageView. */
 body.fanpage-layout-three-active .account-dialog.profile-layout-dialog {
   border: 2px solid var(--doodle-ink, #2f2a2c);
   border-radius: 20px;
@@ -2675,7 +2675,7 @@ body.fanpage-layout-three-active .profile-layout-dialog .profile-layout-option:h
   font-weight: 700;
 }
 
-/* Layout 3 stationery UI: illustrated accents keep text/controls semantic. */
+/*  Layout 3 stationery UI: illustrated accents keep text/controls semantic. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.button, .auth-button) {
   position: relative;
   border-width: 2px;
@@ -2858,7 +2858,7 @@ body.fanpage-layout-three-active :is(.account-dialog, #vodPlayerDialog, #youtube
 }
 body.fanpage-layout-three-active :is(.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog):not(.profile-layout-dialog) .button-primary::before { background-position: center center; }
 
-/* Layout 3 full illustrated control language: keep the real text and actions,
+/*  Layout 3 full illustrated control language: keep the real text and actions,
    but make every interactive surface feel like a hand-drawn stationery piece. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   :is(button:not(.vod-card):not(.youtube-video-card):not(.fan-gallery-card):not(.rolling-paper-gallery-image):not(.weekly-schedule-gallery-image):not(.fanpage-kawaii-mascot):not(.video-library-card):not(.played-game-card),
@@ -3248,7 +3248,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-at
   #fanPageView.fanpage-layout-3 * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
 
-/* Design 3 illustrated controls: the control surface itself is the drawing.
+/*  Design 3 illustrated controls: the control surface itself is the drawing.
    Keep the label as real HTML text, but replace the old tiny sprite-in-button
    treatment with full paper, ribbon, and ticket silhouettes. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
@@ -3310,7 +3310,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   filter: grayscale(.35) opacity(.52);
 }
 
-/* Tabs and compact category controls are paper tickets, not icon buttons. */
+/*  Tabs and compact category controls are paper tickets, not icon buttons. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   :is(.fanpage-tab-button, .fan-quick-link, .fan-gallery-tabs button, [role='tab'],
       .video-library-category, .upbo-topic-tab, .upbo-subtab) {
@@ -3348,7 +3348,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   filter: drop-shadow(2px 3px 0 var(--doodle-shadow, #2f2a2c32));
 }
 
-/* Body-level dialogs are mounted outside #fanPageView. */
+/*  Body-level dialogs are mounted outside #fanPageView. */
 body.fanpage-layout-three-active
   :is(dialog.account-dialog, #vodPlayerDialog, #youtubePlayerDialog, .video-library-add-dialog, .rolling-paper-message-dialog)
   :is(.button, button) {
@@ -3422,7 +3422,7 @@ body.fanpage-layout-three-active
   }
 }
 
-/* Design 3 final component guardrails.
+/*  Design 3 final component guardrails.
    Illustrated controls must not turn semantic profile rows or card geometry
    into buttons. Compact actions use a dedicated mini stationery surface so
    their labels remain readable instead of being squeezed into a wide ribbon. */
@@ -3465,7 +3465,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-detail {
   align-items: center;
   padding: 0 18px;
   border: 2px solid var(--doodle-ink, #2f2a2c);
-  border-radius: 14px;
+  border-radius: 14.26px;
   background: var(--doodle-paper, #fffdf8) !important;
   box-shadow: 3px 4px 0 var(--doodle-shadow, #2f2a2c32);
 }
@@ -3554,7 +3554,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   background-size: 100% 100%;
 }
 
-/* Keep tab navigation and anchored sections clear of the sticky tab bar. */
+/*  Keep tab navigation and anchored sections clear of the sticky tab bar. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-panel-grid > *,
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-section,
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .content-card {
@@ -3932,7 +3932,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
   display: inline-block;
   color: var(--doodle-accent-deep, #b5483f);
   font-family: var(--display, inherit);
-  /* Keep the external-link illustration clearly larger than the label. */
+  /*  Keep the external-link illustration clearly larger than the label. */
   font-size: 2em;
   font-weight: 800;
   line-height: .8;
@@ -3960,7 +3960,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.vod-refresh-
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .vod-refresh-button::before {
   background-position: center center;
 }
-/* Analytics is a text-first destination. Do not add the unrelated stationery
+/*  Analytics is a text-first destination. Do not add the unrelated stationery
    sticker before its label. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .vod-analytics-button::before {
   content: none !important;
@@ -4311,7 +4311,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-label 
   white-space: nowrap !important;
 }
 
-/* Sound settings remains a conventional dialog outside of design 3, but in
+/*  Sound settings remains a conventional dialog outside of design 3, but in
    the sketchbook layout its actions are full illustrated paper surfaces.
    Keep both bottom actions on the same 132×40 footprint: their artwork is
    intentionally larger than the compact label while their text stays clear. */
@@ -4400,7 +4400,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-sound-settin
   }
 }
 
-/* Make the two welcome actions visibly larger than their labels so the
+/*  Make the two welcome actions visibly larger than their labels so the
    illustrated paper/ribbon artwork reads as the primary control surface. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-kawaii-actions > .button {
   min-height: 54px !important;
@@ -4489,7 +4489,7 @@ body.fanpage-layout-three-active
   transform:translateY(2px) rotate(-1deg) scale(.98) !important;
 }
 
-/* The emotion pop-up is mounted beside the fan-page root, so it needs the
+/*  The emotion pop-up is mounted beside the fan-page root, so it needs the
    same terminal rule separately from the dialogs above. */
 body.fanpage-layout-three-active .gs-emote-close {
   display:grid !important;
@@ -4521,7 +4521,7 @@ body.fanpage-layout-three-active .gs-emote-close:focus-visible {
   transform:translateY(-1px) rotate(1.5deg) scale(1.04) !important;
 }
 
-/* Keep the gallery picker’s close illustration at the title area's upper
+/*  Keep the gallery picker’s close illustration at the title area's upper
    right, instead of leaving it among the gallery action buttons. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-image-heading {
   display:grid !important;
@@ -4569,7 +4569,7 @@ body.fanpage-layout-three-active dialog.profile-settings-dialog {
   overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;
   touch-action:pan-y;
-  /* Preserve the rounded paper edge while keeping wheel/touch scrolling. */
+  /*  Preserve the rounded paper edge while keeping wheel/touch scrolling. */
   scrollbar-width:none;
   scrollbar-gutter:auto;
 }
@@ -4701,7 +4701,7 @@ body.fanpage-layout-three-active .profile-settings-dialog .profile-editor-hint {
 #fanPageView.fanpage-layout-2 .weekly-template-controls select{background:#292531;border-color:#5a5263;color:#f8f4fa}
 #fanPageView.fanpage-layout-2 .weekly-schedule-editor-title{color:#f5eef5}
 
-/* Keep schedule navigation anchored to the illustrated title. */
+/*  Keep schedule navigation anchored to the illustrated title. */
 body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-schedule-stage-next) {
   position:absolute !important; z-index:8; display:grid; place-items:center;
   width:40px !important; height:40px !important; min-width:40px !important; min-height:40px !important; padding:0 !important;
@@ -4715,7 +4715,7 @@ body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-s
 body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous,.weekly-schedule-stage-next):active {
   transform:translate(-50%,calc(-50% + 1px)) !important;
 }
-/* SOOP 방송국 보기: 공용 작은 버튼 규칙(button-mini)이 이겨서 그림이 글자보다 작게 보이던 문제.
+/*  SOOP 방송국 보기: 공용 작은 버튼 규칙(button-mini)이 이겨서 그림이 글자보다 작게 보이던 문제.
    라이브 바로가기 버튼은 종이 라벨 그림을 크게 쓴다. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 a.button.live-station-link {
   min-width: 240px; min-height: 66px; padding: 15px 40px; box-sizing: border-box; white-space: nowrap;
@@ -4730,7 +4730,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 a.button.live-sta
   }
 }
 
-/* 디자인 3 공용 색 토큰(값은 그대로, 이름만 부여). 새 규칙은 하드코딩 색 대신 이 토큰을 쓴다. */
+/*  디자인 3 공용 색 토큰(값은 그대로, 이름만 부여). 새 규칙은 하드코딩 색 대신 이 토큰을 쓴다. */
 body.fanpage-layout-three-active {
   --d3-muted-strong: #665d5b;
   --d3-rose: #b13a63;
@@ -4768,7 +4768,7 @@ body.fanpage-layout-three-active {
     white-space: nowrap !important;
   }
 
-  /* 2) 헤더: 4줄(약 161px) → 2줄. 인증 문구·계정 상태 문구는 프로필의 "인증 스트리머" 뱃지와 중복이라 숨긴다. */
+  /*  2) 헤더: 4줄(약 161px) → 2줄. 인증 문구·계정 상태 문구는 프로필의 "인증 스트리머" 뱃지와 중복이라 숨긴다. */
   body.fanpage-layout-three-active .topbar { padding: 8px 14px !important; gap: 6px 10px !important; }
   body.fanpage-layout-three-active .topbar-right {
     width: 100%;
@@ -4782,7 +4782,7 @@ body.fanpage-layout-three-active {
   body.fanpage-layout-three-active .account-status { display: none !important; }
   body.fanpage-layout-three-active .topbar .auth-actions { width: auto !important; flex: 0 0 auto !important; margin-left: auto !important; gap: 8px !important; }
 
-  /* 3) 푸터: 오른쪽 아래 고정 버튼(감정표현)과 빠른 이동 버튼에 문구가 가려지지 않도록 아래 여백을 둔다. */
+  /*  3) 푸터: 오른쪽 아래 고정 버튼(감정표현)과 빠른 이동 버튼에 문구가 가려지지 않도록 아래 여백을 둔다. */
   body.fanpage-layout-three-active .footer {
     padding-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
     flex-direction: column !important;
@@ -4792,7 +4792,7 @@ body.fanpage-layout-three-active {
   }
 }
 
-/* ===== 디자인 3 개선 2단계: 글자 크기·대비·눌림 영역 (2026-11-11) =====
+/*  ===== 디자인 3 개선 2단계: 글자 크기·대비·눌림 영역 (2026-11-11) =====
    디자인 3(`fanpage-layout-three-active` + `fanpage-layout-3`)만. 색은 모든 폭에서, 크기·눌림 영역은 모바일(720px 이하)에서 조정한다. */
 /* 대비: 크림 바탕 위에서 4.5:1에 못 미치던 연한 보조 글자 색을 --doodle-muted(var(--d3-muted-strong)) 계열로 통일한다. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(
@@ -4804,7 +4804,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-ch
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-change.is-down { color: var(--d3-down) !important; }
 
 @media (max-width: 720px) {
-  /* 보조 글자는 12px 이상, 영문 장식 라벨(eyebrow)은 11px 이상 */
+  /*  보조 글자는 12px 이상, 영문 장식 라벨(eyebrow)은 11px 이상 */
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(
     .video-library-source, .video-library-card small, .profile-stock-meta, .profile-stock-change,
     .live-subtitle, .vod-count, .vod-refresh-status, .affiliate-promo-brand, .upbo-request-empty-hint,
@@ -4835,7 +4835,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .profile-stock-ch
 }
 
 @media (max-width: 720px) {
-  /* 주간 일정 이전/다음 버튼: 눌림 영역 44px (그림 위치는 title 기준 중앙 정렬 그대로) */
+  /*  주간 일정 이전/다음 버튼: 눌림 영역 44px (그림 위치는 title 기준 중앙 정렬 그대로) */
   html body #fanPageView.fanpage-layout-3 :is(.weekly-schedule-stage-previous, .weekly-schedule-stage-next) {
     width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important;
   }
@@ -4892,7 +4892,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .streamer-edit-ve
   }
 }
 
-/* 5단계: 디자인 3 주간 일정 모바일 요약 목록 + 즐겨찾기 칩 한 줄 스크롤 — 디자인 3에서만 적용 */
+/*  5단계: 디자인 3 주간 일정 모바일 요약 목록 + 즐겨찾기 칩 한 줄 스크롤 — 디자인 3에서만 적용 */
 @media (max-width: 720px) {
   #fanPageView.fanpage-layout-3 .weekly-schedule-mobile-day {
     grid-template-columns: 64px minmax(0, 1fr); gap: 8px; padding: 10px 6px; align-items: baseline;
@@ -4913,7 +4913,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .streamer-edit-ve
 }
 #fanPageView.fanpage-layout-3 .video-library-count { white-space: nowrap; }
 
-/* 6단계: 디자인 3 로딩 스켈레톤 — 불러오는 중 문구 상자에 종이 카드 윤곽 + 반짝임(디자인 3에서만) */
+/*  6단계: 디자인 3 로딩 스켈레톤 — 불러오는 중 문구 상자에 종이 카드 윤곽 + 반짝임(디자인 3에서만) */
 #fanPageView.fanpage-layout-3 .is-loading:is(.upbo-status, .rolling-paper-status, .youtube-empty-state, .songbook-empty-state, .played-games-empty-state, .memory-moments-empty) {
   position: relative; overflow: hidden; min-height: 96px; display: flex; align-items: center; justify-content: center;
   border: 2px dashed var(--doodle-ink); border-radius: 14px; background: var(--d3-paper-warm); color: var(--doodle-muted);
@@ -4976,7 +4976,7 @@ body.fanpage-layout-three-active .account-dialog :is(.admin-design-usage-heading
 body.fanpage-layout-three-active .account-dialog .admin-design-usage-chip { border: 2px solid #2f2a2c; color: #2f2a2c; }
 body.fanpage-layout-three-active .account-dialog .admin-design-usage-warning, body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog .admin-design-usage-warning { color: #8a4b00; }
 
-/* 관리자 점검 후 보정: 디자인 3 밝은 바탕에서 어두운 테마 기본 글자색이 남은 곳의 대비 */
+/*  관리자 점검 후 보정: 디자인 3 밝은 바탕에서 어두운 테마 기본 글자색이 남은 곳의 대비 */
 #fanPageView.fanpage-layout-3 :is(.profile-link-editor label, .video-library-channel-card a, .profile-inline-editor label) { color: var(--doodle-ink, #2f2a2c) !important; }
 #fanPageView.fanpage-layout-3 :is(.memory-moments-count, .songbook-count, .played-games-count, .competition-history-count, details > summary) { color: var(--d3-muted-strong) !important; }
 body.fanpage-layout-three-active :is(.profile-link-editor-note, .profile-editor-hint) { font-size: 12px; }
@@ -4989,7 +4989,7 @@ body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .account-dialog
 body.fanpage-layout-three-active .account-dialog .admin-design-usage-more { border: 2px solid #2f2a2c; color: #2f2a2c; }
 
 
-/* 디자인 3 관리자 팝업: 디자인 1의 밝은 팝업 규칙을 그대로 적용해 어두운 테마 색이 남지 않게 한다 */
+/*  디자인 3 관리자 팝업: 디자인 1의 밝은 팝업 규칙을 그대로 적용해 어두운 테마 색이 남지 않게 한다 */
 body.fanpage-layout-three-active .account-dialog .admin-stats-dialog-card { color: #51465d; }
 body.fanpage-layout-three-active .account-dialog :is(.admin-stats-tile, .admin-stat-card, .admin-viewer-usage-tile, .admin-viewer-subscription-row, .admin-stat-metric, .admin-viewer-usage-action, .admin-viewer-usage-tier, .admin-viewer-usage-streamer) {
   border-color: #e8deea;
@@ -5047,7 +5047,7 @@ body.fanpage-layout-three-active dialog.account-dialog .admin-stat-card {
 }
 body.fanpage-layout-three-active dialog.account-dialog .admin-stat-card::before,
 body.fanpage-layout-three-active dialog.account-dialog .admin-stat-card::after { display: none !important; }
-/* 통계 창: 디자인 3은 창 장식(테이프)이 잘리지 않도록 창은 overflow visible을 유지하고, 안쪽 카드가 스크롤되게 한다 */
+/*  통계 창: 디자인 3은 창 장식(테이프)이 잘리지 않도록 창은 overflow visible을 유지하고, 안쪽 카드가 스크롤되게 한다 */
 body.fanpage-layout-three-active dialog.admin-stats-dialog .admin-stats-dialog-card {
   max-height: calc(100dvh - 28px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
 }
@@ -5075,7 +5075,7 @@ body.fanpage-layout-three-active :is(input, select, textarea):focus-visible {
   box-shadow: none !important;
 }
 
-/* 데스크톱 우측 고정 버튼 보정: 가로로 긴(3.3:1) 종이 그림이 정사각 버튼에 들어가 가는 띠로 보이던 문제 */
+/*  데스크톱 우측 고정 버튼 보정: 가로로 긴(3.3:1) 종이 그림이 정사각 버튼에 들어가 가는 띠로 보이던 문제 */
 @media (min-width: 721px) {
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle {
     width: 48px !important; height: 48px !important; min-width: 48px !important; min-height: 48px !important;
@@ -5089,7 +5089,7 @@ body.fanpage-layout-three-active :is(input, select, textarea):focus-visible {
     display: block !important; width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round;
   }
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle circle { fill: var(--doodle-accent, #e87564); stroke: currentColor; }
-  /* 감정표현 버튼은 종이 그림 비율(약 3.3:1)에 맞춰 폭을 키워 글자가 그림 안에 들어오게 한다 */
+  /*  감정표현 버튼은 종이 그림 비율(약 3.3:1)에 맞춰 폭을 키워 글자가 그림 안에 들어오게 한다 */
   body.fanpage-layout-three-active #game-series-emote-launcher.fanpage-emote-mobile-floating #game-series-emote-button {
     min-width: 142px; height: 44px; padding: 0 26px; font-size: 15px; font-weight: 800; white-space: nowrap;
   }
@@ -5108,10 +5108,10 @@ body.fanpage-layout-three-active #game-series-emote-launcher.fanpage-emote-remot
   font-size: 14px !important; font-weight: 800 !important;
   filter: drop-shadow(2px 3px 0 #2f2a2c38) !important;
 }
-/* 넓은 화면(1500px 이상)에서는 패널이 항상 열려 있어 앱이 이 버튼을 hidden으로 숨긴다. display 규칙이 그 숨김을 이기지 않게 한다. */
+/*  넓은 화면(1500px 이상)에서는 패널이 항상 열려 있어 앱이 이 버튼을 hidden으로 숨긴다. display 규칙이 그 숨김을 이기지 않게 한다. */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-toggle[hidden] { display: none !important; }
 
-/* 디자인 3 이용권 버튼: 종이 라벨 비율(약 3.3:1)에 맞춰 글자가 잘리지 않게 크기를 확보한다. */
+/*  디자인 3 이용권 버튼: 종이 라벨 비율(약 3.3:1)에 맞춰 글자가 잘리지 않게 크기를 확보한다. */
 body.fanpage-layout-three-active :is(.design-pass-buy, .weekly-template-buy, .design-pass-actions .button, .design-pass-admin-button) {
   min-width: 220px !important;
   min-height: 52px !important;
@@ -5123,7 +5123,7 @@ body.fanpage-layout-three-active :is(.design-pass-buy, .weekly-template-buy, .de
 body.fanpage-layout-three-active .design-pass-panel { border-color: var(--d3-muted-strong, #665d5b); }
 body.fanpage-layout-three-active .design-pass-actions { justify-content: center; }
 
-/* 주간 일정표 보기 대화상자는 #fanPageView 밖(body)에 붙으므로, 제목 양옆 이전/다음 버튼도
+/*  주간 일정표 보기 대화상자는 #fanPageView 밖(body)에 붙으므로, 제목 양옆 이전/다음 버튼도
    body 기준으로 둥근 버튼 모양과 중앙 정렬을 따로 지정한다(공용 대화상자 버튼 규칙이 덮어쓰지 못하게). */
 body.fanpage-layout-three-active dialog.weekly-schedule-view-dialog :is(.weekly-schedule-stage-previous, .weekly-schedule-stage-next) {
   position: absolute !important; z-index: 8; display: grid; place-items: center;
@@ -5210,7 +5210,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fan-quick-sticke
   box-shadow: 1px 1px 0 var(--doodle-shadow, #2f2a2c32) !important; transform: translateY(2px) !important;
 }
 
-/* 다마고치 창(보석 상점·방송 오버레이)도 디자인 1·3의 창 모양을 따른다(2026-11-14).
+/*  다마고치 창(보석 상점·방송 오버레이)도 디자인 1·3의 창 모양을 따른다(2026-11-14).
    창은 document.body에 붙으므로 body 클래스로 고른다. 디자인 2는 style.css 기본(어두운 창). */
 body:is(.fanpage-layout-one-active, .fanpage-home-kawaii-active) .tg-overlay-dialog {
   color-scheme: light;
@@ -5239,5 +5239,5 @@ body.fanpage-layout-three-active .tg-overlay-dialog .tg-shop-card { border: 2px 
 body.fanpage-layout-three-active .tg-overlay-dialog .tg-shop-card.is-on { background: #ffe9ef; }
 body.fanpage-layout-three-active .tg-overlay-dialog .tg-shop-card .tg-button { border: 2px solid var(--doodle-ink, #2f2a2c); }
 body.fanpage-layout-three-active .tg-overlay-dialog .tg-overlay-close { color: var(--doodle-ink, #2f2a2c); }
-/* 디자인 3: 상점 버튼이 다른 칩(유대감·금고)과 같은 모양이 되게 전역 버튼 손그림 테두리를 덜어 낸다 */
+/*  디자인 3: 상점 버튼이 다른 칩(유대감·금고)과 같은 모양이 되게 전역 버튼 손그림 테두리를 덜어 낸다 */
 body.fanpage-layout-three-active .tg-care-meta .tg-care-shop-btn { min-height: 0; padding: 3px 10px; border: 1px solid color-mix(in srgb, var(--tg-accent) 35%, transparent); border-radius: 999px; box-shadow: none; background: color-mix(in srgb, var(--tg-accent) 16%, transparent); color: inherit; font: inherit; font-size: .85rem; transform: none; }
