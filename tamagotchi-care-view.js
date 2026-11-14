@@ -170,6 +170,27 @@ export function mountCareView(container, {
     root.append(box);
   }
 
+  // ---------- 처음 한 번만 보이는 돌봄 안내 ----------
+  // 이 브라우저에서 처음 돌봄 화면을 열 때만 띄운다(localStorage). 닫으면 다시 보이지 않는다.
+  const GUIDE_KEY = 'streamerFanPage.tamagotchi.careGuide.v1';
+  function showFirstGuide() {
+    try { if (localStorage.getItem(GUIDE_KEY)) return; } catch { return; }
+    if (!refs.stage || refs.stage.querySelector('.tg-first-guide')) return;
+    const card = el('div', 'tg-first-guide'); card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', '돌봄 안내');
+    const title = el('strong', 'tg-first-guide-title', '이렇게 돌봐 주세요');
+    const steps = el('ol', 'tg-first-guide-steps');
+    [
+      '아래 도구 중 하나를 눌러 골라요.',
+      '펫을 누르거나 펫 위에서 문질러 줘요. 도구마다 방법이 달라서, 고르면 말풍선으로 알려 줘요.',
+      '돌볼수록 아래 상태 막대가 채워지고, 다시 누르면 도구 선택이 풀려요.',
+    ].forEach((text) => steps.append(el('li', '', text)));
+    const ok = el('button', 'button button-primary tg-first-guide-ok', '알겠어요'); ok.type = 'button';
+    ok.addEventListener('click', () => { try { localStorage.setItem(GUIDE_KEY, '1'); } catch { /* 무시 */ } card.remove(); });
+    card.append(title, steps, ok);
+    refs.stage.append(card);
+    ok.focus({ preventScroll: true });
+  }
+
   // ---------- 방송 오버레이(📺): 발급·재발급·끄기, 옵션, 미리보기 ----------
   const OVERLAY_PAGE = new URL('overlay.html', location.origin + location.pathname).href;
   function openOverlayDialog() {
@@ -543,11 +564,12 @@ export function mountCareView(container, {
       const [m, list] = await Promise.all([loadShopModules(), callShop({ action: 'pets', streamerId: page.streamer.id })]);
       if (destroyed) return;
       mods = m; pets = Array.isArray(list.data?.pets) ? list.data.pets : [];
-      if (!pets.length) { empty('아직 함께하는 다마고치가 없어요.', canManage); return; }
+      if (!pets.length) { empty(canManage ? '아직 분양받은 다마고치가 없어요. 통합 상점 분양소에서 다마고치를 데려와 팬들과 함께 키워 보세요.' : '아직 함께하는 다마고치가 없어요. 스트리머가 분양소에서 다마고치를 데려오면 여기서 함께 돌볼 수 있어요.', canManage); return; }
       build();
       sound = mods.createSound(); renderSoundBtn();
       refs.sound.addEventListener('click', () => { sound.setEnabled(!sound.enabled()); renderSoundBtn(); });
       await choose(pets[0]);
+      showFirstGuide();
       refreshTimer = setInterval(refresh, REFRESH_MS);
       document.addEventListener('visibilitychange', onVisibility); window.addEventListener('pagehide', onPageHide);
       window.addEventListener('resize', onResize);
