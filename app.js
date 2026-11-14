@@ -15,10 +15,10 @@ const firebaseConfig = {
   messagingSenderId: '997788925900',
   appId: '1:997788925900:web:b58db2970489bf18a3a769'
 };
-// 다른 시리즈 앱과 같은 origin·apiKey·기본 Firebase 앱 세션을 공유해 기존 UID를 이어받는다.
+//  다른 시리즈 앱과 같은 origin·apiKey·기본 Firebase 앱 세션을 공유해 기존 UID를 이어받는다.
 const app = initializeApp(firebaseConfig);
-// App Check: 이 사이트(github.io)에서 온 요청만 서버가 받도록 토큰을 붙인다(고점체크와 같은 키). 2026-11-14
-// 같은 페이지의 다른 모듈(감정표현·점검 게이트)이 다시 초기화하지 않게 표시해 둔다.
+//  App Check: 이 사이트(github.io)에서 온 요청만 서버가 받도록 토큰을 붙인다(고점체크와 같은 키). 2026-11-14
+//  같은 페이지의 다른 모듈(감정표현·점검 게이트)이 다시 초기화하지 않게 표시해 둔다.
 try { initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('6Ld0AfAtAAAAABcCio4_5AoiCdrjfM7_4riWiYXR'), isTokenAutoRefreshEnabled: true }); window.__seriesAppCheck = true; } catch (error) { console.warn('App Check 초기화 실패', error); }
 const auth = getAuth(app);
 const db = getDatabase(app);
@@ -70,7 +70,7 @@ const callYouTubeVideos = authenticatedCallable('streamerFanPageYouTubeVideos');
 const callCafePosts = authenticatedCallable('streamerFanPageCafePosts');
 const callRoulette = authenticatedCallable('streamerFanPageRoulette');
 const callUpbo = authenticatedCallable('streamerFanPageUpbo');
-// 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
+//  로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = authenticatedCallable('linkGoogleAccount');
 const callLinkKakao = authenticatedCallable('linkKakaoAccount');
 const callStreamerVerification = authenticatedCallable('requestStreamerVerification');
@@ -336,7 +336,7 @@ document.addEventListener('click', (event) => {
     if (activation?.button === button && performance.now() - activation.time < 60000) {
       activePointerSoundActivation = activation;
       pendingPointerSoundActivation = null;
-      // Keep the second calendar press active through the browser's following dblclick event.
+      //  Keep the second calendar press active through the browser's following dblclick event.
       window.setTimeout(() => {
         if (activePointerSoundActivation === activation) activePointerSoundActivation = null;
       }, activation.calendarDoublePress ? 800 : 0);
@@ -379,9 +379,9 @@ let verifiedStreamerProfile = null;
 let verifiedStreamerProfileUid = '';
 let isAdminUser = false;
 
-// 디자인 3 편집 모드: 인증 스트리머·관리자만 편집할 수 있고, 디자인 3에서는 기본이 "팬이 보는 화면"이다.
+//  디자인 3 편집 모드: 인증 스트리머·관리자만 편집할 수 있고, 디자인 3에서는 기본이 "팬이 보는 화면"이다.
 // 편집 UI는 편집 모드를 켠 뒤에만 만들어지며(렌더링 자체를 하지 않음), 권한 판정은 서버가 하므로 이 값은 화면 구성에만 쓴다.
-// 디자인 1·2는 이 값과 무관하게 지금처럼 항상 편집 UI를 보인다.
+//  디자인 1·2는 이 값과 무관하게 지금처럼 항상 편집 UI를 보인다.
 const FANPAGE_EDIT_MODE_STORAGE_KEY = 'fanpageD3EditMode';
 let fanpageD3EditMode = (() => {
   try { return sessionStorage.getItem(FANPAGE_EDIT_MODE_STORAGE_KEY) === '1'; } catch { return false; }
@@ -394,7 +394,7 @@ function canOpenWeeklyScheduleEditor(page) {
 function editUiAllowed(page = currentPage) { return !isFanpageLayoutThree(page) || fanpageD3EditMode; }
 // 서버가 준 관리 권한 값(true)을 현재 화면(팬 화면/편집 화면)에 맞게 거른다.
 function uiCan(flag) { return flag === true && editUiAllowed(); }
-// page.isOwner는 읽을 때마다 "실제 관리 권한 && 편집 화면 여부"로 계산한다. 실제 권한은 page.canManage에 둔다.
+//  page.isOwner는 읽을 때마다 "실제 관리 권한 && 편집 화면 여부"로 계산한다. 실제 권한은 page.canManage에 둔다.
 function installPageOwnership(page, canManage) {
   page.canManage = canManage === true;
   Object.defineProperty(page, 'isOwner', {
@@ -954,7 +954,7 @@ const ADMIN_DESIGN_USAGE_ROWS = [
   [2, '디자인 2 · 기존 팬페이지', ''],
   [3, '디자인 3 · 손그림 스티커북', '관리자 전용 · 미공개'],
 ];
-// 디자인별 적용 스트리머 카드. 저장된 값이 없는 스트리머는 기본 디자인(1)으로 세되 "기본"으로 표시한다.
+//  디자인별 적용 스트리머 카드. 저장된 값이 없는 스트리머는 기본 디자인(1)으로 세되 "기본"으로 표시한다.
 function renderAdminDesignUsage(streamers) {
   const section = $('adminDesignUsage');
   section.replaceChildren();
@@ -4332,7 +4332,7 @@ function renderTamagotchiApplication(page, section) {
   }
 
   if (state.stage === 'preparing') {
-    // 공개 전: 신청서·승인 카드 대신 준비 중 안내만 보여 준다.
+    //  공개 전: 신청서·승인 카드 대신 준비 중 안내만 보여 준다.
     const notice = document.createElement('div'); notice.className = 'tamagotchi-empty-state tamagotchi-preparing';
     const symbol = document.createElement('span'); symbol.className = 'tamagotchi-placeholder-symbol'; symbol.setAttribute('aria-hidden', 'true'); symbol.textContent = '✦';
     const heading = document.createElement('strong'); heading.textContent = '다마고치 분양소를 준비하고 있어요';
@@ -4469,7 +4469,7 @@ function formatPreviewRemaining(totalSeconds) {
   const seconds = Math.max(0, Math.ceil(totalSeconds));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
-// 1분 미리보기 타이머. 화면에서만 적용하며 서버에 아무것도 저장하지 않는다.
+//  1분 미리보기 타이머. 화면에서만 적용하며 서버에 아무것도 저장하지 않는다.
 function startDesignPreviewTimer({ seconds = DESIGN_PASS_PREVIEW_SECONDS, onTick, onEnd }) {
   const endAt = Date.now() + seconds * 1000;
   let stopped = false;
@@ -4491,7 +4491,7 @@ function shouldDiscardPaymentRequest(error) {
   return code === 'aborted' && /자동 환불했어요/.test(String(error && error.message || ''));
 }
 function newDesignPassRequestId(streamerId) {
-  // 같은 구매 시도의 재시도는 같은 번호를 쓰도록 sessionStorage에 보관한다(중복 차감 방지).
+  //  같은 구매 시도의 재시도는 같은 번호를 쓰도록 sessionStorage에 보관한다(중복 차감 방지).
   const key = `fanpageDesignPassRequest:${streamerId}`;
   let value = '';
   try { value = sessionStorage.getItem(key) || ''; } catch (_) { value = ''; }
@@ -4504,7 +4504,7 @@ function newDesignPassRequestId(streamerId) {
   return { key, value };
 }
 // 디자인 3 미리보기(이용권 없음). 창을 닫아도 남은 시간 동안 화면에 유지하고, 끝나면 저장된 디자인으로 돌아간다.
-// 서버에는 아무것도 저장하지 않는다. 화면 갱신으로 디자인 창이 다시 만들어져도 저장된 디자인을 잃지 않도록 모듈에 보관한다.
+//  서버에는 아무것도 저장하지 않는다. 화면 갱신으로 디자인 창이 다시 만들어져도 저장된 디자인을 잃지 않도록 모듈에 보관한다.
 let designPreview = null; // { streamerId, savedLayout, timer }
 function designPreviewSavedLayout(streamerId) {
   return designPreview && designPreview.streamerId === streamerId ? designPreview.savedLayout : null;
@@ -4688,7 +4688,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   const displayedLayout = [1, 2, 3].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
-  // 미리보기 중에 창이 다시 만들어진 경우에는 화면에 보이는 디자인이 아니라 마지막으로 저장된 디자인이 기준이다.
+  //  미리보기 중에 창이 다시 만들어진 경우에는 화면에 보이는 디자인이 아니라 마지막으로 저장된 디자인이 기준이다.
   const initialLayout = designPreviewSavedLayout(page.streamer.id) ?? displayedLayout;
   let draftLayout = displayedLayout;
   let saving = false;
@@ -4717,7 +4717,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       : '미리보기를 적용했어요. 닫기 버튼을 누르면 저장됩니다.';
     if (previewOnly) startDesignPreview(targetPage, initialLayout);
     else stopDesignPreview();
-    // Re-rendering removes the dialog from the document. Close it first so the
+    //  Re-rendering removes the dialog from the document. Close it first so the
     // preserved instance can be attached and opened again without an
     // InvalidStateError from showModal() on an already-open, detached dialog.
     if (dialog.open) dialog.close();
@@ -4726,7 +4726,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       reopenLayoutDesignDialog: true,
     });
   };
-  // 미리보기가 끝났을 때 이 창의 선택 상태를 저장된 디자인으로 맞춘다(모듈의 endDesignPreview가 호출).
+  //  미리보기가 끝났을 때 이 창의 선택 상태를 저장된 디자인으로 맞춘다(모듈의 endDesignPreview가 호출).
   dialog._syncDraft = (layout, message) => {
     draftLayout = layout;
     layoutOptions.querySelectorAll('input').forEach((input) => { input.checked = Number(input.value) === layout; });
@@ -4747,8 +4747,8 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       return;
     }
     if (requestedLayout === 3 && !designPassOwned(targetPage)) {
-      // 이용권이 없는 디자인 3은 저장하지 않는다. 창만 닫고, 남은 미리보기 시간 동안은 화면에 유지한다.
-      // 시간이 끝나면 endDesignPreview가 저장된 디자인으로 되돌린다.
+      //  이용권이 없는 디자인 3은 저장하지 않는다. 창만 닫고, 남은 미리보기 시간 동안은 화면에 유지한다.
+      //  시간이 끝나면 endDesignPreview가 저장된 디자인으로 되돌린다.
       if (!designPreview) startDesignPreview(targetPage, initialLayout);
       dialog.close();
       showToast('미리보기는 남은 시간 동안만 유지돼요. 저장하려면 이용권을 구매해 주세요.');
@@ -4777,10 +4777,10 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       dialog.close();
       // Previewing keeps this dialog instance alive across full page renders
       // so its unsaved selection is not lost. Once the server accepts that
-      // selection, however, the old closure still has the former
-      // `initialLayout` and may also retain its temporary disabled controls.
+      //  selection, however, the old closure still has the former
+      //  `initialLayout` and may also retain its temporary disabled controls.
       // Replace it with a new instance based on the saved profile before the
-      // user opens the design dialog again.
+      //  user opens the design dialog again.
       renderFanPage(currentPage);
       showToast('페이지 디자인을 저장했어요.');
     } catch (error) {
@@ -4970,7 +4970,7 @@ function renderFanPage(page, options = {}) {
     ['birthday', '생일', profile.birthday], ['mbti', 'MBTI', profile.mbti],
     ['major', '전공', profile.major], ['debutDate', '데뷔', profile.debutDate],
   ];
-  // 디자인 3: 팬 화면에서는 비어 있는 프로필 칸을 숨긴다(편집 모드의 스트리머·관리자에게만 빈 칸을 보여 채우게 한다).
+  //  디자인 3: 팬 화면에서는 비어 있는 프로필 칸을 숨긴다(편집 모드의 스트리머·관리자에게만 빈 칸을 보여 채우게 한다).
   const hideEmptyProfileFields = isFanpageLayoutThree(page) && !page.isOwner;
   factRows.forEach(([field, labelText, value]) => {
     if (hideEmptyProfileFields && !value) return;
@@ -5009,7 +5009,7 @@ function renderFanPage(page, options = {}) {
   soop.className = 'button'; soop.href = page.streamer.soopUrl; soop.target = '_blank';
   soop.rel = 'noopener noreferrer'; soop.textContent = 'SOOP 방송국 ↗';
   actions.append(soop);
-  // 디자인 3: 프로필 카드에서도 바로 편집 모드를 켜고 끌 수 있게 한다(탭 제목의 버튼과 같은 상태를 공유).
+  //  디자인 3: 프로필 카드에서도 바로 편집 모드를 켜고 끌 수 있게 한다(탭 제목의 버튼과 같은 상태를 공유).
   const profileEditModeToggle = createFanpageEditModeToggle(page);
   if (profileEditModeToggle) actions.append(profileEditModeToggle);
   if (profile.rouletteUrl) {
@@ -5514,7 +5514,7 @@ function createFanPageQuickRemote(view) {
       const label = index === 0 ? '메인'
         : sectionLabels.find(([className]) => element.classList.contains(className))?.[1]
         || element.querySelector('h1, h2, h3')?.textContent.trim().replace(/\s+/g, ' ').slice(0, 18)
-        // 제목이 없는 섹션은 소속 탭 이름(명사)을 쓴다. 번호 이름("영역 N")은 쓰지 않는다.
+        //  제목이 없는 섹션은 소속 탭 이름(명사)을 쓴다. 번호 이름("영역 N")은 쓰지 않는다.
         || element.closest('.fanpage-tab-panel')?.querySelector('.fanpage-tab-panel-heading h2')?.textContent.trim()
         || '기타 항목';
       if (!element.id) element.id = `fanpage-quick-section-${index + 1}`;
@@ -5781,7 +5781,7 @@ function createFanPageQuickRemote(view) {
   remote.append(mobileActions, panel); view.append(remote, soundDialog);
 
   // The design-3 paper-button stylesheet is intentionally broad.  The mobile
-  // utility rail sits outside the normal card tree, so a later shorthand
+  //  utility rail sits outside the normal card tree, so a later shorthand
   // background reset can otherwise erase its PNG art while leaving a clickable
   // (but invisible) 58px button behind.  Apply the three art assets on the
   // generated controls themselves as the final state for this one layout.
@@ -7741,8 +7741,8 @@ async function saveOpggAccount(page, appId, gameType, accountInput, regionSelect
   button.disabled = true; button.textContent = '저장 중…';
   try {
     const result = (await callPlayedGames({
-      // OP.GG accounts are unique per supported game type. Resolve the existing
-      // entry on the server by game type so stale client card IDs cannot block edits.
+      //  OP.GG accounts are unique per supported game type. Resolve the existing
+      //  entry on the server by game type so stale client card IDs cannot block edits.
       action: 'save-opgg-account', streamerId: page.streamer.id, gameType,
       accountId: accountInput.value.trim(),
       ...(gameType === 'league-of-legends' ? { opggRegion: regionSelect?.value || 'kr' } : {}),
@@ -7912,14 +7912,14 @@ function renderCommentUpGauge(kind, comment, goal, prev) {
   wrap.append(name, track, label);
   if (ratio >= 1) { const badge = document.createElement('span'); badge.className = 'comment-up-gauge-badge'; badge.textContent = '달성!'; wrap.append(badge); }
   else if (remain) { const small = document.createElement('small'); small.className = 'comment-up-gauge-remain'; small.textContent = remain; wrap.append(small); }
-  // 이전 값에서 새 값으로 차오르기(모션 줄이기는 CSS에서 전환 제거)
+  //  이전 값에서 새 값으로 차오르기(모션 줄이기는 CSS에서 전환 제거)
   fill.style.width = `${(prev[kind] ?? 0) * 100}%`;
   requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = `${ratio * 100}%`; }));
   prev[kind] = ratio;
   return wrap;
 }
 
-// 댓글 UP 체크 → 다마고치 방송 오버레이 표시(게시글 하나, 순위·UP 선택). 오버레이 값은 이 화면에서 새로고침할 때만 바뀐다.
+//  댓글 UP 체크 → 다마고치 방송 오버레이 표시(게시글 하나, 순위·UP 선택). 오버레이 값은 이 화면에서 새로고침할 때만 바뀐다.
 function renderCommentUpOverlayPanel(page, entries, overlay) {
   const panel = document.createElement('form'); panel.className = 'comment-up-overlay';
   const title = document.createElement('strong'); title.textContent = '방송 오버레이에 표시';
@@ -9414,7 +9414,7 @@ function formatWeeklyScheduleDate(date) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 }
 
-// 템플릿별 입력 그리드(원본 1672×941px 기준)는 weekly-schedule-templates.mjs에 있다.
+//  템플릿별 입력 그리드(원본 1672×941px 기준)는 weekly-schedule-templates.mjs에 있다.
 // 여기서는 모든 템플릿이 같은 이미지 크기만 공유한다.
 const WEEKLY_SCHEDULE_LAYOUT = Object.freeze({ width: WEEKLY_WIDTH, height: WEEKLY_HEIGHT });
 function weeklyTemplateOf(state) {
@@ -9427,13 +9427,13 @@ function applyWeeklyAvatarShape(element, avatarLayout) {
     ? `polygon(${avatarLayout.clip.map(([x, y]) => `${x * 100}% ${y * 100}%`).join(',')})`
     : '';
 }
-// 편집 화면의 입력칸(DOM) 글자색이 캔버스에 그리는 글자색과 같도록 CSS 변수로 전달한다.
+//  편집 화면의 입력칸(DOM) 글자색이 캔버스에 그리는 글자색과 같도록 CSS 변수로 전달한다.
 function applyWeeklyInkVars(element, template) {
   element.style.setProperty('--w-time-ink', template.ink.time);
   element.style.setProperty('--w-content-ink', template.ink.content);
   element.style.setProperty('--w-offline-ink', template.ink.offlineDisplay);
 }
-// 템플릿이 바뀔 때 아바타·이전/다음 화살표 위치를 다시 맞춘다.
+//  템플릿이 바뀔 때 아바타·이전/다음 화살표 위치를 다시 맞춘다.
 function positionWeeklyStage(template, { avatar, previous, next, hitArea }) {
   const layout = template.layout;
   [avatar, hitArea].filter(Boolean).forEach((element) => {
@@ -9768,7 +9768,7 @@ function renderCalendarSection(page) {
         const date = new Date(weekStart); date.setDate(date.getDate() + index);
         const label = document.createElement('strong');
         const fullDayLabel = `${date.getMonth() + 1}월 ${date.getDate()}일 ${weekday}`;
-        // 디자인 3: 요일 라벨을 한 줄로 고정하려고 "11/9 월" 형태로 줄인다(스크린리더에는 전체 날짜를 읽어 준다).
+        //  디자인 3: 요일 라벨을 한 줄로 고정하려고 "11/9 월" 형태로 줄인다(스크린리더에는 전체 날짜를 읽어 준다).
         if (isFanpageLayoutThree(currentPage)) { label.textContent = `${date.getMonth() + 1}/${date.getDate()} ${String(weekday).charAt(0)}`; label.setAttribute('aria-label', fullDayLabel); }
         else label.textContent = fullDayLabel;
         const details = document.createElement('p');
@@ -9935,7 +9935,7 @@ function installWeeklyPointerEffects(frame) {
     });
   });
   frame.addEventListener('pointerleave', () => { if (frame._weeklyFx?.hover) frame._weeklyFx.hover.hidden = true; });
-  // 레트로 아케이드: 클릭하면 픽셀 조각이 터진다(소리 없음).
+  //  레트로 아케이드: 클릭하면 픽셀 조각이 터진다(소리 없음).
   frame.addEventListener('click', (event) => {
     const fx = frame._weeklyFx;
     if (!fx || fx.effects.pointer !== 'pixel' || !allowed()) return;
@@ -10252,8 +10252,8 @@ function renderWeeklyScheduleDialog(page) {
   categoryLabel.append(category);
   const fileLabel = document.createElement('label'); fileLabel.className = 'profile-editor-field'; fileLabel.textContent = '이미지 파일';
   const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
-  // 파일 선택기 취소도 cancel 이벤트를 발생시킨다. 이 이벤트가 모달의 Esc 취소 처리로
-  // 전달되는 브라우저에서도 부모 편집 모달이 닫히지 않도록 입력 요소에서 차단한다.
+  //  파일 선택기 취소도 cancel 이벤트를 발생시킨다. 이 이벤트가 모달의 Esc 취소 처리로
+  //  전달되는 브라우저에서도 부모 편집 모달이 닫히지 않도록 입력 요소에서 차단한다.
   fileInput.addEventListener('cancel', (event) => event.stopPropagation());
   fileLabel.append(fileInput); uploadFields.append(categoryLabel, fileLabel);
   const uploadNote = document.createElement('small'); uploadNote.className = 'weekly-schedule-upload-note';
@@ -10356,7 +10356,7 @@ function renderWeeklyScheduleDialog(page) {
   footerTextInput.maxLength = 48; footerTextInput.setAttribute('aria-label', '하단 리본 날짜 또는 문구');
   footerTextInput.title = '날짜 범위 또는 원하는 문구를 입력할 수 있어요.';
   previousWeek.classList.add('weekly-schedule-stage-previous'); nextWeek.classList.add('weekly-schedule-stage-next');
-  // 아바타 칸·화살표·하단 문구 입력칸·요일 칸은 템플릿마다 위치가 달라 applyEditorTemplateLayout이 맞춘다.
+  //  아바타 칸·화살표·하단 문구 입력칸·요일 칸은 템플릿마다 위치가 달라 applyEditorTemplateLayout이 맞춘다.
   function applyEditorTemplateLayout() {
     const tpl = weeklyTemplateOf(state);
     positionWeeklyStage(tpl, { previous: previousWeek, next: nextWeek, hitArea: avatarHitArea });
@@ -10915,7 +10915,7 @@ function renderWeeklyScheduleDialog(page) {
         }
       }
     } catch (error) {
-      // 저장에 실패하면 편집 내용을 복원해 재시도할 수 있게 한다.
+      //  저장에 실패하면 편집 내용을 복원해 재시도할 수 있게 한다.
       state.weekStart = previous.weekStart;
       state.templateId = previous.templateId;
       state.animationEnabled = previous.animationEnabled;
@@ -11818,7 +11818,7 @@ async function loadApp() {
       try {
         result = (await callBootstrap({ streamerId: requestedId })).data;
       } catch (error) {
-        // Older deployed bootstrap revisions still require the anonymous session;
+        //  Older deployed bootstrap revisions still require the anonymous session;
         // retry after Auth restores so a fresh visitor does not get stuck at startup.
         if (hadAuthAtBootstrap || !['functions/unauthenticated', 'unauthenticated'].includes(error.code)) throw error;
         await authReady;
@@ -11868,7 +11868,7 @@ async function loadApp() {
     } else {
       const page = result.page;
       page.isStreamerOwner = !!(result.verifiedStreamer && result.verifiedStreamer.id === page.streamer.id);
-      // 관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
+      //  관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
       installPageOwnership(page, page.isStreamerOwner || result.isAdmin === true);
       setVisibleView(page);
       openTamagotchiAdminFromDeepLink();
