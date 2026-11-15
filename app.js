@@ -8720,7 +8720,8 @@ function videoLibraryCategorySelect(categories, selectedId, label) {
 
 function openVideoLibraryAddDialog(page) {
   const state = videoLibraryStateFor(page.streamer.id);
-  const editableCategories = state.categories.filter((category) => category.sourceType !== 'cinety');
+  //  창을 연 채 카테고리를 추가해도 바로 고를 수 있게, 그릴 때마다 최신 카테고리 목록을 다시 읽는다.
+  let editableCategories = state.categories.filter((category) => category.sourceType !== 'cinety');
   const dialog = document.createElement('dialog');
   dialog.className = 'account-dialog video-library-add-dialog';
   dialog.setAttribute('aria-labelledby', 'videoLibraryAddTitle');
@@ -8731,6 +8732,7 @@ function openVideoLibraryAddDialog(page) {
   let feedbackKind = 'success';
 
   const render = () => {
+    editableCategories = state.categories.filter((category) => category.sourceType !== 'cinety');
     card.replaceChildren();
     const header = document.createElement('div'); header.className = 'video-library-add-dialog-heading';
     const headingCopy = document.createElement('div');
@@ -8741,7 +8743,7 @@ function openVideoLibraryAddDialog(page) {
       category: '새 하위 카테고리를 만들어요.',
       video: 'YouTube 또는 SOOP 다시보기 링크를 등록해요.',
       flashgame: '플래시게임 페이지 링크를 등록하면 제목과 썸네일을 자동으로 가져와요.',
-      channel: 'YouTube 채널의 공개 영상을 모두 가져와요.',
+      channel: 'YouTube 채널의 공개 영상 전체 또는 재생목록 하나를 가져와요.',
     }[mode] || '즐겨찾기에 항목을 추가해요.');
     headingCopy.append(eyebrow, title, description);
     const close = document.createElement('button'); close.type = 'button'; close.className = 'button video-library-add-dialog-close';
@@ -8779,7 +8781,7 @@ function openVideoLibraryAddDialog(page) {
       addOption('category', '▦', '카테고리', '영상을 주제별로 나눌 새 카테고리');
       addOption('video', '▶', '영상', editableCategories.length ? 'YouTube 또는 SOOP 다시보기 링크' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
       addOption('flashgame', '✦', '플래시게임', editableCategories.length ? '게임 페이지 제목과 썸네일을 자동으로 등록' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
-      if (uiCan(state.isAdmin)) addOption('channel', '▣', 'YouTube 채널', editableCategories.length ? '채널의 전체 공개 영상 가져오기' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
+      if (uiCan(state.isAdmin)) addOption('channel', '▣', 'YouTube 채널·재생목록', editableCategories.length ? '채널 전체 또는 재생목록의 공개 영상 가져오기' : '먼저 직접 관리할 카테고리를 추가해 주세요.', !editableCategories.length);
       card.append(options);
       if (!editableCategories.length) {
         const hint = document.createElement('p'); hint.className = 'video-library-add-dialog-hint';
@@ -9186,7 +9188,7 @@ function renderVideoLibraryItems(page, section, state) {
       if (play instanceof HTMLButtonElement) { play.type = 'button'; play.disabled = isCinety && item.isUnavailable; }
       play.setAttribute('aria-label', isCinety ? `${item.title} 서비스 종료` : `${item.title} 재생`);
       if (!isCinety) play.addEventListener('click', () => {
-        if (item.platform === 'youtube') openYouTubePlayer({ id: item.videoId, title: item.title });
+        if (item.platform === 'youtube') openYouTubePlayer({ id: item.videoId, title: item.title, noBroadcast: NO_BROADCAST_YOUTUBE_CHANNELS.has(item.channelId) });
         else openVodPlayer({ id: item.videoId, title: item.title });
       });
     }
@@ -9280,7 +9282,7 @@ async function loadVideoLibrary(page, options = {}) {
       ...(searchMode ? { query: searchQuery } : {}),
       categoryId: state.categoryId || '', cursor, limit: 24,
     });
-    //  검색·다음 쪽이 아닌 첫 쪽은 모두에게 같아 공개 파일(10분)을 먼저 쓴다(관리자 제외).
+    // 검색·다음 쪽이 아닌 첫 쪽은 모두에게 같아 공개 파일(10분)을 먼저 쓴다(관리자 제외).
     const result = (!searchMode && !cursor && !isAdminUser
       ? await fanFileOrCall(page.streamer.id, `list-${state.categoryId || 'all'}`, 10 * 60 * 1000, (file) => file.library, callLibrary, '_library')
       : await callLibrary()).data;
@@ -9792,7 +9794,7 @@ function renderGallerySection(page) {
 
 function weeklyScheduleWeekTitle(streamerName, weekStart) {
   const monday = parseLocalDateKey(weekStart);
-  // 목요일이 포함된 달을 해당 주의 달로 사용해 월 경계를 넘는 주도 일정하게 표시한다.
+  //  목요일이 포함된 달을 해당 주의 달로 사용해 월 경계를 넘는 주도 일정하게 표시한다.
   const reference = new Date(monday); reference.setDate(reference.getDate() + 3);
   const firstDay = new Date(reference.getFullYear(), reference.getMonth(), 1);
   const mondayOffset = (firstDay.getDay() + 6) % 7;
@@ -9810,13 +9812,13 @@ function formatWeeklyScheduleDate(date) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 }
 
-//  템플릿별 입력 그리드(원본 1672×941px 기준)는 weekly-schedule-templates.mjs에 있다.
-// 여기서는 모든 템플릿이 같은 이미지 크기만 공유한다.
+// 템플릿별 입력 그리드(원본 1672×941px 기준)는 weekly-schedule-templates.mjs에 있다.
+//  여기서는 모든 템플릿이 같은 이미지 크기만 공유한다.
 const WEEKLY_SCHEDULE_LAYOUT = Object.freeze({ width: WEEKLY_WIDTH, height: WEEKLY_HEIGHT });
 function weeklyTemplateOf(state) {
   return weeklyTemplate(isWeeklyTemplateId(state?.templateId) ? state.templateId : 'default');
 }
-//  아바타 칸의 모서리·모양(둥근 모서리, 텐트 모양 등)을 템플릿에 맞춘다.
+// 아바타 칸의 모서리·모양(둥근 모서리, 텐트 모양 등)을 템플릿에 맞춘다.
 function applyWeeklyAvatarShape(element, avatarLayout) {
   element.style.borderRadius = avatarLayout.radius ? `${avatarLayout.radius / WEEKLY_SCHEDULE_LAYOUT.width * 100}cqw` : '';
   element.style.clipPath = avatarLayout.clip
@@ -9829,7 +9831,7 @@ function applyWeeklyInkVars(element, template) {
   element.style.setProperty('--w-content-ink', template.ink.content);
   element.style.setProperty('--w-offline-ink', template.ink.offlineDisplay);
 }
-// 템플릿이 바뀔 때 아바타·이전/다음 화살표 위치를 다시 맞춘다.
+//  템플릿이 바뀔 때 아바타·이전/다음 화살표 위치를 다시 맞춘다.
 function positionWeeklyStage(template, { avatar, previous, next, hitArea }) {
   const layout = template.layout;
   [avatar, hitArea].filter(Boolean).forEach((element) => {
@@ -10007,7 +10009,7 @@ function loadWeeklySchedulePageData(page, weekStart, board, options = {}) {
   return promise;
 }
 
-//  팬(관리 권한 없음)은 공개 방송표 파일을 먼저 읽고, 없으면 공개 응답 하나로 받는다(SOOP 일정까지 서버에서 합쳐 줌).
+// 팬(관리 권한 없음)은 공개 방송표 파일을 먼저 읽고, 없으면 공개 응답 하나로 받는다(SOOP 일정까지 서버에서 합쳐 줌).
 async function loadFanWeeklySchedule(page, weekStart) {
   const file = await loadPublicFanPageFile(page.streamer.id, `week-${weekStart}`, 10 * 60 * 1000);
   if (file && file.weekly) return file.weekly;
@@ -10270,7 +10272,7 @@ function renderCalendarSection(page) {
   return section;
 }
 
-// ── 고급 템플릿 특수효과 ─────────────────────────────────────────────
+//  ── 고급 템플릿 특수효과 ─────────────────────────────────────────────
 //  캔버스 위에 얹는 장식 레이어라 PNG 저장에는 들어가지 않고, 클릭·입력은 그대로 통과한다.
 const weeklyFxPointerQuery = window.matchMedia?.('(hover: hover) and (pointer: fine)');
 const weeklyFxReducedQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -10678,7 +10680,7 @@ function renderWeeklyScheduleDialog(page) {
   categoryLabel.append(category);
   const fileLabel = document.createElement('label'); fileLabel.className = 'profile-editor-field'; fileLabel.textContent = '이미지 파일';
   const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
-  //  파일 선택기 취소도 cancel 이벤트를 발생시킨다. 이 이벤트가 모달의 Esc 취소 처리로
+  // 파일 선택기 취소도 cancel 이벤트를 발생시킨다. 이 이벤트가 모달의 Esc 취소 처리로
   // 전달되는 브라우저에서도 부모 편집 모달이 닫히지 않도록 입력 요소에서 차단한다.
   fileInput.addEventListener('cancel', (event) => event.stopPropagation());
   fileLabel.append(fileInput); uploadFields.append(categoryLabel, fileLabel);
@@ -11290,7 +11292,7 @@ function renderWeeklyScheduleDialog(page) {
     const date = parseLocalDateKey(state.weekStart); date.setDate(date.getDate() + offset * 7);
     const nextWeekStart = localDateKey(date);
 
-    // 화면의 주차와 날짜부터 바꾸고, 저장·불러오기는 그 뒤에 진행한다.
+    //  화면의 주차와 날짜부터 바꾸고, 저장·불러오기는 그 뒤에 진행한다.
     state.weekNavigationBusy = true;
     setNavigationBusy(true);
     state.weekStart = nextWeekStart;
@@ -11447,7 +11449,7 @@ function renderWeeklyScheduleDialog(page) {
   };
   close.addEventListener('click', closeAndSave);
   dialog.addEventListener('cancel', (event) => {
-    //  자식 갤러리 모달이나 파일 선택기에서 올라온 취소는 편집 모달 취소로 처리하지 않는다.
+    // 자식 갤러리 모달이나 파일 선택기에서 올라온 취소는 편집 모달 취소로 처리하지 않는다.
     if (event.target !== dialog) return;
     event.preventDefault(); void closeAndSave();
   });
@@ -11944,7 +11946,11 @@ function renderYouTubePlayerDialog() {
   note.textContent = '영상은 YouTube 공식 플레이어로 재생돼요. 외부 재생이 제한된 영상은 YouTube에서 열어 주세요.';
   const link = document.createElement('a'); link.id = 'youtubePlayerExternalLink'; link.className = 'button button-primary';
   link.href = 'https://www.youtube.com/'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'YouTube에서 열기 ↗';
-  footer.append(note, link); card.append(heading, frame, footer); dialog.append(card);
+  footer.append(note, link);
+  const broadcastWarning = document.createElement('p'); broadcastWarning.id = 'youtubePlayerBroadcastWarning';
+  broadcastWarning.className = 'youtube-broadcast-warning'; broadcastWarning.setAttribute('role', 'alert'); broadcastWarning.hidden = true;
+  broadcastWarning.textContent = '⚠️ 이 영상은 개인 시청용이에요. 라이브 방송에서 화면이나 소리를 송출(같이보기·배경음 포함)하면 저작권 침해가 될 수 있으니 방송 중에는 틀지 마세요.';
+  card.append(heading, broadcastWarning, frame, footer); dialog.append(card);
   volumeSlider.addEventListener('input', () => {
     const volume = setYouTubePlayerVolume(volumeSlider.value);
     if (volume > 0) youtubeLastAudibleVolume = volume;
@@ -12047,11 +12053,15 @@ function updateYouTubeVolumeControls() {
   muteButton.textContent = muted ? '소리 켜기' : '음소거';
 }
 
+//  라이브 방송 송출 허락이 없는 공식 채널(퍼가기 재생만 허용). 팬페이지 안에서 보는 건 괜찮지만 방송 화면 송출은 안 된다.
+const NO_BROADCAST_YOUTUBE_CHANNELS = new Set(['UCBTSkFNWmoOkBeZwANcbiIA']); // AniBox(대원방송) - 먼작귀 등
+
 function openYouTubePlayer(video) {
   if (!video || !/^[A-Za-z0-9_-]{11}$/.test(String(video.id || ''))) return;
   const id = encodeURIComponent(video.id);
   $('youtubePlayerTitle').textContent = video.title || 'YouTube 영상';
   $('youtubePlayerExternalLink').href = `https://www.youtube.com/watch?v=${id}`;
+  $('youtubePlayerBroadcastWarning').hidden = video.noBroadcast !== true;
   const dialog = $('youtubePlayerDialog');
   const frame = $('youtubePlayerFrame');
   const iframe = document.createElement('iframe');
@@ -12104,7 +12114,7 @@ function replaceVodSectionIfCurrent(streamerId) {
   if (section) section.replaceWith(renderVodSection(currentPage));
 }
 
-// 즐겨찾기 영상은 스케줄 대신 인증 스트리머가 접속할 때 서버가 오래된 채널 일부만 나눠 갱신한다.
+//  즐겨찾기 영상은 스케줄 대신 인증 스트리머가 접속할 때 서버가 오래된 채널 일부만 나눠 갱신한다.
 //  서버가 작업만 대기열에 올리고 바로 돌려주므로 화면은 기다리지 않고, 브라우저 세션당 한 번만 요청한다.
 async function startVideoLibraryAutoSyncOnVisit() {
   if (videoLibraryAutoSyncAttempted) return;
@@ -12242,7 +12252,7 @@ async function loadApp() {
   $('startupMessage').textContent = '로그인 상태와 인증된 스트리머 정보를 확인하고 있습니다.';
   try {
     let requestedId = routeId();
-    //  인증 스트리머 계정은 서버 확인을 기다리지 않고 바로 본인 팬페이지로 연결한다(서버가 뒤에서 다시 확인).
+    // 인증 스트리머 계정은 서버 확인을 기다리지 않고 바로 본인 팬페이지로 연결한다(서버가 뒤에서 다시 확인).
     const ownHint = readOwnStreamerHint();
     if (ownHint && ownHint !== requestedId) {
       history.replaceState(null, '', `#/p/${encodeURIComponent(ownHint)}`);
@@ -12254,7 +12264,7 @@ async function loadApp() {
     let needsOwnershipCheck = false;
     let shownFromSnapshot = false;
     if (requestedId) {
-      //  다시 방문: 저장해 둔 공개 사본을 먼저 그리고, 새 데이터가 오면 바뀐 경우에만 다시 그린다.
+      // 다시 방문: 저장해 둔 공개 사본을 먼저 그리고, 새 데이터가 오면 바뀐 경우에만 다시 그린다.
       const cachedPage = readPageCache(requestedId);
       if (cachedPage) {
         installPageOwnership(cachedPage, false);
@@ -12412,7 +12422,7 @@ $('closeLoginAssistTab').addEventListener('click', () => {
     if (!window.closed) $('loginAssistCloseStatus').textContent = '브라우저에서 자동 닫기를 허용하지 않으면 탭의 닫기 버튼을 눌러 주세요.';
   }, 200);
 });
-// 스트리머 인증 모달: SOOP 검색 → 선택 → 인증 신청 단계.
+//  스트리머 인증 모달: SOOP 검색 → 선택 → 인증 신청 단계.
 const VERIFY_SEARCH_DEBOUNCE_MS = 350;
 let verifySearchTimer = 0;
 let verifySearchSequence = 0;
