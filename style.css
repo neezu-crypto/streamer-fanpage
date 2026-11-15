@@ -2136,3 +2136,12 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .tg-care .tg-care
 .fp-tour-target { position: relative; z-index: 1; }
 .fp-tour-replay { min-height: 34px; font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { .fp-tour-ring { transition: none; } }
+/* 프로필 빈 칸(관리 화면)·완성도 막대·팬 화면 다시보기 링크 */
+.profile-field-empty .profile-field-value{color:var(--pink);font-weight:600;opacity:.85}
+.profile-field-empty{border-style:dashed}
+.profile-completion{margin:4px 0 14px;padding:12px 14px;border:1px dashed color-mix(in srgb,var(--pink) 45%,transparent);border-radius:14px;background:color-mix(in srgb,var(--pink) 6%,transparent)}
+.profile-completion-head{margin:0 0 8px;font-size:.92rem}
+.profile-completion-bar{height:8px;border-radius:999px;background:color-mix(in srgb,var(--pink) 15%,transparent);overflow:hidden}
+.profile-completion-bar span{display:block;height:100%;border-radius:inherit;background:var(--pink)}
+.profile-completion-note{margin:8px 0 0;font-size:.82rem;opacity:.75}
+.vod-empty-fan{display:flex;justify-content:flex-start;padding:4px 0 0}
