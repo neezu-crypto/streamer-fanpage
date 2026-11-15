@@ -11938,7 +11938,8 @@ function renderYouTubePlayerDialog() {
   const volumeOutput = document.createElement('output'); volumeOutput.id = 'youtubePlayerVolumeOutput';
   volumeOutput.htmlFor = volumeSlider.id; volumeOutput.textContent = `${youtubeVolumeLevel}%`;
   const muteButton = document.createElement('button'); muteButton.id = 'youtubePlayerMuteButton';
-  muteButton.type = 'button'; muteButton.className = 'button'; muteButton.textContent = '음소거'; muteButton.disabled = true;
+  muteButton.type = 'button'; muteButton.className = 'button youtube-mute-button'; muteButton.textContent = '🔊'; muteButton.disabled = true;
+  muteButton.setAttribute('aria-label', '음소거'); muteButton.title = '음소거';
   volumeControls.append(volumeLabel, volumeSlider, volumeOutput, muteButton);
   heading.append(title, volumeControls, close);
   const footer = document.createElement('div'); footer.className = 'vod-player-footer';
@@ -11959,11 +11960,13 @@ function renderYouTubePlayerDialog() {
       if (volume === 0) youtubePlayer.mute();
       else youtubePlayer.unMute();
     }
+    youtubeMuted = volume === 0;
     updateYouTubeVolumeControls();
   });
   muteButton.addEventListener('click', () => {
     if (!youtubePlayer) return;
-    if (youtubePlayer.isMuted()) {
+    if (youtubeMuted) {
+      youtubeMuted = false;
       const volume = youtubeVolumeLevel > 0 ? youtubeVolumeLevel : youtubeLastAudibleVolume;
       youtubeVolumeLevel = setYouTubePlayerVolume(volume);
       volumeSlider.value = String(volume);
@@ -11976,6 +11979,7 @@ function renderYouTubePlayerDialog() {
         youtubeVolumeLevel = volume;
       }
       youtubePlayer.mute();
+      youtubeMuted = true;
     }
     updateYouTubeVolumeControls();
   });
@@ -12040,23 +12044,29 @@ function loadYouTubeIframeApi() {
   return youtubeIframeApiPromise;
 }
 
+//  YouTube iframe API의 isMuted()는 mute()/unMute() 직후에도 이전 값을 돌려줘서(비동기 반영) 화면이 반대로 보였다.
+//  그래서 음소거 상태를 직접 들고 있고, 플레이어 준비 시점에만 실제 값으로 맞춘다.
+let youtubeMuted = false;
 function updateYouTubeVolumeControls() {
   const slider = $('youtubePlayerVolume');
   const output = $('youtubePlayerVolumeOutput');
   const muteButton = $('youtubePlayerMuteButton');
   if (!slider || !output || !muteButton || !youtubePlayer) return;
-  const muted = youtubePlayer.isMuted();
+  const muted = youtubeMuted;
   const volume = Math.round(Number(youtubePlayer.getVolume()) || youtubeVolumeLevel);
   if (volume > 0) youtubeLastAudibleVolume = volume;
   slider.value = String(youtubeVolumeLevel);
-  output.textContent = `${youtubeVolumeLevel}%${muted ? ' · 음소거' : ''}`;
-  muteButton.textContent = muted ? '소리 켜기' : '음소거';
+  output.textContent = `${youtubeVolumeLevel}%`;
+  //  아이콘 버튼이라 볼륨 줄 너비를 차지하지 않는다. 상태는 아이콘·라벨·aria-pressed로 알린다.
+  muteButton.textContent = muted ? '🔇' : '🔊';
+  muteButton.setAttribute('aria-label', muted ? '소리 켜기' : '음소거'); muteButton.title = muted ? '소리 켜기' : '음소거';
+  muteButton.setAttribute('aria-pressed', muted ? 'true' : 'false');
 }
 
-//  라이브 방송 송출 허락이 없는 공식 채널(퍼가기 재생만 허용). 팬페이지 안에서 보는 건 괜찮지만 방송 화면 송출은 안 된다.
+// 라이브 방송 송출 허락이 없는 공식 채널(퍼가기 재생만 허용). 팬페이지 안에서 보는 건 괜찮지만 방송 화면 송출은 안 된다.
 const NO_BROADCAST_YOUTUBE_CHANNELS = new Set(['UCBTSkFNWmoOkBeZwANcbiIA']); // AniBox(대원방송) - 먼작귀 등
 
-//  송출 금지 영상은 재생 전에 화면 가운데 안내 창으로 한 번 더 알린다. 확인을 눌러야 재생된다.
+// 송출 금지 영상은 재생 전에 화면 가운데 안내 창으로 한 번 더 알린다. 확인을 눌러야 재생된다.
 function confirmNoBroadcastVideo(video) {
   return new Promise((resolve) => {
     const dialog = document.createElement('dialog');
@@ -12130,6 +12140,7 @@ function openYouTubePlayer(video) {
           youtubePlayer = event.target;
           youtubePlayer.setVolume(youtubeVolumeLevel);
           if (youtubeVolumeLevel === 0) youtubePlayer.mute();
+          youtubeMuted = youtubeVolumeLevel === 0 || youtubePlayer.isMuted();
           $('youtubePlayerVolume').disabled = false;
           $('youtubePlayerMuteButton').disabled = false;
           $('youtubePlayerNote').textContent = '영상은 YouTube 공식 플레이어로 재생돼요. 아래 볼륨 조절은 쇼츠 화면에서도 사용할 수 있어요.';
@@ -12149,7 +12160,7 @@ function replaceVodSectionIfCurrent(streamerId) {
   if (section) section.replaceWith(renderVodSection(currentPage));
 }
 
-//  즐겨찾기 영상은 스케줄 대신 인증 스트리머가 접속할 때 서버가 오래된 채널 일부만 나눠 갱신한다.
+// 즐겨찾기 영상은 스케줄 대신 인증 스트리머가 접속할 때 서버가 오래된 채널 일부만 나눠 갱신한다.
 // 서버가 작업만 대기열에 올리고 바로 돌려주므로 화면은 기다리지 않고, 브라우저 세션당 한 번만 요청한다.
 async function startVideoLibraryAutoSyncOnVisit() {
   if (videoLibraryAutoSyncAttempted) return;
@@ -12299,7 +12310,7 @@ async function loadApp() {
     let needsOwnershipCheck = false;
     let shownFromSnapshot = false;
     if (requestedId) {
-      // 다시 방문: 저장해 둔 공개 사본을 먼저 그리고, 새 데이터가 오면 바뀐 경우에만 다시 그린다.
+      //  다시 방문: 저장해 둔 공개 사본을 먼저 그리고, 새 데이터가 오면 바뀐 경우에만 다시 그린다.
       const cachedPage = readPageCache(requestedId);
       if (cachedPage) {
         installPageOwnership(cachedPage, false);
@@ -12373,7 +12384,7 @@ async function loadApp() {
       writePageCache(requestedId, freshCopy);
       const unchanged = shownFromCache && shownFromCache === JSON.stringify(freshCopy);
       page.isStreamerOwner = !!(result.verifiedStreamer && result.verifiedStreamer.id === page.streamer.id);
-      // 관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
+      //  관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
       installPageOwnership(page, page.isStreamerOwner || result.isAdmin === true);
       if (!unchanged) setVisibleView(page);
       openTamagotchiAdminFromDeepLink();
@@ -12405,7 +12416,7 @@ async function loadApp() {
             && authenticated.verifiedStreamer.id === currentPage.streamer.id);
           installPageOwnership(currentPage, currentPage.isStreamerOwner || authenticated.isAdmin === true);
           let rerender = wasOwner !== currentPage.isOwner || wasStreamerOwner !== currentPage.isStreamerOwner;
-          //  정적 사본은 최대 30초 늦을 수 있어, 편집하는 사람(스트리머·관리자)은 서버 최신본으로 맞춘다.
+          // 정적 사본은 최대 30초 늦을 수 있어, 편집하는 사람(스트리머·관리자)은 서버 최신본으로 맞춘다.
           if (shownFromSnapshot && currentPage.canManage) {
             try {
               const latest = (await callBootstrap({ streamerId: requestedId })).data;
@@ -12503,7 +12514,7 @@ function selectVerifyStreamer(item) {
   $('submitStreamerVerification').focus({ preventScroll: true });
 }
 const VERIFY_AVATAR_PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#475569"/><circle cx="18" cy="14" r="6" fill="#cbd5e1"/><path d="M6 32c2-7 8-9 12-9s10 2 12 9z" fill="#cbd5e1"/></svg>');
-//  인증 모달 미리보기: 서버가 avatarUrl을 비워 보내도 SOOP 프로필 이미지 규칙으로 후보 주소를 만들고, 실패하면 차례로 대체한다.
+// 인증 모달 미리보기: 서버가 avatarUrl을 비워 보내도 SOOP 프로필 이미지 규칙으로 후보 주소를 만들고, 실패하면 차례로 대체한다.
 function verifyAvatarCandidates(item) {
   const id = String(item.soopId || '').toLowerCase();
   const urls = /^[a-z0-9]{2,20}$/.test(id)
