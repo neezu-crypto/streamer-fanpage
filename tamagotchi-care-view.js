@@ -403,6 +403,11 @@ export function mountCareView(container, {
       catch (error) { say(error.message || '치료하지 못했어요.'); btn.disabled = false; }
     });
     refs.treat.append(btn, why);
+    //  월드맵 펫 병원(진료표·병문안)으로 이어 준다. 공개 아이디만 주소에 싣는다.
+    const hospital = el('a', 'tg-care-hospital-link', '🏥 펫 병원에서 보기');
+    hospital.href = `${SHOP_BASE}tamagotchi-world.html?s=${encodeURIComponent(page.streamer.id)}&p=${encodeURIComponent(pet.petId)}#hospital`;
+    hospital.target = '_blank'; hospital.rel = 'noopener';
+    refs.treat.append(hospital);
   }
 
   // ---------- 도구 ----------
