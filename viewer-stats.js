@@ -1854,7 +1854,8 @@ function showStatsLinks(card, stats) {
   const curveToggle = document.createElement('button');
   curveToggle.type = 'button';
   curveToggle.className = 'viewer-stat-link viewer-curve-toggle';
-  curveToggle.textContent = '📈 그래프';
+  curveToggle.textContent = '📈';
+  curveToggle.title = '그래프';
   curveToggle.setAttribute('aria-label', (card._vod.title || '다시보기') + ' 시청자 그래프 미리보기');
   curveToggle.addEventListener('click', (event) => {
     event.preventDefault(); event.stopPropagation();
@@ -1962,7 +1963,15 @@ function attachCurvePeek(card) {
   card.addEventListener('focusout', (event) => { if (!card.contains(event.relatedTarget)) closeCurvePeek(card); });
   card.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeCurvePeek(card); });
 }
-window.addEventListener('scroll', () => { if (curvePeekCard && !window.matchMedia('(hover: none)').matches) closeCurvePeek(); }, { passive: true });
+window.addEventListener('scroll', () => { if (curvePeekCard) closeCurvePeek(); }, { passive: true });
+//  그래프 바깥(다른 카드·빈 곳)을 누르면 닫는다. 같은 카드의 📈 버튼은 자체 토글로 처리한다.
+document.addEventListener('pointerdown', (event) => {
+  if (!curvePeekCard) return;
+  const target = event.target;
+  if (curvePeek && curvePeek.contains(target)) return;
+  if (target && target.closest && target.closest('.viewer-curve-toggle') && curvePeekCard.contains(target)) return;
+  closeCurvePeek();
+}, { passive: true });
 window.addEventListener('resize', () => { if (curvePeekCard) positionCurvePeek(curvePeekCard); });
 
 function showQueueWaitMessage(card, loadToken) {
