@@ -1838,9 +1838,9 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 .vs-fx-card,.vs-fx-period,.vs-fx-vod{position:relative}
 .vs-fx-rise{animation:vs-fx-rise .4s ease both;animation-delay:var(--vs-fx-delay,0ms)}
 @keyframes vs-fx-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.vs-fx-crown{position:absolute;left:14px;top:-14px;font-size:22px;line-height:1;opacity:0;transform:translateY(-26px) rotate(-20deg);pointer-events:none;z-index:2}
+.vs-fx-crown{position:absolute;right:12px;top:8px;font-size:24px;line-height:1;opacity:0;transform:translateY(-18px) rotate(-20deg);pointer-events:none;z-index:2}
 .vs-fx-settled .vs-fx-crown{animation:vs-fx-crown .5s cubic-bezier(.3,1.5,.5,1) forwards}
-@keyframes vs-fx-crown{to{opacity:1;transform:rotate(-12deg)}}
+@keyframes vs-fx-crown{to{opacity:1;transform:rotate(12deg)}}
 .vs-fx-settled.vs-fx-gold{border-color:#e0a91b!important;box-shadow:0 6px 20px rgba(224,169,27,.22)}
 .vs-fx-settled.vs-fx-silver{border-color:#9aa6b8!important}
 .vs-fx-settled.vs-fx-bronze{border-color:#c07a45!important}
@@ -1879,4 +1879,4 @@ body.viewer-stats-page{--viewer-ink:#17243a;--viewer-muted:#637188;--viewer-soft
 .viewer-curve-peek-state{display:grid;place-items:center;height:96px;color:#637188;font-size:12px}
 .viewer-curve-toggle{display:none;grid-column:1/-1;min-height:40px!important;border:1px dashed #c9d3e6;background:#f7f9fd;color:#3659c2;font:inherit;font-weight:700;cursor:pointer}
 @media (hover:none){.viewer-curve-toggle{display:inline-flex;align-items:center;justify-content:center}}
-@media(prefers-reduced-motion:reduce){.vs-fx-rise,.vs-fx-flip,.vs-fx-vod-pop,.vs-fx-vod-pop .viewer-vod-main-action::after,.vs-fx-settled .vs-fx-crown,.vs-fx-best .vs-fx-stamp,.vs-fx-curve.is-drawn .vs-fx-pin,.vs-fx-curve.is-drawn .vs-fx-ring,.vs-fx-gold::after,.vs-fx-silver::after,.vs-fx-bronze::after{animation:none!important}.vs-fx-settled .vs-fx-crown{opacity:1;transform:rotate(-12deg)}.vs-fx-best .vs-fx-stamp{opacity:1;transform:rotate(-8deg)}.vs-fx-curve.is-drawn .vs-fx-pin{opacity:1}.viewer-curve-peek{transition:none}}
+@media(prefers-reduced-motion:reduce){.vs-fx-rise,.vs-fx-flip,.vs-fx-vod-pop,.vs-fx-vod-pop .viewer-vod-main-action::after,.vs-fx-settled .vs-fx-crown,.vs-fx-best .vs-fx-stamp,.vs-fx-curve.is-drawn .vs-fx-pin,.vs-fx-curve.is-drawn .vs-fx-ring,.vs-fx-gold::after,.vs-fx-silver::after,.vs-fx-bronze::after{animation:none!important}.vs-fx-settled .vs-fx-crown{opacity:1;transform:rotate(12deg)}.vs-fx-best .vs-fx-stamp{opacity:1;transform:rotate(-8deg)}.vs-fx-curve.is-drawn .vs-fx-pin{opacity:1}.viewer-curve-peek{transition:none}}
