@@ -136,7 +136,12 @@ export function mountCareView(container, {
     refs.bond = el('span', 'tg-care-chip'); refs.gems = el('span', 'tg-care-chip');
     refs.shopBtn = el('button', 'tg-care-chip tg-care-shop-btn', '🛍️ 보석 상점'); refs.shopBtn.type = 'button';
     refs.shopBtn.addEventListener('click', () => openGemShop());
-    const meta = el('div', 'tg-care-meta'); meta.append(refs.name, refs.bond, refs.gems, refs.shopBtn);
+    // 이름 바꾸기: 해당 팬페이지 인증 스트리머 본인에게만. 결제·확인은 훈련소의 이름 바꾸기 창에서 한다(첫 1회 무료).
+    refs.renameLink = null;
+    if (page.isStreamerOwner === true) {
+      refs.renameLink = el('a', 'tg-care-chip tg-care-rename', '✏️ 이름 바꾸기'); refs.renameLink.target = '_blank'; refs.renameLink.rel = 'noopener';
+    }
+    const meta = el('div', 'tg-care-meta'); meta.append(refs.name, ...(refs.renameLink ? [refs.renameLink] : []), refs.bond, refs.gems, refs.shopBtn);
     head.append(refs.picker, meta);
     if (callOverlay && canManage) {
       const tv = el('button', 'tg-care-icon-btn', '📺'); tv.type = 'button'; tv.title = '방송 오버레이'; tv.setAttribute('aria-label', '방송 오버레이');
@@ -539,6 +544,7 @@ export function mountCareView(container, {
     refs.toolBtns = null;
     pet = next; shown = {}; target = {}; refs.statRows = null; lastWarn = 0;
     refs.name.textContent = pet.nickname || '이름 없는 다마고치';
+    if (refs.renameLink) refs.renameLink.href = `${SHOP_BASE}tamagotchi-world.html?rename=${encodeURIComponent(pet.petId)}#train`;
     refs.picker.replaceChildren(...(pets.length > 1 ? pets.map((p) => {
       const b = el('button', 'tg-care-pick', p.nickname || p.petId); b.type = 'button'; b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', String(p.petId === pet.petId)); b.addEventListener('click', () => { if (p.petId !== pet.petId) void choose(p); });

@@ -4439,7 +4439,7 @@ function renderTamagotchiSection(page) {
     // ?tgpreview=1: 관리자 전용 미리보기(메모리 DB, 운영 저장 없음)
     const preview = isAdminUser === true && new URLSearchParams(location.search).get('tgpreview') === '1';
     Promise.all([
-      import('./tamagotchi-care-view.js?v=20261115-guide2'),
+      import('./tamagotchi-care-view.js?v=20261115-rename1'),
       preview ? import('./tamagotchi-care-preview.js?v=20261114-wear1').then((m) => m.createCarePreview(page)) : null,
     ]).then(([{ mountCareView }, mock]) => {
       if (currentPage?.streamer.id !== page.streamer.id) return;
@@ -4486,6 +4486,13 @@ function fanpageTabTourSteps(page, tabKey) {
       { target: q('.rolling-paper-topic-view'), waitClick: true, action: '"메시지 보기"를 눌러 보세요.', text: '주제를 열면 다른 팬들이 남긴 메시지를 볼 수 있어요.' },
       { target: q('.rolling-paper-topic-compose'), waitClick: true, action: '"메시지 남기기"를 눌러 보세요.', text: '나도 응원 메시지를 남겨 볼까요? 로그인이 필요하면 로그인 창이 열려요.' },
       { target: q('textarea[name="message"]'), text: '여기에 메시지를 적고 남기기를 누르면 롤링페이퍼에 붙어요. 지금 꼭 남기지 않아도 괜찮아요.' },
+    ] };
+  }
+  if (tabKey === 'tamagotchi' && page.isStreamerOwner) {
+    return { id: 'tamagotchi:owner', steps: [
+      { target: q('.tg-care-name'), timeout: 8000, text: '팬페이지의 다마고치예요. 팬들이 도구를 골라 함께 돌보고, 모은 하트 보석으로 꾸밀 수 있어요.' },
+      { target: q('.tg-care-rename'), text: '"이름 바꾸기"를 누르면 통합 상점 훈련소에서 새 이름을 정할 수 있어요. 분양 후 첫 1회는 무료예요.' },
+      { target: q('.tg-care-shop-btn'), optional: true, text: '보석 상점에서는 팬들이 모은 하트 보석으로 꾸미기를 살 수 있어요.' },
     ] };
   }
   if (tabKey === 'comment-up' && page.isOwner) {
