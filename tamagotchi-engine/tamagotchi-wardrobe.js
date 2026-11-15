@@ -59,7 +59,7 @@ async function petTransaction(db, sid, pid, now, mutate) {
     if (raw === null) return null;
     if (!raw || raw.status !== 'active') { failure = new Err('not-found', '펫을 찾을 수 없어요.'); return; }
     const pet = { ...raw };
-    const s = care.advance(raw.stats, now, care.napOpts(raw, now)); s.seenAt = now;
+    const s = care.advance(raw.stats, now, care.napOpts(raw, now)); s.actAt = now;
     try { mutate(pet, s); } catch (error) { failure = error; return; }
     pet.stats = s; petInfo = pet;
     return pet;
