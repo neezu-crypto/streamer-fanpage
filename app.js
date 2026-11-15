@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken as getAppCheckToken } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signInWithCustomToken, linkWithPopup, signOut, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
@@ -20,7 +20,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 //  App Check: 이 사이트(github.io)에서 온 요청만 서버가 받도록 토큰을 붙인다(고점체크와 같은 키). 2026-11-14
 //  같은 페이지의 다른 모듈(감정표현·점검 게이트)이 다시 초기화하지 않게 표시해 둔다.
-try { initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('6Ld0AfAtAAAAABcCio4_5AoiCdrjfM7_4riWiYXR'), isTokenAutoRefreshEnabled: true }); window.__seriesAppCheck = true; } catch (error) { console.warn('App Check 초기화 실패', error); }
+let appCheckInstance = null;
+try { appCheckInstance = initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('6Ld0AfAtAAAAABcCio4_5AoiCdrjfM7_4riWiYXR'), isTokenAutoRefreshEnabled: true }); window.__seriesAppCheck = true; } catch (error) { console.warn('App Check 초기화 실패', error); }
 const auth = getAuth(app);
 const db = getDatabase(app);
 // 주식 시세·스파크라인 전용 참조. 이전 데이터 대조가 끝나는 전환 배포 전까지
@@ -34,6 +35,71 @@ function authenticatedCallable(name, options) {
   return (data, callOptions) => ensureAuthReady().then(() => callable(data, callOptions));
 }
 const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
+//  빠른 첫 화면: 공개 팬페이지 데이터는 로그인 복원을 기다리지 않고 받는다(App Check 토큰만 붙임).
+//  로그인 계정의 권한(내 팬페이지인지·관리자인지)은 그 뒤 ownershipOnly 호출로 따로 확인한다. 권한 판정은 계속 서버가 한다.
+const BOOTSTRAP_URL = 'https://us-central1-soop-stock-market.cloudfunctions.net/streamerFanPageBootstrap';
+async function callPublicBootstrap(streamerId) {
+  let token = '';
+  try { token = appCheckInstance ? (await getAppCheckToken(appCheckInstance, false)).token : ''; } catch { token = ''; }
+  const response = await fetch(BOOTSTRAP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Firebase-AppCheck': token } : {}) },
+    body: JSON.stringify({ data: { streamerId } }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body.error) {
+    const status = String(body.error?.status || 'internal').toLowerCase().replace(/_/g, '-');
+    throw Object.assign(new Error(body.error?.message || '팬페이지를 불러오지 못했어요.'), { code: `functions/${status}` });
+  }
+  return body.result || {};
+}
+//  다시 방문할 때 바로 보여 줄 공개 팬페이지 사본(이 브라우저에만, 공개 정보만, 7일·최근 5곳).
+const PAGE_CACHE_PREFIX = 'fanpageCache.v1:';
+const PAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const PAGE_CACHE_MAX_ENTRIES = 5;
+const PAGE_CACHE_MAX_CHARS = 400000;
+function publicPageCopy(page) {
+  const copy = JSON.parse(JSON.stringify(page || {}));
+  delete copy.designPass; // 이용권 여부는 주인·관리자에게만 주는 값이라 사본에 넣지 않는다
+  return copy;
+}
+function readPageCache(streamerId) {
+  try {
+    const raw = localStorage.getItem(PAGE_CACHE_PREFIX + streamerId);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved || !saved.page || Date.now() - Number(saved.at || 0) > PAGE_CACHE_TTL_MS) { localStorage.removeItem(PAGE_CACHE_PREFIX + streamerId); return null; }
+    return saved.page;
+  } catch { return null; }
+}
+function removePageCache(streamerId) { try { localStorage.removeItem(PAGE_CACHE_PREFIX + streamerId); } catch { /* 무시 */ } }
+function writePageCache(streamerId, page) {
+  try {
+    const raw = JSON.stringify({ at: Date.now(), page });
+    if (raw.length > PAGE_CACHE_MAX_CHARS) return;
+    localStorage.setItem(PAGE_CACHE_PREFIX + streamerId, raw);
+    const entries = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key || !key.startsWith(PAGE_CACHE_PREFIX)) continue;
+      let at = 0; try { at = Number(JSON.parse(localStorage.getItem(key)).at) || 0; } catch { at = 0; }
+      entries.push([key, at]);
+    }
+    entries.sort((a, b) => b[1] - a[1]).slice(PAGE_CACHE_MAX_ENTRIES).forEach(([key]) => localStorage.removeItem(key));
+  } catch { /* 저장 공간이 없으면 사본 없이 동작 */ }
+}
+// 인증 스트리머 계정: 마지막으로 확인한 본인 팬페이지 아이디(이 브라우저에만). 다음 방문 때 바로 본인 페이지로 연결한다.
+//  서버가 로그인 계정을 다시 확인해 아니면 지우고 원래 흐름을 따른다(관리자는 저장하지 않음).
+const OWN_STREAMER_HINT_KEY = 'fanpageOwnStreamer.v1';
+function readOwnStreamerHint() {
+  try { const id = String(localStorage.getItem(OWN_STREAMER_HINT_KEY) || '').toLowerCase(); return /^[a-z0-9_]{2,20}$/.test(id) ? id : ''; } catch { return ''; }
+}
+function syncOwnStreamerHint(result) {
+  try {
+    if (result && result.verifiedStreamer && result.isAdmin !== true) localStorage.setItem(OWN_STREAMER_HINT_KEY, String(result.verifiedStreamer.id || '').toLowerCase());
+    else localStorage.removeItem(OWN_STREAMER_HINT_KEY);
+  } catch { /* 무시 */ }
+}
 const callSearch = authenticatedCallable('streamerFanPageSearch');
 const callRecent = authenticatedCallable('streamerFanPageRecent');
 const callAdminStats = authenticatedCallable('streamerFanPageAdminStats');
@@ -71,7 +137,7 @@ const callYouTubeVideos = authenticatedCallable('streamerFanPageYouTubeVideos');
 const callCafePosts = authenticatedCallable('streamerFanPageCafePosts');
 const callRoulette = authenticatedCallable('streamerFanPageRoulette');
 const callUpbo = authenticatedCallable('streamerFanPageUpbo');
-//  로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
+// 로그인 연결은 시리즈의 공유 Firebase Functions callable을 사용한다.
 const callLinkGoogle = authenticatedCallable('linkGoogleAccount');
 const callLinkKakao = authenticatedCallable('linkKakaoAccount');
 const callStreamerVerification = authenticatedCallable('requestStreamerVerification');
@@ -337,7 +403,7 @@ document.addEventListener('click', (event) => {
     if (activation?.button === button && performance.now() - activation.time < 60000) {
       activePointerSoundActivation = activation;
       pendingPointerSoundActivation = null;
-      //  Keep the second calendar press active through the browser's following dblclick event.
+      // Keep the second calendar press active through the browser's following dblclick event.
       window.setTimeout(() => {
         if (activePointerSoundActivation === activation) activePointerSoundActivation = null;
       }, activation.calendarDoublePress ? 800 : 0);
@@ -382,7 +448,7 @@ let isAdminUser = false;
 
 //  디자인 3 편집 모드: 인증 스트리머·관리자만 편집할 수 있고, 디자인 3에서는 기본이 "팬이 보는 화면"이다.
 // 편집 UI는 편집 모드를 켠 뒤에만 만들어지며(렌더링 자체를 하지 않음), 권한 판정은 서버가 하므로 이 값은 화면 구성에만 쓴다.
-//  디자인 1·2는 이 값과 무관하게 지금처럼 항상 편집 UI를 보인다.
+// 디자인 1·2는 이 값과 무관하게 지금처럼 항상 편집 UI를 보인다.
 const FANPAGE_EDIT_MODE_STORAGE_KEY = 'fanpageD3EditMode';
 let fanpageD3EditMode = (() => {
   try { return sessionStorage.getItem(FANPAGE_EDIT_MODE_STORAGE_KEY) === '1'; } catch { return false; }
@@ -392,7 +458,7 @@ function isFanpageLayoutThree(page) { return Number(page?.profile?.layoutDesign)
 function canOpenWeeklyScheduleEditor(page) {
   return page.isOwner === true || (isAdminUser && editUiAllowed(page)) || (isFanpageLayoutThree(page) && page.canManage === true);
 }
-// 디자인 1·2 "팬 화면으로 보기": 켜면 관리 권한자도 팬과 같은 화면(빈 칸 숨김·편집 도구 없음)을 본다. 이 탭에서만 유지.
+//  디자인 1·2 "팬 화면으로 보기": 켜면 관리 권한자도 팬과 같은 화면(빈 칸 숨김·편집 도구 없음)을 본다. 이 탭에서만 유지.
 const FANPAGE_FAN_PREVIEW_STORAGE_KEY = 'fanpageFanPreview';
 let fanpageFanPreview = (() => {
   try { return sessionStorage.getItem(FANPAGE_FAN_PREVIEW_STORAGE_KEY) === '1'; } catch { return false; }
@@ -401,9 +467,9 @@ function editUiAllowed(page = currentPage) {
   if (isFanpageLayoutThree(page)) return fanpageD3EditMode;
   return !fanpageFanPreview;
 }
-//  서버가 준 관리 권한 값(true)을 현재 화면(팬 화면/편집 화면)에 맞게 거른다.
+// 서버가 준 관리 권한 값(true)을 현재 화면(팬 화면/편집 화면)에 맞게 거른다.
 function uiCan(flag) { return flag === true && editUiAllowed(); }
-// page.isOwner는 읽을 때마다 "실제 관리 권한 && 편집 화면 여부"로 계산한다. 실제 권한은 page.canManage에 둔다.
+//  page.isOwner는 읽을 때마다 "실제 관리 권한 && 편집 화면 여부"로 계산한다. 실제 권한은 page.canManage에 둔다.
 function installPageOwnership(page, canManage) {
   page.canManage = canManage === true;
   Object.defineProperty(page, 'isOwner', {
@@ -782,6 +848,7 @@ async function logout() {
   try {
     await signOut(auth);
     localStorage.removeItem(KAKAO_LINKED_UID_KEY);
+    localStorage.removeItem(OWN_STREAMER_HINT_KEY);
     location.reload();
   } catch (error) {
     showToast(error.message || '로그아웃하지 못했어요.');
@@ -826,7 +893,7 @@ function showToast(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
 }
-//  SOOP 프로필 이미지는 계정에 따라 stimg 주소가 404인 경우가 있어, 같은 경로의 profile.img 주소를 먼저 시도하고 실패하면 stimg로 대체한다.
+// SOOP 프로필 이미지는 계정에 따라 stimg 주소가 404인 경우가 있어, 같은 경로의 profile.img 주소를 먼저 시도하고 실패하면 stimg로 대체한다.
 const SOOP_LOGO_URL_RE = /^https:\/\/(?:stimg|profile\.img)\.sooplive\.com(\/LOGO\/[A-Za-z0-9]{2}\/[A-Za-z0-9]+\/[A-Za-z0-9]+\.jpg)$/;
 function avatarUrlCandidates(url) {
   const raw = String(url || '');
@@ -2822,7 +2889,7 @@ function profileQuickEditDisplayValue(page, field) {
   return profileQuickEditValue(page, field);
 }
 
-// 관리 화면의 빈 칸 문구: 누르면 바로 채울 수 있다는 걸 보여 준다.
+//  관리 화면의 빈 칸 문구: 누르면 바로 채울 수 있다는 걸 보여 준다.
 function profileEmptyPrompt(field) {
   if (field === 'intro') return '＋ 소개 한 줄 쓰기';
   return `＋ ${PROFILE_QUICK_EDIT_FIELDS[field]?.label || '항목'} 추가`;
@@ -2991,16 +3058,16 @@ function renderKawaiiWelcome(page, onSectionNavigate = (sectionId) => {
   mascot.setAttribute('aria-pressed', 'false');
   const idle = document.createElement('img'); idle.className = 'fanpage-kawaii-mascot-idle';
   idle.src = usesDoodleMascot
-    ? 'assets/fanpage-doodle/design3-star-lamb-idle.png'
-    : 'assets/fanpage-kawaii/moon-bunny-idle.png';
+    ? 'assets/fanpage-doodle/design3-star-lamb-idle.webp'
+    : 'assets/fanpage-kawaii/moon-bunny-idle.webp';
   idle.alt = usesDoodleMascot
     ? '별을 든 작은 양 요정'
     : '별 머리핀을 한 작은 크림색 달토끼';
   idle.loading = 'lazy'; idle.decoding = 'async';
   const wink = document.createElement('img'); wink.className = 'fanpage-kawaii-mascot-wink';
   wink.src = usesDoodleMascot
-    ? 'assets/fanpage-doodle/design3-star-lamb-hover.png'
-    : 'assets/fanpage-kawaii/moon-bunny-wink.png';
+    ? 'assets/fanpage-doodle/design3-star-lamb-hover.webp'
+    : 'assets/fanpage-kawaii/moon-bunny-wink.webp';
   wink.alt = ''; wink.setAttribute('aria-hidden', 'true');
   wink.loading = 'lazy'; wink.decoding = 'async';
   mascot.append(idle, wink);
@@ -4396,7 +4463,7 @@ function renderTamagotchiApplication(page, section) {
   }
 
   if (state.stage === 'preparing') {
-    // 공개 전: 신청서·승인 카드 대신 준비 중 안내만 보여 준다.
+    //  공개 전: 신청서·승인 카드 대신 준비 중 안내만 보여 준다.
     const notice = document.createElement('div'); notice.className = 'tamagotchi-empty-state tamagotchi-preparing';
     const symbol = document.createElement('span'); symbol.className = 'tamagotchi-placeholder-symbol'; symbol.setAttribute('aria-hidden', 'true'); symbol.textContent = '✦';
     const heading = document.createElement('strong'); heading.textContent = '다마고치 분양소를 준비하고 있어요';
@@ -4482,7 +4549,7 @@ async function loadTamagotchiApplication(page, section, force = false) {
 function renderTamagotchiSection(page) {
   const section = document.createElement('section'); section.className = 'tamagotchi-section content-card';
   section.id = 'tamagotchiSection';
-  //  제목·설명은 탭 머리말(다마고치)에 한 번만 표시한다.
+  // 제목·설명은 탭 머리말(다마고치)에 한 번만 표시한다.
   section.setAttribute('aria-label', '다마고치');
   // 돌봄 화면(3-C). 디자인 신청서는 ✎ 아이콘 버튼 → 대화상자(스트리머·관리자만)
   const careHost = document.createElement('div'); careHost.className = 'tamagotchi-care-host';
@@ -4521,8 +4588,8 @@ function renderTamagotchiSection(page) {
   return section;
 }
 
-// ---- 인증 스트리머 첫 방문 "팬페이지 시작하기" 체크리스트 ----
-//  이미 있는 정보(소개 문구·디자인·노래/게임 목록)로 완료를 판정하고, 나머지는 한 번 열어 보면 완료로 친다.
+//  ---- 인증 스트리머 첫 방문 "팬페이지 시작하기" 체크리스트 ----
+// 이미 있는 정보(소개 문구·디자인·노래/게임 목록)로 완료를 판정하고, 나머지는 한 번 열어 보면 완료로 친다.
 // 진행 상태는 이 브라우저(localStorage)에만 둔다(서버 저장 없음). 다 하거나 닫으면 다시 보이지 않는다.
 const OWNER_CHECKLIST_KEY = 'streamerFanPage.ownerChecklist.v1';
 function ownerChecklistStore(streamerId) {
@@ -4532,7 +4599,7 @@ function ownerChecklistStore(streamerId) {
   const save = (next) => { try { all[streamerId] = next; localStorage.setItem(OWNER_CHECKLIST_KEY, JSON.stringify(all)); } catch { /* 저장 불가 브라우저는 매번 보임 */ } };
   return { get: () => ({ ...mine }), set: (patch) => { Object.assign(mine, patch); save(mine); } };
 }
-// 직접 해 봐야 하는 탭(롤링페이퍼·댓글 UP 체크)만 체험형 안내를 둔다. 보기 전용 탭은 머리말 한 줄로 충분하다.
+//  직접 해 봐야 하는 탭(롤링페이퍼·댓글 UP 체크)만 체험형 안내를 둔다. 보기 전용 탭은 머리말 한 줄로 충분하다.
 function fanpageTabTourSteps(page, tabKey) {
   const root = () => document.getElementById('fanpagePanel-' + tabKey);
   const q = (selector) => () => root()?.querySelector(selector);
@@ -4674,8 +4741,8 @@ function newDesignPassRequestId(streamerId) {
   }
   return { key, value };
 }
-//  디자인 3 미리보기(이용권 없음). 창을 닫아도 남은 시간 동안 화면에 유지하고, 끝나면 저장된 디자인으로 돌아간다.
-//  서버에는 아무것도 저장하지 않는다. 화면 갱신으로 디자인 창이 다시 만들어져도 저장된 디자인을 잃지 않도록 모듈에 보관한다.
+// 디자인 3 미리보기(이용권 없음). 창을 닫아도 남은 시간 동안 화면에 유지하고, 끝나면 저장된 디자인으로 돌아간다.
+// 서버에는 아무것도 저장하지 않는다. 화면 갱신으로 디자인 창이 다시 만들어져도 저장된 디자인을 잃지 않도록 모듈에 보관한다.
 let designPreview = null; // { streamerId, savedLayout, timer }
 function designPreviewSavedLayout(streamerId) {
   return designPreview && designPreview.streamerId === streamerId ? designPreview.savedLayout : null;
@@ -4767,7 +4834,7 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
   cancel.addEventListener('click', closeDialog);
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(); });
   dialog.addEventListener('close', () => dialog.remove());
-  //  잔액 조회: 창을 열 때, 충전 탭에서 돌아왔을 때(포커스·화면 복귀), 창이 열려 있는 동안 15초마다 다시 확인한다.
+  // 잔액 조회: 창을 열 때, 충전 탭에서 돌아왔을 때(포커스·화면 복귀), 창이 열려 있는 동안 15초마다 다시 확인한다.
   let checking = false; let firstCheck = true;
   const refreshBalance = () => {
     if (checking || busy || !dialog.isConnected) return;
@@ -4811,7 +4878,7 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
       showToast(data.status === 'owned' ? '이미 이용권이 있어요.' : '디자인 3 이용권을 구매했어요.');
       onPurchased?.({ alreadyOwned: data.status === 'owned' });
     } catch (error) {
-      // 확정 실패(잔액 부족·이미 환불됨 등)면 요청 번호를 버려 다음 시도가 새 번호로 결제되게 한다. 결과 불명(네트워크 등)은 같은 번호를 유지한다.
+      //  확정 실패(잔액 부족·이미 환불됨 등)면 요청 번호를 버려 다음 시도가 새 번호로 결제되게 한다. 결과 불명(네트워크 등)은 같은 번호를 유지한다.
       if (shouldDiscardPaymentRequest(error)) { try { sessionStorage.removeItem(request.key); } catch (_) { /* 무시 */ } }
       busy = false; cancel.disabled = false; pay.textContent = `${priceCash}캐시로 구매`;
       pay.disabled = false;
@@ -4859,7 +4926,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   const displayedLayout = [1, 2, 3].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
-  // 미리보기 중에 창이 다시 만들어진 경우에는 화면에 보이는 디자인이 아니라 마지막으로 저장된 디자인이 기준이다.
+  //  미리보기 중에 창이 다시 만들어진 경우에는 화면에 보이는 디자인이 아니라 마지막으로 저장된 디자인이 기준이다.
   const initialLayout = designPreviewSavedLayout(page.streamer.id) ?? displayedLayout;
   let draftLayout = displayedLayout;
   let saving = false;
@@ -4889,8 +4956,8 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     if (previewOnly) startDesignPreview(targetPage, initialLayout);
     else stopDesignPreview();
     // Re-rendering removes the dialog from the document. Close it first so the
-    // preserved instance can be attached and opened again without an
-    // InvalidStateError from showModal() on an already-open, detached dialog.
+    //  preserved instance can be attached and opened again without an
+    //  InvalidStateError from showModal() on an already-open, detached dialog.
     if (dialog.open) dialog.close();
     renderFanPage(targetPage, {
       preservedLayoutDesignDialog: dialog,
@@ -4918,7 +4985,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       return;
     }
     if (requestedLayout === 3 && !designPassOwned(targetPage)) {
-      //  이용권이 없는 디자인 3은 저장하지 않는다. 창만 닫고, 남은 미리보기 시간 동안은 화면에 유지한다.
+      // 이용권이 없는 디자인 3은 저장하지 않는다. 창만 닫고, 남은 미리보기 시간 동안은 화면에 유지한다.
       // 시간이 끝나면 endDesignPreview가 저장된 디자인으로 되돌린다.
       if (!designPreview) startDesignPreview(targetPage, initialLayout);
       dialog.close();
@@ -4941,17 +5008,17 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       if (savedLayout !== requestedLayout) {
         throw new Error('저장 결과에서 선택한 디자인을 확인하지 못했어요. 다시 시도해 주세요.');
       }
-      //  Keep the locally rendered page in sync with the server-normalized
-      //  response. This prevents a refresh/render race from putting the old
-      //  layout back on screen after a successful save.
+      // Keep the locally rendered page in sync with the server-normalized
+      // response. This prevents a refresh/render race from putting the old
+      // layout back on screen after a successful save.
       currentPage.profile = { ...(result.data.page.profile || {}), layoutDesign: requestedLayout };
       dialog.close();
-      // Previewing keeps this dialog instance alive across full page renders
+      //  Previewing keeps this dialog instance alive across full page renders
       // so its unsaved selection is not lost. Once the server accepts that
-      // selection, however, the old closure still has the former
+      //  selection, however, the old closure still has the former
       // `initialLayout` and may also retain its temporary disabled controls.
       // Replace it with a new instance based on the saved profile before the
-      //  user opens the design dialog again.
+      // user opens the design dialog again.
       renderFanPage(currentPage);
       showToast('페이지 디자인을 저장했어요.');
     } catch (error) {
@@ -5142,7 +5209,7 @@ function renderFanPage(page, options = {}) {
     ['major', '전공', profile.major], ['debutDate', '데뷔', profile.debutDate],
   ];
   // 디자인 3: 팬 화면에서는 비어 있는 프로필 칸을 숨긴다(편집 모드의 스트리머·관리자에게만 빈 칸을 보여 채우게 한다).
-  //  모든 디자인: 팬 화면에서는 빈 칸을 숨기고, 관리 화면에서만 "＋ 추가"로 보여 채우게 한다.
+  // 모든 디자인: 팬 화면에서는 빈 칸을 숨기고, 관리 화면에서만 "＋ 추가"로 보여 채우게 한다.
   const hideEmptyProfileFields = !page.isOwner;
   factRows.forEach(([field, labelText, value]) => {
     if (hideEmptyProfileFields && !value) return;
@@ -5397,7 +5464,7 @@ function renderFanPage(page, options = {}) {
     ['tamagotchi', createFanPageTabPanel(tabDefinitions[7], [tamagotchiSection])],
   ]);
   // 탭 줄이 화면 위에 붙어 있으면(아래로 읽던 중) 탭을 바꿀 때 새 탭의 시작이 탭 줄 바로 아래에 오게 옮긴다.
-  // 페이지 맨 위에서 누를 때는 움직이지 않는다. 처음 열기·빠른 이동처럼 코드가 부르는 전환에는 적용하지 않는다.
+  //  페이지 맨 위에서 누를 때는 움직이지 않는다. 처음 열기·빠른 이동처럼 코드가 부르는 전환에는 적용하지 않는다.
   const tabAnnouncer = document.createElement('p');
   tabAnnouncer.className = 'sr-only'; tabAnnouncer.setAttribute('aria-live', 'polite'); tabAnnouncer.setAttribute('role', 'status');
   function tabNavIsStuck() {
@@ -5465,7 +5532,7 @@ function renderFanPage(page, options = {}) {
     if (tabKey === 'comment-up') view.querySelector('#commentUpSection')?._load?.();
     if (tabKey === 'tamagotchi') tamagotchiSection._loadCare();
     runFanpageTabTour(page, tabKey);
-    // 다마고치 탭에서는 모바일 떠 있는 버튼을 작게 줄여 아래쪽 줄에 모은다(fanpage-mobile-actions.css).
+    //  다마고치 탭에서는 모바일 떠 있는 버튼을 작게 줄여 아래쪽 줄에 모은다(fanpage-mobile-actions.css).
     document.body.classList.toggle('fanpage-tamagotchi-tab', tabKey === 'tamagotchi');
     // 모바일은 모든 디자인에서 탭 바가 한 줄 가로 스크롤이므로 선택한 탭이 항상 보이도록 가운데로 맞춘다.
     if (tabNav.scrollWidth > tabNav.clientWidth + 1) {
@@ -5477,7 +5544,7 @@ function renderFanPage(page, options = {}) {
     }
     if (moveFocus) tabButtons.get(tabKey)?.focus({ preventScroll: true });
     if (wasStuck) scrollToTabStart(tabKey);
-    // 화면 읽기 프로그램: 새 탭 제목을 읽어 준다(포커스는 탭 버튼에 둔다).
+    //  화면 읽기 프로그램: 새 탭 제목을 읽어 준다(포커스는 탭 버튼에 둔다).
     if (fromUser) {
       const definition = tabDefinitions.find((item) => item.key === tabKey);
       tabAnnouncer.textContent = definition ? `${definition.label} 탭 · ${definition.title}` : '';
@@ -5486,7 +5553,7 @@ function renderFanPage(page, options = {}) {
   view._selectFanPageTab = selectFanPageTab;
   const ownerChecklist = renderOwnerChecklist(page, selectFanPageTab);
   view.append(...(ownerChecklist ? [ownerChecklist] : []), tabNav, tabAnnouncer, ...tabPanels.values());
-  // 한 줄 탭 바가 넘칠 때만 끝에 화살표를 보여 옆에 탭이 더 있다는 걸 알린다(폭과 무관).
+  //  한 줄 탭 바가 넘칠 때만 끝에 화살표를 보여 옆에 탭이 더 있다는 걸 알린다(폭과 무관).
   ['left', 'right'].forEach((dir) => {
     const more = document.createElement('button');
     more.type = 'button';
@@ -5522,7 +5589,7 @@ function renderFanPage(page, options = {}) {
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
 
-  //  디자인 3 미리보기는 팬 화면(편집 UI 없음)으로 다시 그려지므로, 열려 있던 디자인 창은 실제 관리 권한만 있으면 유지한다.
+  // 디자인 3 미리보기는 팬 화면(편집 UI 없음)으로 다시 그려지므로, 열려 있던 디자인 창은 실제 관리 권한만 있으면 유지한다.
   if ((page.isOwner || page.canManage === true) && options.preservedLayoutDesignDialog) {
     view.append(options.preservedLayoutDesignDialog);
     if (options.reopenLayoutDesignDialog) options.preservedLayoutDesignDialog.showModal();
@@ -5717,7 +5784,7 @@ function createFanPageQuickRemote(view) {
       const label = index === 0 ? '메인'
         : sectionLabels.find(([className]) => element.classList.contains(className))?.[1]
         || element.querySelector('h1, h2, h3')?.textContent.trim().replace(/\s+/g, ' ').slice(0, 18)
-        //  제목이 없는 섹션은 소속 탭 이름(명사)을 쓴다. 번호 이름("영역 N")은 쓰지 않는다.
+        // 제목이 없는 섹션은 소속 탭 이름(명사)을 쓴다. 번호 이름("영역 N")은 쓰지 않는다.
         || element.closest('.fanpage-tab-panel')?.querySelector('.fanpage-tab-panel-heading h2')?.textContent.trim()
         || '기타 항목';
       if (!element.id) element.id = `fanpage-quick-section-${index + 1}`;
@@ -5983,11 +6050,11 @@ function createFanPageQuickRemote(view) {
   mobileActions.append(stickerControl, toggle, fullscreenButton);
   remote.append(mobileActions, panel); view.append(remote, soundDialog);
 
-  // The design-3 paper-button stylesheet is intentionally broad.  The mobile
-  //  utility rail sits outside the normal card tree, so a later shorthand
-  //  background reset can otherwise erase its PNG art while leaving a clickable
-  // (but invisible) 58px button behind.  Apply the three art assets on the
-  // generated controls themselves as the final state for this one layout.
+  //  The design-3 paper-button stylesheet is intentionally broad.  The mobile
+  // utility rail sits outside the normal card tree, so a later shorthand
+  // background reset can otherwise erase its PNG art while leaving a clickable
+  //  (but invisible) 58px button behind.  Apply the three art assets on the
+  //  generated controls themselves as the final state for this one layout.
   const mobileIllustratedActions = [
     [toggle, 'assets/fanpage-doodle/mobile-action-quick.png'],
     [fullscreenButton, 'assets/fanpage-doodle/mobile-action-fullscreen.png'],
@@ -7955,7 +8022,7 @@ async function saveOpggAccount(page, appId, gameType, accountInput, regionSelect
   try {
     const result = (await callPlayedGames({
       // OP.GG accounts are unique per supported game type. Resolve the existing
-      // entry on the server by game type so stale client card IDs cannot block edits.
+      //  entry on the server by game type so stale client card IDs cannot block edits.
       action: 'save-opgg-account', streamerId: page.streamer.id, gameType,
       accountId: accountInput.value.trim(),
       ...(gameType === 'league-of-legends' ? { opggRegion: regionSelect?.value || 'kr' } : {}),
@@ -8098,7 +8165,7 @@ function commentUpGoalInputs(entry = {}) {
   });
 }
 
-//  목표 게이지: UP은 현재/목표, 등수는 목표 안이면 100%, 아니면 목표/현재
+// 목표 게이지: UP은 현재/목표, 등수는 목표 안이면 100%, 아니면 목표/현재
 function renderCommentUpGauge(kind, comment, goal, prev) {
   const wrap = document.createElement('div'); wrap.className = 'comment-up-gauge';
   const name = document.createElement('span'); name.className = 'comment-up-gauge-name'; name.textContent = kind === 'up' ? 'UP' : '등수';
@@ -8125,7 +8192,7 @@ function renderCommentUpGauge(kind, comment, goal, prev) {
   wrap.append(name, track, label);
   if (ratio >= 1) { const badge = document.createElement('span'); badge.className = 'comment-up-gauge-badge'; badge.textContent = '달성!'; wrap.append(badge); }
   else if (remain) { const small = document.createElement('small'); small.className = 'comment-up-gauge-remain'; small.textContent = remain; wrap.append(small); }
-  //  이전 값에서 새 값으로 차오르기(모션 줄이기는 CSS에서 전환 제거)
+  // 이전 값에서 새 값으로 차오르기(모션 줄이기는 CSS에서 전환 제거)
   fill.style.width = `${(prev[kind] ?? 0) * 100}%`;
   requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = `${ratio * 100}%`; }));
   prev[kind] = ratio;
@@ -9609,7 +9676,7 @@ function renderGallerySection(page) {
 
 function weeklyScheduleWeekTitle(streamerName, weekStart) {
   const monday = parseLocalDateKey(weekStart);
-  //  목요일이 포함된 달을 해당 주의 달로 사용해 월 경계를 넘는 주도 일정하게 표시한다.
+  // 목요일이 포함된 달을 해당 주의 달로 사용해 월 경계를 넘는 주도 일정하게 표시한다.
   const reference = new Date(monday); reference.setDate(reference.getDate() + 3);
   const firstDay = new Date(reference.getFullYear(), reference.getMonth(), 1);
   const mondayOffset = (firstDay.getDay() + 6) % 7;
@@ -9628,19 +9695,19 @@ function formatWeeklyScheduleDate(date) {
 }
 
 // 템플릿별 입력 그리드(원본 1672×941px 기준)는 weekly-schedule-templates.mjs에 있다.
-// 여기서는 모든 템플릿이 같은 이미지 크기만 공유한다.
+//  여기서는 모든 템플릿이 같은 이미지 크기만 공유한다.
 const WEEKLY_SCHEDULE_LAYOUT = Object.freeze({ width: WEEKLY_WIDTH, height: WEEKLY_HEIGHT });
 function weeklyTemplateOf(state) {
   return weeklyTemplate(isWeeklyTemplateId(state?.templateId) ? state.templateId : 'default');
 }
-//  아바타 칸의 모서리·모양(둥근 모서리, 텐트 모양 등)을 템플릿에 맞춘다.
+// 아바타 칸의 모서리·모양(둥근 모서리, 텐트 모양 등)을 템플릿에 맞춘다.
 function applyWeeklyAvatarShape(element, avatarLayout) {
   element.style.borderRadius = avatarLayout.radius ? `${avatarLayout.radius / WEEKLY_SCHEDULE_LAYOUT.width * 100}cqw` : '';
   element.style.clipPath = avatarLayout.clip
     ? `polygon(${avatarLayout.clip.map(([x, y]) => `${x * 100}% ${y * 100}%`).join(',')})`
     : '';
 }
-// 편집 화면의 입력칸(DOM) 글자색이 캔버스에 그리는 글자색과 같도록 CSS 변수로 전달한다.
+//  편집 화면의 입력칸(DOM) 글자색이 캔버스에 그리는 글자색과 같도록 CSS 변수로 전달한다.
 function applyWeeklyInkVars(element, template) {
   element.style.setProperty('--w-time-ink', template.ink.time);
   element.style.setProperty('--w-content-ink', template.ink.content);
@@ -10057,7 +10124,7 @@ function renderCalendarSection(page) {
   return section;
 }
 
-//  ── 고급 템플릿 특수효과 ─────────────────────────────────────────────
+// ── 고급 템플릿 특수효과 ─────────────────────────────────────────────
 // 캔버스 위에 얹는 장식 레이어라 PNG 저장에는 들어가지 않고, 클릭·입력은 그대로 통과한다.
 const weeklyFxPointerQuery = window.matchMedia?.('(hover: hover) and (pointer: fine)');
 const weeklyFxReducedQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -10466,7 +10533,7 @@ function renderWeeklyScheduleDialog(page) {
   const fileLabel = document.createElement('label'); fileLabel.className = 'profile-editor-field'; fileLabel.textContent = '이미지 파일';
   const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
   // 파일 선택기 취소도 cancel 이벤트를 발생시킨다. 이 이벤트가 모달의 Esc 취소 처리로
-  // 전달되는 브라우저에서도 부모 편집 모달이 닫히지 않도록 입력 요소에서 차단한다.
+  //  전달되는 브라우저에서도 부모 편집 모달이 닫히지 않도록 입력 요소에서 차단한다.
   fileInput.addEventListener('cancel', (event) => event.stopPropagation());
   fileLabel.append(fileInput); uploadFields.append(categoryLabel, fileLabel);
   const uploadNote = document.createElement('small'); uploadNote.className = 'weekly-schedule-upload-note';
@@ -10569,7 +10636,7 @@ function renderWeeklyScheduleDialog(page) {
   footerTextInput.maxLength = 48; footerTextInput.setAttribute('aria-label', '하단 리본 날짜 또는 문구');
   footerTextInput.title = '날짜 범위 또는 원하는 문구를 입력할 수 있어요.';
   previousWeek.classList.add('weekly-schedule-stage-previous'); nextWeek.classList.add('weekly-schedule-stage-next');
-  // 아바타 칸·화살표·하단 문구 입력칸·요일 칸은 템플릿마다 위치가 달라 applyEditorTemplateLayout이 맞춘다.
+  //  아바타 칸·화살표·하단 문구 입력칸·요일 칸은 템플릿마다 위치가 달라 applyEditorTemplateLayout이 맞춘다.
   function applyEditorTemplateLayout() {
     const tpl = weeklyTemplateOf(state);
     positionWeeklyStage(tpl, { previous: previousWeek, next: nextWeek, hitArea: avatarHitArea });
@@ -10916,7 +10983,7 @@ function renderWeeklyScheduleDialog(page) {
   function beginStarlightPreview(templateId) {
     try { state.entries = collectWeeklyEntries(); } catch (error) { templateSelect.value = state.templateId; saveStatus.textContent = error.message; return; }
     const label = weeklyTemplate(templateId).label;
-    //  이미 미리보기 중이면 시간을 늘리지 않고 템플릿만 바꿔 보여 준다.
+    // 이미 미리보기 중이면 시간을 늘리지 않고 템플릿만 바꿔 보여 준다.
     if (state.previewingStarlight && starlightPreviewTimer) {
       state.templateId = templateId; syncWeeklyFields(); $('calendarSection')?._drawWeeklyBoard?.(); return;
     }
@@ -11234,7 +11301,7 @@ function renderWeeklyScheduleDialog(page) {
   };
   close.addEventListener('click', closeAndSave);
   dialog.addEventListener('cancel', (event) => {
-    // 자식 갤러리 모달이나 파일 선택기에서 올라온 취소는 편집 모달 취소로 처리하지 않는다.
+    //  자식 갤러리 모달이나 파일 선택기에서 올라온 취소는 편집 모달 취소로 처리하지 않는다.
     if (event.target !== dialog) return;
     event.preventDefault(); void closeAndSave();
   });
@@ -11891,7 +11958,7 @@ function replaceVodSectionIfCurrent(streamerId) {
   if (section) section.replaceWith(renderVodSection(currentPage));
 }
 
-//  즐겨찾기 영상은 스케줄 대신 인증 스트리머가 접속할 때 서버가 오래된 채널 일부만 나눠 갱신한다.
+// 즐겨찾기 영상은 스케줄 대신 인증 스트리머가 접속할 때 서버가 오래된 채널 일부만 나눠 갱신한다.
 // 서버가 작업만 대기열에 올리고 바로 돌려주므로 화면은 기다리지 않고, 브라우저 세션당 한 번만 요청한다.
 async function startVideoLibraryAutoSyncOnVisit() {
   if (videoLibraryAutoSyncAttempted) return;
@@ -12015,6 +12082,11 @@ function showStartupError(error) {
   $('retryButton').textContent = isStreamerNotFound ? '스트리머 검색으로 이동' : '다시 불러오기';
   $('retryButton').classList.remove('hidden');
 }
+function revealFanpageShell() {
+  $('startupCover').classList.add('hidden');
+  $('siteShell').setAttribute('aria-hidden', 'false');
+  $('siteShell').classList.add('is-ready');
+}
 async function loadApp() {
   $('startupCover').classList.remove('is-error');
   $('startupCover').classList.remove('is-not-found');
@@ -12024,18 +12096,40 @@ async function loadApp() {
   $('startupMessage').textContent = '로그인 상태와 인증된 스트리머 정보를 확인하고 있습니다.';
   try {
     let requestedId = routeId();
-    const hadAuthAtBootstrap = !!auth.currentUser;
+    //  인증 스트리머 계정은 서버 확인을 기다리지 않고 바로 본인 팬페이지로 연결한다(서버가 뒤에서 다시 확인).
+    const ownHint = readOwnStreamerHint();
+    if (ownHint && ownHint !== requestedId) {
+      history.replaceState(null, '', `#/p/${encodeURIComponent(ownHint)}`);
+      requestedId = ownHint;
+    }
     const authReady = ensureAuthReady();
     let result;
+    let shownFromCache = '';
+    let needsOwnershipCheck = false;
     if (requestedId) {
+      //  다시 방문: 저장해 둔 공개 사본을 먼저 그리고, 새 데이터가 오면 바뀐 경우에만 다시 그린다.
+      const cachedPage = readPageCache(requestedId);
+      if (cachedPage) {
+        installPageOwnership(cachedPage, false);
+        cachedPage.isStreamerOwner = false;
+        setVisibleView(cachedPage);
+        revealFanpageShell();
+        shownFromCache = JSON.stringify(publicPageCopy(cachedPage));
+      }
       try {
-        result = (await callBootstrap({ streamerId: requestedId })).data;
+        result = await callPublicBootstrap(requestedId);
+        needsOwnershipCheck = true;
       } catch (error) {
-        // Older deployed bootstrap revisions still require the anonymous session;
-        //  retry after Auth restores so a fresh visitor does not get stuck at startup.
-        if (hadAuthAtBootstrap || !['functions/unauthenticated', 'unauthenticated'].includes(error.code)) throw error;
-        await authReady;
-        result = (await callBootstrap({ streamerId: requestedId })).data;
+        if (String(error.code || '').endsWith('not-found')) { removePageCache(requestedId); throw error; }
+        if (shownFromCache) {
+          console.warn('최신 팬페이지를 불러오지 못해 저장된 화면을 유지해요:', error.message || error);
+          result = { page: cachedPage, isAdmin: false, verifiedStreamer: null };
+          needsOwnershipCheck = true;
+        } else {
+          //  공개 호출이 안 되면 예전 방식(로그인 복원 후 호출)으로 한 번 더 시도한다.
+          await authReady;
+          result = (await callBootstrap({ streamerId: requestedId })).data;
+        }
       }
     } else {
       await authReady;
@@ -12046,10 +12140,11 @@ async function loadApp() {
       requestedId = result.redirectTo;
       result = (await callBootstrap({ streamerId: requestedId })).data;
     }
+    if (!needsOwnershipCheck && auth.currentUser && !auth.currentUser.isAnonymous) syncOwnStreamerHint(result);
     isAdminUser = result.isAdmin === true;
-    verifiedStreamerUid = result.verifiedStreamer ? auth.currentUser.uid : '';
+    verifiedStreamerUid = result.verifiedStreamer && auth.currentUser ? auth.currentUser.uid : '';
     verifiedStreamerProfile = result.verifiedStreamer || null;
-    verifiedStreamerProfileUid = result.verifiedStreamer ? auth.currentUser.uid : '';
+    verifiedStreamerProfileUid = result.verifiedStreamer && auth.currentUser ? auth.currentUser.uid : '';
     renderAuthControls();
     if (requestedId && !result.page) {
       throw Object.assign(new Error('팬페이지를 찾을 수 없습니다.'), { code: 'not-found' });
@@ -12080,20 +12175,24 @@ async function loadApp() {
       $('clearSearch').onclick = () => { $('searchInput').value = ''; runSearch(); $('searchInput').focus(); };
     } else {
       const page = result.page;
+      const freshCopy = publicPageCopy(page);
+      writePageCache(requestedId, freshCopy);
+      const unchanged = shownFromCache && shownFromCache === JSON.stringify(freshCopy);
       page.isStreamerOwner = !!(result.verifiedStreamer && result.verifiedStreamer.id === page.streamer.id);
-      //  관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
+      // 관리자는 서버가 권한을 확인한 경우에만 스트리머 시점의 설정 UI를 본다.
       installPageOwnership(page, page.isStreamerOwner || result.isAdmin === true);
-      setVisibleView(page);
+      if (!unchanged) setVisibleView(page);
       openTamagotchiAdminFromDeepLink();
       recentPromise.then((recent) => {
         if (currentPage && currentPage.streamer.id === page.streamer.id) {
           renderList($('recentPages'), recent, true, '최근 방문한 팬페이지가 여기에 표시돼요.');
         }
       });
-      if (!hadAuthAtBootstrap) {
+      if (needsOwnershipCheck) {
         void authReady.then(async (user) => {
           if (!user || routeId() !== requestedId) return;
-          const authenticated = (await callBootstrap({ streamerId: requestedId })).data;
+          const authenticated = (await callBootstrap({ streamerId: requestedId, ownershipOnly: true })).data;
+          if (!user.isAnonymous) syncOwnStreamerHint(authenticated);
           if (authenticated.redirectTo && authenticated.redirectTo !== requestedId) {
             history.replaceState(null, '', `#/p/${encodeURIComponent(authenticated.redirectTo)}`);
             void loadApp();
@@ -12105,6 +12204,7 @@ async function loadApp() {
           verifiedStreamerProfileUid = authenticated.verifiedStreamer ? user.uid : '';
           renderAuthControls();
           if (!currentPage || currentPage.streamer.id !== requestedId) return;
+          if (authenticated.designPass) currentPage.designPass = authenticated.designPass;
           const wasOwner = currentPage.isOwner;
           const wasStreamerOwner = currentPage.isStreamerOwner;
           currentPage.isStreamerOwner = !!(authenticated.verifiedStreamer
@@ -12118,9 +12218,7 @@ async function loadApp() {
       }
     }
     void waitForPageAssets();
-    $('startupCover').classList.add('hidden');
-    $('siteShell').setAttribute('aria-hidden', 'false');
-    $('siteShell').classList.add('is-ready');
+    revealFanpageShell();
     if (LOGIN_ASSIST_QUERY) {
       const loginUrl = new URL(location.href);
       loginUrl.searchParams.delete('login');
@@ -12229,7 +12327,7 @@ function renderVerifyResults(streamers) {
     avatar.width = 36; avatar.height = 36;
     avatar.loading = 'lazy';
     avatar.referrerPolicy = 'no-referrer';
-    //  이미지가 없는 계정도 목록 정렬이 흐트러지지 않도록 후보 주소를 차례로 시도한 뒤 기본 아이콘으로 대체한다.
+    // 이미지가 없는 계정도 목록 정렬이 흐트러지지 않도록 후보 주소를 차례로 시도한 뒤 기본 아이콘으로 대체한다.
     applyVerifyAvatar(avatar, item);
     const text = document.createElement('span'); text.className = 'verification-search-text';
     const strong = document.createElement('strong'); strong.textContent = item.nickname;
