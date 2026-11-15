@@ -26,6 +26,7 @@ let unlocked = false;
 let adminUnlocked = false;
 let pauseKnown = false;
 let paused = DEFAULT_PAUSED;
+let adminCheckPendingUser = null;
 let locked = false;
 let gate;
 let auth;
@@ -111,6 +112,7 @@ async function readPauseFlag() {
     if (!pauseKnown) { paused = DEFAULT_PAUSED; pauseKnown = true; }
   }
   applyState();
+  if (paused && !adminUnlocked && adminCheckPendingUser && auth && auth.currentUser === adminCheckPendingUser) void verify(adminCheckPendingUser);
 }
 
 function createGate() {
@@ -156,6 +158,9 @@ async function verify(user) {
     render('점검 중입니다. 관리자는 Google 계정으로 로그인해 정상 이용할 수 있습니다.');
     return;
   }
+  // 점검 중이 아닐 때는 관리자 확인 호출을 하지 않는다(서버 호출 절약). 점검으로 바뀌면 그때 확인한다.
+  if (!pauseKnown || !paused) { adminCheckPendingUser = user; return; }
+  adminCheckPendingUser = null;
   render('관리자 권한을 확인하고 있습니다.', false);
   try {
     const result = await checkAccess({});
