@@ -2150,3 +2150,10 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .tg-care .tg-care
 
 .youtube-broadcast-warning{margin:0 0 10px;padding:10px 12px;border:1px solid #f1b3b3;border-radius:12px;background:#fff1f1;color:#a12a2a;font-size:13px;font-weight:700;line-height:1.5}
 .youtube-broadcast-warning[hidden]{display:none}
+.no-broadcast-dialog-card{max-width:400px;padding:26px 24px 20px;text-align:center}
+.no-broadcast-icon{font-size:40px;line-height:1;margin-bottom:10px}
+.no-broadcast-dialog .no-broadcast-dialog-card h2{margin:0 0 10px;font-size:20px;color:#a12a2a}
+.no-broadcast-dialog .no-broadcast-dialog-card>p:not(.eyebrow){margin:0 0 8px;font-size:14px;line-height:1.6}
+.no-broadcast-dialog .no-broadcast-dialog-card>p.no-broadcast-tip{font-size:13px;opacity:.8}
+.no-broadcast-actions{display:flex;gap:8px;justify-content:center;margin-top:16px}
+.no-broadcast-actions .button{min-height:44px;padding:9px 16px}

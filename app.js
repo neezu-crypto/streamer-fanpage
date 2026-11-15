@@ -12056,8 +12056,43 @@ function updateYouTubeVolumeControls() {
 //  라이브 방송 송출 허락이 없는 공식 채널(퍼가기 재생만 허용). 팬페이지 안에서 보는 건 괜찮지만 방송 화면 송출은 안 된다.
 const NO_BROADCAST_YOUTUBE_CHANNELS = new Set(['UCBTSkFNWmoOkBeZwANcbiIA']); // AniBox(대원방송) - 먼작귀 등
 
+//  송출 금지 영상은 재생 전에 화면 가운데 안내 창으로 한 번 더 알린다. 확인을 눌러야 재생된다.
+function confirmNoBroadcastVideo(video) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'account-dialog no-broadcast-dialog';
+    dialog.setAttribute('aria-labelledby', 'noBroadcastTitle');
+    dialog.setAttribute('aria-describedby', 'noBroadcastBody');
+    const card = document.createElement('div'); card.className = 'account-dialog-card no-broadcast-dialog-card';
+    const icon = document.createElement('div'); icon.className = 'no-broadcast-icon'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = '📵';
+    const title = document.createElement('h2'); title.id = 'noBroadcastTitle'; title.textContent = '라이브 방송 송출 금지 영상이에요';
+    const body = document.createElement('p'); body.id = 'noBroadcastBody';
+    body.textContent = '이 영상은 개인 시청용이에요. 라이브 방송에서 화면이나 소리를 송출(같이보기·배경음 포함)하면 저작권 침해가 될 수 있으니 방송 중에는 틀지 마세요.';
+    const tip = document.createElement('p'); tip.className = 'no-broadcast-tip';
+    tip.textContent = '방송 중이라면 송출에 잡히지 않는 개인 헤드폰으로만 들어 주세요.';
+    const actions = document.createElement('div'); actions.className = 'no-broadcast-actions';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
+    const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'button button-primary'; ok.textContent = '확인했어요, 재생';
+    actions.append(cancel, ok);
+    card.append(icon, title, body, tip, actions); dialog.append(card);
+    let result = false;
+    const finish = (value) => { result = value; dialog.close(); };
+    cancel.addEventListener('click', () => finish(false));
+    ok.addEventListener('click', () => finish(true));
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) finish(false); });
+    dialog.addEventListener('close', () => { dialog.remove(); resolve(result); }, { once: true });
+    document.body.append(dialog);
+    dialog.showModal();
+    ok.focus();
+  });
+}
+
 function openYouTubePlayer(video) {
   if (!video || !/^[A-Za-z0-9_-]{11}$/.test(String(video.id || ''))) return;
+  if (video.noBroadcast === true && !video.broadcastConfirmed) {
+    void confirmNoBroadcastVideo(video).then((confirmed) => { if (confirmed) openYouTubePlayer({ ...video, broadcastConfirmed: true }); });
+    return;
+  }
   const id = encodeURIComponent(video.id);
   $('youtubePlayerTitle').textContent = video.title || 'YouTube 영상';
   $('youtubePlayerExternalLink').href = `https://www.youtube.com/watch?v=${id}`;
@@ -12115,7 +12150,7 @@ function replaceVodSectionIfCurrent(streamerId) {
 }
 
 //  즐겨찾기 영상은 스케줄 대신 인증 스트리머가 접속할 때 서버가 오래된 채널 일부만 나눠 갱신한다.
-//  서버가 작업만 대기열에 올리고 바로 돌려주므로 화면은 기다리지 않고, 브라우저 세션당 한 번만 요청한다.
+// 서버가 작업만 대기열에 올리고 바로 돌려주므로 화면은 기다리지 않고, 브라우저 세션당 한 번만 요청한다.
 async function startVideoLibraryAutoSyncOnVisit() {
   if (videoLibraryAutoSyncAttempted) return;
   videoLibraryAutoSyncAttempted = true;
@@ -12370,7 +12405,7 @@ async function loadApp() {
             && authenticated.verifiedStreamer.id === currentPage.streamer.id);
           installPageOwnership(currentPage, currentPage.isStreamerOwner || authenticated.isAdmin === true);
           let rerender = wasOwner !== currentPage.isOwner || wasStreamerOwner !== currentPage.isStreamerOwner;
-          // 정적 사본은 최대 30초 늦을 수 있어, 편집하는 사람(스트리머·관리자)은 서버 최신본으로 맞춘다.
+          //  정적 사본은 최대 30초 늦을 수 있어, 편집하는 사람(스트리머·관리자)은 서버 최신본으로 맞춘다.
           if (shownFromSnapshot && currentPage.canManage) {
             try {
               const latest = (await callBootstrap({ streamerId: requestedId })).data;
@@ -12422,7 +12457,7 @@ $('closeLoginAssistTab').addEventListener('click', () => {
     if (!window.closed) $('loginAssistCloseStatus').textContent = '브라우저에서 자동 닫기를 허용하지 않으면 탭의 닫기 버튼을 눌러 주세요.';
   }, 200);
 });
-//  스트리머 인증 모달: SOOP 검색 → 선택 → 인증 신청 단계.
+// 스트리머 인증 모달: SOOP 검색 → 선택 → 인증 신청 단계.
 const VERIFY_SEARCH_DEBOUNCE_MS = 350;
 let verifySearchTimer = 0;
 let verifySearchSequence = 0;
@@ -12468,7 +12503,7 @@ function selectVerifyStreamer(item) {
   $('submitStreamerVerification').focus({ preventScroll: true });
 }
 const VERIFY_AVATAR_PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#475569"/><circle cx="18" cy="14" r="6" fill="#cbd5e1"/><path d="M6 32c2-7 8-9 12-9s10 2 12 9z" fill="#cbd5e1"/></svg>');
-// 인증 모달 미리보기: 서버가 avatarUrl을 비워 보내도 SOOP 프로필 이미지 규칙으로 후보 주소를 만들고, 실패하면 차례로 대체한다.
+//  인증 모달 미리보기: 서버가 avatarUrl을 비워 보내도 SOOP 프로필 이미지 규칙으로 후보 주소를 만들고, 실패하면 차례로 대체한다.
 function verifyAvatarCandidates(item) {
   const id = String(item.soopId || '').toLowerCase();
   const urls = /^[a-z0-9]{2,20}$/.test(id)
@@ -12501,7 +12536,7 @@ function renderVerifyResults(streamers) {
     avatar.width = 36; avatar.height = 36;
     avatar.loading = 'lazy';
     avatar.referrerPolicy = 'no-referrer';
-    //  이미지가 없는 계정도 목록 정렬이 흐트러지지 않도록 후보 주소를 차례로 시도한 뒤 기본 아이콘으로 대체한다.
+    // 이미지가 없는 계정도 목록 정렬이 흐트러지지 않도록 후보 주소를 차례로 시도한 뒤 기본 아이콘으로 대체한다.
     applyVerifyAvatar(avatar, item);
     const text = document.createElement('span'); text.className = 'verification-search-text';
     const strong = document.createElement('strong'); strong.textContent = item.nickname;
