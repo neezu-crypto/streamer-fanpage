@@ -2123,3 +2123,15 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .tg-care .tg-care
 .owner-checklist-copy span { color: var(--muted, #7a6f66); font-size: 12px; }
 .owner-checklist-go { min-height: 40px; white-space: nowrap; }
 @media (max-width: 520px) { .owner-checklist-item { grid-template-columns: 24px 1fr; } .owner-checklist-go { grid-column: 2; justify-self: start; } }
+/* 체험형 탭 안내(fanpage-tour.mjs): 화면을 막지 않고 강조 테두리와 말풍선만 띄운다. */
+.fp-tour-ring { position: fixed; z-index: 9000; pointer-events: none; border: 3px solid #e87564; border-radius: 14px; box-shadow: 0 0 0 4px rgba(232, 117, 100, .25); transition: top .2s ease, left .2s ease, width .2s ease, height .2s ease; }
+.fp-tour-ring[hidden], .fp-tour-bubble[hidden] { display: none; }
+.fp-tour-bubble { position: fixed; z-index: 9001; box-sizing: border-box; padding: 14px 16px 12px; border: 2px solid #2f2a2c; border-radius: 16px; background: #fffdf8; color: #2f2a2c; box-shadow: 4px 5px 0 #2f2a2c; font-size: 14px; line-height: 1.5; }
+.fp-tour-bubble p { margin: 4px 0; }
+.fp-tour-step { color: #a0928a; font-size: 12px; font-weight: 700; }
+.fp-tour-hint { color: #c4513f; font-weight: 700; }
+.fp-tour-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.fp-tour-actions .button { min-height: 36px; }
+.fp-tour-target { position: relative; z-index: 1; }
+.fp-tour-replay { min-height: 34px; font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .fp-tour-ring { transition: none; } }
