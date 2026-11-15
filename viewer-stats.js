@@ -4,6 +4,7 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gst
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { createViewerStatsVisitNotifier } from './viewer-stats-visit.mjs';
+import { countUp, celebrateRanking, celebratePeriods, celebrateVodCard, drawPeakCurve } from './viewer-stats-effects.mjs?v=20261115-fx1';
 import { VIEWER_SERVICES, serviceFromHash, nextTabIndex, hasAnyPaidUnlock, shouldShowAffiliate, mergeSponsorStrip, bugReportStateFromError } from './viewer-stats-ui.mjs?v=20261110-ui-v1';
 
 const firebaseConfig = {
@@ -1847,8 +1848,122 @@ function showStatsLinks(card, stats) {
   lowest.textContent = '최저 ' + Number(stats.lowest.viewers).toLocaleString('ko-KR') + '명 · ' + formatClock(stats.lowest.second);
   lowest.title = '이 다시보기에서 최저 시청자 수가 기록된 시점으로 이동합니다.';
   card._statsActions.append(highest, lowest);
+  card._highestLink = highest;
+  card._highestSecond = Number(stats.highest.second) || 0;
+  //  마우스가 없는 기기는 버튼으로 그래프 미리보기를 연다.
+  const curveToggle = document.createElement('button');
+  curveToggle.type = 'button';
+  curveToggle.className = 'viewer-stat-link viewer-curve-toggle';
+  curveToggle.textContent = '📈 그래프';
+  curveToggle.setAttribute('aria-label', (card._vod.title || '다시보기') + ' 시청자 그래프 미리보기');
+  curveToggle.addEventListener('click', (event) => {
+    event.preventDefault(); event.stopPropagation();
+    if (curvePeekCard === card) closeCurvePeek(card); else void openCurvePeek(card);
+  });
+  card._statsActions.append(curveToggle);
   card.dataset.statsState = 'ready';
+  attachCurvePeek(card);
 }
+
+// ── 그래프 미리보기(마우스를 올리면 카드 옆에 ① 연출) ──
+//  그래프 요약은 처음 열 때만 서버에서 받고, 이 화면에서는 메모리에 두고 다시 쓴다.
+const curveCache = new Map();
+let curvePeek = null;
+let curvePeekCard = null;
+let curveHoverTimer = 0;
+function ensureCurvePeek() {
+  if (curvePeek) return curvePeek;
+  curvePeek = document.createElement('div');
+  curvePeek.className = 'viewer-curve-peek';
+  curvePeek.id = 'viewerCurvePeek';
+  curvePeek.setAttribute('role', 'tooltip');
+  document.body.append(curvePeek);
+  return curvePeek;
+}
+function positionCurvePeek(card) {
+  const peek = ensureCurvePeek();
+  const rect = card.getBoundingClientRect();
+  const width = Math.min(300, window.innerWidth - 24);
+  const height = peek.offsetHeight || 150;
+  const narrow = window.innerWidth < 760 || window.matchMedia('(hover: none)').matches;
+  let left; let top;
+  if (narrow) {
+    left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+    top = rect.bottom + 8;
+    if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 8);
+  } else {
+    left = rect.right + 12;
+    if (left + width > window.innerWidth - 12) left = rect.left - 12 - width;
+    if (left < 12) left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+    top = Math.max(8, Math.min(rect.top + rect.height / 2 - height / 2, window.innerHeight - height - 8));
+  }
+  Object.assign(peek.style, { left: left + 'px', top: top + 'px', width: width + 'px' });
+}
+function loadCurve(card) {
+  const streamerId = selectedStreamer && selectedStreamer.soopId;
+  const key = streamerId + ':' + card._vod.id;
+  if (!curveCache.has(key)) {
+    curveCache.set(key, callViewerStats({ action: 'statsCurve', streamerId, vodId: String(card._vod.id) })
+      .then((result) => (result.data && result.data.curve) || null)
+      .catch((error) => { curveCache.delete(key); throw error; }));
+  }
+  return curveCache.get(key);
+}
+async function openCurvePeek(card) {
+  if (card.dataset.statsState !== 'ready' || !selectedStreamer) return;
+  const peek = ensureCurvePeek();
+  curvePeekCard = card;
+  const chart = document.createElement('div');
+  const state = document.createElement('div');
+  state.className = 'viewer-curve-peek-state'; state.textContent = '그래프 준비 중…';
+  chart.append(state);
+  const head = document.createElement('div');
+  head.className = 'viewer-curve-peek-head';
+  const peakText = Number(card._peakViewers || 0).toLocaleString('ko-KR') + '명';
+  const amount = document.createElement('strong'); amount.textContent = peakText;
+  const label = document.createElement('span'); label.textContent = '최고 · ' + formatClock(card._highestSecond);
+  head.append(amount, label);
+  peek.replaceChildren(chart, head);
+  peek.setAttribute('aria-label', (card._vod.title || '다시보기') + ' 시청자 그래프, 최고 ' + peakText + ' · ' + formatClock(card._highestSecond));
+  positionCurvePeek(card);
+  peek.classList.add('is-open');
+  card.setAttribute('aria-describedby', peek.id);
+  let curve = null; let failed = false;
+  try { curve = await loadCurve(card); } catch (_) { failed = true; }
+  if (curvePeekCard !== card) return;
+  if (curve) {
+    drawPeakCurve(chart, curve);
+    countUp(amount, card._peakViewers, { ms: 500, finalText: peakText });
+  } else {
+    state.textContent = failed ? '그래프를 불러오지 못했어요. 잠시 후 다시 올려 주세요.' : '이 다시보기는 그래프 정보가 없어요.';
+  }
+  positionCurvePeek(card);
+}
+function closeCurvePeek(card) {
+  clearTimeout(curveHoverTimer);
+  if (card && curvePeekCard !== card) return;
+  if (curvePeekCard) curvePeekCard.removeAttribute('aria-describedby');
+  curvePeekCard = null;
+  curvePeek?.classList.remove('is-open');
+}
+function attachCurvePeek(card) {
+  if (card._curvePeekAttached) return;
+  card._curvePeekAttached = true;
+  card.addEventListener('mouseenter', () => {
+    if (window.matchMedia('(hover: none)').matches) return;
+    clearTimeout(curveHoverTimer);
+    curveHoverTimer = setTimeout(() => { void openCurvePeek(card); }, 150);
+  });
+  card.addEventListener('mouseleave', () => closeCurvePeek(card));
+  card.addEventListener('focusin', (event) => {
+    if (event.target && event.target.classList && event.target.classList.contains('viewer-curve-toggle')) return;
+    if (curvePeekCard !== card) void openCurvePeek(card);
+  });
+  card.addEventListener('focusout', (event) => { if (!card.contains(event.relatedTarget)) closeCurvePeek(card); });
+  card.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeCurvePeek(card); });
+}
+window.addEventListener('scroll', () => { if (curvePeekCard && !window.matchMedia('(hover: none)').matches) closeCurvePeek(); }, { passive: true });
+window.addEventListener('resize', () => { if (curvePeekCard) positionCurvePeek(curvePeekCard); });
 
 function showQueueWaitMessage(card, loadToken) {
   if (!card.isConnected || loadToken !== activeLoadToken) return;
@@ -2404,6 +2519,11 @@ function renderComparisonResults(request, comparisons) {
   });
   results.append(heading, summary, grid);
   results.classList.remove('hidden');
+  //  연출: 고점이 높은 쪽 카드에 왕관(같으면 등장만), 차이·최고 시청자 숫자 올리기.
+  const ranked = [...grid.children].map((card, index) => ({ card, peak: peaks[index] })).sort((a, b) => b.peak - a.peak);
+  celebrateRanking(ranked.map((item) => item.card), { tie: peaks[0] === peaks[1], medals: 1 });
+  countUp(summaryValue, difference, { finalText: summaryValue.textContent, format: (n) => (peaks[0] === peaks[1] ? '' : '+') + Math.round(n).toLocaleString('ko-KR') + '명' });
+  grid.querySelectorAll('.is-peak strong').forEach((el, index) => countUp(el, peaks[index], { delay: 120, finalText: el.textContent, format: (n) => Math.round(n).toLocaleString('ko-KR') + '명' }));
 }
 
 function showComparisonError(error, request) {
@@ -2735,6 +2855,11 @@ function renderKeywordComparisonResults(request, comparisons) {
   });
   results.append(heading, summary, grid);
   results.classList.remove('hidden');
+  //  연출: 순위대로 올라오고 1위 왕관, 1~3위 금·은·동(1위와 고점이 같으면 왕관 없이 등장만).
+  const cards = [...grid.children];
+  const topPeaks = ordered.map((item) => Number(item.stats.highest.viewers) || 0);
+  celebrateRanking(cards, { tie: topPeaks.length > 1 && topPeaks[0] === topPeaks[1], medals: 3 });
+  grid.querySelectorAll('.is-peak strong').forEach((el, index) => countUp(el, topPeaks[index], { delay: 100 + index * 90, finalText: el.textContent, format: (n) => Math.round(n).toLocaleString('ko-KR') + '명' }));
 }
 
 function showKeywordComparisonError(error) {
@@ -2880,6 +3005,13 @@ function enqueueStats(card, vod, loadToken) {
     .then((stats) => {
       if (!card.isConnected || loadToken !== activeLoadToken) return;
       showStatsLinks(card, stats);
+      //  방금 직접 분석한 결과에만 연출(캐시·공개 파일에서 채운 카드는 그대로).
+      const highestText = card._highestLink ? card._highestLink.textContent : '';
+      celebrateVodCard(card);
+      if (card._highestLink) {
+        const suffix = highestText.replace(/^최고 [\d,]+명/, '');
+        countUp(card._highestLink, card._peakViewers, { ms: 650, finalText: highestText, format: (n) => '최고 ' + Math.round(n).toLocaleString('ko-KR') + '명' + suffix });
+      }
     })
     .catch(async (error) => {
       if (!card.isConnected || loadToken !== activeLoadToken) return;
@@ -3001,6 +3133,19 @@ function renderPeriodPeakCards(peaks, vodCounts, isScanning, isLocked = !canUseP
       card.append(empty);
     }
     grid.append(card);
+  });
+}
+
+//  기간별 연출: 4장이 차례로 뒤집히고, 1년 최고 기록이 처음 나온 가장 짧은 기간 카드에 "최고 기록" 도장.
+function celebratePeriodResult(peaks) {
+  const cards = [...$('viewerPeriodGrid').children];
+  const values = VIEWER_PEAK_PERIODS.map((period) => Number(peaks.get(period.days) && peaks.get(period.days).viewers) || 0);
+  const best = Math.max(0, ...values);
+  if (!best) return;
+  celebratePeriods(cards, values.indexOf(best));
+  cards.forEach((card, index) => {
+    const count = card.querySelector('.viewer-period-peak-count');
+    if (count && values[index]) countUp(count, values[index], { delay: index * 100, ms: 600, finalText: count.textContent, format: (n) => Math.round(n).toLocaleString('ko-KR') + '명' });
   });
 }
 
@@ -3385,6 +3530,7 @@ async function runPeriodPeakScan({ forceRefresh = false } = {}) {
     await Promise.all(Array.from({ length: Math.min(2, vodsToAnalyze.length) }, () => worker()));
     if (!isCurrentPeriodScan(scanToken, loadToken)) return;
     renderPeriodPeakCards(peaks, vodCounts, false);
+    celebratePeriodResult(peaks);
     const suffix = failed ? ' · 통계 미제공/오류 ' + failed.toLocaleString('ko-KR') + '개 제외' : '';
     const limitMessage = pageLimitReached ? ' · 다시보기 페이지 상한까지 확인해 일부가 빠질 수 있어요.' : '';
     const quotaMessage = rateLimitMessage
