@@ -5214,7 +5214,7 @@ function renderFanPage(page, options = {}) {
     { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 응원 메시지를 남겨 보세요.' },
     { key: 'memories', label: '기억의 순간', eyebrow: 'MEMORY MOMENTS', title: '기억의 순간', description: '100일·200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아봤어요.' },
     { key: 'comment-up', label: '댓글 UP 체크', eyebrow: 'COMMENT UP', title: '댓글 UP 체크', description: '등록한 게시글에서 남긴 댓글의 UP과 순위를 확인해요.' },
-    { key: 'tamagotchi', label: '다마고치', eyebrow: 'STREAMER TAMAGOTCHI', title: '다마고치', description: '스트리머 팬페이지에서 함께 키우는 다마고치를 준비하고 있어요.' },
+    { key: 'tamagotchi', label: '다마고치', eyebrow: 'STREAMER TAMAGOTCHI', title: '다마고치', description: '통합 상점에서 분양받은 다마고치를 팬과 함께 돌보고 키워요.' },
   ];
   const tabNav = document.createElement('div');
   tabNav.className = 'fanpage-tab-nav';
