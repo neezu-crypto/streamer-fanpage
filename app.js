@@ -8853,10 +8853,10 @@ function openVideoLibraryAddDialog(page) {
       const categoryLabel = document.createElement('label'); categoryLabel.className = 'video-library-add-dialog-field'; categoryLabel.textContent = '추가할 카테고리';
       const category = videoLibraryCategorySelect(editableCategories, editableCategories.some((item) => item.id === state.categoryId)
         ? state.categoryId : editableCategories[0]?.id || '', '가져올 영상 카테고리'); categoryLabel.append(category);
-      const urlLabel = document.createElement('label'); urlLabel.className = 'video-library-add-dialog-field'; urlLabel.textContent = 'YouTube 채널 링크';
+      const urlLabel = document.createElement('label'); urlLabel.className = 'video-library-add-dialog-field'; urlLabel.textContent = 'YouTube 채널 또는 재생목록 링크';
       const url = document.createElement('input'); url.type = 'url'; url.required = true; url.maxLength = 500;
-      url.placeholder = 'YouTube 채널 또는 @핸들 링크'; url.setAttribute('aria-label', 'YouTube 채널 주소'); urlLabel.append(url);
-      const note = document.createElement('p'); note.className = 'video-library-add-dialog-hint'; note.textContent = '등록 후 공개 영상 전체를 백그라운드에서 가져옵니다.';
+      url.placeholder = '채널(@핸들) 또는 playlist?list= 링크'; url.setAttribute('aria-label', 'YouTube 채널 또는 재생목록 주소'); urlLabel.append(url);
+      const note = document.createElement('p'); note.className = 'video-library-add-dialog-hint'; note.textContent = '채널은 공개 영상 전체, 재생목록은 그 목록의 공개 영상만 백그라운드에서 가져옵니다. 영상은 YouTube 퍼가기로 재생돼요.';
       const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
       submit.disabled = state.saving; submit.textContent = state.saving ? '채널 확인 중…' : '채널 추가';
       form.append(categoryLabel, urlLabel, note, submit);
@@ -9034,7 +9034,8 @@ function renderVideoLibrarySection(page) {
       state.channels.forEach((channel) => {
         const card = document.createElement('article'); card.className = 'video-library-channel-card';
         const name = document.createElement('a'); name.href = channel.channelUrl; name.target = '_blank';
-        name.rel = 'noopener noreferrer'; name.textContent = channel.channelTitle || channel.id;
+        name.rel = 'noopener noreferrer'; name.textContent = (channel.sourceType === 'playlist' ? '▶ 재생목록 · ' : '') + (channel.channelTitle || channel.id)
+          + (channel.sourceType === 'playlist' && channel.ownerTitle ? ` (${channel.ownerTitle})` : '');
         const progress = document.createElement('progress'); progress.max = 100;
         progress.value = channel.videoCount ? Math.min(100, channel.importedCount / channel.videoCount * 100) : (channel.syncStatus === 'ready' ? 100 : 0);
         const status = document.createElement('small');
