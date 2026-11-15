@@ -1,6 +1,7 @@
 import { getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
+import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAZcjQPHphENs-Bb7IfdL2qTtOMhJrRP54',
@@ -27,6 +28,8 @@ let adminUnlocked = false;
 let pauseKnown = false;
 let paused = DEFAULT_PAUSED;
 let adminCheckPendingUser = null;
+let pausePollTimer = 0;
+let pauseWatching = false;
 let locked = false;
 let gate;
 let auth;
@@ -115,6 +118,33 @@ async function readPauseFlag() {
   if (paused && !adminUnlocked && adminCheckPendingUser && auth && auth.currentUser === adminCheckPendingUser) void verify(adminCheckPendingUser);
 }
 
+// 첫 확인 뒤에는 20초마다 다시 읽지 않고, 실시간 연결로 값이 바뀔 때만 받는다(DB 읽기 절약·즉시 반영).
+// 연결이 거부되거나 끊기면 예전처럼 주기 확인으로 되돌아간다.
+function applyPauseValue(value) {
+  paused = value && typeof value.active === 'boolean' ? value.active : DEFAULT_PAUSED;
+  pauseKnown = true;
+  applyState();
+  if (paused && !adminUnlocked && adminCheckPendingUser && auth && auth.currentUser === adminCheckPendingUser) void verify(adminCheckPendingUser);
+}
+function startPausePolling() {
+  if (!pausePollTimer) pausePollTimer = setInterval(() => { void readPauseFlag(); }, PAUSE_POLL_MS);
+}
+function watchPauseFlag(app) {
+  try {
+    onValue(ref(getDatabase(app), `servicePause/${SERVICE_ID}`), (snapshot) => {
+      pauseWatching = true;
+      if (pausePollTimer) { clearInterval(pausePollTimer); pausePollTimer = 0; }
+      applyPauseValue(snapshot.val());
+    }, (error) => {
+      console.warn(`서비스 일시정지 실시간 확인 실패(${SERVICE_ID}), 주기 확인으로 전환:`, error && error.message);
+      pauseWatching = false;
+      startPausePolling();
+    });
+  } catch (error) {
+    startPausePolling();
+  }
+}
+
 function createGate() {
   const style = document.createElement('style');
   style.textContent = `
@@ -189,6 +219,7 @@ function connectToPageFirebase(startedAt = Date.now()) {
   }
   auth = getAuth(app);
   checkAccess = httpsCallable(getFunctions(app, 'us-central1'), 'streamerFanPageMaintenanceAccess');
+  watchPauseFlag(app);
   onAuthStateChanged(auth, (user) => { void verify(user); });
 }
 
@@ -196,6 +227,6 @@ createGate();
 if (DEFAULT_PAUSED) lockPage();
 render('페이지를 준비하고 있습니다.', false);
 void readPauseFlag();
-setInterval(() => { void readPauseFlag(); }, PAUSE_POLL_MS);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void readPauseFlag(); });
+startPausePolling();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !pauseWatching) void readPauseFlag(); });
 connectToPageFirebase();
