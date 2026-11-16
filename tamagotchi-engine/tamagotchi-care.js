@@ -461,7 +461,10 @@ async function treat({ db, uid, streamerId, petId, kind, now = Date.now() }) {
   // 누른 팬 유대감 +5
   const fanRef = db.ref(`${FANS_ROOT}/${sid}/${pid}/${fanKey(uid, sid)}`);
   await fanRef.transaction((raw) => { const f = normalizeFan(raw, dayKey(now)); f.bond += 5; return f; });
-  return { ...publicStats(tx.snapshot.val(), now), learned: [...learnedSet(petInfo, now)], training: trainingMap(petInfo, now), serverNow: now, spent: cost };
+  const out = { ...publicStats(tx.snapshot.val(), now), learned: [...learnedSet(petInfo, now)], training: trainingMap(petInfo, now), serverNow: now, spent: cost };
+  // 공개 요약 갱신용(응답 JSON에는 실리지 않게 열거 안 함, interact와 같은 방식)
+  Object.defineProperty(out, 'pet', { value: { ...petInfo, stats: tx.snapshot.val() }, enumerable: false });
+  return out;
 }
 
 // 관리자가 아니면 스탯 숫자를 지우고 단계(band)만 남긴다(3-C 결정: 숫자는 관리자만)
