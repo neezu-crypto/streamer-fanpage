@@ -2161,3 +2161,6 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .youtube-player-volume .youtube-mute-button{width:34px;min-width:34px;height:34px;padding:0!important;font-size:16px!important;line-height:1}
 @media(max-width:560px){.youtube-player-heading{flex-wrap:wrap;row-gap:8px}.youtube-player-heading h2{flex:1 1 100%}.youtube-player-heading .youtube-player-volume{flex:1 1 0;min-width:0;margin-left:0}.youtube-player-heading .youtube-player-volume output{min-width:34px}.youtube-player-heading>.profile-settings-close{flex:none}.youtube-player-heading>.profile-settings-close::after{display:none!important}}
 .tg-care-hospital-link{font-size:.84rem;font-weight:700}
+
+/* 모바일: 프로필 편집 칸이 열려 있는 동안 오른쪽에 떠 있는 빠른 이동·전체화면 버튼이 입력란을 가리지 않게 잠시 숨긴다(모든 디자인 공통). */
+@media (max-width:760px){body:has(#fanPageView .profile-inline-editor) :is(.fan-quick-toggle,.fan-quick-fullscreen){visibility:hidden;pointer-events:none}}

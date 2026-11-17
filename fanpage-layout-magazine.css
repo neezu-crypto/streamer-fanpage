@@ -39,6 +39,8 @@ body.fanpage-layout-four-active .topbar a,body.fanpage-layout-four-active .topba
 #fanPageView.fanpage-layout-4 .profile-facts{grid-area:facts;align-self:start;align-content:start;gap:0;counter-reset:mzfact;border-top:3px solid var(--mz-rule)}
 #fanPageView.fanpage-layout-4 .profile-facts::before{content:'IN THIS ISSUE';display:block;padding:10px 0 8px;border-bottom:1px solid var(--mz-rule);color:var(--mz-ink);font:700 12px var(--font);letter-spacing:.18em}
 #fanPageView.fanpage-layout-4 .profile-fact{counter-increment:mzfact;min-height:0;grid-template-columns:44px 110px minmax(0,1fr);border-radius:0;border-bottom:1px solid var(--mz-hair);background:none;box-shadow:none;padding:11px 0}
+/* 사실 칸 하나가 편집 칸으로 바뀌어도 아래 번호가 당겨지지 않게 편집 칸도 한 번 센다 */
+#fanPageView.fanpage-layout-4 .profile-facts>.profile-inline-editor{counter-increment:mzfact}
 #fanPageView.fanpage-layout-4 .profile-fact::before{content:counter(mzfact,decimal-leading-zero);color:var(--mz-red);font:700 15px var(--mz-serif)}
 #fanPageView.fanpage-layout-4 .profile-fact span{display:block;height:auto;background:none;color:var(--mz-soft);font-size:12px;letter-spacing:.12em;text-align:left}
 #fanPageView.fanpage-layout-4 .profile-fact strong{padding:0;text-align:left;font:700 17px var(--mz-serif);color:var(--mz-ink)}
