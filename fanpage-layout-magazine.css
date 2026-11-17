@@ -191,6 +191,83 @@ body.fanpage-layout-four-active :is(.site-shell,main){background:transparent}
   #fanPageView.fanpage-layout-4 .mz-live-ticker-label::before{animation:none}
 }
 
+/* ---------- 배포 후 전체 점검 보정 (2026-11-18) ---------- */
+/* 바로가기 리모컨·떠 있는 버튼: 종이 카드 */
+#fanPageView.fanpage-layout-4 .fan-quick-panel{border:1px solid var(--mz-rule);border-top:4px solid var(--mz-rule);border-radius:0;background:var(--mz-card);color:var(--mz-ink);box-shadow:4px 4px 0 rgba(21,20,19,.12);backdrop-filter:none}
+#fanPageView.fanpage-layout-4 .fan-quick-header{border-bottom:1px solid var(--mz-hair);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .fan-quick-header *{color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(.fan-quick-sound-settings,.fan-quick-close){border:1px solid var(--mz-rule);border-radius:0;background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
+#fanPageView.fanpage-layout-4 .fan-quick-link{border-radius:0;background:none;color:var(--mz-ink);box-shadow:none}
+#fanPageView.fanpage-layout-4 .fan-quick-link:hover{background:#efe9de}
+#fanPageView.fanpage-layout-4 .fan-quick-link:is(.active,.is-active,[aria-current=true],[aria-current=location]){background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .fan-quick-number{color:var(--mz-red);font-family:var(--mz-serif);font-weight:700}
+#fanPageView.fanpage-layout-4 .fan-quick-link:is(.active,.is-active,[aria-current=true],[aria-current=location]) .fan-quick-number{color:#ff9a9f}
+#fanPageView.fanpage-layout-4 .fan-quick-label{color:inherit}
+#fanPageView.fanpage-layout-4 .fan-quick-scroll-rail{border-radius:0;background:var(--mz-hair)}
+#fanPageView.fanpage-layout-4 .fan-quick-scroll-thumb{border-radius:0;background:var(--mz-red)}
+#fanPageView.fanpage-layout-4 :is(.fan-quick-sticker-button,.fan-quick-toggle,.fan-quick-fullscreen){border:1px solid var(--mz-rule);border-radius:0;background:var(--mz-card);color:var(--mz-ink);box-shadow:3px 3px 0 rgba(21,20,19,.14)}
+#fanPageView.fanpage-layout-4 .fan-quick-sticker-menu{border:1px solid var(--mz-rule);border-radius:0;background:var(--mz-card);color:var(--mz-ink);box-shadow:4px 4px 0 rgba(21,20,19,.12)}
+#fanPageView.fanpage-layout-4 .fan-quick-sticker-menu *{color:var(--mz-ink)}
+/* 감정표현 버튼: 공용 규칙(어두운 바탕)보다 우선하도록 같은 경로로 지정 */
+#fanPageView.fanpage-layout-4 .fan-quick-remote > #game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button{border:1px solid var(--mz-rule);border-radius:0;background:var(--mz-card);color:var(--mz-ink);box-shadow:3px 3px 0 rgba(21,20,19,.14);font-size:12px;font-weight:700}
+#fanPageView.fanpage-layout-4 .fan-quick-remote > #game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button *{color:inherit}
+#fanPageView.fanpage-layout-4 .fan-quick-remote > #game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button:hover{background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .game-series-emote-tooltip{border-radius:0;background:var(--mz-ink);color:var(--mz-paper);box-shadow:none}
+/* 방송 종료 카드·일정 편집 버튼·남은 둥근 표시 */
+#fanPageView.fanpage-layout-4 .live-offline-card{border:1px solid var(--mz-hair);border-radius:0;background:var(--mz-card);box-shadow:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .live-offline-mark{border:1px solid var(--mz-rule);border-radius:0;background:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .live-offline-copy span{color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .weekly-schedule-board-edit{border:1px solid var(--mz-rule);border-radius:0;background:var(--mz-ink);background-image:none;color:var(--mz-paper);box-shadow:none}
+#fanPageView.fanpage-layout-4 :is(.upbo-choice-mark,.memory-moment-thumbnail-fallback){border-radius:0}
+/* 가독성: 공용 스타일의 9~11px 글씨를 디자인 4에서는 12px로 */
+#fanPageView.fanpage-layout-4 .verified-tag,
+#fanPageView.fanpage-layout-4 .profile-stock-eyebrow,
+#fanPageView.fanpage-layout-4 .profile-stock-meta,
+#fanPageView.fanpage-layout-4 .profile-stock-attendance-gift,
+#fanPageView.fanpage-layout-4 .profile-stock-attendance-copy > span,
+#fanPageView.fanpage-layout-4 .eyebrow,
+#fanPageView.fanpage-layout-4 .live-subtitle,
+#fanPageView.fanpage-layout-4 .button,
+#fanPageView.fanpage-layout-4 .live-offline-copy > span,
+#fanPageView.fanpage-layout-4 .vod-count,
+#fanPageView.fanpage-layout-4 .vod-refresh-status,
+#fanPageView.fanpage-layout-4 .vod-duration,
+#fanPageView.fanpage-layout-4 .vod-metadata > span,
+#fanPageView.fanpage-layout-4 .fan-quick-number,
+#fanPageView.fanpage-layout-4 .fan-quick-label,
+#fanPageView.fanpage-layout-4 .upbo-request-note,
+#fanPageView.fanpage-layout-4 .messenger-link-note,
+#fanPageView.fanpage-layout-4 .roulette-description,
+#fanPageView.fanpage-layout-4 .roulette-status,
+#fanPageView.fanpage-layout-4 .roulette-item-count,
+#fanPageView.fanpage-layout-4 .roulette-item-type,
+#fanPageView.fanpage-layout-4 .roulette-scroll-note,
+#fanPageView.fanpage-layout-4 .fan-gallery-count,
+#fanPageView.fanpage-layout-4 .fan-gallery-tabs > button,
+#fanPageView.fanpage-layout-4 .fan-gallery-category,
+#fanPageView.fanpage-layout-4 .fan-gallery-date,
+#fanPageView.fanpage-layout-4 .fan-gallery-stats,
+#fanPageView.fanpage-layout-4 .profile-link-editor-note,
+#fanPageView.fanpage-layout-4 .youtube-status,
+#fanPageView.fanpage-layout-4 .songbook-owner-hint,
+#fanPageView.fanpage-layout-4 .cafe-more-link,
+#fanPageView.fanpage-layout-4 .cafe-post-author,
+#fanPageView.fanpage-layout-4 .cafe-post-date,
+#fanPageView.fanpage-layout-4 .cafe-post-comments,
+#fanPageView.fanpage-layout-4 .played-games-owner-hint,
+#fanPageView.fanpage-layout-4 .competition-history-count,
+#fanPageView.fanpage-layout-4 .video-library-count,
+#fanPageView.fanpage-layout-4 .video-library-admin-tools > summary,
+#fanPageView.fanpage-layout-4 .video-library-channel-card > small,
+#fanPageView.fanpage-layout-4 .video-library-source,
+#fanPageView.fanpage-layout-4 .video-library-card-body > small,
+#fanPageView.fanpage-layout-4 .rolling-paper-count,
+#fanPageView.fanpage-layout-4 .rolling-paper-topic-count,
+#fanPageView.fanpage-layout-4 .memory-moments-owner-hint,
+#fanPageView.fanpage-layout-4 .memory-moment-platform,
+#fanPageView.fanpage-layout-4 .memory-moment-date{font-size:12px}
+#fanPageView.fanpage-layout-4 :is(.eyebrow,.profile-stock-eyebrow){letter-spacing:.14em}
+
 @media (max-width:760px){
   #fanPageView.fanpage-layout-4 .profile-board{grid-template-columns:1fr;grid-template-areas:"tab" "name" "facts" "about" "details" "stock" "actions"}
   #fanPageView.fanpage-layout-4 .profile-identity{grid-template-columns:96px minmax(0,1fr)}
