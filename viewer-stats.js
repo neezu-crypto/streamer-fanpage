@@ -24,7 +24,22 @@ initializeAppCheck(app, {
 const auth = getAuth(app);
 const database = getDatabase(app);
 const functions = getFunctions(app, 'us-central1');
-const callViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats');
+const rawCallViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats');
+// 2026-11-18 0시부터 고점체크 분석은 로그인 이용자만 쓸 수 있다. 서버가 로그인 필요로 거절하면
+// 로그인 창을 띄우고, 로그인을 마치면 같은 요청을 이어서 보낸다(창을 닫으면 원래 오류로 끝난다).
+function callViewerStats(payload) {
+  return rawCallViewerStats(payload).catch((error) => {
+    if (!(error && error.code === 'functions/unauthenticated' && error.details && error.details.loginRequired)) throw error;
+    return new Promise((resolve, reject) => {
+      let resumed = false;
+      askLoginForResult(() => { resumed = true; return rawCallViewerStats(payload).then(resolve, reject); });
+      $('viewerLoginDialogStatus').textContent = '고점체크는 로그인한 이용자만 쓸 수 있어요. 로그인하면 하던 분석을 이어갑니다.';
+      $('viewerLoginDialog').addEventListener('close', () => {
+        window.setTimeout(() => { if (!resumed) reject(error); }, 150);
+      }, { once: true });
+    });
+  });
+}
 const callViewerStatsVisit = httpsCallable(functions, 'streamerFanPageViewerStatsVisit');
 const callSponsorAds = httpsCallable(functions, 'streamerFanPageViewerSponsors');
 const callAdminSponsorAds = httpsCallable(functions, 'streamerFanPageAdminSponsorAds');
