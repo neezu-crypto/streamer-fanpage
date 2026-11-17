@@ -32,7 +32,7 @@ function callViewerStats(payload) {
     if (!(error && error.code === 'functions/unauthenticated' && error.details && error.details.loginRequired)) throw error;
     return new Promise((resolve, reject) => {
       let resumed = false;
-      askLoginForResult(() => { resumed = true; return rawCallViewerStats(payload).then(resolve, reject); });
+      askLoginForResult(() => { resumed = true; return rawCallViewerStats({ ...payload, loginResumed: true }).then(resolve, reject); });
       $('viewerLoginDialogStatus').textContent = '고점체크는 로그인한 이용자만 쓸 수 있어요. 로그인하면 하던 분석을 이어갑니다.';
       $('viewerLoginDialog').addEventListener('close', () => {
         window.setTimeout(() => { if (!resumed) reject(error); }, 150);
