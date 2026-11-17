@@ -5124,6 +5124,8 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       // response. This prevents a refresh/render race from putting the old
       // layout back on screen after a successful save.
       currentPage.profile = { ...(result.data.page.profile || {}), layoutDesign: requestedLayout };
+      // 이 브라우저의 저장 사본도 바로 바꿔, 새로고침할 때 예전 디자인이 먼저 보이지 않게 한다.
+      writePageCache(currentPage.streamer.id, publicPageCopy(currentPage));
       dialog.close();
       // Previewing keeps this dialog instance alive across full page renders
       // so its unsaved selection is not lost. Once the server accepts that
@@ -12402,15 +12404,21 @@ async function loadApp() {
     if (requestedId) {
       // 다시 방문: 저장해 둔 공개 사본을 먼저 그리고, 새 데이터가 오면 바뀐 경우에만 다시 그린다.
       const cachedPage = readPageCache(requestedId);
+      // 공개 사본(CDN)을 먼저 요청하고, 0.4초 안에 오면 그것으로 바로 그린다. 저장된 사본이 예전 디자인이라
+      // 다른 디자인이 잠깐 보였다가 바뀌는 깜빡임을 막는다. 늦으면 지금처럼 저장된 사본을 먼저 그린다.
+      const snapshotPromise = loadPublicSnapshot(requestedId);
       if (cachedPage) {
-        installPageOwnership(cachedPage, false);
-        cachedPage.isStreamerOwner = false;
-        setVisibleView(cachedPage);
-        revealFanpageShell();
-        shownFromCache = JSON.stringify(publicPageCopy(cachedPage));
+        const early = await Promise.race([snapshotPromise, new Promise((resolve) => setTimeout(() => resolve(undefined), 400))]);
+        if (!early) { // 늦거나 사본이 없으면(서버 호출로 넘어감) 저장된 사본을 먼저 보여 준다
+          installPageOwnership(cachedPage, false);
+          cachedPage.isStreamerOwner = false;
+          setVisibleView(cachedPage);
+          revealFanpageShell();
+          shownFromCache = JSON.stringify(publicPageCopy(cachedPage));
+        }
       }
       try {
-        const snapshotPage = await loadPublicSnapshot(requestedId);
+        const snapshotPage = await snapshotPromise;
         if (snapshotPage) { result = { page: snapshotPage, isAdmin: false, verifiedStreamer: null }; shownFromSnapshot = true; }
         else result = await callPublicBootstrap(requestedId);
         needsOwnershipCheck = true;
