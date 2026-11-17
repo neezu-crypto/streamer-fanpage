@@ -304,6 +304,22 @@ body.fanpage-layout-four-active #adminStatsDialog :is(span,strong,button,small){
 /* 모바일: 입력란 16px(눌렀을 때 화면 확대 방지) */
 @media (max-width:760px){body.fanpage-layout-four-active :is(dialog,#fanPageView) :is(input:not([type=radio]):not([type=checkbox]):not([type=range]),select,textarea){font-size:16px}}
 
+/* ---------- 사용자 점검 보정 (2026-11-18) ---------- */
+/* 프로필 바로 편집 칸: 기본 어두운 칸 대신 종이 칸 */
+#fanPageView.fanpage-layout-4 .profile-inline-editor{border:1px solid var(--mz-rule);border-radius:0;background:var(--mz-card);box-shadow:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .profile-inline-editor .button:not(.button-primary){border:1px solid var(--mz-rule);background:transparent;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .profile-inline-editor-status{color:var(--mz-soft)}
+/* 제휴 광고: 테두리 있는 상자 + 작은 사진 옆 글(:not(#…)은 위 섹션 공통 규칙보다 우선하게) */
+#fanPageView.fanpage-layout-4 .affiliate-promo-card:not(#mz-none){border:1px solid var(--mz-rule);border-top:3px solid var(--mz-rule);background:var(--mz-card);padding:14px}
+#fanPageView.fanpage-layout-4 .affiliate-promo-layout{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:start}
+#fanPageView.fanpage-layout-4 .affiliate-promo-image-link img{width:96px;height:96px;object-fit:cover}
+#fanPageView.fanpage-layout-4 .affiliate-promo-title{font-size:17px;margin:2px 0 4px}
+#fanPageView.fanpage-layout-4 .affiliate-promo-description{font-size:13px;line-height:1.5;margin:0 0 4px}
+#fanPageView.fanpage-layout-4 .affiliate-promo-disclosure{margin-top:10px;padding-top:8px;border-top:1px dashed var(--mz-hair);font-size:12px;color:var(--mz-soft)}
+/* 홈: 칸 비율을 넓혀 일정표가 크게 보이고 좌우 높이가 비슷하게 */
+#fanPageView.fanpage-layout-4 .fanpage-home-columns{grid-template-columns:minmax(300px,.95fr) minmax(0,1.05fr)}
+#fanPageView.fanpage-layout-4 .fanpage-home-side-column>*+*{margin-top:22px}
+
 /* ---------- 모바일 점검 보정 (2026-11-18) ---------- */
 /* 영상 플레이어 창: 어두운 창 위 버튼·볼륨·댓글 칸은 종이색 글씨 */
 #fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) .button:not(.button-primary){border-color:var(--mz-paper);background:transparent;color:var(--mz-paper)}
