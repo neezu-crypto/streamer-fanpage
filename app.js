@@ -3058,6 +3058,9 @@ function openProfileQuickEdit(page, field, target) {
     }
   });
 
+  // 디자인마다 칸 배치(grid-area)가 달라, 편집 칸이 원래 항목 자리에서 열리도록 같은 칸 위치를 물려준다.
+  const targetArea = getComputedStyle(target).gridArea;
+  if (targetArea && !/^auto(\s*\/\s*auto)*$/.test(targetArea)) form.style.gridArea = targetArea;
   target.replaceWith(form);
   editor.focus();
   if (editor instanceof HTMLInputElement) editor.select();
