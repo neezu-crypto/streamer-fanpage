@@ -320,6 +320,10 @@ body.fanpage-layout-four-active #adminStatsDialog :is(span,strong,button,small){
 #fanPageView.fanpage-layout-4 .fanpage-home-columns{grid-template-columns:minmax(300px,.95fr) minmax(0,1.05fr)}
 #fanPageView.fanpage-layout-4 .fanpage-home-side-column>*+*{margin-top:22px}
 
+/* 모바일 감정표현 버튼(떠 있는·붙은 상태): 디자인 1 둥근 흰 버튼 대신 종이 칸. 기본 규칙에 !important가 있어 맞춘다 */
+body.fanpage-layout-four-active #fanPageView.fanpage-layout-4 #game-series-emote-launcher:is(.fanpage-emote-mobile-floating,.fanpage-emote-mobile-attached) #game-series-emote-button{border:1px solid var(--mz-rule)!important;border-radius:0!important;background:var(--mz-card)!important;color:var(--mz-ink)!important;box-shadow:3px 3px 0 rgba(21,20,19,.18)!important;font-family:var(--mz-sans,inherit)!important;font-weight:700!important;min-height:44px!important}
+body.fanpage-layout-four-active #fanPageView.fanpage-layout-4 #game-series-emote-launcher:is(.fanpage-emote-mobile-floating,.fanpage-emote-mobile-attached) #game-series-emote-button::before{color:var(--mz-red)!important}
+
 /* ---------- 모바일 점검 보정 (2026-11-18) ---------- */
 /* 영상 플레이어 창: 어두운 창 위 버튼·볼륨·댓글 칸은 종이색 글씨 */
 #fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) .button:not(.button-primary){border-color:var(--mz-paper);background:transparent;color:var(--mz-paper)}
