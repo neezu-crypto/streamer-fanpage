@@ -4677,7 +4677,7 @@ function renderTamagotchiSection(page) {
     const preview = isAdminUser === true && new URLSearchParams(location.search).get('tgpreview') === '1';
     Promise.all([
       import('./tamagotchi-care-view.js?v=20261116-hosp1'),
-      preview ? import('./tamagotchi-care-preview.js?v=20261117-public1').then((m) => m.createCarePreview(page)) : null,
+      preview ? import('./tamagotchi-care-preview.js?v=20261118-full72').then((m) => m.createCarePreview(page)) : null,
     ]).then(([{ mountCareView }, mock]) => {
       if (currentPage?.streamer.id !== page.streamer.id) return;
       currentTamagotchiCare?.destroy();

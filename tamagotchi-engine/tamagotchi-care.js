@@ -63,6 +63,7 @@ function discharge(s, at) {
 // ---------- 시간 변화: 마지막 계산 시각부터 now까지 1시간(마지막은 남은 분) 단위로 진행 ----------
 // 낮잠: 배우지 않아도 피로가 AUTO_SLEEP_AT에 닿으면 스스로 잠든다. 배우면 원할 때 재울 수 있고 회복이 조금 빠르다.
 const AUTO_SLEEP_AT = 75;
+const FULL_DECAY_PER_HOUR = 100 / 72; // 배부름은 깨어 있을 때 100에서 0까지 72시간(2026-11-18, 기존 시간당 4)
 const NAP_RECOVER = { learned: 5, self: 4 }; // 잠든 동안 분당 피로 감소
 // 피곤하면(AUTO_SLEEP_AT↑) 보고 있어도 스스로 잠든다. 팬이 상호작용하면 깨고(applyOne),
 // 마지막 상호작용 뒤 ACT_GRACE_MS 동안 아무것도 안 했는데 여전히 피곤하면 다시 잠든다. 누가 했는지는 기록하지 않고 시각만 남긴다.
@@ -88,7 +89,7 @@ function advance(raw, now, { napLearned = false } = {}) {
       if (toSleep < dt) { dt = Math.max(0, Math.ceil(toSleep)); dozeOff = true; }
     }
     const h = dt / HOUR;
-    s.full = clamp(s.full - 4 * h * soft * (asleep ? 0.5 : 1));
+    s.full = clamp(s.full - FULL_DECAY_PER_HOUR * h * soft * (asleep ? 0.5 : 1));
     s.mood = clamp(s.mood - 2 * h * soft);
     s.clean = clamp(s.clean - 1.5 * h * soft);
     if (asleep) {
