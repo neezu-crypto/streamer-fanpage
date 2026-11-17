@@ -81,7 +81,7 @@ body.fanpage-layout-four-active .topbar a,body.fanpage-layout-four-active .topba
 
 #fanPageView.fanpage-layout-4 :is(.messenger-link-section,.fan-gallery-card,.vod-card,.roulette-list-viewport,.roulette-item,.upbo-choice-preview,.rolling-paper-topic-card,.memory-moment-card){border-radius:0;background:var(--mz-card);background-image:none;border:1px solid var(--mz-hair);box-shadow:none;color:var(--mz-ink)}
 #fanPageView.fanpage-layout-4 .messenger-link-section{border:0;border-top:3px solid var(--mz-rule);background:transparent}
-#fanPageView.fanpage-layout-4 :is(input,select,textarea,.video-library-search,.played-games-type-select){border-radius:0;border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(input,select,textarea,.video-library-search,.played-games-type-select):not(.weekly-schedule-preview-frame *){border-radius:0;border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink)}
 #fanPageView.fanpage-layout-4 :is(.live-thumbnail-frame,.vod-thumbnail-frame,.fan-gallery-thumb-frame,.video-library-thumbnail-frame,.memory-moment-thumbnail-frame){border-radius:0;background:#e6e0d6;background-image:none}
 #fanPageView.fanpage-layout-4 .live-preview-card{border-radius:0;background:var(--mz-ink);color:var(--mz-paper)}
 #fanPageView.fanpage-layout-4 .live-preview-card *{color:inherit}
@@ -126,7 +126,7 @@ body.fanpage-layout-four-active .topbar a,body.fanpage-layout-four-active .topba
 /* 주간 일정 */
 #fanPageView.fanpage-layout-4 :is(.weekly-schedule-board-frame,.weekly-schedule-mobile-list){background:var(--mz-card);border:1px solid var(--mz-hair);box-shadow:none}
 #fanPageView.fanpage-layout-4 .weekly-schedule-date-caption{border-radius:0;background:var(--mz-ink);background-image:none;color:var(--mz-paper);box-shadow:none}
-#fanPageView.fanpage-layout-4 .weekly-schedule-arrow{border-radius:0;border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
+#fanPageView.fanpage-layout-4 .weekly-schedule-arrow:not(.weekly-schedule-preview-frame *){border-radius:0;border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
 #fanPageView.fanpage-layout-4 .weekly-schedule-mobile-day{grid-template-columns:minmax(118px,auto) minmax(0,1fr);border-color:var(--mz-hair)}
 #fanPageView.fanpage-layout-4 .weekly-schedule-mobile-day>:first-child{white-space:nowrap;color:var(--mz-red);font-weight:700}
 #fanPageView.fanpage-layout-4 .weekly-schedule-mobile-day.is-empty>:last-child{color:var(--mz-soft)}
@@ -267,6 +267,42 @@ body.fanpage-layout-four-active :is(.site-shell,main){background:transparent}
 #fanPageView.fanpage-layout-4 .memory-moment-platform,
 #fanPageView.fanpage-layout-4 .memory-moment-date{font-size:12px}
 #fanPageView.fanpage-layout-4 :is(.eyebrow,.profile-stock-eyebrow){letter-spacing:.14em}
+
+/* 스트리머 본인 화면: 프로필 채우기 안내·제휴 상품 링크, 창 닫기 × 크기 */
+#fanPageView.fanpage-layout-4 .profile-completion{grid-column:1/-1;border:1px dashed var(--mz-rule);border-radius:0;background:var(--mz-card);background-image:none;box-shadow:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .profile-completion-note{color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .profile-completion-bar{height:4px;border-radius:0;background:var(--mz-hair);background-image:none}
+#fanPageView.fanpage-layout-4 .profile-completion-bar>*{border-radius:0;background:var(--mz-red);background-image:none}
+#fanPageView.fanpage-layout-4 .affiliate-promo-button{color:var(--mz-red);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+#fanPageView.fanpage-layout-4 :is(.profile-settings-close,.layout-design-dialog-close,.video-library-add-dialog-close,.weekly-schedule-image-tools-close){font-size:22px;line-height:1;font-weight:400}
+
+/* 팬페이지 영역 밖 창(로그인·스트리머 인증·디자인 문의·계정 전환·사이트 통계)도 디자인 4 종이 창으로.
+   주간 일정 편집 창의 일정표 그림(템플릿) 안 입력칸·버튼은 템플릿 모양을 그대로 둔다. */
+body.fanpage-layout-four-active dialog.account-dialog{border:1px solid var(--mz-rule);border-top:6px solid var(--mz-rule);border-radius:0;background:var(--mz-paper);color:var(--mz-ink);box-shadow:0 24px 60px rgba(21,20,19,.28)}
+body.fanpage-layout-four-active dialog.account-dialog::backdrop{background:rgba(21,20,19,.55)}
+body.fanpage-layout-four-active dialog.account-dialog :is(h2,h3){font-family:var(--mz-serif);color:var(--mz-ink)}
+body.fanpage-layout-four-active dialog.account-dialog :is(p,span,small,label,legend,li,strong,dt,dd,summary,output){color:inherit}
+body.fanpage-layout-four-active dialog.account-dialog :is(.eyebrow,small,.muted,[class*=note],[class*=hint],[class*=status]){color:var(--mz-soft)}
+body.fanpage-layout-four-active dialog.account-dialog .eyebrow{color:var(--mz-red);letter-spacing:.14em;font-size:12px;background:transparent!important;box-shadow:none;padding-inline:0}
+body.fanpage-layout-four-active dialog.account-dialog :is(input:not([type=radio]):not([type=checkbox]):not([type=range]),select,textarea):not(.weekly-schedule-preview-frame *){border:1px solid var(--mz-rule);border-radius:0;background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
+body.fanpage-layout-four-active dialog.account-dialog :is(input,textarea)::placeholder{color:#7a736a}
+body.fanpage-layout-four-active dialog.account-dialog :is(input,select,textarea,button,a):focus-visible{outline:3px solid var(--mz-ink);outline-offset:2px}
+body.fanpage-layout-four-active dialog.account-dialog .button{border:1px solid var(--mz-ink);border-radius:0;background:transparent;color:var(--mz-ink);box-shadow:none}
+body.fanpage-layout-four-active dialog.account-dialog .button:hover{background:var(--mz-ink);color:var(--mz-paper)}
+body.fanpage-layout-four-active dialog.account-dialog .button-primary{border-color:var(--mz-red);background:var(--mz-red);color:#fff}
+body.fanpage-layout-four-active dialog.account-dialog .auth-button{border-radius:0}
+body.fanpage-layout-four-active dialog.account-dialog :is(fieldset,[class*=card]:not(.account-dialog-card),[class*=tile],[class*=choice],[class*=row],[class*=item],[class*=sender]):not(.weekly-schedule-preview-frame *){border-color:var(--mz-hair);border-radius:0;background-color:var(--mz-card);background-image:none;box-shadow:none;color:var(--mz-ink)}
+body.fanpage-layout-four-active dialog.account-dialog .account-dialog-card{background:transparent;color:var(--mz-ink)}
+body.fanpage-layout-four-active dialog.account-dialog a:not(.button):not(.auth-button){color:var(--mz-red)}
+body.fanpage-layout-four-active dialog.account-dialog :is([class*=heading],[class*=heading] *){color:var(--mz-ink)}
+body.fanpage-layout-four-active dialog.account-dialog .verification-status{border:1px solid var(--mz-hair);border-radius:0;background:var(--mz-card)}
+body.fanpage-layout-four-active dialog.account-dialog :is(.verification-status,.admin-stats-note){color:var(--mz-soft)!important;font-size:12px}
+body.fanpage-layout-four-active dialog.account-dialog :is(label,legend,[class*=note],[class*=hint]){font-size:max(12px,1em)}
+body.fanpage-layout-four-active dialog.account-dialog :is([class*=status],[class*=context]){font-size:13px}
+body.fanpage-layout-four-active #adminStatsDialog :is(span,strong,button,small){font-size:max(12px,1em)}
+#fanPageView.fanpage-layout-4 dialog small{font-size:12px}
+/* 모바일: 입력란 16px(눌렀을 때 화면 확대 방지) */
+@media (max-width:760px){body.fanpage-layout-four-active :is(dialog,#fanPageView) :is(input:not([type=radio]):not([type=checkbox]):not([type=range]),select,textarea){font-size:16px}}
 
 @media (max-width:760px){
   #fanPageView.fanpage-layout-4 .profile-board{grid-template-columns:1fr;grid-template-areas:"tab" "name" "facts" "about" "details" "stock" "actions"}
