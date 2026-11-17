@@ -304,6 +304,35 @@ body.fanpage-layout-four-active #adminStatsDialog :is(span,strong,button,small){
 /* 모바일: 입력란 16px(눌렀을 때 화면 확대 방지) */
 @media (max-width:760px){body.fanpage-layout-four-active :is(dialog,#fanPageView) :is(input:not([type=radio]):not([type=checkbox]):not([type=range]),select,textarea){font-size:16px}}
 
+/* ---------- 모바일 점검 보정 (2026-11-18) ---------- */
+/* 영상 플레이어 창: 어두운 창 위 버튼·볼륨·댓글 칸은 종이색 글씨 */
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) .button:not(.button-primary){border-color:var(--mz-paper);background:transparent;color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) .button:not(.button-primary):hover{background:var(--mz-paper);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) :is(.youtube-player-volume,.vod-comments-panel,[class*=volume]){border-color:rgba(245,241,234,.25);border-radius:0;background:rgba(245,241,234,.08);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) :is(.youtube-player-volume,.vod-comments-panel,[class*=volume]) *{color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) :is(p,output){font-size:12px}
+/* 일정 편집 창의 빨간 저장 버튼 글씨는 흰색 */
+#fanPageView.fanpage-layout-4 #weeklyScheduleGraphicDialog .button-primary{color:#fff}
+/* 상단바·남은 작은 글씨 */
+body.fanpage-layout-four-active .topbar :is(.topbar-caption,.account-status){color:var(--mz-soft);font-size:12px}
+body.fanpage-layout-four-active .topbar .auth-button{font-size:12px;border-radius:0}
+body.fanpage-layout-four-active .profile-stock-change{font-size:12px}
+#fanPageView.fanpage-layout-4 :is(.messenger-link-description,#tamagotchiSection p){font-size:12px}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading p:not(.eyebrow){font-size:13px}
+body.fanpage-layout-four-active dialog.account-dialog :is(.verification-status,.admin-stats-note){font-size:12px!important}
+/* 모바일 누름 영역 44px */
+@media (max-width:760px){
+  body.fanpage-layout-four-active .topbar .auth-button{min-height:44px;display:inline-flex;align-items:center;padding-inline:12px}
+  #fanPageView.fanpage-layout-4 .button,body.fanpage-layout-four-active dialog.account-dialog .button{min-height:44px}
+  #fanPageView.fanpage-layout-4 :is(.profile-settings-close,.layout-design-dialog-close,.video-library-add-dialog-close,.weekly-schedule-image-tools-close,.fan-sound-settings-close,.tamagotchi-application-dialog-close),body.fanpage-layout-four-active dialog.account-dialog :is(.profile-settings-close,.verification-manual-toggle){min-width:44px;min-height:44px}
+  #fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) .button{min-width:44px}
+  #fanPageView.fanpage-layout-4 :is(.upbo-subtab,.fan-gallery-tabs button,.video-library-category){min-height:44px;padding-inline:14px}
+  #fanPageView.fanpage-layout-4 .affiliate-promo-button{display:inline-flex;align-items:center;min-height:44px}
+  #fanPageView.fanpage-layout-4 .affiliate-promo-image-link{display:block;min-height:44px}
+  #fanPageView.fanpage-layout-4 .video-library-admin-tools>summary{min-height:44px;display:flex;align-items:center}
+  #fanPageView.fanpage-layout-4 .video-library-admin-tools a{display:inline-flex;align-items:center;min-height:44px}
+}
+
 @media (max-width:760px){
   #fanPageView.fanpage-layout-4 .profile-board{grid-template-columns:1fr;grid-template-areas:"tab" "name" "facts" "about" "details" "stock" "actions"}
   #fanPageView.fanpage-layout-4 .profile-identity{grid-template-columns:96px minmax(0,1fr)}
