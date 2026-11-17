@@ -2,3 +2,6 @@ functions/node_modules/
 .firebase/
 static-data/viewer-stats/
 functions/
+
+# 내부 문서(기획·설계·심사 준비)는 로컬 전용
+docs/
