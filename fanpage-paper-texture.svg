@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360">
+  <!-- 디자인 4 종이 질감: 요철(조명) 바탕 + 얼룩 + 섬유 결 + 미세 입자. 움직이지 않는 배경 타일. -->
+  <defs>
+    <!-- 1. 종이 요철: 잡음을 높이로 보고 비스듬한 빛을 비춰 오돌토돌한 표면을 만든다(밝은 종이색 범위 안에서만 변함) -->
+    <filter id="tooth" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".75" numOctaves="4" seed="7" stitchTiles="stitch" result="n"/>
+      <feDiffuseLighting in="n" surfaceScale="2.2" diffuseConstant="1" lighting-color="#fff" result="lit">
+        <feDistantLight azimuth="225" elevation="55"/>
+      </feDiffuseLighting>
+      <feColorMatrix in="lit" type="matrix" values=".13 0 0 0 .855  .128 0 0 0 .838  .122 0 0 0 .802  0 0 0 0 1"/>
+    </filter>
+    <!-- 2. 얼룩: 넓게 번진 옅은 음영 -->
+    <filter id="mottle" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".0055" numOctaves="2" seed="11" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .55  0 0 0 0 .45  0 0 0 0 .32  1.1 0 0 0 -.42"/>
+    </filter>
+    <!-- 3. 섬유 결: 가로로 길게 늘어난 가는 결, 진한 부분만 남긴다 -->
+    <filter id="fiber" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".006 .32" numOctaves="3" seed="3" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .42  0 0 0 0 .35  0 0 0 0 .25  1.3 0 0 0 -.66"/>
+    </filter>
+    <!-- 4. 미세 입자: 펄프 찌꺼기 같은 드문 점 -->
+    <filter id="speck" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="19" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .32  0 0 0 0 .26  0 0 0 0 .19  -48 0 0 0 14.1"/>
+    </filter>
+  </defs>
+  <rect width="360" height="360" filter="url(#tooth)"/>
+  <rect width="360" height="360" filter="url(#mottle)" opacity=".26"/>
+  <rect width="360" height="360" filter="url(#fiber)" opacity=".32"/>
+  <rect width="360" height="360" filter="url(#speck)" opacity=".55"/>
+</svg>

@@ -1086,6 +1086,7 @@ const ADMIN_DESIGN_USAGE_ROWS = [
   [1, '디자인 1 · 파스텔 만화풍', ''],
   [2, '디자인 2 · 기존 팬페이지', ''],
   [3, '디자인 3 · 손그림 스티커북', '관리자 전용 · 미공개'],
+  [4, '디자인 4 · 매거진 커버', ''],
 ];
 //  디자인별 적용 스트리머 카드. 저장된 값이 없는 스트리머는 기본 디자인(1)으로 세되 "기본"으로 표시한다.
 function renderAdminDesignUsage(streamers) {
@@ -1650,7 +1651,7 @@ function setVisibleView(page) {
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active', 'fanpage-tamagotchi-tab');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
-  const pageLayoutDesign = page && [1, 2, 3].includes(Number(page.profile?.layoutDesign))
+  const pageLayoutDesign = page && [1, 2, 3, 4].includes(Number(page.profile?.layoutDesign))
     ? Number(page.profile.layoutDesign)
     : DEFAULT_FANPAGE_LAYOUT;
   const usesKawaiiLayout = !!page && (pageLayoutDesign === 1 || pageLayoutDesign === 3);
@@ -1659,6 +1660,7 @@ function setVisibleView(page) {
   $('mainContent').classList.toggle('has-fanpage-home-kawaii', usesKawaiiHome);
   document.body.classList.toggle('fanpage-layout-one-active', !!page && pageLayoutDesign === 1);
   document.body.classList.toggle('fanpage-layout-three-active', !!page && pageLayoutDesign === 3);
+  document.body.classList.toggle('fanpage-layout-four-active', !!page && pageLayoutDesign === 4);
   document.body.classList.toggle('fanpage-home-kawaii-active', usesKawaiiHome);
   document.body.classList.toggle('fanpage-theme-sora-active', !!page && String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   $('homeView').classList.toggle('hidden', !!page);
@@ -4757,7 +4759,7 @@ function renderOwnerChecklist(page, selectTab) {
   };
   const items = [
     { id: 'profile', label: '프로필 채우기', get hint() { const c = profileCompletion(page); return c.filled < c.total ? `소개·생일·방송 시간 등 ${c.filled}/${c.total}칸 채웠어요. 팬에게는 채운 칸만 보여요.` : '프로필을 모두 채웠어요.'; }, done: () => { const c = profileCompletion(page); return c.filled === c.total; }, open: () => goTo('profileBoard') },
-    { id: 'design', label: '페이지 디자인 고르기', hint: '디자인 1·2·3 중 마음에 드는 모양으로.', done: () => [1, 2, 3].includes(Number(page.profile?.layoutDesign)), open: () => { const b = document.getElementById('layoutDesignButton'); if (b) b.click(); else goTo('profileBoard'); } },
+    { id: 'design', label: '페이지 디자인 고르기', hint: '디자인 1~4 중 마음에 드는 모양으로.', done: () => [1, 2, 3, 4].includes(Number(page.profile?.layoutDesign)), open: () => { const b = document.getElementById('layoutDesignButton'); if (b) b.click(); else goTo('profileBoard'); } },
     { id: 'schedule', label: '이번 주 방송 일정 올리기', hint: '홈 탭의 주간 일정표에서 편집해요.', open: () => goTo('calendarSection') },
     { id: 'songs', label: '노래·플레이한 게임 추가', hint: '콘텐츠 탭에서 YouTube·게임 링크로 추가해요.', done: () => (Array.isArray(page.songbook) && page.songbook.length > 0) || (Array.isArray(page.playedGames) && page.playedGames.length > 0), open: () => goTo('songbookSection') },
     { id: 'tamagotchi', label: '다마고치 둘러보기', hint: '분양받으면 팬들과 함께 돌보고 방송 화면에도 띄울 수 있어요.', open: () => goTo('tamagotchiSection') },
@@ -4797,10 +4799,13 @@ function renderOwnerChecklist(page, selectTab) {
   return box;
 }
 
-//  ---- 디자인 3 이용권(영구제, 100캐시) 공용 도우미 ----
+//  ---- 유료 디자인 이용권(디자인 3·4 각각 영구제, 100캐시) 공용 도우미 ----
 const DESIGN_PASS_PREVIEW_SECONDS = 60;
-function designPassOwned(page) {
-  return isAdminUser === true || page?.designPass?.layout3 === true;
+const PAID_FANPAGE_LAYOUTS = [3, 4];
+function isPaidLayout(layout) { return PAID_FANPAGE_LAYOUTS.includes(Number(layout)); }
+const DESIGN_PASS_LABELS = { 3: '디자인 3(손그림 스티커북)', 4: '디자인 4(매거진 커버)' };
+function designPassOwned(page, layout = 3) {
+  return isAdminUser === true || page?.designPass?.[`layout${Number(layout)}`] === true;
 }
 function designPassPriceCash(page) {
   return Number(page?.designPass?.priceCash) > 0 ? Number(page.designPass.priceCash) : 100;
@@ -4830,9 +4835,9 @@ function shouldDiscardPaymentRequest(error) {
   if (['failed-precondition', 'already-exists', 'invalid-argument', 'permission-denied', 'resource-exhausted', 'not-found'].includes(code)) return true;
   return code === 'aborted' && /자동 환불했어요/.test(String(error && error.message || ''));
 }
-function newDesignPassRequestId(streamerId) {
-  //  같은 구매 시도의 재시도는 같은 번호를 쓰도록 sessionStorage에 보관한다(중복 차감 방지).
-  const key = `fanpageDesignPassRequest:${streamerId}`;
+function newDesignPassRequestId(streamerId, layout = 3) {
+  //  같은 구매 시도의 재시도는 같은 번호를 쓰도록 sessionStorage에 보관한다(중복 차감 방지). 디자인마다 따로 둔다.
+  const key = Number(layout) === 3 ? `fanpageDesignPassRequest:${streamerId}` : `fanpageDesignPassRequest:${streamerId}:${Number(layout)}`;
   let value = '';
   try { value = sessionStorage.getItem(key) || ''; } catch (_) { value = ''; }
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(value)) {
@@ -4845,7 +4850,7 @@ function newDesignPassRequestId(streamerId) {
 }
 //  디자인 3 미리보기(이용권 없음). 창을 닫아도 남은 시간 동안 화면에 유지하고, 끝나면 저장된 디자인으로 돌아간다.
 // 서버에는 아무것도 저장하지 않는다. 화면 갱신으로 디자인 창이 다시 만들어져도 저장된 디자인을 잃지 않도록 모듈에 보관한다.
-let designPreview = null; // { streamerId, savedLayout, timer }
+let designPreview = null; // { streamerId, savedLayout, layout, timer }
 function designPreviewSavedLayout(streamerId) {
   return designPreview && designPreview.streamerId === streamerId ? designPreview.savedLayout : null;
 }
@@ -4853,8 +4858,8 @@ function stopDesignPreview() {
   designPreview?.timer.stop();
   designPreview = null;
 }
-function designPreviewStatusText(remaining) {
-  return `디자인 3 미리보기 중이에요 (${formatPreviewRemaining(remaining)} 남음). 구매하면 저장할 수 있어요.`;
+function designPreviewStatusText(remaining, layout = designPreview?.layout || 3) {
+  return `디자인 ${layout} 미리보기 중이에요 (${formatPreviewRemaining(remaining)} 남음). 구매하면 저장할 수 있어요.`;
 }
 function endDesignPreview(message) {
   const preview = designPreview;
@@ -4872,12 +4877,13 @@ function endDesignPreview(message) {
   renderFanPage(page, dialog ? { preservedLayoutDesignDialog: dialog, reopenLayoutDesignDialog: wasOpen } : {});
   if (message) showToast(message);
 }
-function startDesignPreview(page, savedLayout) {
+function startDesignPreview(page, savedLayout, layout = 3) {
   stopDesignPreview();
   const streamerId = page.streamer.id;
   designPreview = {
     streamerId,
     savedLayout,
+    layout: Number(layout),
     timer: startDesignPreviewTimer({
       onTick: (remaining) => {
         const el = document.querySelector('#layoutDesignDialog .profile-layout-status');
@@ -4888,7 +4894,9 @@ function startDesignPreview(page, savedLayout) {
   };
 }
 
-function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
+function openDesignPassPurchaseDialog(page, { onPurchased, layout = 3 } = {}) {
+  layout = isPaidLayout(layout) ? Number(layout) : 3;
+  const passKey = `layout${layout}`;
   const streamerId = page.streamer.id;
   const priceCash = designPassPriceCash(page);
   document.getElementById('designPassDialog')?.remove();
@@ -4898,15 +4906,16 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
   const card = document.createElement('div');
   card.className = 'account-dialog-card design-pass-dialog-card';
   const title = document.createElement('h2');
-  title.textContent = '디자인 3 이용권';
+  title.textContent = `디자인 ${layout} 이용권`;
   const lead = document.createElement('p');
   lead.className = 'design-pass-lead';
   lead.textContent = `${priceCash}캐시로 한 번 구매하면 계속 쓸 수 있어요.`;
   const list = document.createElement('ul');
   list.className = 'design-pass-benefits';
   [
-    '디자인 3(손그림 스티커북) 레이아웃',
+    `${DESIGN_PASS_LABELS[layout]} 레이아웃`,
     '주간 일정표의 고급 템플릿 9종 전체 (어떤 디자인에서도 사용)',
+    '다른 유료 디자인은 따로 구매해요',
     '이 팬페이지에 적용되며 다른 계정·페이지로 옮길 수 없어요',
   ].forEach((text) => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
   const balance = document.createElement('p');
@@ -4941,7 +4950,7 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
   const refreshBalance = () => {
     if (checking || busy || !dialog.isConnected) return;
     checking = true;
-    callDesignPass({ action: 'status', streamerId }).then((result) => {
+    callDesignPass({ action: 'status', streamerId, layout }).then((result) => {
       if (busy || !dialog.isConnected) return;
       const data = result.data || {};
       if (data.owned) { balance.textContent = '이미 이용권이 있어요.'; pay.disabled = true; charge.hidden = true; onPurchased?.({ alreadyOwned: true }); return; }
@@ -4967,17 +4976,17 @@ function openDesignPassPurchaseDialog(page, { onPurchased } = {}) {
   pay.addEventListener('click', async () => {
     if (busy) return;
     busy = true; pay.disabled = true; cancel.disabled = true; pay.textContent = '결제 중…';
-    const request = newDesignPassRequestId(streamerId);
+    const request = newDesignPassRequestId(streamerId, layout);
     try {
-      const result = await callDesignPass({ action: 'purchase', streamerId, requestId: request.value });
+      const result = await callDesignPass({ action: 'purchase', streamerId, layout, requestId: request.value });
       try { sessionStorage.removeItem(request.key); } catch (_) { /* 무시 */ }
       const data = result.data || {};
       if (data.status !== 'activated' && data.status !== 'owned') throw new Error('결제 결과를 확인하지 못했어요. 잠시 후 다시 확인해 주세요.');
-      if (currentPage?.streamer.id === streamerId) currentPage.designPass = { ...(currentPage.designPass || {}), layout3: true, priceCash };
-      page.designPass = { ...(page.designPass || {}), layout3: true, priceCash };
+      if (currentPage?.streamer.id === streamerId) currentPage.designPass = { ...(currentPage.designPass || {}), [passKey]: true, priceCash };
+      page.designPass = { ...(page.designPass || {}), [passKey]: true, priceCash };
       busy = false;
       dialog.close();
-      showToast(data.status === 'owned' ? '이미 이용권이 있어요.' : '디자인 3 이용권을 구매했어요.');
+      showToast(data.status === 'owned' ? '이미 이용권이 있어요.' : `디자인 ${layout} 이용권을 구매했어요.`);
       onPurchased?.({ alreadyOwned: data.status === 'owned' });
     } catch (error) {
       // 확정 실패(잔액 부족·이미 환불됨 등)면 요청 번호를 버려 다음 시도가 새 번호로 결제되게 한다. 결과 불명(네트워크 등)은 같은 번호를 유지한다.
@@ -5027,7 +5036,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   status.className = 'profile-layout-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  const displayedLayout = [1, 2, 3].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
+  const displayedLayout = [1, 2, 3, 4].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
   // 미리보기 중에 창이 다시 만들어진 경우에는 화면에 보이는 디자인이 아니라 마지막으로 저장된 디자인이 기준이다.
   const initialLayout = designPreviewSavedLayout(page.streamer.id) ?? displayedLayout;
   let draftLayout = displayedLayout;
@@ -5040,7 +5049,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     if (saving) return;
     const targetPage = currentPage;
     if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
-    const previousLayout = [1, 2, 3].includes(Number(targetPage.profile?.layoutDesign))
+    const previousLayout = [1, 2, 3, 4].includes(Number(targetPage.profile?.layoutDesign))
       ? Number(targetPage.profile.layoutDesign)
       : DEFAULT_FANPAGE_LAYOUT;
     draftLayout = selectedLayout;
@@ -5051,11 +5060,12 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     }
     const previousProfile = { ...(targetPage.profile || {}) };
     targetPage.profile = { ...previousProfile, layoutDesign: selectedLayout };
-    const previewOnly = selectedLayout === 3 && !designPassOwned(targetPage);
+    const previewOnly = isPaidLayout(selectedLayout) && !designPassOwned(targetPage, selectedLayout);
     status.textContent = previewOnly
-      ? designPreviewStatusText(DESIGN_PASS_PREVIEW_SECONDS)
+      ? designPreviewStatusText(DESIGN_PASS_PREVIEW_SECONDS, selectedLayout)
       : '미리보기를 적용했어요. 닫기 버튼을 누르면 저장됩니다.';
-    if (previewOnly) startDesignPreview(targetPage, initialLayout);
+    syncPassPanel();
+    if (previewOnly) startDesignPreview(targetPage, initialLayout, selectedLayout);
     else stopDesignPreview();
     // Re-rendering removes the dialog from the document. Close it first so the
     //  preserved instance can be attached and opened again without an
@@ -5077,7 +5087,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     const targetPage = currentPage;
     if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
     const requestedLayout = Number(draftLayout);
-    if (![1, 2, 3].includes(requestedLayout)) {
+    if (![1, 2, 3, 4].includes(requestedLayout)) {
       showToast('페이지 디자인 선택을 확인해 주세요.');
       return;
     }
@@ -5086,10 +5096,10 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
       dialog.close();
       return;
     }
-    if (requestedLayout === 3 && !designPassOwned(targetPage)) {
-      // 이용권이 없는 디자인 3은 저장하지 않는다. 창만 닫고, 남은 미리보기 시간 동안은 화면에 유지한다.
+    if (isPaidLayout(requestedLayout) && !designPassOwned(targetPage, requestedLayout)) {
+      // 이용권이 없는 유료 디자인(3·4)은 저장하지 않는다. 창만 닫고, 남은 미리보기 시간 동안은 화면에 유지한다.
       // 시간이 끝나면 endDesignPreview가 저장된 디자인으로 되돌린다.
-      if (!designPreview) startDesignPreview(targetPage, initialLayout);
+      if (!designPreview) startDesignPreview(targetPage, initialLayout, requestedLayout);
       dialog.close();
       showToast('미리보기는 남은 시간 동안만 유지돼요. 저장하려면 이용권을 구매해 주세요.');
       return;
@@ -5143,6 +5153,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     [1, '디자인 1 · 파스텔 만화풍', '포근한 파스텔 컬러와 캐릭터가 있는 디자인'],
     [2, '디자인 2 · 기존 팬페이지', '차분한 어두운 톤의 기존 팬페이지 디자인'],
     [3, '디자인 3 · 손그림 스티커북', '단색 종이 바탕과 굵은 손그림 테두리'],
+    [4, '디자인 4 · 매거진 커버', '잡지 표지처럼 큰 제목과 목차, 기사형 칸 배치'],
   ];
   layoutOptionsData.forEach(([value, titleText, descriptionText]) => {
     const option = document.createElement('label');
@@ -5162,8 +5173,8 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     optionTitle.textContent = titleText;
     const optionDescription = document.createElement('small');
     optionDescription.textContent = descriptionText;
-    if (value === 3 && !designPassOwned(page)) {
-      optionDescription.textContent = '디자인 3 구매자 전용 · 1분 미리보기 가능 · 100캐시 영구 이용';
+    if (isPaidLayout(value) && !designPassOwned(page, value)) {
+      optionDescription.textContent = `디자인 ${value} 구매자 전용 · 1분 미리보기 가능 · ${designPassPriceCash(page)}캐시 영구 이용`;
     }
     copy.append(optionTitle, optionDescription);
     const thumb = document.createElement('span');
@@ -5185,36 +5196,48 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   const adminPassButton = document.createElement('button');
   adminPassButton.type = 'button'; adminPassButton.className = 'button design-pass-admin-button';
   adminPassRow.append(adminPassButton);
-  const syncPassPanel = () => {
-    const owned = designPassOwned(currentPage || page);
-    const adminOwned = (currentPage || page).designPass?.layout3 === true;
-    passPanel.hidden = owned;
-    passText.textContent = '디자인 3과 주간 일정표의 모든 고급 템플릿은 유료 디자인 이용권 구매자 전용이에요. 지금은 1분 동안 미리볼 수 있어요.';
-    buy.textContent = `이용권 구매 · ${designPassPriceCash(page)}캐시 (영구)`;
-    adminPassRow.hidden = isAdminUser !== true;
-    adminPassButton.textContent = adminOwned ? '관리자: 이 팬페이지 이용권 회수' : '관리자: 이 팬페이지에 이용권 부여';
+  // 안내할 유료 디자인: 지금 고른 디자인이 유료면 그 디자인, 아니면 아직 없는 첫 유료 디자인.
+  const passPanelLayout = () => {
+    const target = currentPage || page;
+    if (isPaidLayout(draftLayout)) return Number(draftLayout);
+    return PAID_FANPAGE_LAYOUTS.find((n) => !designPassOwned(target, n)) || 3;
   };
+  function syncPassPanel() {
+    const target = currentPage || page;
+    const layout = passPanelLayout();
+    const owned = designPassOwned(target, layout);
+    const adminOwned = target.designPass?.[`layout${layout}`] === true;
+    passPanel.hidden = owned;
+    passText.textContent = `디자인 ${layout}은 이용권 구매자 전용이에요(디자인마다 따로 구매). 이용권이 있으면 주간 일정표의 고급 템플릿도 쓸 수 있어요. 지금은 1분 동안 미리볼 수 있어요.`;
+    buy.textContent = `디자인 ${layout} 이용권 구매 · ${designPassPriceCash(page)}캐시 (영구)`;
+    adminPassRow.hidden = isAdminUser !== true;
+    adminPassButton.textContent = adminOwned ? `관리자: 디자인 ${layout} 이용권 회수` : `관리자: 디자인 ${layout} 이용권 부여`;
+  }
   buy.addEventListener('click', () => {
+    const layout = passPanelLayout();
     openDesignPassPurchaseDialog(currentPage || page, {
+      layout,
       onPurchased: () => {
         stopDesignPreview();
         syncPassPanel();
-        status.textContent = draftLayout === 3
-          ? '이용권을 구매했어요. 닫기 버튼을 누르면 디자인 3이 저장됩니다.'
-          : '이용권을 구매했어요. 이제 디자인 3을 선택해 저장할 수 있어요.';
+        status.textContent = Number(draftLayout) === layout
+          ? `이용권을 구매했어요. 닫기 버튼을 누르면 디자인 ${layout}이 저장됩니다.`
+          : `이용권을 구매했어요. 이제 디자인 ${layout}을 선택해 저장할 수 있어요.`;
         layoutOptions.querySelectorAll('.profile-layout-option-copy small').forEach((small, index) => {
-          if (layoutOptionsData[index]?.[0] === 3) small.textContent = layoutOptionsData[index][2];
+          if (layoutOptionsData[index]?.[0] === layout) small.textContent = layoutOptionsData[index][2];
         });
       },
     });
   });
   adminPassButton.addEventListener('click', async () => {
     const target = currentPage || page;
-    const grant = target.designPass?.layout3 !== true;
+    const layout = passPanelLayout();
+    const passKey = `layout${layout}`;
+    const grant = target.designPass?.[passKey] !== true;
     adminPassButton.disabled = true;
     try {
-      const result = await callDesignPass({ action: grant ? 'admin-grant' : 'admin-revoke', streamerId: target.streamer.id });
-      target.designPass = { ...(target.designPass || {}), layout3: result.data?.owned === true, priceCash: designPassPriceCash(target) };
+      const result = await callDesignPass({ action: grant ? 'admin-grant' : 'admin-revoke', streamerId: target.streamer.id, layout });
+      target.designPass = { ...(target.designPass || {}), [passKey]: result.data?.owned === true, priceCash: designPassPriceCash(target) };
       showToast(grant ? '이 팬페이지에 이용권을 부여했어요.' : '이 팬페이지의 이용권을 회수했어요.');
     } catch (error) {
       showToast(error.message || '이용권 상태를 바꾸지 못했어요.');
@@ -5224,13 +5247,75 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     }
   });
   syncPassPanel();
-  if (!designPassOwned(page) && initialLayout !== 3) {
-    status.textContent = '디자인 3은 구매자 전용이에요. 선택하면 1분 동안 미리볼 수 있어요.';
+  const unownedPaid = PAID_FANPAGE_LAYOUTS.filter((n) => !designPassOwned(page, n) && n !== initialLayout);
+  if (unownedPaid.length) {
+    status.textContent = `디자인 ${unownedPaid.join('·')}는 구매자 전용이에요. 선택하면 1분 동안 미리볼 수 있어요.`;
   }
   layoutChoice.append(layoutLegend, layoutOptions);
   card.append(headingRow, intro, layoutChoice, passPanel, adminPassRow, status);
   dialog.append(card);
   return dialog;
+}
+
+// ---- 디자인 4(매거진) 배경 효과: 기사 등장(한 번만), 방송 중 속보 띠 ----
+// 서버 호출 없이 이미 받은 방송 상태만 쓴다. 애니메이션은 CSS(경과 시간 기준)이며 동작 줄이기면 CSS에서 끈다.
+const magazineRevealedSections = new Set(); // `${streamerId}:${sectionId}` — 다시 그려도 한 번 본 기사는 다시 움직이지 않는다.
+let magazineRevealObserver = null;
+let magazineTickerObserver = null;
+function magazineFxEnabled(view) { return !!view && view.classList.contains('fanpage-layout-4'); }
+function syncMagazineReveal(page, view) {
+  magazineRevealObserver?.disconnect(); magazineRevealObserver = null;
+  if (!magazineFxEnabled(view) || !('IntersectionObserver' in window)) return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const streamerId = page.streamer.id;
+  magazineRevealObserver = new IntersectionObserver((entries) => entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    const el = entry.target;
+    el.classList.add('mz-revealed');
+    if (el.id) magazineRevealedSections.add(`${streamerId}:${el.id}`);
+    magazineRevealObserver?.unobserve(el);
+  }), { rootMargin: '0px 0px -8% 0px', threshold: 0.04 });
+  const viewportBottom = window.innerHeight;
+  view.querySelectorAll('.fanpage-tab-panel section, .fanpage-tab-panel .content-card, .fanpage-tab-panel-heading').forEach((el) => {
+    if (el.parentElement?.closest('.mz-reveal')) return; // 바깥 칸만 움직인다
+    if (el.id && magazineRevealedSections.has(`${streamerId}:${el.id}`)) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.height && rect.top < viewportBottom) return; // 처음부터 보이는 칸은 그대로 둔다
+    el.classList.add('mz-reveal');
+    magazineRevealObserver.observe(el);
+  });
+}
+function syncMagazineTicker(page) {
+  const view = $('fanPageView');
+  view?.querySelector('.mz-live-ticker')?.remove();
+  magazineTickerObserver?.disconnect(); magazineTickerObserver = null;
+  if (!magazineFxEnabled(view) || !page) return;
+  const state = liveStatusStateFor(page.streamer.id);
+  if (!state.hasLoaded || !state.isLive || !state.streamUrl) return;
+  const ticker = document.createElement('a');
+  ticker.className = 'mz-live-ticker';
+  ticker.href = state.streamUrl; ticker.target = '_blank'; ticker.rel = 'noopener noreferrer';
+  const viewers = `시청자 ${Number(state.viewerCount || 0).toLocaleString('ko-KR')}명`;
+  const text = `${page.streamer.nickname} 방송 중 · ${state.title || '방송을 진행하고 있어요.'} · ${viewers} · 방송 보러가기 ↗`;
+  ticker.setAttribute('aria-label', `${page.streamer.nickname} 라이브 방송 보기 (${viewers})`);
+  const label = document.createElement('span'); label.className = 'mz-live-ticker-label'; label.textContent = 'LIVE';
+  const track = document.createElement('span'); track.className = 'mz-live-ticker-track'; track.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 2; i += 1) { const item = document.createElement('span'); item.textContent = text; track.append(item); }
+  // 글 길이에 비례한 속도(초당 약 60px)로 흐르게 한다.
+  track.style.setProperty('--mz-ticker-seconds', `${Math.max(14, Math.round(text.length * 0.45))}s`);
+  ticker.append(label, track);
+  const board = $('profileBoard');
+  if (board?.parentElement) board.before(ticker); else view.prepend(ticker);
+  if ('IntersectionObserver' in window) {
+    magazineTickerObserver = new IntersectionObserver((entries) => entries.forEach((entry) => {
+      entry.target.classList.toggle('mz-paused', !entry.isIntersecting);
+    }));
+    magazineTickerObserver.observe(ticker);
+  }
+}
+function syncMagazineFx(page, view) {
+  syncMagazineReveal(page, view);
+  syncMagazineTicker(page);
 }
 
 function renderFanPage(page, options = {}) {
@@ -5254,12 +5339,12 @@ function renderFanPage(page, options = {}) {
   const previousTabStreamerId = view.dataset.fanpageTabStreamerId || '';
   const preferredTab = previousTabStreamerId === streamerIdForTabs ? view.dataset.fanpageActiveTab : 'home';
   view.dataset.fanpageTabStreamerId = streamerIdForTabs;
-  view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2', 'fanpage-layout-3');
+  view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2', 'fanpage-layout-3', 'fanpage-layout-4');
   view.classList.remove('has-account-top-banner');
   document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-account-banner-hidden');
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active');
-  const layoutDesign = [1, 2, 3].includes(Number(page.profile?.layoutDesign))
+  const layoutDesign = [1, 2, 3, 4].includes(Number(page.profile?.layoutDesign))
     ? Number(page.profile.layoutDesign)
     : DEFAULT_FANPAGE_LAYOUT;
   const usesKawaiiLayout = layoutDesign === 1 || layoutDesign === 3;
@@ -5267,6 +5352,7 @@ function renderFanPage(page, options = {}) {
   $('mainContent').classList.remove('has-fanpage-home-kawaii');
   document.body.classList.toggle('fanpage-layout-one-active', layoutDesign === 1);
   document.body.classList.toggle('fanpage-layout-three-active', layoutDesign === 3);
+  document.body.classList.toggle('fanpage-layout-four-active', layoutDesign === 4);
   document.body.classList.toggle('fanpage-theme-sora-active', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   document.body.classList.remove('fanpage-home-kawaii-active');
   view.classList.add(`fanpage-layout-${layoutDesign}`);
@@ -5535,8 +5621,10 @@ function renderFanPage(page, options = {}) {
     panel.append(heading, grid);
     return panel;
   }
-  const homePanel = createFanPageTabPanel(tabDefinitions[0], usesKawaiiLayout ? [] : [liveSection, calendarSection, vodSection]);
-  if (usesKawaiiLayout) {
+  // 디자인 1·3과 4(매거진)는 홈·활동·콘텐츠를 칼럼으로 나눠 배치한다.
+  const usesColumnLayout = usesKawaiiLayout || layoutDesign === 4;
+  const homePanel = createFanPageTabPanel(tabDefinitions[0], usesColumnLayout ? [] : [liveSection, calendarSection, vodSection]);
+  if (usesColumnLayout) {
     const homeColumns = document.createElement('div');
     homeColumns.className = 'fanpage-home-columns';
     const mainColumn = document.createElement('div');
@@ -5550,10 +5638,10 @@ function renderFanPage(page, options = {}) {
   }
   const tabPanels = new Map([
     ['home', homePanel],
-    ['activity', createFanPageTabPanel(tabDefinitions[1], usesKawaiiLayout
+    ['activity', createFanPageTabPanel(tabDefinitions[1], usesColumnLayout
       ? [featuredPair, createFanPageColumnStacks('fanpage-activity-columns', [upboSection, messengerSection], [rouletteSection]), gallerySection, fanCharacterCard ? null : ogqSection]
       : [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, fanCharacterCard ? null : ogqSection])],
-    ['content', createFanPageTabPanel(tabDefinitions[2], usesKawaiiLayout
+    ['content', createFanPageTabPanel(tabDefinitions[2], usesColumnLayout
       ? [
         createFanPageColumnStacks('fanpage-content-columns fanpage-content-overview-columns', [youtubeSection], [songbookSection, cafeSection]),
         createFanPageColumnStacks('fanpage-content-columns fanpage-game-history-columns', [playedGamesSection], [competitionHistorySection]),
@@ -5688,6 +5776,7 @@ function renderFanPage(page, options = {}) {
   view.append(renderVodPlayerDialog());
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
   fanPageQuickNavCleanup = createFanPageQuickRemote(view);
+  syncMagazineFx(page, view);
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
 
@@ -6577,7 +6666,7 @@ function profileForLinkSave(source, field, value) {
     ogqEmoticonUrl: String(profile.ogqEmoticonUrl || ''),
     // 이용권 없는 디자인 3 미리보기 중에도 다른 설정 저장에는 마지막으로 저장된 디자인을 보낸다.
     layoutDesign: designPreviewSavedLayout(currentPage?.streamer?.id)
-      ?? ([1, 2, 3].includes(Number(profile.layoutDesign)) ? Number(profile.layoutDesign) : DEFAULT_FANPAGE_LAYOUT),
+      ?? ([1, 2, 3, 4].includes(Number(profile.layoutDesign)) ? Number(profile.layoutDesign) : DEFAULT_FANPAGE_LAYOUT),
     topBannerImageUrls: Array.isArray(profile.topBannerImageUrls) ? profile.topBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerImageUrls: Array.isArray(profile.bottomBannerImageUrls) ? profile.bottomBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerLayout: profile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked',
@@ -7252,6 +7341,7 @@ function refreshLiveSection(streamerId) {
     const focusKey = active && active.dataset.liveFocus;
     const replacement = renderLiveSection(currentPage);
     section.replaceWith(replacement);
+    syncMagazineTicker(currentPage);
     if (focusKey) {
       const focusTarget = [...replacement.querySelectorAll('[data-live-focus]')]
         .find((element) => element.dataset.liveFocus === focusKey)

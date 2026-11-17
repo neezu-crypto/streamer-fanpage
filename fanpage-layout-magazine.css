@@ -1,0 +1,203 @@
+/* 디자인 4 · 매거진 커버 (2026-11-17)
+   잡지 표지처럼: 아이보리 종이 바탕, 검은 글씨, 포인트 색 하나(레드), 세리프 제목, 모서리 없는 칸과 가는 괘선.
+   배치도 바꾼다: 프로필 = 표지(큰 이름 + 큰 사진 + 목차), 탭 = 섹션 색인, 홈 = 좁은 왼쪽 칼럼(일정) + 넓은 본문(방송·다시보기).
+   글꼴은 따로 내려받지 않고 기기의 명조체를 쓴다(추가 전송 없음). */
+body.fanpage-layout-four-active{
+  --mz-paper:#f5f1ea;--mz-card:#fffdf8;--mz-ink:#151413;--mz-soft:#5d5852;--mz-rule:#151413;--mz-hair:#d8d1c5;--mz-red:#b71c27;
+  --mz-serif:'Nanum Myeongjo','AppleMyungjo','Noto Serif KR','Batang',serif;
+  --bg:var(--mz-paper);--panel:var(--mz-card);--panel2:#f0ebe2;--line:var(--mz-hair);--text:var(--mz-ink);--muted:var(--mz-soft);--pink:var(--mz-red);--lav:var(--mz-red);
+  color-scheme:light;background:var(--mz-paper);color:var(--mz-ink);
+}
+body.fanpage-layout-four-active .site-shell,body.fanpage-layout-four-active main{background:var(--mz-paper)}
+body.fanpage-layout-four-active .topbar{background:var(--mz-paper);border-bottom:3px double var(--mz-rule);color:var(--mz-ink)}
+body.fanpage-layout-four-active .topbar a,body.fanpage-layout-four-active .topbar button{color:var(--mz-ink)}
+
+#fanPageView.fanpage-layout-4{color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .fanpage-kawaii-hero{display:none}
+#fanPageView.fanpage-layout-4 :is(h1,h2,h3){font-family:var(--mz-serif);letter-spacing:-.02em}
+#fanPageView.fanpage-layout-4 :is(p,li,span,strong,label,small,time){color:inherit}
+
+/* ---------- 표지(프로필) ---------- */
+#fanPageView.fanpage-layout-4 .profile-board{
+  grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);grid-template-areas:"tab tab" "name facts" "about about" "details details" "stock stock" "actions actions";
+  column-gap:clamp(20px,4vw,56px);row-gap:18px;padding:22px 0 30px;border:0;border-top:6px solid var(--mz-rule);border-bottom:1px solid var(--mz-rule);border-radius:0;background:transparent;box-shadow:none;color:var(--mz-ink)
+}
+#fanPageView.fanpage-layout-4 .profile-board::before,#fanPageView.fanpage-layout-4 .profile-board::after{display:none}
+#fanPageView.fanpage-layout-4 .profile-tab{grid-area:tab;position:static;display:flex;justify-content:space-between;padding:0 0 10px;border-radius:0;border-bottom:1px solid var(--mz-rule);background:none;color:var(--mz-ink);font:700 12px/1.2 var(--font);letter-spacing:.2em;text-transform:uppercase}
+#fanPageView.fanpage-layout-4 .profile-tab::after{content:'FAN ISSUE · SOOP';color:var(--mz-red)}
+/* 이름은 크게, 그 아래 작은 정사각 초상(액자) + 아이디·인증 표시 */
+#fanPageView.fanpage-layout-4 .profile-identity{grid-area:name;display:grid;grid-template-columns:132px minmax(0,1fr);grid-template-areas:"title title" "photo meta";gap:18px 20px;align-items:end;justify-items:start}
+#fanPageView.fanpage-layout-4 .profile-identity>div{display:contents}
+#fanPageView.fanpage-layout-4 .profile-avatar{grid-area:photo;width:132px;height:132px;aspect-ratio:1;padding:5px;border:0;border-radius:0;outline:1px solid var(--mz-rule);background:var(--mz-card);box-shadow:none;object-fit:cover}
+#fanPageView.fanpage-layout-4 .profile-name{grid-area:title}
+#fanPageView.fanpage-layout-4 .profile-handle{grid-area:meta;align-self:start}
+#fanPageView.fanpage-layout-4 .profile-identity .verified-tag{grid-area:meta;align-self:end;margin:0}
+#fanPageView.fanpage-layout-4 .profile-name{font:900 clamp(46px,9vw,112px)/.92 var(--mz-serif);letter-spacing:-.045em;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .profile-handle{margin:6px 0 0;color:var(--mz-red);font:700 13px var(--font);letter-spacing:.18em;text-transform:uppercase}
+#fanPageView.fanpage-layout-4 .verified-tag{border-radius:0;background:var(--mz-ink);color:var(--mz-paper)}
+/* 목차: 번호 붙은 목록 */
+#fanPageView.fanpage-layout-4 .profile-facts{grid-area:facts;align-self:start;align-content:start;gap:0;counter-reset:mzfact;border-top:3px solid var(--mz-rule)}
+#fanPageView.fanpage-layout-4 .profile-facts::before{content:'IN THIS ISSUE';display:block;padding:10px 0 8px;border-bottom:1px solid var(--mz-rule);color:var(--mz-ink);font:700 12px var(--font);letter-spacing:.18em}
+#fanPageView.fanpage-layout-4 .profile-fact{counter-increment:mzfact;min-height:0;grid-template-columns:44px 110px minmax(0,1fr);border-radius:0;border-bottom:1px solid var(--mz-hair);background:none;box-shadow:none;padding:11px 0}
+#fanPageView.fanpage-layout-4 .profile-fact::before{content:counter(mzfact,decimal-leading-zero);color:var(--mz-red);font:700 15px var(--mz-serif)}
+#fanPageView.fanpage-layout-4 .profile-fact span{display:block;height:auto;background:none;color:var(--mz-soft);font-size:12px;letter-spacing:.12em;text-align:left}
+#fanPageView.fanpage-layout-4 .profile-fact strong{padding:0;text-align:left;font:700 17px var(--mz-serif);color:var(--mz-ink)}
+/* 소개: 큰 따옴표 인용 */
+#fanPageView.fanpage-layout-4 .profile-about{grid-area:about;display:block;margin:6px 0 0;padding:20px 0 0;border-top:1px solid var(--mz-rule);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .profile-about strong{display:none}
+#fanPageView.fanpage-layout-4 .profile-about span{display:block;font:italic 400 clamp(19px,2.4vw,27px)/1.5 var(--mz-serif)}
+#fanPageView.fanpage-layout-4 .profile-about span::before{content:'“';color:var(--mz-red);font-size:1.6em;line-height:0;margin-right:4px;vertical-align:-.35em}
+/* 상세: 기사 단(column) */
+#fanPageView.fanpage-layout-4 .profile-details{grid-area:details;display:block;columns:2 260px;column-gap:40px;column-rule:1px solid var(--mz-hair);padding:18px 0 0;border-top:0}
+#fanPageView.fanpage-layout-4 .profile-detail{break-inside:avoid;display:grid;grid-template-columns:1fr;gap:2px;width:100%;margin:0 0 14px;padding:0;border:0;background:none;color:var(--mz-ink);text-align:left}
+#fanPageView.fanpage-layout-4 .profile-detail-label{color:var(--mz-red);font:700 12px var(--font);letter-spacing:.16em;text-transform:uppercase}
+#fanPageView.fanpage-layout-4 .profile-detail-value{color:var(--mz-ink);font-size:15px}
+#fanPageView.fanpage-layout-4 .profile-stock-module{grid-area:stock}
+#fanPageView.fanpage-layout-4 .profile-stock-card{border:1px solid var(--mz-rule);border-radius:0;background:var(--mz-card);box-shadow:none}
+#fanPageView.fanpage-layout-4 .profile-actions{grid-area:actions;justify-content:flex-start;gap:8px}
+
+/* ---------- 버튼·칩: 각진 검정 ---------- */
+#fanPageView.fanpage-layout-4 .button{border:1px solid var(--mz-ink);border-radius:0;background:transparent;color:var(--mz-ink);box-shadow:none;font-weight:700;letter-spacing:.04em}
+#fanPageView.fanpage-layout-4 .button:hover{background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .button-primary{border-color:var(--mz-red);background:var(--mz-red);color:#fff}
+#fanPageView.fanpage-layout-4 .button-primary:hover{background:var(--mz-ink);border-color:var(--mz-ink)}
+
+/* ---------- 탭 = 섹션 색인 ---------- */
+#fanPageView.fanpage-layout-4 .fanpage-tab-nav{counter-reset:mztab;gap:0;margin:0;padding:0;border:0;border-bottom:1px solid var(--mz-rule);border-radius:0;background:var(--mz-paper);box-shadow:none}
+#fanPageView.fanpage-layout-4 .fanpage-tab-button{counter-increment:mztab;min-height:48px;padding:10px 16px 8px;border:0;border-right:1px solid var(--mz-hair);border-radius:0;background:none;color:var(--mz-soft);box-shadow:none;font:700 13px var(--font);letter-spacing:.06em}
+#fanPageView.fanpage-layout-4 .fanpage-tab-button::before{content:counter(mztab,decimal-leading-zero) ' ';color:var(--mz-red);font:700 12px var(--mz-serif)}
+#fanPageView.fanpage-layout-4 .fanpage-tab-button:is([aria-selected=true],.active){background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .fanpage-tab-button[aria-selected=true]::before{color:#ff8a8f}
+
+/* ---------- 섹션 칸: 모서리 없음, 굵은 윗선 + 머리말 ---------- */
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading{border-bottom:1px solid var(--mz-rule);padding:22px 0 14px}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading>*:first-child{color:var(--mz-red);letter-spacing:.18em}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading :is(h2,h3){font:900 clamp(26px,4vw,40px)/1.05 var(--mz-serif);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(.content-card,.live-section,.affiliate-promo-card,.weekly-schedule-board,#fanGallerySection,#ogqSection,#videoLibrarySection,#rollingPaperSection,#memoryMomentsSection,#commentUpSection,#tamagotchiSection){
+  border:0;border-top:3px solid var(--mz-rule);border-radius:0;background:transparent;box-shadow:none;color:var(--mz-ink)
+}
+#fanPageView.fanpage-layout-4 :is(.content-card,.live-section,.weekly-schedule-board) :is(h2,h3){color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 img{border-radius:0}
+
+#fanPageView.fanpage-layout-4 :is(.messenger-link-section,.fan-gallery-card,.vod-card,.roulette-list-viewport,.roulette-item,.upbo-choice-preview,.rolling-paper-topic-card,.memory-moment-card){border-radius:0;background:var(--mz-card);background-image:none;border:1px solid var(--mz-hair);box-shadow:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .messenger-link-section{border:0;border-top:3px solid var(--mz-rule);background:transparent}
+#fanPageView.fanpage-layout-4 :is(input,select,textarea,.video-library-search,.played-games-type-select){border-radius:0;border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(.live-thumbnail-frame,.vod-thumbnail-frame,.fan-gallery-thumb-frame,.video-library-thumbnail-frame,.memory-moment-thumbnail-frame){border-radius:0;background:#e6e0d6;background-image:none}
+#fanPageView.fanpage-layout-4 .live-preview-card{border-radius:0;background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .live-preview-card *{color:inherit}
+
+/* 홈: 왼쪽 좁은 칼럼(일정·홍보) + 오른쪽 넓은 본문, 사이 세로 괘선 */
+#fanPageView.fanpage-layout-4 .fanpage-home-columns{display:grid;align-items:start;grid-template-columns:minmax(260px,.62fr) minmax(0,1.38fr);gap:0}
+#fanPageView.fanpage-layout-4 :is(.fanpage-home-side-column,.fanpage-home-main-column){width:auto;min-width:0}
+#fanPageView.fanpage-layout-4 .fanpage-home-side-column{overflow:hidden}
+#fanPageView.fanpage-layout-4 .fanpage-home-side-column>*{max-width:100%;width:auto;min-width:0}
+#fanPageView.fanpage-layout-4 .affiliate-promo-card img{max-width:100%;height:auto}
+#fanPageView.fanpage-layout-4 .fanpage-home-side-column{order:-1;padding-right:clamp(16px,2.4vw,32px);border-right:1px solid var(--mz-rule)}
+#fanPageView.fanpage-layout-4 .fanpage-home-main-column{padding-left:clamp(16px,2.4vw,32px)}
+/* 방송 칸: 속보 띠 */
+#fanPageView.fanpage-layout-4 .live-section{border-top:8px solid var(--mz-red)}
+
+
+/* ---------- 2026-11-17 전 탭 점검 후 보정 ---------- */
+/* 배지·오버레이: 어두운 칸 위 글씨는 종이색 */
+#fanPageView.fanpage-layout-4 .live-badge{border-radius:0;background:var(--mz-red);color:#fff;letter-spacing:.12em}
+#fanPageView.fanpage-layout-4 :is(.vod-duration,.fan-gallery-category){border-radius:0;background:var(--mz-ink);color:var(--mz-paper)}
+/* 하위 탭·분류 칩: 밑줄 색인 */
+#fanPageView.fanpage-layout-4 :is(.upbo-subtabs,.fan-gallery-tabs,.video-library-categories){gap:0;border-bottom:1px solid var(--mz-rule)}
+#fanPageView.fanpage-layout-4 :is(.upbo-subtab,.fan-gallery-tabs button,.video-library-category){border:0;border-radius:0;background:none;color:var(--mz-soft);box-shadow:none;font-weight:700}
+#fanPageView.fanpage-layout-4 :is(.upbo-subtab.is-active,.fan-gallery-tabs button:is(.active,.is-active,[aria-pressed=true],[aria-selected=true]),.video-library-category:is(.active,.is-active,[aria-pressed=true])){background:var(--mz-ink);color:var(--mz-paper)}
+/* 카페 글 목록: 괘선 목록 */
+#fanPageView.fanpage-layout-4 .cafe-post-row{border-bottom:1px solid var(--mz-hair);border-radius:0;background:none}
+#fanPageView.fanpage-layout-4 .cafe-post-row:hover{background:var(--mz-card)}
+#fanPageView.fanpage-layout-4 .cafe-post-row::before{background:var(--mz-red)}
+#fanPageView.fanpage-layout-4 .cafe-post-title{color:var(--mz-ink);font-family:var(--mz-serif);font-weight:700}
+#fanPageView.fanpage-layout-4 :is(.cafe-post-author,.cafe-post-date,.cafe-post-comments){color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .cafe-more-link{color:var(--mz-red);font-weight:700}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading p,#fanPageView.fanpage-layout-4 #tamagotchiSection p{color:var(--mz-soft)}
+/* 남아 있던 둥근 칸·빈 상태 */
+#fanPageView.fanpage-layout-4 :is(.profile-detail,.weekly-schedule-board-frame,.upbo-choice-scrollbox,.upbo-inline-empty,.roulette-group,.profile-link-empty-state,.profile-link-editor,.songbook-empty-state,.played-games-empty-state,.competition-history-empty,.video-library-admin-tools,.video-library-channel-card,.video-library-card,.rolling-paper-sticker-board,.roulette-item-type,.roulette-item-meter,.roulette-item-meter-fill,.memory-moment-platform,.rolling-paper-sticker-trigger,.button){border-radius:0}
+#fanPageView.fanpage-layout-4 :is(.upbo-choice-scrollbox,.upbo-inline-empty,.roulette-group,.profile-link-empty-state,.profile-link-editor,.songbook-empty-state,.played-games-empty-state,.competition-history-empty,.video-library-admin-tools,.video-library-channel-card,.video-library-card){background:var(--mz-card);border:1px solid var(--mz-hair);box-shadow:none}
+#fanPageView.fanpage-layout-4 :is(.songbook-empty-state,.played-games-empty-state,.competition-history-empty,.profile-link-empty-state,.upbo-inline-empty){border-style:dashed;color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .roulette-item-type{background:none;border:1px solid var(--mz-hair);color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .roulette-item-meter-fill{background:var(--mz-red)}
+#fanPageView.fanpage-layout-4 .button:disabled,#fanPageView.fanpage-layout-4 .button[aria-disabled=true]{border-color:var(--mz-hair);background:#ebe5db;color:#8d867d;opacity:1}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading .button+.button{margin-left:6px}
+#fanPageView.fanpage-layout-4 .messenger-link-section [class*=icon]{border:1px solid var(--mz-rule);border-radius:0;background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
+/* 주간 일정 */
+#fanPageView.fanpage-layout-4 :is(.weekly-schedule-board-frame,.weekly-schedule-mobile-list){background:var(--mz-card);border:1px solid var(--mz-hair);box-shadow:none}
+#fanPageView.fanpage-layout-4 .weekly-schedule-date-caption{border-radius:0;background:var(--mz-ink);background-image:none;color:var(--mz-paper);box-shadow:none}
+#fanPageView.fanpage-layout-4 .weekly-schedule-arrow{border-radius:0;border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
+#fanPageView.fanpage-layout-4 .weekly-schedule-mobile-day{grid-template-columns:minmax(118px,auto) minmax(0,1fr);border-color:var(--mz-hair)}
+#fanPageView.fanpage-layout-4 .weekly-schedule-mobile-day>:first-child{white-space:nowrap;color:var(--mz-red);font-weight:700}
+#fanPageView.fanpage-layout-4 .weekly-schedule-mobile-day.is-empty>:last-child{color:var(--mz-soft)}
+/* 롤링페이퍼: 줄 노트 */
+#fanPageView.fanpage-layout-4 .rolling-paper-topic-card{border:1px solid var(--mz-rule);background:var(--mz-card) repeating-linear-gradient(to bottom,transparent 0 31px,var(--mz-hair) 31px 32px);background-position:0 18px}
+#fanPageView.fanpage-layout-4 .rolling-paper-topic-title{font:900 clamp(22px,3vw,30px)/1.2 var(--mz-serif);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .rolling-paper-topic-decoration{background:var(--mz-ink);color:var(--mz-paper)}
+/* 탭 색인: 한 줄 가로 넘김, 머리말 아래 이중 괘선 제거, 칸 좌우 여백 정렬 */
+#fanPageView.fanpage-layout-4 .fanpage-tab-nav{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;border-top:1px solid var(--mz-rule)}
+#fanPageView.fanpage-layout-4 .fanpage-tab-nav::-webkit-scrollbar{display:none}
+#fanPageView.fanpage-layout-4 .fanpage-tab-button{flex:1 0 auto;white-space:nowrap}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading{border-bottom:0;padding-bottom:18px}
+#fanPageView.fanpage-layout-4 :is(.content-card,.live-section,.weekly-schedule-board,#fanGallerySection,#ogqSection,#videoLibrarySection,#rollingPaperSection,#memoryMomentsSection,#commentUpSection,#tamagotchiSection,.messenger-link-section){padding-left:0;padding-right:0}
+/* 팝업: 종이 카드, 영상 플레이어만 어두운 화면 */
+#fanPageView.fanpage-layout-4 dialog{border:1px solid var(--mz-rule);border-top:6px solid var(--mz-rule);border-radius:0;background:var(--mz-paper);color:var(--mz-ink);box-shadow:0 24px 60px rgba(21,20,19,.28)}
+#fanPageView.fanpage-layout-4 dialog::backdrop{background:rgba(21,20,19,.55)}
+#fanPageView.fanpage-layout-4 dialog :is(h2,h3){color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 dialog :is(p,small,legend,label,span){color:inherit}
+#fanPageView.fanpage-layout-4 dialog :is(fieldset,.profile-layout-option){border-radius:0;border-color:var(--mz-hair);background:var(--mz-card);box-shadow:none}
+#fanPageView.fanpage-layout-4 dialog .profile-layout-option:has(input:checked){border-color:var(--mz-rule);box-shadow:inset 4px 0 0 var(--mz-red)}
+#fanPageView.fanpage-layout-4 dialog :is(.dialog-close,[class*=close]){border-radius:0;border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 dialog input[type=radio]{accent-color:var(--mz-red)}
+#fanPageView.fanpage-layout-4 dialog :is(.profile-editor-field,.banner-settings-heading){color:var(--mz-ink);border-radius:0;border-color:var(--mz-hair);background:transparent}
+#fanPageView.fanpage-layout-4 dialog .profile-editor-hint{color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 #weeklyScheduleGraphicDialog button{color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog){background:var(--mz-ink);color:var(--mz-paper);border-color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) :is(h2,h3,p,span,button){color:var(--mz-paper)}
+
+/* 가독성: 포커스 표시(키보드 이동), 어두운 칸 위에서는 종이색 */
+#fanPageView.fanpage-layout-4 :is(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:3px solid var(--mz-ink);outline-offset:2px;box-shadow:0 0 0 5px var(--mz-paper)}
+#fanPageView.fanpage-layout-4 :is(.button-primary,.fanpage-tab-button[aria-selected=true],.live-preview-card *,#vodPlayerDialog *,#youtubePlayerDialog *):focus-visible{outline-color:var(--mz-red);box-shadow:0 0 0 5px var(--mz-paper)}
+#fanPageView.fanpage-layout-4 dialog :focus-visible{outline:3px solid var(--mz-ink);outline-offset:2px}
+
+/* ---------- 배경 효과 (2026-11-18) ---------- */
+/* 1. 종이 질감: 요철·섬유 결·얼룩·입자를 겹친 정지 타일(fanpage-paper-texture.svg) */
+body.fanpage-layout-four-active{background-color:var(--mz-paper);background-image:url("fanpage-paper-texture.svg?v=20261118-p6");background-size:360px 360px}
+/* 가장자리 음영: 종이 한 장 위에 올린 느낌(고정, 클릭 통과) */
+body.fanpage-layout-four-active::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 50% 42%,transparent 58%,rgba(92,70,40,.10) 100%)}
+body.fanpage-layout-four-active :is(.site-shell,main){background:transparent}
+/* 2. 기사 등장: 화면에 들어올 때 한 번, 위 괘선이 그어지고 내용이 떠오른다 */
+#fanPageView.fanpage-layout-4 .mz-reveal{position:relative;opacity:0;transform:translateY(14px)}
+#fanPageView.fanpage-layout-4 .mz-reveal.mz-revealed{opacity:1;transform:none;transition:opacity .55s ease-out,transform .55s cubic-bezier(.2,.7,.2,1)}
+#fanPageView.fanpage-layout-4 .mz-reveal::after{content:'';position:absolute;left:0;top:-3px;width:100%;height:3px;background:var(--mz-red);transform:scaleX(0);transform-origin:left;pointer-events:none}
+#fanPageView.fanpage-layout-4 .mz-reveal.mz-revealed::after{animation:mz-rule-draw .9s cubic-bezier(.6,0,.2,1) forwards}
+@keyframes mz-rule-draw{0%{transform:scaleX(0);opacity:1}60%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
+/* 3. 방송 중 속보 띠 */
+#fanPageView.fanpage-layout-4 .mz-live-ticker{display:flex;align-items:stretch;overflow:hidden;margin:0 0 14px;border:1px solid var(--mz-red);background:var(--mz-red);color:#fff;text-decoration:none;font:700 14px/1 var(--font)}
+#fanPageView.fanpage-layout-4 .mz-live-ticker-label{flex:none;display:flex;align-items:center;gap:7px;padding:10px 14px;position:relative;z-index:1;background:var(--mz-ink);color:#fff;letter-spacing:.16em;box-shadow:6px 0 0 var(--mz-red)}
+#fanPageView.fanpage-layout-4 .mz-live-ticker-label::before{content:'';width:8px;height:8px;background:var(--mz-red);animation:mz-blink 1.2s steps(2,start) infinite}
+#fanPageView.fanpage-layout-4 .mz-live-ticker-track{display:flex;flex:none;white-space:nowrap;animation:mz-ticker var(--mz-ticker-seconds,20s) linear infinite}
+#fanPageView.fanpage-layout-4 .mz-live-ticker-track span{padding:10px 48px 10px 18px}
+#fanPageView.fanpage-layout-4 .mz-live-ticker:is(:hover,:focus-visible) .mz-live-ticker-track,#fanPageView.fanpage-layout-4 .mz-live-ticker.mz-paused .mz-live-ticker-track{animation-play-state:paused}
+#fanPageView.fanpage-layout-4 .mz-live-ticker.mz-paused .mz-live-ticker-label::before{animation-play-state:paused}
+#fanPageView.fanpage-layout-4 .mz-live-ticker:focus-visible{outline:3px solid var(--mz-ink);outline-offset:2px}
+@keyframes mz-ticker{to{transform:translateX(-50%)}}
+@keyframes mz-blink{to{visibility:hidden}}
+@media (prefers-reduced-motion:reduce){
+  #fanPageView.fanpage-layout-4 .mz-reveal{opacity:1;transform:none}
+  #fanPageView.fanpage-layout-4 .mz-reveal::after{display:none}
+  #fanPageView.fanpage-layout-4 .mz-live-ticker-track{animation:none;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+  #fanPageView.fanpage-layout-4 .mz-live-ticker-track span+span{display:none}
+  #fanPageView.fanpage-layout-4 .mz-live-ticker-label::before{animation:none}
+}
+
+@media (max-width:760px){
+  #fanPageView.fanpage-layout-4 .profile-board{grid-template-columns:1fr;grid-template-areas:"tab" "name" "facts" "about" "details" "stock" "actions"}
+  #fanPageView.fanpage-layout-4 .profile-identity{grid-template-columns:96px minmax(0,1fr)}
+  #fanPageView.fanpage-layout-4 .profile-avatar{width:96px;height:96px}
+  #fanPageView.fanpage-layout-4 .profile-name{font-size:clamp(44px,15vw,72px)}
+  #fanPageView.fanpage-layout-4 .fanpage-home-columns{grid-template-columns:1fr}
+  #fanPageView.fanpage-layout-4 .fanpage-home-side-column{order:0;padding:0;border:0}
+  #fanPageView.fanpage-layout-4 .fanpage-home-main-column{padding:0}
+  #fanPageView.fanpage-layout-4 .fanpage-tab-button{border-right:0}
+}
