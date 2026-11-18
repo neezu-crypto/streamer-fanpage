@@ -1,0 +1,427 @@
+/* 디자인 4 · 포토카드 바인더 (2026-11-18)
+   팬들이 모으는 포토카드와 바인더: 크림 속지 + 점 무늬, 핑크 포인트, 둥근 칸, 마스킹테이프·스티커 장식.
+   프로필 = 대문(큰 제목 + 홀로그램 테두리 사진), 대문 아래 포카 바인더 바로가기, 탭 = 바인더 속지(오른쪽에서 넘겨 들어옴).
+   글꼴은 사이트에 이미 있는 Jua·Gowun Dodum만 쓴다(추가 내려받기 없음). 대표 색 고르기는 없다(고정 팔레트). */
+body.fanpage-layout-four-active{
+  --mz-paper:#fbf9f6;--mz-card:#ffffff;--mz-ink:#231b2e;--mz-soft:#5f566b;--mz-rule:#d8c6d4;--mz-hair:#efe4ec;--mz-red:#c0245f;
+  --mz-serif:'Jua','Gowun Dodum',var(--font),sans-serif;
+  --bd-pink:#ff6fa3;--bd-pink2:#ffb3cf;--bd-t1:#ffe3ee;--bd-t3:#fff0f5;--bd-t4:#fff6ec;--bd-t5:#f1e6ff;--bd-r:16px;
+  --bd-holo:conic-gradient(from 210deg,#ffd1e8,#c9f0ff,#e1d4ff,#fff3c4,#c9ffe6,#ffd1e8);
+  --bg:var(--mz-paper);--panel:var(--mz-card);--panel2:#f6f0f4;--line:var(--mz-hair);--text:var(--mz-ink);--muted:var(--mz-soft);--pink:var(--mz-red);--lav:var(--mz-red);
+  color-scheme:light;background:var(--mz-paper);color:var(--mz-ink);
+}
+body.fanpage-layout-four-active .site-shell,body.fanpage-layout-four-active main{background:var(--mz-paper)}
+body.fanpage-layout-four-active .topbar{background:var(--mz-paper);border-bottom:3px double var(--mz-rule);color:var(--mz-ink)}
+body.fanpage-layout-four-active .topbar a,body.fanpage-layout-four-active .topbar button{color:var(--mz-ink)}
+
+#fanPageView.fanpage-layout-4{color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .fanpage-kawaii-hero{display:none}
+#fanPageView.fanpage-layout-4 :is(h1,h2,h3){font-family:var(--mz-serif);letter-spacing:-.02em}
+#fanPageView.fanpage-layout-4 :is(p,li,span,strong,label,small,time){color:inherit}
+
+/* ---------- 대문(프로필) ---------- */
+#fanPageView.fanpage-layout-4 .profile-board{
+  position:relative;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);grid-template-areas:"tab tab" "name photo" "chars photo" "about photo" "facts facts" "details details" "stock stock" "actions actions";
+  column-gap:clamp(20px,4vw,56px);row-gap:16px;padding:26px 0 30px;border:0;border-radius:var(--bd-r);background:transparent;box-shadow:none;color:var(--mz-ink)
+}
+#fanPageView.fanpage-layout-4 .profile-board::before,#fanPageView.fanpage-layout-4 .profile-board::after{display:none}
+#fanPageView.fanpage-layout-4 .profile-tab{grid-area:tab;justify-self:start;position:static;padding:5px 14px;border-radius:3px;background:color-mix(in oklab,var(--bd-pink) 30%,#fff);color:var(--mz-ink);font:400 14px/1.2 var(--mz-serif);letter-spacing:0;text-transform:none;rotate:-2deg}
+#fanPageView.fanpage-layout-4 .profile-tab::after{content:' · fan page'}
+#fanPageView.fanpage-layout-4 .profile-identity{display:contents}
+#fanPageView.fanpage-layout-4 .profile-identity>div{grid-area:name;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+/* 사진: 홀로그램 테두리 포토카드 + 테이프·별 스티커 */
+#fanPageView.fanpage-layout-4 .profile-avatar{grid-area:photo;align-self:start;justify-self:stretch;width:100%;height:auto;aspect-ratio:4/5;padding:12px;border:0;border-radius:20px;background:var(--bd-holo);box-shadow:0 20px 50px color-mix(in oklab,var(--bd-pink) 30%,transparent);object-fit:cover}
+#fanPageView.fanpage-layout-4 .profile-name{font:400 clamp(44px,7.4vw,96px)/1.02 var(--mz-serif);letter-spacing:-.01em;color:var(--mz-ink);word-break:keep-all}
+#fanPageView.fanpage-layout-4 .profile-handle{margin:0;color:var(--mz-red);font:700 14px var(--font)}
+#fanPageView.fanpage-layout-4 .verified-tag{border-radius:999px;background:var(--mz-ink);color:#fff}
+#fanPageView.fanpage-layout-4 .fanpage-binder-characters{grid-area:chars;margin:0}
+/* 사실 칸: 둥근 파스텔 카드 4열 */
+#fanPageView.fanpage-layout-4 .profile-facts{grid-area:facts;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#fanPageView.fanpage-layout-4 .profile-fact{min-height:86px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;padding:14px 16px;border:0;border-radius:var(--bd-r);background:var(--bd-t1);box-shadow:inset 0 0 0 1.5px color-mix(in oklab,var(--bd-pink) 22%,transparent);text-align:left}
+#fanPageView.fanpage-layout-4 .profile-fact:nth-child(4n+2){background:var(--bd-t5)}
+#fanPageView.fanpage-layout-4 .profile-fact:nth-child(4n+3){background:var(--bd-t4)}
+#fanPageView.fanpage-layout-4 .profile-fact:nth-child(4n){background:var(--bd-t3)}
+#fanPageView.fanpage-layout-4 .profile-fact span{display:block;height:auto;background:none;color:var(--mz-soft);font-size:12px;text-align:left}
+#fanPageView.fanpage-layout-4 .profile-fact strong{padding:0;text-align:left;font:400 20px/1.2 var(--mz-serif);color:var(--mz-ink)}
+/* 소개 */
+#fanPageView.fanpage-layout-4 .profile-about{grid-area:about;display:block;margin:0;padding:0;border:0;background:none;color:var(--mz-ink);text-align:left}
+#fanPageView.fanpage-layout-4 .profile-about strong{display:none}
+#fanPageView.fanpage-layout-4 .profile-about span{display:block;font-size:16px;line-height:1.7}
+/* 상세 */
+#fanPageView.fanpage-layout-4 .profile-details{grid-area:details;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:0;border:0}
+#fanPageView.fanpage-layout-4 .profile-detail{display:grid;grid-template-columns:1fr;gap:4px;width:100%;margin:0;padding:12px 16px;border:0;border-radius:var(--bd-r);background:var(--mz-card);box-shadow:inset 0 0 0 1.5px var(--mz-hair);color:var(--mz-ink);text-align:left}
+#fanPageView.fanpage-layout-4 .profile-detail-label{color:var(--mz-red);font:700 12px var(--font)}
+#fanPageView.fanpage-layout-4 .profile-detail-value{color:var(--mz-ink);font-size:15px}
+#fanPageView.fanpage-layout-4 .profile-stock-module{grid-area:stock}
+#fanPageView.fanpage-layout-4 .profile-stock-card{border:0;border-radius:var(--bd-r);background:var(--mz-card);box-shadow:inset 0 0 0 1.5px var(--mz-hair)}
+#fanPageView.fanpage-layout-4 .profile-actions{grid-area:actions;justify-content:flex-start;gap:8px}
+
+/* ---------- 버튼·칩: 각진 검정 ---------- */
+#fanPageView.fanpage-layout-4 .button{border:1px solid var(--mz-ink);border-radius:var(--bd-r);background:transparent;color:var(--mz-ink);box-shadow:none;font-weight:700;letter-spacing:.04em}
+#fanPageView.fanpage-layout-4 .button:hover{background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .button-primary{border-color:var(--mz-red);background:var(--mz-red);color:#fff}
+#fanPageView.fanpage-layout-4 .button-primary:hover{background:var(--mz-ink);border-color:var(--mz-ink)}
+
+/* ---------- 섹션 칸: 모서리 없음, 굵은 윗선 + 머리말 ---------- */
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading{border-bottom:1px solid var(--mz-rule);padding:22px 0 14px}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading>*:first-child{color:var(--mz-red);letter-spacing:.18em}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading :is(h2,h3){font:900 clamp(26px,4vw,40px)/1.05 var(--mz-serif);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(.content-card,.live-section,.affiliate-promo-card,.weekly-schedule-board,#fanGallerySection,#ogqSection,#videoLibrarySection,#rollingPaperSection,#memoryMomentsSection,#commentUpSection,#tamagotchiSection){
+  border:0;border-radius:20px;background:var(--mz-card);box-shadow:inset 0 0 0 1.5px var(--mz-hair),0 10px 24px rgba(35,27,46,.05);color:var(--mz-ink)
+}
+#fanPageView.fanpage-layout-4 :is(.content-card,.live-section,.weekly-schedule-board) :is(h2,h3){color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 img{border-radius:var(--bd-r)}
+
+#fanPageView.fanpage-layout-4 :is(.messenger-link-section,.fan-gallery-card,.vod-card,.roulette-list-viewport,.roulette-item,.upbo-choice-preview,.rolling-paper-topic-card,.memory-moment-card){border-radius:var(--bd-r);background:var(--mz-card);background-image:none;border:1px solid var(--mz-hair);box-shadow:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .messenger-link-section{border:0;border-radius:20px;background:var(--mz-card);box-shadow:inset 0 0 0 1.5px var(--mz-hair)}
+#fanPageView.fanpage-layout-4 :is(input,select,textarea,.video-library-search,.played-games-type-select):not(.weekly-schedule-preview-frame *){border-radius:var(--bd-r);border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(.live-thumbnail-frame,.vod-thumbnail-frame,.fan-gallery-thumb-frame,.video-library-thumbnail-frame,.memory-moment-thumbnail-frame){border-radius:var(--bd-r);background:#f3eaf0;background-image:none}
+#fanPageView.fanpage-layout-4 .live-preview-card{border-radius:var(--bd-r);background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .live-preview-card *{color:inherit}
+
+/* 홈: 왼쪽 좁은 칼럼(일정·홍보) + 오른쪽 넓은 본문, 사이 세로 괘선 */
+#fanPageView.fanpage-layout-4 .fanpage-home-columns{display:grid;align-items:start;gap:16px}
+#fanPageView.fanpage-layout-4 :is(.fanpage-home-side-column,.fanpage-home-main-column){width:auto;min-width:0}
+#fanPageView.fanpage-layout-4 .fanpage-home-side-column{overflow:hidden}
+#fanPageView.fanpage-layout-4 .fanpage-home-side-column>*{max-width:100%;width:auto;min-width:0}
+#fanPageView.fanpage-layout-4 .affiliate-promo-card img{max-width:100%;height:auto}
+#fanPageView.fanpage-layout-4 .fanpage-home-side-column{order:1}
+
+/* 방송 칸: 속보 띠 */
+
+
+
+/* ---------- 2026-11-17 전 탭 점검 후 보정 ---------- */
+/* 배지·오버레이: 어두운 칸 위 글씨는 종이색 */
+#fanPageView.fanpage-layout-4 .live-badge{border-radius:var(--bd-r);background:var(--mz-red);color:#fff;letter-spacing:.12em}
+#fanPageView.fanpage-layout-4 :is(.vod-duration,.fan-gallery-category){border-radius:var(--bd-r);background:var(--mz-ink);color:var(--mz-paper)}
+/* 하위 탭·분류 칩: 밑줄 색인 */
+#fanPageView.fanpage-layout-4 :is(.upbo-subtabs,.fan-gallery-tabs,.video-library-categories){gap:0;border-bottom:1px solid var(--mz-rule)}
+#fanPageView.fanpage-layout-4 :is(.upbo-subtab,.fan-gallery-tabs button,.video-library-category){border:0;border-radius:var(--bd-r);background:none;color:var(--mz-soft);box-shadow:none;font-weight:700}
+#fanPageView.fanpage-layout-4 :is(.upbo-subtab.is-active,.fan-gallery-tabs button:is(.active,.is-active,[aria-pressed=true],[aria-selected=true]),.video-library-category:is(.active,.is-active,[aria-pressed=true])){background:var(--mz-ink);color:var(--mz-paper)}
+/* 카페 글 목록: 괘선 목록 */
+#fanPageView.fanpage-layout-4 .cafe-post-row{border-bottom:1px solid var(--mz-hair);border-radius:var(--bd-r);background:none}
+#fanPageView.fanpage-layout-4 .cafe-post-row:hover{background:var(--mz-card)}
+#fanPageView.fanpage-layout-4 .cafe-post-row::before{background:var(--mz-red)}
+#fanPageView.fanpage-layout-4 .cafe-post-title{color:var(--mz-ink);font-family:var(--mz-serif);font-weight:700}
+#fanPageView.fanpage-layout-4 :is(.cafe-post-author,.cafe-post-date,.cafe-post-comments){color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .cafe-more-link{color:var(--mz-red);font-weight:700}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading p,#fanPageView.fanpage-layout-4 #tamagotchiSection p{color:var(--mz-soft)}
+/* 남아 있던 둥근 칸·빈 상태 */
+#fanPageView.fanpage-layout-4 :is(.profile-detail,.weekly-schedule-board-frame,.upbo-choice-scrollbox,.upbo-inline-empty,.roulette-group,.profile-link-empty-state,.profile-link-editor,.songbook-empty-state,.played-games-empty-state,.competition-history-empty,.video-library-admin-tools,.video-library-channel-card,.video-library-card,.rolling-paper-sticker-board,.roulette-item-type,.roulette-item-meter,.roulette-item-meter-fill,.memory-moment-platform,.rolling-paper-sticker-trigger,.button){border-radius:var(--bd-r)}
+#fanPageView.fanpage-layout-4 :is(.upbo-choice-scrollbox,.upbo-inline-empty,.roulette-group,.profile-link-empty-state,.profile-link-editor,.songbook-empty-state,.played-games-empty-state,.competition-history-empty,.video-library-admin-tools,.video-library-channel-card,.video-library-card){background:var(--mz-card);border:1px solid var(--mz-hair);box-shadow:none}
+#fanPageView.fanpage-layout-4 :is(.songbook-empty-state,.played-games-empty-state,.competition-history-empty,.profile-link-empty-state,.upbo-inline-empty){border-style:dashed;color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .roulette-item-type{background:none;border:1px solid var(--mz-hair);color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .roulette-item-meter-fill{background:var(--mz-red)}
+#fanPageView.fanpage-layout-4 .button:disabled,#fanPageView.fanpage-layout-4 .button[aria-disabled=true]{border-color:var(--mz-hair);background:#f1ebef;color:#7d7487;opacity:1}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading .button+.button{margin-left:6px}
+#fanPageView.fanpage-layout-4 .messenger-link-section [class*=icon]{border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
+/* 주간 일정 */
+#fanPageView.fanpage-layout-4 :is(.weekly-schedule-board-frame,.weekly-schedule-mobile-list){background:var(--mz-card);border:1px solid var(--mz-hair);box-shadow:none}
+#fanPageView.fanpage-layout-4 .weekly-schedule-date-caption{border-radius:var(--bd-r);background:var(--mz-ink);background-image:none;color:var(--mz-paper);box-shadow:none}
+#fanPageView.fanpage-layout-4 .weekly-schedule-arrow:not(.weekly-schedule-preview-frame *){border-radius:var(--bd-r);border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
+#fanPageView.fanpage-layout-4 .weekly-schedule-mobile-day{grid-template-columns:minmax(118px,auto) minmax(0,1fr);border-color:var(--mz-hair)}
+#fanPageView.fanpage-layout-4 .weekly-schedule-mobile-day>:first-child{white-space:nowrap;color:var(--mz-red);font-weight:700}
+#fanPageView.fanpage-layout-4 .weekly-schedule-mobile-day.is-empty>:last-child{color:var(--mz-soft)}
+/* 롤링페이퍼: 줄 노트 */
+#fanPageView.fanpage-layout-4 .rolling-paper-topic-card{border:1px solid var(--mz-rule);background:var(--mz-card) repeating-linear-gradient(to bottom,transparent 0 31px,var(--mz-hair) 31px 32px);background-position:0 18px}
+#fanPageView.fanpage-layout-4 .rolling-paper-topic-title{font:900 clamp(22px,3vw,30px)/1.2 var(--mz-serif);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .rolling-paper-topic-decoration{background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading{border-bottom:0;padding-bottom:18px}
+#fanPageView.fanpage-layout-4 :is(.content-card,.live-section,.weekly-schedule-board,#fanGallerySection,#ogqSection,#videoLibrarySection,#rollingPaperSection,#memoryMomentsSection,#commentUpSection,#tamagotchiSection,.messenger-link-section){padding:clamp(16px,2.4vw,24px)}
+/* 팝업: 종이 카드, 영상 플레이어만 어두운 화면 */
+#fanPageView.fanpage-layout-4 dialog{border:0;border-radius:20px;background:var(--mz-paper);outline:6px solid #fff;outline-offset:-6px;color:var(--mz-ink);box-shadow:0 0 0 2px color-mix(in oklab,var(--bd-pink) 40%,transparent),0 40px 100px rgba(35,27,46,.35)}
+#fanPageView.fanpage-layout-4 dialog::backdrop{background:rgba(35,27,46,.55)}
+#fanPageView.fanpage-layout-4 dialog :is(h2,h3){color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 dialog :is(p,small,legend,label,span){color:inherit}
+#fanPageView.fanpage-layout-4 dialog :is(fieldset,.profile-layout-option){border-radius:var(--bd-r);border-color:var(--mz-hair);background:var(--mz-card);box-shadow:none}
+#fanPageView.fanpage-layout-4 dialog .profile-layout-option:has(input:checked){border-color:var(--mz-rule);box-shadow:inset 4px 0 0 var(--mz-red)}
+#fanPageView.fanpage-layout-4 dialog :is(.dialog-close,[class*=close]){border-radius:var(--bd-r);border:1px solid var(--mz-rule);background:var(--mz-card);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 dialog input[type=radio]{accent-color:var(--mz-red)}
+#fanPageView.fanpage-layout-4 dialog :is(.profile-editor-field,.banner-settings-heading){color:var(--mz-ink);border-radius:var(--bd-r);border-color:var(--mz-hair);background:transparent}
+#fanPageView.fanpage-layout-4 dialog .profile-editor-hint{color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 #weeklyScheduleGraphicDialog button{color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog){background:var(--mz-ink);color:var(--mz-paper);border-color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) :is(h2,h3,p,span,button){color:var(--mz-paper)}
+
+/* 가독성: 포커스 표시(키보드 이동), 어두운 칸 위에서는 종이색 */
+#fanPageView.fanpage-layout-4 :is(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:3px solid var(--mz-ink);outline-offset:2px;box-shadow:0 0 0 5px var(--mz-paper)}
+#fanPageView.fanpage-layout-4 :is(.button-primary,.fanpage-tab-button[aria-selected=true],.live-preview-card *,#vodPlayerDialog *,#youtubePlayerDialog *):focus-visible{outline-color:var(--mz-red);box-shadow:0 0 0 5px var(--mz-paper)}
+#fanPageView.fanpage-layout-4 dialog :focus-visible{outline:3px solid var(--mz-ink);outline-offset:2px}
+
+/* ---------- 배경: 바인더 속지 점 무늬 ---------- */
+body.fanpage-layout-four-active{background-color:var(--mz-paper);background-image:radial-gradient(color-mix(in oklab,var(--bd-pink) 16%,transparent) 1px,transparent 1.5px);background-size:22px 22px}
+body.fanpage-layout-four-active :is(.site-shell,main){background:transparent}
+
+/* ---------- 배포 후 전체 점검 보정 (2026-11-18) ---------- */
+/* 바로가기 리모컨·떠 있는 버튼: 종이 카드 */
+#fanPageView.fanpage-layout-4 .fan-quick-panel{border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-card);color:var(--mz-ink);box-shadow:0 10px 28px rgba(35,27,46,.14);backdrop-filter:none}
+#fanPageView.fanpage-layout-4 .fan-quick-header{border-bottom:1px solid var(--mz-hair);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .fan-quick-header *{color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(.fan-quick-sound-settings,.fan-quick-close){border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
+#fanPageView.fanpage-layout-4 .fan-quick-link{border-radius:var(--bd-r);background:none;color:var(--mz-ink);box-shadow:none}
+#fanPageView.fanpage-layout-4 .fan-quick-link:hover{background:#fff0f5}
+#fanPageView.fanpage-layout-4 .fan-quick-link:is(.active,.is-active,[aria-current=true],[aria-current=location]){background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .fan-quick-number{color:var(--mz-red);font-family:var(--mz-serif);font-weight:700}
+#fanPageView.fanpage-layout-4 .fan-quick-link:is(.active,.is-active,[aria-current=true],[aria-current=location]) .fan-quick-number{color:#ffd1e1}
+#fanPageView.fanpage-layout-4 .fan-quick-label{color:inherit}
+#fanPageView.fanpage-layout-4 .fan-quick-scroll-rail{border-radius:var(--bd-r);background:var(--mz-hair)}
+#fanPageView.fanpage-layout-4 .fan-quick-scroll-thumb{border-radius:var(--bd-r);background:var(--mz-red)}
+#fanPageView.fanpage-layout-4 :is(.fan-quick-sticker-button,.fan-quick-toggle,.fan-quick-fullscreen){border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-card);color:var(--mz-ink);box-shadow:0 6px 16px rgba(35,27,46,.14)}
+#fanPageView.fanpage-layout-4 .fan-quick-sticker-menu{border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-card);color:var(--mz-ink);box-shadow:0 10px 28px rgba(35,27,46,.14)}
+#fanPageView.fanpage-layout-4 .fan-quick-sticker-menu *{color:var(--mz-ink)}
+/* 감정표현 버튼: 공용 규칙(어두운 바탕)보다 우선하도록 같은 경로로 지정 */
+#fanPageView.fanpage-layout-4 .fan-quick-remote > #game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button{border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-card);color:var(--mz-ink);box-shadow:0 6px 16px rgba(35,27,46,.14);font-size:12px;font-weight:700}
+#fanPageView.fanpage-layout-4 .fan-quick-remote > #game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button *{color:inherit}
+#fanPageView.fanpage-layout-4 .fan-quick-remote > #game-series-emote-launcher.fanpage-emote-remote-attached #game-series-emote-button:hover{background:var(--mz-ink);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 .game-series-emote-tooltip{border-radius:var(--bd-r);background:var(--mz-ink);color:var(--mz-paper);box-shadow:none}
+/* 방송 종료 카드·일정 편집 버튼·남은 둥근 표시 */
+#fanPageView.fanpage-layout-4 .live-offline-card{border:1px solid var(--mz-hair);border-radius:var(--bd-r);background:var(--mz-card);box-shadow:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .live-offline-mark{border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .live-offline-copy span{color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .weekly-schedule-board-edit{border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-ink);background-image:none;color:var(--mz-paper);box-shadow:none}
+#fanPageView.fanpage-layout-4 :is(.upbo-choice-mark,.memory-moment-thumbnail-fallback){border-radius:var(--bd-r)}
+/* 가독성: 공용 스타일의 9~11px 글씨를 디자인 4에서는 12px로 */
+#fanPageView.fanpage-layout-4 .verified-tag,
+#fanPageView.fanpage-layout-4 .profile-stock-eyebrow,
+#fanPageView.fanpage-layout-4 .profile-stock-meta,
+#fanPageView.fanpage-layout-4 .profile-stock-attendance-gift,
+#fanPageView.fanpage-layout-4 .profile-stock-attendance-copy > span,
+#fanPageView.fanpage-layout-4 .eyebrow,
+#fanPageView.fanpage-layout-4 .live-subtitle,
+#fanPageView.fanpage-layout-4 .button,
+#fanPageView.fanpage-layout-4 .live-offline-copy > span,
+#fanPageView.fanpage-layout-4 .vod-count,
+#fanPageView.fanpage-layout-4 .vod-refresh-status,
+#fanPageView.fanpage-layout-4 .vod-duration,
+#fanPageView.fanpage-layout-4 .vod-metadata > span,
+#fanPageView.fanpage-layout-4 .fan-quick-number,
+#fanPageView.fanpage-layout-4 .fan-quick-label,
+#fanPageView.fanpage-layout-4 .upbo-request-note,
+#fanPageView.fanpage-layout-4 .messenger-link-note,
+#fanPageView.fanpage-layout-4 .roulette-description,
+#fanPageView.fanpage-layout-4 .roulette-status,
+#fanPageView.fanpage-layout-4 .roulette-item-count,
+#fanPageView.fanpage-layout-4 .roulette-item-type,
+#fanPageView.fanpage-layout-4 .roulette-scroll-note,
+#fanPageView.fanpage-layout-4 .fan-gallery-count,
+#fanPageView.fanpage-layout-4 .fan-gallery-tabs > button,
+#fanPageView.fanpage-layout-4 .fan-gallery-category,
+#fanPageView.fanpage-layout-4 .fan-gallery-date,
+#fanPageView.fanpage-layout-4 .fan-gallery-stats,
+#fanPageView.fanpage-layout-4 .profile-link-editor-note,
+#fanPageView.fanpage-layout-4 .youtube-status,
+#fanPageView.fanpage-layout-4 .songbook-owner-hint,
+#fanPageView.fanpage-layout-4 .cafe-more-link,
+#fanPageView.fanpage-layout-4 .cafe-post-author,
+#fanPageView.fanpage-layout-4 .cafe-post-date,
+#fanPageView.fanpage-layout-4 .cafe-post-comments,
+#fanPageView.fanpage-layout-4 .played-games-owner-hint,
+#fanPageView.fanpage-layout-4 .competition-history-count,
+#fanPageView.fanpage-layout-4 .video-library-count,
+#fanPageView.fanpage-layout-4 .video-library-admin-tools > summary,
+#fanPageView.fanpage-layout-4 .video-library-channel-card > small,
+#fanPageView.fanpage-layout-4 .video-library-source,
+#fanPageView.fanpage-layout-4 .video-library-card-body > small,
+#fanPageView.fanpage-layout-4 .rolling-paper-count,
+#fanPageView.fanpage-layout-4 .rolling-paper-topic-count,
+#fanPageView.fanpage-layout-4 .memory-moments-owner-hint,
+#fanPageView.fanpage-layout-4 .memory-moment-platform,
+#fanPageView.fanpage-layout-4 .memory-moment-date{font-size:12px}
+#fanPageView.fanpage-layout-4 :is(.eyebrow,.profile-stock-eyebrow){letter-spacing:.14em}
+
+/* 스트리머 본인 화면: 프로필 채우기 안내·제휴 상품 링크, 창 닫기 × 크기 */
+#fanPageView.fanpage-layout-4 .profile-completion{grid-column:1/-1;border:1px dashed var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-card);background-image:none;box-shadow:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .profile-completion-note{color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .profile-completion-bar{height:4px;border-radius:var(--bd-r);background:var(--mz-hair);background-image:none}
+#fanPageView.fanpage-layout-4 .profile-completion-bar>*{border-radius:var(--bd-r);background:var(--mz-red);background-image:none}
+#fanPageView.fanpage-layout-4 .affiliate-promo-button{color:var(--mz-red);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+#fanPageView.fanpage-layout-4 :is(.profile-settings-close,.layout-design-dialog-close,.video-library-add-dialog-close,.weekly-schedule-image-tools-close){font-size:22px;line-height:1;font-weight:400}
+
+/* 팬페이지 영역 밖 창(로그인·스트리머 인증·디자인 문의·계정 전환·사이트 통계)도 디자인 4 종이 창으로.
+   주간 일정 편집 창의 일정표 그림(템플릿) 안 입력칸·버튼은 템플릿 모양을 그대로 둔다. */
+body.fanpage-layout-four-active dialog.account-dialog{border:0;border-radius:20px;background:var(--mz-paper);outline:6px solid #fff;outline-offset:-6px;color:var(--mz-ink);box-shadow:0 0 0 2px color-mix(in oklab,var(--bd-pink) 40%,transparent),0 40px 100px rgba(35,27,46,.35)}
+body.fanpage-layout-four-active dialog.account-dialog::backdrop{background:rgba(35,27,46,.55)}
+body.fanpage-layout-four-active dialog.account-dialog :is(h2,h3){font-family:var(--mz-serif);color:var(--mz-ink)}
+body.fanpage-layout-four-active dialog.account-dialog :is(p,span,small,label,legend,li,strong,dt,dd,summary,output){color:inherit}
+body.fanpage-layout-four-active dialog.account-dialog :is(.eyebrow,small,.muted,[class*=note],[class*=hint],[class*=status]){color:var(--mz-soft)}
+body.fanpage-layout-four-active dialog.account-dialog .eyebrow{color:var(--mz-red);letter-spacing:.14em;font-size:12px;background:transparent!important;box-shadow:none;padding-inline:0}
+body.fanpage-layout-four-active dialog.account-dialog :is(input:not([type=radio]):not([type=checkbox]):not([type=range]),select,textarea):not(.weekly-schedule-preview-frame *){border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-card);color:var(--mz-ink);box-shadow:none}
+body.fanpage-layout-four-active dialog.account-dialog :is(input,textarea)::placeholder{color:#7d7487}
+body.fanpage-layout-four-active dialog.account-dialog :is(input,select,textarea,button,a):focus-visible{outline:3px solid var(--mz-ink);outline-offset:2px}
+body.fanpage-layout-four-active dialog.account-dialog .button{border:1px solid var(--mz-ink);border-radius:var(--bd-r);background:transparent;color:var(--mz-ink);box-shadow:none}
+body.fanpage-layout-four-active dialog.account-dialog .button:hover{background:var(--mz-ink);color:var(--mz-paper)}
+body.fanpage-layout-four-active dialog.account-dialog .button-primary{border-color:var(--mz-red);background:var(--mz-red);color:#fff}
+body.fanpage-layout-four-active dialog.account-dialog .auth-button{border-radius:var(--bd-r)}
+body.fanpage-layout-four-active dialog.account-dialog :is(fieldset,[class*=card]:not(.account-dialog-card),[class*=tile],[class*=choice],[class*=row],[class*=item],[class*=sender]):not(.weekly-schedule-preview-frame *){border-color:var(--mz-hair);border-radius:var(--bd-r);background-color:var(--mz-card);background-image:none;box-shadow:none;color:var(--mz-ink)}
+body.fanpage-layout-four-active dialog.account-dialog .account-dialog-card{background:transparent;color:var(--mz-ink)}
+body.fanpage-layout-four-active dialog.account-dialog a:not(.button):not(.auth-button){color:var(--mz-red)}
+body.fanpage-layout-four-active dialog.account-dialog :is([class*=heading],[class*=heading] *){color:var(--mz-ink)}
+body.fanpage-layout-four-active dialog.account-dialog .verification-status{border:1px solid var(--mz-hair);border-radius:var(--bd-r);background:var(--mz-card)}
+body.fanpage-layout-four-active dialog.account-dialog :is(.verification-status,.admin-stats-note){color:var(--mz-soft)!important;font-size:12px}
+body.fanpage-layout-four-active dialog.account-dialog :is(label,legend,[class*=note],[class*=hint]){font-size:max(12px,1em)}
+body.fanpage-layout-four-active dialog.account-dialog :is([class*=status],[class*=context]){font-size:13px}
+body.fanpage-layout-four-active #adminStatsDialog :is(span,strong,button,small){font-size:max(12px,1em)}
+#fanPageView.fanpage-layout-4 dialog small{font-size:12px}
+/* 모바일: 입력란 16px(눌렀을 때 화면 확대 방지) */
+@media (max-width:760px){body.fanpage-layout-four-active :is(dialog,#fanPageView) :is(input:not([type=radio]):not([type=checkbox]):not([type=range]),select,textarea){font-size:16px}}
+
+/* ---------- 사용자 점검 보정 (2026-11-18) ---------- */
+/* 프로필 바로 편집 칸: 기본 어두운 칸 대신 종이 칸 */
+#fanPageView.fanpage-layout-4 .profile-inline-editor{border:1px solid var(--mz-rule);border-radius:var(--bd-r);background:var(--mz-card);box-shadow:none;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .profile-inline-editor .button:not(.button-primary){border:1px solid var(--mz-rule);background:transparent;color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .profile-inline-editor-status{color:var(--mz-soft)}
+/* 제휴 광고: 테두리 있는 상자 + 작은 사진 옆 글(:not(#…)은 위 섹션 공통 규칙보다 우선하게) */
+#fanPageView.fanpage-layout-4 .affiliate-promo-card:not(#mz-none){border:1px solid var(--mz-rule);border-top:3px solid var(--mz-rule);background:var(--mz-card);padding:14px}
+#fanPageView.fanpage-layout-4 .affiliate-promo-layout{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:start}
+#fanPageView.fanpage-layout-4 .affiliate-promo-image-link img{width:96px;height:96px;object-fit:cover}
+#fanPageView.fanpage-layout-4 .affiliate-promo-title{font-size:17px;margin:2px 0 4px}
+#fanPageView.fanpage-layout-4 .affiliate-promo-description{font-size:13px;line-height:1.5;margin:0 0 4px}
+#fanPageView.fanpage-layout-4 .affiliate-promo-disclosure{margin-top:10px;padding-top:8px;border-top:1px dashed var(--mz-hair);font-size:12px;color:var(--mz-soft)}
+/* 홈: 칸 비율을 넓혀 일정표가 크게 보이고 좌우 높이가 비슷하게 */
+#fanPageView.fanpage-layout-4 .fanpage-home-columns{grid-template-columns:minmax(0,1.6fr) minmax(260px,.8fr);gap:16px}
+#fanPageView.fanpage-layout-4 .fanpage-home-side-column>*+*{margin-top:22px}
+
+/* 모바일 감정표현 버튼(떠 있는·붙은 상태): 디자인 1 둥근 흰 버튼 대신 종이 칸. 기본 규칙에 !important가 있어 맞춘다 */
+body.fanpage-layout-four-active #fanPageView.fanpage-layout-4 #game-series-emote-launcher:is(.fanpage-emote-mobile-floating,.fanpage-emote-mobile-attached) #game-series-emote-button{border:1px solid var(--mz-rule)!important;border-radius:var(--bd-r)!important;background:var(--mz-card)!important;color:var(--mz-ink)!important;box-shadow:0 6px 16px rgba(35,27,46,.18)!important;font-family:var(--mz-serif)!important;font-weight:700!important;min-height:44px!important}
+body.fanpage-layout-four-active #fanPageView.fanpage-layout-4 #game-series-emote-launcher:is(.fanpage-emote-mobile-floating,.fanpage-emote-mobile-attached) #game-series-emote-button::before{color:var(--mz-red)!important}
+
+/* ---------- 모바일 점검 보정 (2026-11-18) ---------- */
+/* 영상 플레이어 창: 어두운 창 위 버튼·볼륨·댓글 칸은 종이색 글씨 */
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) .button:not(.button-primary){border-color:var(--mz-paper);background:transparent;color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) .button:not(.button-primary):hover{background:var(--mz-paper);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) :is(.youtube-player-volume,.vod-comments-panel,[class*=volume]){border-color:rgba(245,241,234,.25);border-radius:var(--bd-r);background:rgba(245,241,234,.08);color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) :is(.youtube-player-volume,.vod-comments-panel,[class*=volume]) *{color:var(--mz-paper)}
+#fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) :is(p,output){font-size:12px}
+/* 일정 편집 창의 빨간 저장 버튼 글씨는 흰색 */
+#fanPageView.fanpage-layout-4 #weeklyScheduleGraphicDialog .button-primary{color:#fff}
+/* 상단바·남은 작은 글씨 */
+body.fanpage-layout-four-active .topbar :is(.topbar-caption,.account-status){color:var(--mz-soft);font-size:12px}
+body.fanpage-layout-four-active .topbar .auth-button{font-size:12px;border-radius:var(--bd-r)}
+body.fanpage-layout-four-active .profile-stock-change{font-size:12px}
+#fanPageView.fanpage-layout-4 :is(.messenger-link-description,#tamagotchiSection p){font-size:12px}
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading p:not(.eyebrow){font-size:13px}
+body.fanpage-layout-four-active dialog.account-dialog :is(.verification-status,.admin-stats-note){font-size:12px!important}
+/* 모바일 누름 영역 44px */
+@media (max-width:760px){
+  body.fanpage-layout-four-active .topbar .auth-button{min-height:44px;display:inline-flex;align-items:center;padding-inline:12px}
+  #fanPageView.fanpage-layout-4 .button,body.fanpage-layout-four-active dialog.account-dialog .button{min-height:44px}
+  #fanPageView.fanpage-layout-4 :is(.profile-settings-close,.layout-design-dialog-close,.video-library-add-dialog-close,.weekly-schedule-image-tools-close,.fan-sound-settings-close,.tamagotchi-application-dialog-close),body.fanpage-layout-four-active dialog.account-dialog :is(.profile-settings-close,.verification-manual-toggle){min-width:44px;min-height:44px}
+  #fanPageView.fanpage-layout-4 :is(#vodPlayerDialog,#youtubePlayerDialog) .button{min-width:44px}
+  #fanPageView.fanpage-layout-4 :is(.upbo-subtab,.fan-gallery-tabs button,.video-library-category){min-height:44px;padding-inline:14px}
+  #fanPageView.fanpage-layout-4 .affiliate-promo-button{display:inline-flex;align-items:center;min-height:44px}
+  #fanPageView.fanpage-layout-4 .affiliate-promo-image-link{display:block;min-height:44px}
+  #fanPageView.fanpage-layout-4 .video-library-admin-tools>summary{min-height:44px;display:flex;align-items:center}
+  #fanPageView.fanpage-layout-4 .video-library-admin-tools a{display:inline-flex;align-items:center;min-height:44px}
+}
+
+@media (max-width:760px){
+  #fanPageView.fanpage-layout-4 .profile-board{grid-template-columns:1fr;grid-template-areas:"tab" "name" "chars" "photo" "about" "facts" "details" "stock" "actions"}
+  #fanPageView.fanpage-layout-4 .profile-avatar{max-width:300px;justify-self:center}
+  #fanPageView.fanpage-layout-4 .profile-name{font-size:clamp(38px,11vw,56px)}
+  #fanPageView.fanpage-layout-4 .profile-facts{grid-template-columns:1fr 1fr}
+  #fanPageView.fanpage-layout-4 .fanpage-home-columns{grid-template-columns:1fr}
+  #fanPageView.fanpage-layout-4 .fanpage-home-side-column{order:0;padding:0;border:0}
+  #fanPageView.fanpage-layout-4 .fanpage-home-main-column{padding:0}
+}
+
+/* ---------- 버튼: 둥근 사각 ---------- */
+#fanPageView.fanpage-layout-4 .button{border-radius:14px;border-color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .button-primary{border-color:var(--mz-ink);background:var(--mz-ink);color:#fff}
+#fanPageView.fanpage-layout-4 .button-primary:hover{background:var(--mz-red);border-color:var(--mz-red)}
+#fanPageView.fanpage-layout-4 :is(h1,h2,h3){font-weight:400;letter-spacing:0}
+
+/* ---------- 마스킹테이프 꼬리표 ---------- */
+#fanPageView.fanpage-layout-4 :is(.eyebrow,.fanpage-binder-tape){display:inline-block;justify-self:start;width:max-content;max-width:100%;padding:5px 12px;border-radius:3px;background:color-mix(in oklab,var(--bd-pink) 30%,#fff);color:var(--mz-ink);font:400 13px/1.2 var(--mz-serif);letter-spacing:0;text-transform:none;rotate:-2deg}
+
+/* ---------- 포카 바인더 바로가기 ---------- */
+#fanPageView.fanpage-layout-4 .fanpage-binder-photocards{margin:24px 0 36px;text-align:center;overflow-x:clip}
+#fanPageView.fanpage-layout-4 .fanpage-binder-photocards-head h2{margin:10px 0 6px;font:400 clamp(32px,5vw,56px)/1.1 var(--mz-serif);color:var(--mz-ink)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-photocards-head p:not(.fanpage-binder-tape){margin:0 0 18px;color:var(--mz-soft);font-size:14px}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sheet{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px;max-width:1060px;margin:0 auto;padding:26px 26px 26px 64px;border-radius:14px 22px 22px 14px;background:color-mix(in oklab,var(--bd-pink) 8%,#fff);box-shadow:0 30px 60px rgba(35,27,46,.12),inset 0 0 0 1px var(--mz-hair)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sheet::before{content:"";position:absolute;left:22px;top:28px;bottom:28px;width:18px;background:radial-gradient(circle,var(--mz-paper) 6px,color-mix(in oklab,var(--bd-pink) 40%,#999) 7px,transparent 8px) 0 0/18px 33.3% repeat-y}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sleeve{position:relative;aspect-ratio:55/85;border-radius:12px;background:color-mix(in oklab,var(--bd-pink) 6%,#fff);box-shadow:inset 0 0 0 1px var(--mz-hair)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sleeve::after{content:"";position:absolute;inset:0;border-radius:12px;z-index:2;pointer-events:none;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.55) 42%,transparent 50%),linear-gradient(transparent 22%,rgba(255,255,255,.28) 22.5%);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.9)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-card{position:absolute;inset:8px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;padding:16px;border:5px solid transparent;border-radius:9px;background:linear-gradient(var(--card-bg,#fff),var(--card-bg,#fff)) padding-box,var(--bd-holo) border-box;color:var(--mz-ink);text-align:left;cursor:pointer;transition:translate .2s}
+#fanPageView.fanpage-layout-4 .fanpage-binder-card strong{font:400 clamp(20px,2.2vw,28px)/1.15 var(--mz-serif);word-break:keep-all}
+#fanPageView.fanpage-layout-4 .fanpage-binder-card span{font-size:13px;color:var(--mz-soft)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-card:hover{translate:0 -6px}
+#fanPageView.fanpage-layout-4 .fanpage-binder-card:focus-visible{outline:3px solid var(--mz-ink);outline-offset:3px}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sleeve:nth-child(1) .fanpage-binder-card{--card-bg:var(--bd-t1)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sleeve:nth-child(2) .fanpage-binder-card{--card-bg:var(--bd-pink2)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sleeve:nth-child(3) .fanpage-binder-card{--card-bg:var(--mz-red);color:#fff}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sleeve:nth-child(3) .fanpage-binder-card span{color:#fff}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sleeve:nth-child(4) .fanpage-binder-card{--card-bg:var(--bd-t5)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-sleeve:nth-child(5) .fanpage-binder-card{--card-bg:var(--bd-t4)}
+/* 스크롤하면 오른쪽에서 한 장씩 꽂힌다(스크롤 연동, 지원 브라우저만) */
+@supports (animation-timeline: view()){
+  #fanPageView.fanpage-layout-4 .fanpage-binder-card{animation:bd-slot linear both;animation-timeline:view();animation-range:entry calc(10% + var(--card-index,0) * 6%) cover calc(36% + var(--card-index,0) * 6%)}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-sleeve{--card-index:0}
+}
+@keyframes bd-slot{0%{transform:translateX(160%) rotate(8deg);opacity:0}30%{opacity:1}85%{transform:translateX(-3%) rotate(0)}100%{transform:none;opacity:1}}
+
+/* ---------- 탭 이동 ---------- */
+/* PC: 위쪽 탭 줄 대신 바인더 오른쪽 옆면 인덱스 */
+@media (min-width:761px){#fanPageView.fanpage-layout-4 .fanpage-tab-nav{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);margin:0;padding:0;border:0}}
+/* 모바일: 위쪽에 종이 탭(위 모서리만 둥근 칩), 지금 탭은 진한 핑크 */
+@media (max-width:760px){
+  #fanPageView.fanpage-layout-4 .fanpage-tab-nav{display:flex;flex-wrap:nowrap;align-items:flex-end;gap:2px;overflow-x:auto;scrollbar-width:none;margin:0;padding:10px 12px 0;border:0;border-radius:0;background:var(--mz-paper);box-shadow:inset 0 -2px 0 color-mix(in oklab,var(--bd-pink) 30%,#ddd);backdrop-filter:none}
+  #fanPageView.fanpage-layout-4 .fanpage-tab-nav::-webkit-scrollbar{display:none}
+  #fanPageView.fanpage-layout-4 .fanpage-tab-button{flex:none;min-height:44px;padding:0 14px;border:0;border-radius:12px 12px 0 0;background:color-mix(in oklab,var(--bd-pink) 10%,#fff);color:var(--mz-ink);font:400 14px var(--mz-serif);box-shadow:none;white-space:nowrap}
+  #fanPageView.fanpage-layout-4 .fanpage-tab-button[aria-selected=true]{min-height:50px;background:var(--mz-red);color:#fff}
+  #fanPageView.fanpage-layout-4 .fanpage-tab-more{display:none}
+}
+
+/* ---------- 바인더 무대와 속지(탭 패널) ---------- */
+#fanPageView.fanpage-layout-4 .fanpage-binder{position:relative;margin:0 0 28px}
+#fanPageView.fanpage-layout-4 .fanpage-binder-stage{position:sticky;margin-right:-60px;padding-right:60px;clip-path:inset(0 0 0 -40px)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page{position:absolute;left:0;right:60px;top:0;margin:0;min-height:100%;box-sizing:border-box;padding:clamp(22px,3vw,40px) clamp(18px,3vw,40px) 96px clamp(48px,5vw,72px);border-radius:10px 20px 20px 10px;background:var(--page-bg,var(--mz-card));color:var(--page-ink,var(--mz-ink));box-shadow:-2px 0 0 color-mix(in oklab,var(--bd-pink) 30%,#ccc),-18px 0 40px rgba(35,27,46,.14);scroll-margin-top:0}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page::before{content:"";position:absolute;left:16px;top:40px;bottom:40px;width:16px;background:radial-gradient(circle,var(--mz-paper) 5px,color-mix(in oklab,var(--bd-pink) 40%,#999) 6px,transparent 7px) 0 0/16px 120px repeat-y;pointer-events:none}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n+1){--page-bg:#2a2035;--page-ink:#fff}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n+2){--page-bg:var(--bd-t5)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n+3){--page-bg:var(--bd-t3)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n+4){--page-bg:var(--bd-t1)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n+5){--page-bg:var(--bd-t4)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n+6){--page-bg:var(--bd-pink)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n+7){--page-bg:var(--bd-pink2)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n+8){--page-bg:#ffffff}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n){--page-bg:var(--bd-t4)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:6px 16px;padding:0 0 22px;border:0}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading>*{grid-column:1}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading>:is(.button,button){grid-column:2;grid-row:1/span 3;align-self:end}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading :is(h2,h3){margin:4px 0 0;font:400 clamp(30px,4.4vw,52px)/1.1 var(--mz-serif);color:inherit}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading p:not(.eyebrow){color:inherit;opacity:.85;font-size:14px}
+/* 홈 속지(짙은 보라): 머리말만 밝은 글씨, 안의 칸은 흰 카드 */
+#fanPageView.fanpage-layout-4 .fanpage-binder-page:nth-child(9n+1)>.fanpage-tab-panel-heading .button{border-color:#fff;color:#fff}
+/* 오른쪽 옆면 인덱스 */
+#fanPageView.fanpage-layout-4 .fanpage-binder-index{position:absolute;top:12px;right:0;width:60px;z-index:5;display:flex;flex-direction:column;gap:3px}
+#fanPageView.fanpage-layout-4 .fanpage-binder-index-tab{display:flex;align-items:center;justify-content:center;min-height:44px;width:36px;padding:8px 0;border:0;border-radius:0 10px 10px 0;background:color-mix(in oklab,var(--bd-pink) 14%,#fff);color:var(--mz-ink);writing-mode:vertical-rl;font:400 12px var(--mz-serif);cursor:pointer;box-shadow:3px 2px 8px rgba(35,27,46,.12);transition:width .25s,background-color .25s}
+#fanPageView.fanpage-layout-4 .fanpage-binder-index-tab:hover{width:44px}
+#fanPageView.fanpage-layout-4 .fanpage-binder-index-tab.is-current{width:54px;background:var(--mz-red);color:#fff;font-size:13px;box-shadow:4px 3px 12px rgba(35,27,46,.22)}
+#fanPageView.fanpage-layout-4 .fanpage-binder-index-tab:focus-visible{outline:3px solid var(--mz-ink);outline-offset:2px}
+@media (max-width:760px){
+  #fanPageView.fanpage-layout-4 .fanpage-binder-stage{margin-right:0;padding-right:0;clip-path:inset(0)}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-page{right:0;padding:22px 14px 110px 40px}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-page::before{left:10px}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-index{display:none}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading{grid-template-columns:1fr}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading>:is(.button,button){grid-column:1;grid-row:auto;justify-self:start}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-sheet{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:14px 12px 14px 36px}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-sheet::before{left:12px}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-sleeve{aspect-ratio:3/4}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-card{inset:4px;padding:8px;border-width:3px}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-card strong{font-size:15px}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-card span{font-size:12px}
+}
+@media (prefers-reduced-motion:reduce){
+  #fanPageView.fanpage-layout-4 .fanpage-binder-card{animation:none!important}
+  #fanPageView.fanpage-layout-4 .fanpage-binder-index-tab{transition:none}
+}
+
+/* ---------- 자동 측정 보정 (2026-11-18) ---------- */
+/* 탭 머리말 테이프: 진한 핑크 글씨(대비 4.37) 대신 잉크색 */
+#fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading>.eyebrow{color:var(--mz-ink)}
+/* 롤링페이퍼 안내·상태 글씨 10~11px → 12px */
+#fanPageView.fanpage-layout-4 :is(.rolling-paper-sticker-hint,.rolling-paper-status){font-size:12px}
+/* 검색으로 돌아가기: 옅은 글씨(대비 2.0)·17px 높이 → 진하게, 누름 영역 44px */
+#fanPageView.fanpage-layout-4 .back-link{display:inline-flex;align-items:center;min-height:44px;color:var(--mz-soft)}

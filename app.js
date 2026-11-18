@@ -1086,7 +1086,7 @@ const ADMIN_DESIGN_USAGE_ROWS = [
   [1, '디자인 1 · 파스텔 만화풍', ''],
   [2, '디자인 2 · 기존 팬페이지', ''],
   [3, '디자인 3 · 손그림 스티커북', '관리자 전용 · 미공개'],
-  [4, '디자인 4 · 매거진 커버', ''],
+  [4, '디자인 4 · 포토카드 바인더', ''],
 ];
 //  디자인별 적용 스트리머 카드. 저장된 값이 없는 스트리머는 기본 디자인(1)으로 세되 "기본"으로 표시한다.
 function renderAdminDesignUsage(streamers) {
@@ -1637,6 +1637,7 @@ function setVisibleView(page) {
     fanPageQuickNavCleanup();
     fanPageQuickNavCleanup = null;
   }
+  if (!page) { fanpageBinderCleanup?.(); fanpageBinderCleanup = null; }
   if (!page && liveStatusTimer) {
     window.clearInterval(liveStatusTimer);
     liveStatusTimer = 0;
@@ -4755,6 +4756,7 @@ function renderOwnerChecklist(page, selectTab) {
   if (store.get().dismissed) return null;
   const goTo = (sectionId) => {
     const target = document.getElementById(sectionId);
+    if (document.getElementById('fanPageView')?._binder?.reveal(target)) return;
     const panel = target?.closest('[role="tabpanel"]');
     const key = panel?.id?.replace(/^fanpagePanel-/, '');
     if (key) selectTab(key);
@@ -4806,7 +4808,7 @@ function renderOwnerChecklist(page, selectTab) {
 const DESIGN_PASS_PREVIEW_SECONDS = 60;
 const PAID_FANPAGE_LAYOUTS = [3, 4];
 function isPaidLayout(layout) { return PAID_FANPAGE_LAYOUTS.includes(Number(layout)); }
-const DESIGN_PASS_LABELS = { 3: '디자인 3(손그림 스티커북)', 4: '디자인 4(매거진 커버)' };
+const DESIGN_PASS_LABELS = { 3: '디자인 3(손그림 스티커북)', 4: '디자인 4(포토카드 바인더)' };
 function designPassOwned(page, layout = 3) {
   return isAdminUser === true || page?.designPass?.[`layout${Number(layout)}`] === true;
 }
@@ -5158,7 +5160,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     [1, '디자인 1 · 파스텔 만화풍', '포근한 파스텔 컬러와 캐릭터가 있는 디자인'],
     [2, '디자인 2 · 기존 팬페이지', '차분한 어두운 톤의 기존 팬페이지 디자인'],
     [3, '디자인 3 · 손그림 스티커북', '단색 종이 바탕과 굵은 손그림 테두리'],
-    [4, '디자인 4 · 매거진 커버', '잡지 표지처럼 큰 제목과 목차, 기사형 칸 배치'],
+    [4, '디자인 4 · 포토카드 바인더', '포토카드 바인더처럼 탭이 한 장씩 넘어가는 파스텔 디자인'],
   ];
   layoutOptionsData.forEach(([value, titleText, descriptionText]) => {
     const option = document.createElement('label');
@@ -5262,65 +5264,161 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   return dialog;
 }
 
-// ---- 디자인 4(매거진) 배경 효과: 기사 등장(한 번만), 방송 중 속보 띠 ----
-// 서버 호출 없이 이미 받은 방송 상태만 쓴다. 애니메이션은 CSS(경과 시간 기준)이며 동작 줄이기면 CSS에서 끈다.
-const magazineRevealedSections = new Set(); // `${streamerId}:${sectionId}` — 다시 그려도 한 번 본 기사는 다시 움직이지 않는다.
-let magazineRevealObserver = null;
-let magazineTickerObserver = null;
-function magazineFxEnabled(view) { return !!view && view.classList.contains('fanpage-layout-4'); }
-function syncMagazineReveal(page, view) {
-  magazineRevealObserver?.disconnect(); magazineRevealObserver = null;
-  if (!magazineFxEnabled(view) || !('IntersectionObserver' in window)) return;
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-  const streamerId = page.streamer.id;
-  magazineRevealObserver = new IntersectionObserver((entries) => entries.forEach((entry) => {
-    if (!entry.isIntersecting) return;
-    const el = entry.target;
-    el.classList.add('mz-revealed');
-    if (el.id) magazineRevealedSections.add(`${streamerId}:${el.id}`);
-    magazineRevealObserver?.unobserve(el);
-  }), { rootMargin: '0px 0px -8% 0px', threshold: 0.04 });
-  const viewportBottom = window.innerHeight;
-  view.querySelectorAll('.fanpage-tab-panel section, .fanpage-tab-panel .content-card, .fanpage-tab-panel-heading').forEach((el) => {
-    if (el.parentElement?.closest('.mz-reveal')) return; // 바깥 칸만 움직인다
-    if (el.id && magazineRevealedSections.has(`${streamerId}:${el.id}`)) return;
-    const rect = el.getBoundingClientRect();
-    if (rect.height && rect.top < viewportBottom) return; // 처음부터 보이는 칸은 그대로 둔다
-    el.classList.add('mz-reveal');
-    magazineRevealObserver.observe(el);
+// ---- 디자인 4(포토카드 바인더): 대문 아래 "우리들의 포카 바인더" 바로가기 ----
+// 팬 활동 칸 5곳으로 가는 포토카드. 숫자는 따로 불러오지 않는다(서버 호출 없음).
+function renderFanpageBinderPhotocards(page, onOpen) {
+  const wrap = document.createElement('section'); wrap.className = 'fanpage-binder-photocards';
+  wrap.setAttribute('aria-labelledby', 'fanpageBinderPhotocardsTitle');
+  const head = document.createElement('header'); head.className = 'fanpage-binder-photocards-head';
+  const tag = document.createElement('p'); tag.className = 'fanpage-binder-tape'; tag.textContent = 'fan zone';
+  const title = document.createElement('h2'); title.id = 'fanpageBinderPhotocardsTitle'; title.textContent = '우리들의 포카 바인더';
+  const note = document.createElement('p'); note.textContent = '포토카드를 누르면 그 칸으로 넘겨 드려요.';
+  head.append(tag, title, note);
+  const sheet = document.createElement('div'); sheet.className = 'fanpage-binder-sheet';
+  [
+    ['rolling-paper', null, '롤링페이퍼', '응원 메시지 남기기'],
+    ['memories', null, '기억의 순간', '기념 다시보기'],
+    ['activity', '#fanGallerySection', '팬 갤러리', '팬아트 보러 가기'],
+    ['content', '.songbook-section', '노래책', '부른 노래 모음'],
+    ['activity', '.upbo-section', '업보·룰렛', '진행 현황과 확률'],
+  ].forEach(([key, selector, name, desc], index) => {
+    const sleeve = document.createElement('div'); sleeve.className = 'fanpage-binder-sleeve';
+    sleeve.style.setProperty('--card-index', index);
+    const card = document.createElement('button'); card.type = 'button'; card.className = 'fanpage-binder-card';
+    const strong = document.createElement('strong'); strong.textContent = name;
+    const small = document.createElement('span'); small.textContent = desc;
+    card.append(strong, small);
+    card.addEventListener('click', () => onOpen(key, selector));
+    sleeve.append(card); sheet.append(sleeve);
   });
+  wrap.append(head, sheet);
+  return wrap;
 }
-function syncMagazineTicker(page) {
-  const view = $('fanPageView');
-  view?.querySelector('.mz-live-ticker')?.remove();
-  magazineTickerObserver?.disconnect(); magazineTickerObserver = null;
-  if (!magazineFxEnabled(view) || !page) return;
-  const state = liveStatusStateFor(page.streamer.id);
-  if (!state.hasLoaded || !state.isLive || !state.streamUrl) return;
-  const ticker = document.createElement('a');
-  ticker.className = 'mz-live-ticker';
-  ticker.href = state.streamUrl; ticker.target = '_blank'; ticker.rel = 'noopener noreferrer';
-  const viewers = `시청자 ${Number(state.viewerCount || 0).toLocaleString('ko-KR')}명`;
-  const text = `${page.streamer.nickname} 방송 중 · ${state.title || '방송을 진행하고 있어요.'} · ${viewers} · 방송 보러가기 ↗`;
-  ticker.setAttribute('aria-label', `${page.streamer.nickname} 라이브 방송 보기 (${viewers})`);
-  const label = document.createElement('span'); label.className = 'mz-live-ticker-label'; label.textContent = 'LIVE';
-  const track = document.createElement('span'); track.className = 'mz-live-ticker-track'; track.setAttribute('aria-hidden', 'true');
-  for (let i = 0; i < 2; i += 1) { const item = document.createElement('span'); item.textContent = text; track.append(item); }
-  // 글 길이에 비례한 속도(초당 약 60px)로 흐르게 한다.
-  track.style.setProperty('--mz-ticker-seconds', `${Math.max(14, Math.round(text.length * 0.45))}s`);
-  ticker.append(label, track);
-  const board = $('profileBoard');
-  if (board?.parentElement) board.before(ticker); else view.prepend(ticker);
-  if ('IntersectionObserver' in window) {
-    magazineTickerObserver = new IntersectionObserver((entries) => entries.forEach((entry) => {
-      entry.target.classList.toggle('mz-paused', !entry.isIntersecting);
-    }));
-    magazineTickerObserver.observe(ticker);
+
+// ---- 디자인 4(포토카드 바인더): 탭 넘김 ----
+// 탭 패널을 한 줄로 이어 붙여, 지금 탭을 끝까지 읽으면 잠깐 멈췄다가 다음 탭이 오른쪽에서 밀려 들어와 덮는다.
+// 창 스크롤 기준(프레임 수와 무관)이며 서버 호출은 하지 않는다. 데이터는 보고 있는 탭과 바로 다음 탭만 불러온다(onCurrent·onPrefetch).
+// 자리 잡은 탭은 transform 없이 top으로만 옮겨 탭 안의 고정 위치 요소·포커스가 그대로 동작하게 한다.
+let fanpageBinderCleanup = null;
+function isFanpageBinderLayout(view) { return !!view && view.classList.contains('fanpage-layout-4'); }
+function setupFanpageBinder(view, { tabNav, panels, labels, onCurrent, onPrefetch }) {
+  fanpageBinderCleanup?.(); fanpageBinderCleanup = null;
+  if (!panels.length) return null;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const box = document.createElement('div'); box.className = 'fanpage-binder';
+  const stage = document.createElement('div'); stage.className = 'fanpage-binder-stage';
+  panels[0].before(box); box.append(stage);
+  panels.forEach((panel, index) => { panel.hidden = false; panel.classList.add('fanpage-binder-page'); panel.style.setProperty('--binder-index', index); stage.append(panel); });
+  const rail = document.createElement('nav'); rail.className = 'fanpage-binder-index'; rail.setAttribute('aria-label', '바인더 인덱스');
+  const railButtons = panels.map((panel, index) => {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'fanpage-binder-index-tab';
+    button.textContent = labels[index]; button.dataset.binderIndex = String(index);
+    button.addEventListener('click', () => goTo(index));
+    rail.append(button); return button;
+  });
+  stage.append(rail);
+  const HOLD = 0.28; // 탭 사이 멈춤 길이(보이는 높이 대비)
+  let top = 0, visible = 0, hold = 0, slide = 0, start = 0, reads = [], segs = [], current = -1, prefetched = new Set(), frame = 0;
+  const isMobile = () => window.matchMedia('(max-width: 760px)').matches;
+  function fit() {
+    top = isMobile() && tabNav ? tabNav.getBoundingClientRect().height : 0;
+    visible = Math.max(320, window.innerHeight - top);
+    hold = Math.round(visible * HOLD); slide = Math.round(Math.min(window.innerWidth, 1200) * 0.8) + hold * 2;
+    stage.style.top = `${top}px`; stage.style.height = `${visible}px`;
+    let pos = 0; reads = []; segs = [];
+    panels.forEach((panel, index) => {
+      segs.push(pos);
+      const read = Math.max(0, panel.offsetHeight - visible); reads.push(read); pos += read;
+      if (index < panels.length - 1) pos += slide;
+    });
+    box.style.height = `${pos + visible}px`;
+    start = box.getBoundingClientRect().top + window.scrollY - top;
+    draw();
   }
-}
-function syncMagazineFx(page, view) {
-  syncMagazineReveal(page, view);
-  syncMagazineTicker(page);
+  function setCurrent(index) {
+    if (index === current) return;
+    current = index;
+    railButtons.forEach((button, i) => { button.classList.toggle('is-current', i === index); if (i === index) button.setAttribute('aria-current', 'true'); else button.removeAttribute('aria-current'); });
+    onCurrent?.(index);
+  }
+  function prefetch(index) {
+    if (index < 0 || index >= panels.length || prefetched.has(index)) return;
+    prefetched.add(index); onPrefetch?.(index);
+  }
+  function draw() {
+    frame = 0;
+    //  위쪽 대문·배너가 늦게 그려져 높이가 바뀌어도 맞도록 시작 위치는 매번 다시 잰다.
+    start = box.getBoundingClientRect().top + window.scrollY - top;
+    const y = Math.max(0, window.scrollY - start);
+    let cur = panels.length - 1, off = reads[cur] || 0, next = -1, progress = 0, pos = 0;
+    for (let i = 0; i < panels.length; i += 1) {
+      if (y < pos + reads[i]) { cur = i; off = y - pos; break; }
+      pos += reads[i];
+      if (i < panels.length - 1 && y < pos + slide) {
+        cur = i; off = reads[i]; next = i + 1;
+        progress = Math.min(1, Math.max(0, (y - pos - hold) / (slide - hold * 2)));
+        progress = progress < 0.5 ? 2 * progress * progress : 1 - ((-2 * progress + 2) ** 2) / 2;
+        break;
+      }
+      pos += slide;
+    }
+    const still = reduceMotion.matches;
+    panels.forEach((panel, i) => {
+      if (i === cur) {
+        panel.style.visibility = 'visible'; panel.style.zIndex = '1'; panel.style.top = `${-off}px`;
+        panel.style.transform = next >= 0 && !still && progress > 0 ? `scale(${1 - progress * 0.04})` : '';
+        panel.style.filter = next >= 0 && progress > 0 ? `brightness(${1 - progress * 0.12})` : '';
+      } else if (i === next && progress > 0) {
+        panel.style.visibility = 'visible'; panel.style.zIndex = '2'; panel.style.top = '0px'; panel.style.filter = '';
+        panel.style.transform = `translate3d(${(1 - progress) * 105}%,0,0)${still ? '' : ` rotate(${(1 - progress) * 2}deg)`}`;
+      } else {
+        panel.style.visibility = 'hidden'; panel.style.zIndex = '0'; panel.style.transform = ''; panel.style.filter = '';
+      }
+    });
+    setCurrent(next >= 0 && progress > 0.5 ? next : cur);
+    prefetch(current);
+    // 지금 탭의 남은 읽을 거리가 화면 한 장 이하로 줄면 다음 탭을 미리 불러 둔다(넘길 때 끊기지 않게).
+    if (next >= 0 || reads[cur] - off < visible) prefetch(cur + 1);
+  }
+  const schedule = () => { if (!frame) frame = window.requestAnimationFrame(draw); };
+  function scrollToY(target) {
+    window.scrollTo({ top: Math.max(0, Math.ceil(target) + 1), behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+  }
+  function goTo(index) {
+    if (index < 0 || index >= panels.length) return;
+    prefetch(index); fit(); scrollToY(start + segs[index]);
+  }
+  function reveal(element) {
+    const panel = element?.closest?.('.fanpage-binder-page');
+    const index = panels.indexOf(panel);
+    if (index < 0) return false;
+    prefetch(index); fit();
+    const inner = element.getBoundingClientRect().top - panel.getBoundingClientRect().top;
+    scrollToY(start + segs[index] + Math.min(reads[index], Math.max(0, inner - 16)));
+    return true;
+  }
+  // 키보드로 화면 밖 칸에 들어가면 그 칸이 보이게 옮긴다.
+  const onFocusIn = (event) => {
+    const panel = event.target.closest?.('.fanpage-binder-page');
+    if (!panel || event.target.closest('dialog')) return;
+    const rect = event.target.getBoundingClientRect();
+    if (panel.style.visibility === 'hidden' || rect.bottom > window.innerHeight || rect.top < top) reveal(event.target);
+  };
+  window.addEventListener('scroll', schedule, { passive: true });
+  window.addEventListener('resize', fit);
+  stage.addEventListener('focusin', onFocusIn);
+  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => fit()) : null;
+  panels.forEach((panel) => observer?.observe(panel));
+  fit();
+  const api = { goTo, reveal, fit, indexOf: (panel) => panels.indexOf(panel) };
+  view._binder = api;
+  fanpageBinderCleanup = () => {
+    window.removeEventListener('scroll', schedule); window.removeEventListener('resize', fit);
+    stage.removeEventListener('focusin', onFocusIn); observer?.disconnect();
+    if (frame) window.cancelAnimationFrame(frame);
+    if (view._binder === api) view._binder = null;
+  };
+  return api;
 }
 
 function renderFanPage(page, options = {}) {
@@ -5330,6 +5428,7 @@ function renderFanPage(page, options = {}) {
     fanPageQuickNavCleanup();
     fanPageQuickNavCleanup = null;
   }
+  fanpageBinderCleanup?.(); fanpageBinderCleanup = null;
   if (stockPriceUnsubscribe) {
     stockPriceUnsubscribe();
     stockPriceUnsubscribe = null;
@@ -5361,6 +5460,7 @@ function renderFanPage(page, options = {}) {
   document.body.classList.toggle('fanpage-theme-sora-active', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   document.body.classList.remove('fanpage-home-kawaii-active');
   view.classList.add(`fanpage-layout-${layoutDesign}`);
+  const usesBinderLayout = layoutDesign === 4;
   view.classList.toggle('fanpage-theme-sora', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   view.replaceChildren();
   const back = document.createElement('a');
@@ -5489,6 +5589,7 @@ function renderFanPage(page, options = {}) {
   if (!page.isOwner) view.append(back);
   function navigateToFanPageSection(sectionId) {
     const target = document.getElementById(sectionId);
+    if (view._binder?.reveal(target)) return;
     if (target?.id === 'profileBoard' && target.hidden) view._selectFanPageTab?.('home');
     const tabPanel = target?.closest('.fanpage-tab-panel');
     if (tabPanel && tabPanel.hidden) view._selectFanPageTab?.(tabPanel.dataset.fanpageTabPanel);
@@ -5553,6 +5654,9 @@ function renderFanPage(page, options = {}) {
     { key: 'comment-up', label: '댓글 UP 체크', eyebrow: 'COMMENT UP', title: '댓글 UP 체크', description: '등록한 게시글에서 남긴 댓글의 UP과 순위를 확인해요.' },
     { key: 'tamagotchi', label: '다마고치', eyebrow: 'STREAMER TAMAGOTCHI', title: '다마고치', description: '통합 상점에서 분양받은 다마고치를 팬과 함께 돌보고 키워요.' },
   ];
+  //  디자인 4(바인더): 주간일정표를 홈에서 떼어 단독 탭(두 번째 장)으로 둔다.
+  if (usesBinderLayout) tabDefinitions.splice(1, 0, { key: 'schedule', label: '주간일정표', eyebrow: 'WEEKLY SCHEDULE', title: '이번 주 방송', description: '스트리머가 올린 주간 일정표를 크게 보여드려요.' });
+  const tabDefinition = (key) => tabDefinitions.find((tab) => tab.key === key);
   const tabNav = document.createElement('div');
   tabNav.className = 'fanpage-tab-nav';
   tabNav.id = 'fanpageTabNav';
@@ -5626,9 +5730,9 @@ function renderFanPage(page, options = {}) {
     panel.append(heading, grid);
     return panel;
   }
-  // 디자인 1·3과 4(매거진)는 홈·활동·콘텐츠를 칼럼으로 나눠 배치한다.
+  // 디자인 1·3과 4(포토카드 바인더)는 홈·활동·콘텐츠를 칼럼으로 나눠 배치한다.
   const usesColumnLayout = usesKawaiiLayout || layoutDesign === 4;
-  const homePanel = createFanPageTabPanel(tabDefinitions[0], usesColumnLayout ? [] : [liveSection, calendarSection, vodSection]);
+  const homePanel = createFanPageTabPanel(tabDefinition('home'), usesColumnLayout ? [] : [liveSection, calendarSection, vodSection]);
   if (usesColumnLayout) {
     const homeColumns = document.createElement('div');
     homeColumns.className = 'fanpage-home-columns';
@@ -5637,26 +5741,32 @@ function renderFanPage(page, options = {}) {
     const sideColumn = document.createElement('div');
     sideColumn.className = 'fanpage-home-side-column';
     mainColumn.append(liveSection, vodSection);
-    sideColumn.append(calendarSection, renderAffiliatePromoCard());
+    if (usesBinderLayout) sideColumn.append(renderAffiliatePromoCard());
+    else sideColumn.append(calendarSection, renderAffiliatePromoCard());
     homeColumns.append(mainColumn, sideColumn);
     homePanel.querySelector('.fanpage-tab-panel-grid').append(homeColumns);
   }
+  //  디자인 4(바인더): 팬 캐릭터·OGQ는 대문 제목 밑으로 옮긴다.
+  const heroCharacters = usesBinderLayout ? (featuredPair || ogqSection) : null;
   const tabPanels = new Map([
     ['home', homePanel],
-    ['activity', createFanPageTabPanel(tabDefinitions[1], usesColumnLayout
+    ...(usesBinderLayout ? [['schedule', createFanPageTabPanel(tabDefinition('schedule'), [calendarSection])]] : []),
+    ['activity', createFanPageTabPanel(tabDefinition('activity'), usesBinderLayout
+      ? [createFanPageColumnStacks('fanpage-activity-columns', [upboSection, messengerSection], [rouletteSection]), gallerySection]
+      : usesColumnLayout
       ? [featuredPair, createFanPageColumnStacks('fanpage-activity-columns', [upboSection, messengerSection], [rouletteSection]), gallerySection, fanCharacterCard ? null : ogqSection]
       : [featuredPair, upboSection, rouletteSection, messengerSection, gallerySection, fanCharacterCard ? null : ogqSection])],
-    ['content', createFanPageTabPanel(tabDefinitions[2], usesColumnLayout
+    ['content', createFanPageTabPanel(tabDefinition('content'), usesColumnLayout
       ? [
         createFanPageColumnStacks('fanpage-content-columns fanpage-content-overview-columns', [youtubeSection], [songbookSection, cafeSection]),
         createFanPageColumnStacks('fanpage-content-columns fanpage-game-history-columns', [playedGamesSection], [competitionHistorySection]),
       ]
       : [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
-    ['video-library', createFanPageTabPanel(tabDefinitions[3], [videoLibrarySection])],
-    ['rolling-paper', createFanPageTabPanel(tabDefinitions[4], [rollingPaperSection])],
-    ['memories', createFanPageTabPanel(tabDefinitions[5], [memoriesSection])],
-    ['comment-up', createFanPageTabPanel(tabDefinitions[6], [renderCommentUpSection(page)])],
-    ['tamagotchi', createFanPageTabPanel(tabDefinitions[7], [tamagotchiSection])],
+    ['video-library', createFanPageTabPanel(tabDefinition('video-library'), [videoLibrarySection])],
+    ['rolling-paper', createFanPageTabPanel(tabDefinition('rolling-paper'), [rollingPaperSection])],
+    ['memories', createFanPageTabPanel(tabDefinition('memories'), [memoriesSection])],
+    ['comment-up', createFanPageTabPanel(tabDefinition('comment-up'), [renderCommentUpSection(page)])],
+    ['tamagotchi', createFanPageTabPanel(tabDefinition('tamagotchi'), [tamagotchiSection])],
   ]);
   //  탭 줄이 화면 위에 붙어 있으면(아래로 읽던 중) 탭을 바꿀 때 새 탭의 시작이 탭 줄 바로 아래에 오게 옮긴다.
   // 페이지 맨 위에서 누를 때는 움직이지 않는다. 처음 열기·빠른 이동처럼 코드가 부르는 전환에는 적용하지 않는다.
@@ -5673,38 +5783,8 @@ function renderFanPage(page, options = {}) {
     const top = window.scrollY + panel.getBoundingClientRect().top - stickyTop - tabNav.offsetHeight - 12;
     window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
-  function selectFanPageTab(tabKey, moveFocus = false, { fromUser = false } = {}) {
-    if (!tabPanels.has(tabKey)) return;
-    const wasStuck = fromUser && tabKey !== view.dataset.fanpageActiveTab && tabNavIsStuck();
-    if (tabKey !== 'video-library') view.querySelector('dialog.video-library-add-dialog[open]')?.close();
-    const previousTabKey = view.dataset.fanpageActiveTab;
-    if (tabKey === 'rolling-paper' && previousTabKey !== 'rolling-paper') {
-      const rollingPaperState = rollingPaperStateFor(page.streamer.id);
-      rollingPaperState.activeTopicId = '';
-      refreshRollingPaperSection(page.streamer.id);
-    }
-    view.dataset.fanpageActiveTab = tabKey;
-    section.hidden = tabKey !== 'home';
-    if (tabKey !== 'rolling-paper') {
-      const stickerState = rollingPaperStateFor(page.streamer.id);
-      stickerState.stickerActionMenuOpen = false; stickerState.selectedStickerMenuId = '';
-      stickerState.stickerPaletteOpen = false; stickerState.stickerPlacing = false;
-      stickerState.selectedStickerEmoji = '';
-      if (stickerState.movingStickerId && !stickerState.savingSticker) {
-        const original = stickerState.stickerMoveOriginal;
-        const sticker = stickerState.stickers.find((item) => item.id === stickerState.movingStickerId);
-        if (original && sticker && original.id === sticker.id) { sticker.x = original.x; sticker.y = original.y; }
-        stickerState.stickerMoveOriginal = null; stickerState.movingStickerId = ''; stickerState.draggingStickerId = '';
-      }
-    }
-    tabDefinitions.forEach((tab) => {
-      const selected = tab.key === tabKey;
-      const button = tabButtons.get(tab.key);
-      button.setAttribute('aria-selected', String(selected));
-      button.tabIndex = selected ? 0 : -1;
-      tabPanels.get(tab.key).hidden = !selected;
-    });
-    view._syncRollingPaperStickerQuickTools?.();
+  // 탭 데이터 불러오기(이미 불러온 탭은 각 함수가 다시 부르지 않는다). 바인더는 다음 탭을 미리 불러올 때도 쓴다.
+  function loadFanPageTabData(tabKey) {
     if (tabKey === 'activity') {
       gallerySection.loadGallery?.();
       const upboState = upboStateFor(page.streamer.id);
@@ -5726,6 +5806,46 @@ function renderFanPage(page, options = {}) {
     if (tabKey === 'memories') loadFanPageMemories(page);
     if (tabKey === 'comment-up') view.querySelector('#commentUpSection')?._load?.();
     if (tabKey === 'tamagotchi') tamagotchiSection._loadCare();
+  }
+  //  fromBinder: 바인더가 스크롤 위치로 지금 탭을 알릴 때(화면 이동 없이 상태만 맞춘다).
+  function selectFanPageTab(tabKey, moveFocus = false, { fromUser = false, fromBinder = false } = {}) {
+    if (!tabPanels.has(tabKey)) return;
+    //  바인더: 사용자가 탭을 고르면 그 장으로 넘겨 간다. 상태는 넘기는 동안 바인더가 알려 준다.
+    if (view._binder && !fromBinder) {
+      const binderIndex = [...tabPanels.keys()].indexOf(tabKey);
+      if (fromUser || moveFocus) { view._binder.goTo(binderIndex); if (moveFocus) tabButtons.get(tabKey)?.focus({ preventScroll: true }); return; }
+    }
+    const wasStuck = !view._binder && fromUser && tabKey !== view.dataset.fanpageActiveTab && tabNavIsStuck();
+    if (tabKey !== 'video-library') view.querySelector('dialog.video-library-add-dialog[open]')?.close();
+    const previousTabKey = view.dataset.fanpageActiveTab;
+    if (tabKey === 'rolling-paper' && previousTabKey !== 'rolling-paper') {
+      const rollingPaperState = rollingPaperStateFor(page.streamer.id);
+      rollingPaperState.activeTopicId = '';
+      refreshRollingPaperSection(page.streamer.id);
+    }
+    view.dataset.fanpageActiveTab = tabKey;
+    section.hidden = !usesBinderLayout && tabKey !== 'home';
+    if (tabKey !== 'rolling-paper') {
+      const stickerState = rollingPaperStateFor(page.streamer.id);
+      stickerState.stickerActionMenuOpen = false; stickerState.selectedStickerMenuId = '';
+      stickerState.stickerPaletteOpen = false; stickerState.stickerPlacing = false;
+      stickerState.selectedStickerEmoji = '';
+      if (stickerState.movingStickerId && !stickerState.savingSticker) {
+        const original = stickerState.stickerMoveOriginal;
+        const sticker = stickerState.stickers.find((item) => item.id === stickerState.movingStickerId);
+        if (original && sticker && original.id === sticker.id) { sticker.x = original.x; sticker.y = original.y; }
+        stickerState.stickerMoveOriginal = null; stickerState.movingStickerId = ''; stickerState.draggingStickerId = '';
+      }
+    }
+    tabDefinitions.forEach((tab) => {
+      const selected = tab.key === tabKey;
+      const button = tabButtons.get(tab.key);
+      button.setAttribute('aria-selected', String(selected));
+      button.tabIndex = selected ? 0 : -1;
+      tabPanels.get(tab.key).hidden = !usesBinderLayout && !selected;
+    });
+    view._syncRollingPaperStickerQuickTools?.();
+    loadFanPageTabData(tabKey);
     runFanpageTabTour(page, tabKey);
     // 다마고치 탭에서는 모바일 떠 있는 버튼을 작게 줄여 아래쪽 줄에 모은다(fanpage-mobile-actions.css).
     document.body.classList.toggle('fanpage-tamagotchi-tab', tabKey === 'tamagotchi');
@@ -5748,6 +5868,24 @@ function renderFanPage(page, options = {}) {
   view._selectFanPageTab = selectFanPageTab;
   const ownerChecklist = renderOwnerChecklist(page, selectFanPageTab);
   view.append(...(ownerChecklist ? [ownerChecklist] : []), tabNav, tabAnnouncer, ...tabPanels.values());
+  if (usesBinderLayout) {
+    //  스트리머 관리 상자는 대문 위, 팬 캐릭터·OGQ는 대문 안(제목 밑), 대문 아래에 포카 바인더 바로가기.
+    if (ownerChecklist) section.before(ownerChecklist);
+    if (heroCharacters) { heroCharacters.classList.add('fanpage-binder-characters'); identity.after(heroCharacters); }
+    tabNav.before(renderFanpageBinderPhotocards(page, (key, selector) => {
+      const panel = tabPanels.get(key);
+      const target = (selector && panel?.querySelector(selector)) || panel;
+      if (!view._binder?.reveal(target)) selectFanPageTab(key, false, { fromUser: true });
+    }));
+    const binderKeys = [...tabPanels.keys()];
+    setupFanpageBinder(view, {
+      tabNav,
+      panels: [...tabPanels.values()],
+      labels: binderKeys.map((key) => tabDefinition(key)?.label || key),
+      onCurrent: (index) => selectFanPageTab(binderKeys[index], false, { fromBinder: true }),
+      onPrefetch: (index) => loadFanPageTabData(binderKeys[index]),
+    });
+  }
   //  한 줄 탭 바가 넘칠 때만 끝에 화살표를 보여 옆에 탭이 더 있다는 걸 알린다(폭과 무관).
   ['left', 'right'].forEach((dir) => {
     const more = document.createElement('button');
@@ -5781,7 +5919,6 @@ function renderFanPage(page, options = {}) {
   view.append(renderVodPlayerDialog());
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
   fanPageQuickNavCleanup = createFanPageQuickRemote(view);
-  syncMagazineFx(page, view);
   loadLiveStatus(page.streamer.id);
   liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
 
@@ -5961,8 +6098,11 @@ function createFanPageQuickRemote(view) {
     ['comment-up-section', '댓글 UP 체크'], ['affiliate-promo-card', '제휴 상품'],
     ['fan-banner-bottom', '하단 배너'],
   ];
-  const candidates = [...view.children].flatMap((element) => {
-    if (element.classList.contains('fanpage-tab-nav')) return [];
+  //  디자인 4(바인더)는 탭 패널이 바인더 무대 안에 있으므로 꺼내서 같은 순서로 훑는다.
+  const topLevel = [...view.children].flatMap((element) => (element.classList.contains('fanpage-binder')
+    ? [...element.querySelectorAll(':scope > .fanpage-binder-stage > .fanpage-tab-panel')] : [element]));
+  const candidates = topLevel.flatMap((element) => {
+    if (element.classList.contains('fanpage-tab-nav') || element.classList.contains('fanpage-binder-photocards')) return [];
     if (element.classList.contains('fanpage-tab-panel')) {
       const flattenSectionGroups = (section) => {
         if (section.matches('.fanpage-home-columns, .fanpage-home-main-column, .fanpage-home-side-column, .fanpage-tab-columns, .fanpage-tab-column')) {
@@ -6222,6 +6362,7 @@ function createFanPageQuickRemote(view) {
     button.append(number, label);
     button.addEventListener('click', () => {
       const target = document.getElementById(section.id);
+      if (view._binder?.reveal(target)) { if (!window.matchMedia('(min-width: 1500px)').matches) setExpanded(false); return; }
       if (target?.id === 'profileBoard' && target.hidden) view._selectFanPageTab?.('home');
       const tabPanel = target?.closest('.fanpage-tab-panel');
       if (tabPanel && tabPanel.hidden) view._selectFanPageTab?.(tabPanel.dataset.fanpageTabPanel);
@@ -7346,7 +7487,6 @@ function refreshLiveSection(streamerId) {
     const focusKey = active && active.dataset.liveFocus;
     const replacement = renderLiveSection(currentPage);
     section.replaceWith(replacement);
-    syncMagazineTicker(currentPage);
     if (focusKey) {
       const focusTarget = [...replacement.querySelectorAll('[data-live-focus]')]
         .find((element) => element.dataset.liveFocus === focusKey)
