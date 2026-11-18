@@ -12822,7 +12822,20 @@ function renderVerifyResults(streamers) {
   list.hidden = streamers.length === 0;
   $('verificationSearchInput').setAttribute('aria-expanded', String(streamers.length > 0));
 }
+//  인증 서버는 신청이 드물어 꺼져 있다가 켜지느라 첫 호출이 2~3초 걸린다. 스트리머를 검색하는 동안
+//  확인 전용 호출(checkOnly, 신청 기록·코드를 만들지 않음)을 한 번 보내 서버를 미리 깨워 둔다. 결과는 쓰지 않는다.
+let verifyWarmAt = 0;
+function warmStreamerVerification() {
+  if (Date.now() - verifyWarmAt < 5 * 60 * 1000) return;
+  verifyWarmAt = Date.now();
+  (async () => {
+    if (!auth.currentUser) await waitForAuthRestore();
+    if (!auth.currentUser) await signInAnonymously(auth);
+    await callStreamerVerification({ source: 'streamer-fanpage', checkOnly: true });
+  })().catch(() => {});
+}
 async function runVerifySearch(query) {
+  warmStreamerVerification();
   const sequence = ++verifySearchSequence;
   $('verificationSearchHint').textContent = '검색하고 있어요…';
   try {
