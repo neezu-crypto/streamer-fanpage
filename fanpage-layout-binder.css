@@ -432,3 +432,9 @@ body.fanpage-layout-four-active dialog.account-dialog :is(.verification-status,.
   body.fanpage-layout-four-active :is(#fanPageView,dialog) input[type=range]{min-height:44px}
   body.fanpage-layout-four-active #adminStatsDialog select{min-height:44px}
 }
+/* 넘김 성능 (2026-11-18): 덮이는 장은 필터 대신 반투명 덮개(opacity만), 움직이는 동안만 합성층 */
+#fanPageView.fanpage-layout-4 .fanpage-binder-page::after{content:"";position:absolute;inset:0;border-radius:inherit;background:#1b1424;opacity:var(--binder-shade,0);pointer-events:none;z-index:50}
+#fanPageView.fanpage-layout-4 .fanpage-binder.is-sliding .fanpage-binder-page{will-change:transform}
+@media (max-width:760px){
+  #fanPageView.fanpage-layout-4 .fanpage-binder-page{box-shadow:-2px 0 0 color-mix(in oklab,var(--bd-pink) 30%,#ccc),-8px 0 14px rgba(35,27,46,.12)}
+}

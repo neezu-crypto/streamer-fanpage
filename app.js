@@ -5335,6 +5335,8 @@ function setupFanpageBinder(view, { tabNav, panels, labels, onCurrent, onPrefetc
     start = box.getBoundingClientRect().top + window.scrollY - top;
     draw();
   }
+  //  대문·배너 높이가 바뀌면(이미지 늦게 그려짐 등) 시작 위치를 다시 잰다. 매 프레임 재지 않는다.
+  const refit = () => { if (!frame) frame = window.requestAnimationFrame(fit); };
   function setCurrent(index) {
     if (index === current) return;
     current = index;
@@ -5345,10 +5347,17 @@ function setupFanpageBinder(view, { tabNav, panels, labels, onCurrent, onPrefetc
     if (index < 0 || index >= panels.length || prefetched.has(index)) return;
     prefetched.add(index); onPrefetch?.(index);
   }
+  //  움직이는 동안은 합성만 쓰는 transform·opacity로 그리고(레이아웃·필터 없음), 스크롤이 멈추면 지금 탭을 top으로 되돌려
+  //  탭 안의 고정 위치 요소·포커스가 그대로 동작하게 한다. 같은 값은 다시 쓰지 않는다.
+  const lastStyle = new Map();
+  const put = (panel, key, value) => {
+    let rec = lastStyle.get(panel); if (!rec) { rec = {}; lastStyle.set(panel, rec); }
+    if (rec[key] === value) return; rec[key] = value;
+    if (key === 'shade') panel.style.setProperty('--binder-shade', value); else panel.style[key] = value;
+  };
+  let settled = true, idleTimer = 0;
   function draw() {
     frame = 0;
-    //  위쪽 대문·배너가 늦게 그려져 높이가 바뀌어도 맞도록 시작 위치는 매번 다시 잰다.
-    start = box.getBoundingClientRect().top + window.scrollY - top;
     const y = Math.max(0, window.scrollY - start);
     let cur = panels.length - 1, off = reads[cur] || 0, next = -1, progress = 0, pos = 0;
     for (let i = 0; i < panels.length; i += 1) {
@@ -5363,23 +5372,32 @@ function setupFanpageBinder(view, { tabNav, panels, labels, onCurrent, onPrefetc
       pos += slide;
     }
     const still = reduceMotion.matches;
+    const sliding = next >= 0 && progress > 0;
     panels.forEach((panel, i) => {
       if (i === cur) {
-        panel.style.visibility = 'visible'; panel.style.zIndex = '1'; panel.style.top = `${-off}px`;
-        panel.style.transform = next >= 0 && !still && progress > 0 ? `scale(${1 - progress * 0.04})` : '';
-        panel.style.filter = next >= 0 && progress > 0 ? `brightness(${1 - progress * 0.12})` : '';
-      } else if (i === next && progress > 0) {
-        panel.style.visibility = 'visible'; panel.style.zIndex = '2'; panel.style.top = '0px'; panel.style.filter = '';
-        panel.style.transform = `translate3d(${(1 - progress) * 105}%,0,0)${still ? '' : ` rotate(${(1 - progress) * 2}deg)`}`;
+        put(panel, 'visibility', 'visible'); put(panel, 'zIndex', '1');
+        if (settled) { put(panel, 'top', `${-off}px`); put(panel, 'transform', ''); }
+        else { put(panel, 'top', '0px'); put(panel, 'transform', `translate3d(0,${-off}px,0)`); }
+        put(panel, 'shade', sliding ? (progress * 0.14).toFixed(3) : '0');
+      } else if (i === next && sliding) {
+        put(panel, 'visibility', 'visible'); put(panel, 'zIndex', '2'); put(panel, 'top', '0px'); put(panel, 'shade', '0');
+        put(panel, 'transform', `translate3d(${((1 - progress) * 105).toFixed(2)}%,0,0)${still ? '' : ` rotate(${((1 - progress) * 2).toFixed(2)}deg)`}`);
       } else {
-        panel.style.visibility = 'hidden'; panel.style.zIndex = '0'; panel.style.transform = ''; panel.style.filter = '';
+        put(panel, 'visibility', 'hidden'); put(panel, 'zIndex', '0'); put(panel, 'transform', ''); put(panel, 'shade', '0');
       }
     });
+    box.classList.toggle('is-sliding', sliding);
     setCurrent(next >= 0 && progress > 0.5 ? next : cur);
     prefetch(current);
     // 지금 탭의 남은 읽을 거리가 화면 한 장 이하로 줄면 다음 탭을 미리 불러 둔다(넘길 때 끊기지 않게).
     if (next >= 0 || reads[cur] - off < visible) prefetch(cur + 1);
   }
+  const onScroll = () => {
+    if (settled) { settled = false; }
+    window.clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(() => { settled = true; schedule(); }, 140);
+    schedule();
+  };
   const schedule = () => { if (!frame) frame = window.requestAnimationFrame(draw); };
   function scrollToY(target) {
     window.scrollTo({ top: Math.max(0, Math.ceil(target) + 1), behavior: reduceMotion.matches ? 'auto' : 'smooth' });
@@ -5404,16 +5422,18 @@ function setupFanpageBinder(view, { tabNav, panels, labels, onCurrent, onPrefetc
     const rect = event.target.getBoundingClientRect();
     if (panel.style.visibility === 'hidden' || rect.bottom > window.innerHeight || rect.top < top) reveal(event.target);
   };
-  window.addEventListener('scroll', schedule, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', fit);
   stage.addEventListener('focusin', onFocusIn);
-  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => fit()) : null;
+  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(refit) : null;
   panels.forEach((panel) => observer?.observe(panel));
+  observer?.observe(view);
   fit();
   const api = { goTo, reveal, fit, indexOf: (panel) => panels.indexOf(panel) };
   view._binder = api;
   fanpageBinderCleanup = () => {
-    window.removeEventListener('scroll', schedule); window.removeEventListener('resize', fit);
+    window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', fit);
+    window.clearTimeout(idleTimer);
     stage.removeEventListener('focusin', onFocusIn); observer?.disconnect();
     if (frame) window.cancelAnimationFrame(frame);
     if (view._binder === api) view._binder = null;
