@@ -422,7 +422,7 @@ body.fanpage-layout-four-active dialog.account-dialog :is(.verification-status,.
 /* 탭 머리말 테이프: 진한 핑크 글씨(대비 4.37) 대신 잉크색 */
 #fanPageView.fanpage-layout-4 .fanpage-tab-panel-heading>.eyebrow{color:var(--mz-ink)}
 /* 롤링페이퍼 안내·상태 글씨 10~11px → 12px */
-#fanPageView.fanpage-layout-4 :is(.rolling-paper-sticker-hint,.rolling-paper-status){font-size:12px}
+#fanPageView.fanpage-layout-4 :is(.rolling-paper-sticker-hint,.rolling-paper-status,.upbo-request-empty-hint){font-size:12px}
 /* 검색으로 돌아가기: 옅은 글씨(대비 2.0)·17px 높이 → 진하게, 누름 영역 44px */
 #fanPageView.fanpage-layout-4 .back-link{display:inline-flex;align-items:center;min-height:44px;color:var(--mz-soft)}
 /* 배포 후 실제 화면 측정 보정 (2026-11-18): 모바일 누름 영역 44px */
