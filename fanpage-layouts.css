@@ -1964,13 +1964,9 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-to
   color: var(--doodle-muted, #665d5b);
   text-align: center;
 }
+/* 디자인 3 롤링페이퍼 주제 카드: 작은 장식 기호(✦♡✿)가 "메시지 n개" 글자에 겹쳐 보여 숨긴다(종이 카드에 테이프·하트 장식이 이미 있다). */
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-topic-decoration {
-  position: absolute;
-  inset: 18px auto auto 26px;
-  z-index: 1;
-  border: 0;
-  background: transparent;
-  color: var(--doodle-accent-deep, #bf5d7e);
+  display: none;
 }
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-topic-card-actions {
   position: relative;
@@ -5258,3 +5254,17 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.button, .fan
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.button, .fan-gallery-tabs > button, .weekly-schedule-board-edit):not(.live-station-link):not(.fan-quick-link):not(.fanpage-tab-button):not([class*="tg-"]):not(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):active:not(:disabled) { transform: translateY(2px) rotate(-.3deg); box-shadow: 1px 1px 0 var(--doodle-ink, #2f2a2c) !important; }
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 :is(.button, .fan-gallery-tabs > button, .weekly-schedule-board-edit):not(.live-station-link):not(.fan-quick-link):not(.fanpage-tab-button):not([class*="tg-"]):not(.profile-settings-close, .video-library-add-dialog-close, .weekly-schedule-image-tools-close):disabled { opacity: .55; box-shadow: none !important; transform: none; }
 body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .weekly-schedule-board-edit { position: absolute !important; inset: auto 12px 12px auto !important; width: 42px; height: 42px; min-width: 42px; padding: 0; z-index: 2; }
+
+/*  디자인 3: 탭 안 항목 카드가 화면에 들어올 때 부드럽게 나타난다(app.js setupFanpageScrollReveal). translate(개별 속성)·opacity만 움직여 카드 원래 기울기(transform)는 건드리지 않는다. 동작 줄이기면 즉시 보임. */
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 [data-reveal="pending"] {
+  opacity: 0;
+  translate: 0 18px;
+}
+body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 [data-reveal="shown"] {
+  opacity: 1;
+  translate: none;
+  transition: opacity .5s ease-out, translate .5s cubic-bezier(.22, .9, .32, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 [data-reveal] { opacity: 1; translate: none; transition: none; }
+}

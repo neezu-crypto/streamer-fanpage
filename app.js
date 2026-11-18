@@ -5479,6 +5479,26 @@ function setupFanpageBinder(view, { tabNav, panels, labels, onCurrent, onPrefetc
   return api;
 }
 
+//  디자인 3: 탭 안 항목 카드는 화면에 들어올 때 부드럽게 나타난다. 처음 렌더한 카드만 표시(data-reveal)하므로
+//  나중에 새로 그려진 카드는 바로 보인다(깜빡임 없음). 한 번 나타나면 관찰을 끝낸다. 동작 줄이기·IO 미지원이면 생략.
+let fanpageScrollRevealObserver = null;
+function setupFanpageScrollReveal(panels) {
+  fanpageScrollRevealObserver?.disconnect(); fanpageScrollRevealObserver = null;
+  if (typeof IntersectionObserver !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const groups = '.fanpage-home-columns, .fanpage-home-main-column, .fanpage-home-side-column, .fanpage-tab-columns, .fanpage-tab-column';
+  const flatten = (element) => (element.matches(groups) ? [...element.children].flatMap(flatten) : [element]);
+  const items = [...panels].flatMap((panel) => [...panel.querySelectorAll(':scope > .fanpage-tab-panel-grid > *')].flatMap(flatten));
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      observer.unobserve(entry.target);
+      const item = entry.target; item.dataset.reveal = 'shown';
+      setTimeout(() => { if (item.dataset.reveal === 'shown') delete item.dataset.reveal; }, 650); // 끝나면 표시를 지워 카드 원래 전환 효과로 돌려 놓는다
+    });
+  }, { rootMargin: '0px 0px -6% 0px', threshold: 0.01 });
+  items.forEach((item) => { if (item.tagName === 'DIALOG') return; item.dataset.reveal = 'pending'; observer.observe(item); });
+  fanpageScrollRevealObserver = observer;
+}
 function renderFanPage(page, options = {}) {
   if (liveStatusTimer) window.clearInterval(liveStatusTimer);
   liveStatusTimer = 0;
@@ -5956,6 +5976,7 @@ function renderFanPage(page, options = {}) {
       onPrefetch: (index) => loadFanPageTabData(binderKeys[index]),
     });
   }
+  if (layoutDesign === 3) setupFanpageScrollReveal(tabPanels.values());
   //  한 줄 탭 바가 넘칠 때만 끝에 화살표를 보여 옆에 탭이 더 있다는 걸 알린다(폭과 무관).
   ['left', 'right'].forEach((dir) => {
     const more = document.createElement('button');
