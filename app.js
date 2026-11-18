@@ -5495,7 +5495,7 @@ function setupFanpageScrollReveal(panels) {
       const item = entry.target; item.dataset.reveal = 'shown';
       setTimeout(() => { if (item.dataset.reveal === 'shown') delete item.dataset.reveal; }, 650); // 끝나면 표시를 지워 카드 원래 전환 효과로 돌려 놓는다
     });
-  }, { rootMargin: '0px 0px -6% 0px', threshold: 0.01 });
+  }, { rootMargin: '0px 0px -16% 0px', threshold: 0.01 });
   items.forEach((item) => { if (item.tagName === 'DIALOG') return; item.dataset.reveal = 'pending'; observer.observe(item); });
   fanpageScrollRevealObserver = observer;
 }
