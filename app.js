@@ -5902,7 +5902,7 @@ function renderFanPage(page, options = {}) {
       button.tabIndex = selected ? 0 : -1;
       tabPanels.get(tab.key).hidden = !usesBinderLayout && !selected;
     });
-    //  디자인 3: 사용자가 탭을 바꾸면 새 탭 종이가 살짝 기운 채 아래에서 올라와 놓인다(0.3초, 바꿀 때 한 번만).
+    //  디자인 3: 사용자가 탭을 바꾸면 새 탭 종이가 살짝 기운 채 아래에서 올라와 놓인다(0.5초, 바꿀 때 한 번만).
     //  transform·opacity만 움직이고 끝나면 남기지 않는다(fill 없음 → 고정 위치 자식에 영향 없음). 동작 줄이기면 생략.
     if (fromUser && previousTabKey && previousTabKey !== tabKey && isFanpageLayoutThree(page)
       && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -5912,7 +5912,7 @@ function renderFanPage(page, options = {}) {
         { transform: 'translate3d(0, 26px, 0) rotate(-1.2deg)', opacity: 0 },
         { transform: 'translate3d(0, -3px, 0) rotate(.25deg)', opacity: 1, offset: .72 },
         { transform: 'none', opacity: 1 },
-      ], { duration: 300, easing: 'cubic-bezier(.22,.9,.32,1)' });
+      ], { duration: 500, easing: 'cubic-bezier(.22,.9,.32,1)' });
     }
     view._syncRollingPaperStickerQuickTools?.();
     loadFanPageTabData(tabKey);
