@@ -389,6 +389,9 @@ body.fanpage-layout-four-active dialog.account-dialog :is(.verification-status,.
 #fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:6px 16px;padding:0 0 22px;border:0}
 #fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading>*{grid-column:1}
 #fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading>:is(.button,button){grid-column:2;grid-row:1/span 3;align-self:end}
+/* 버튼이 둘(❔ 사용법 + 팬 화면으로 보기)이면 같은 칸에 겹쳤다: 사용법은 위 줄, 화면 전환은 아래 줄로 나눈다 */
+#fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading>.fp-tour-replay:has(+ :is(.button,button)){grid-row:1/span 2;justify-self:end}
+#fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading>.fp-tour-replay+:is(.button,button){grid-row:3;justify-self:end}
 #fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading :is(h2,h3){margin:4px 0 0;font:400 clamp(30px,4.4vw,52px)/1.1 var(--mz-serif);color:inherit}
 #fanPageView.fanpage-layout-4 .fanpage-binder-page>.fanpage-tab-panel-heading p:not(.eyebrow){color:inherit;opacity:.85;font-size:14px}
 /* 홈 속지(짙은 보라): 머리말만 밝은 글씨, 안의 칸은 흰 카드 */

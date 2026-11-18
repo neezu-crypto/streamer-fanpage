@@ -30,7 +30,7 @@ export function stopTour() {
 }
 
 // steps: [{ target: () => Element, text, action?: '눌러 보세요' 문구, waitClick?: true }]
-export async function startTour(id, steps, { force = false } = {}) {
+export async function startTour(id, steps, { force = false, noScroll = false } = {}) {
   if (!force && tourDone(id)) return;
   stopTour();
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -45,7 +45,7 @@ export async function startTour(id, steps, { force = false } = {}) {
   actions.append(skip, next); bubble.append(stepLabel, text, hint, actions);
   document.body.append(ring, bubble);
 
-  let index = -1; let target = null; let detachClick = null; let raf = 0; let token = 0;
+  let index = -1; let shownAny = false; let target = null; let detachClick = null; let raf = 0; let token = 0;
   const state = { cleanup() {
     token += 1; cancelAnimationFrame(raf); detachClick?.(); target?.classList.remove('fp-tour-target');
     ring.remove(); bubble.remove(); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true);
@@ -66,7 +66,7 @@ export async function startTour(id, steps, { force = false } = {}) {
       Object.assign(bubble.style, { top: `${top}px`, left: `${left}px`, width: `${bw}px` });
     });
   }
-  function finish(completed) { markDone(id); stopTour(); if (completed) document.dispatchEvent(new CustomEvent('fanpage-tour-done', { detail: { id } })); }
+  function finish(completed) { if (shownAny || !noScroll) markDone(id); stopTour(); if (completed) document.dispatchEvent(new CustomEvent('fanpage-tour-done', { detail: { id } })); }
   function onKey(event) { if (event.key === 'Escape') finish(false); }
 
   async function go(nextIndex) {
@@ -78,8 +78,13 @@ export async function startTour(id, steps, { force = false } = {}) {
     const el = await waitForElement(step.target, step.timeout || 4000);
     if (myToken !== token) return;
     if (!el) { if (step.optional !== false) { go(index + 1); } else finish(false); return; }
-    target = el; target.classList.add('fp-tour-target');
-    target.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+    //  noScroll(바인더): 스크롤을 옮기지 않는다. 대상이 화면 밖이면 그 단계는 건너뛴다.
+    if (noScroll) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) { go(index + 1); return; }
+    }
+    target = el; shownAny = true; target.classList.add('fp-tour-target');
+    if (!noScroll) target.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
     stepLabel.textContent = `${index + 1} / ${steps.length}`;
     text.textContent = step.text;
     hint.textContent = step.waitClick ? `👉 ${step.action || '강조된 버튼을 직접 눌러 보세요.'}` : '';

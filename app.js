@@ -3,7 +3,7 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken as getAppChec
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signInWithCustomToken, linkWithPopup, signOut, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
-import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261115-tour1';
+import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261118-tour3';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
@@ -4781,9 +4781,9 @@ function fanpageTabTourSteps(page, tabKey) {
   }
   return null;
 }
-function runFanpageTabTour(page, tabKey, force = false) {
+function runFanpageTabTour(page, tabKey, force = false, { noScroll = false } = {}) {
   const tour = fanpageTabTourSteps(page, tabKey);
-  if (tour) startTour(tour.id, tour.steps, { force });
+  if (tour) startTour(tour.id, tour.steps, { force, noScroll });
   else stopTour();
 }
 
@@ -5936,7 +5936,23 @@ function renderFanPage(page, options = {}) {
     }
     view._syncRollingPaperStickerQuickTools?.();
     loadFanPageTabData(tabKey);
-    runFanpageTabTour(page, tabKey);
+    //  바인더(디자인 4)는 스크롤이 곧 탭 넘김이라, 넘기는 도중에 안내를 띄워 스크롤을 옮기면 화면이 왔다갔다 한다.
+    //  스크롤이 0.7초 멈춘 뒤 그 탭이 여전히 현재 탭일 때만 띄우고, 안내는 스크롤을 움직이지 않는다.
+    if (view._binder) {
+      clearTimeout(view._tourIdleTimer);
+      stopTour();
+      const waitIdle = () => {
+        clearTimeout(view._tourIdleTimer);
+        view._tourIdleTimer = setTimeout(() => {
+          window.removeEventListener('scroll', waitIdle);
+          if (view.isConnected && view.dataset.fanpageActiveTab === tabKey) runFanpageTabTour(page, tabKey, false, { noScroll: true });
+        }, 700);
+      };
+      window.removeEventListener('scroll', view._tourIdleListener || waitIdle);
+      view._tourIdleListener = waitIdle;
+      window.addEventListener('scroll', waitIdle, { passive: true });
+      waitIdle();
+    } else runFanpageTabTour(page, tabKey);
     // 다마고치 탭에서는 모바일 떠 있는 버튼을 작게 줄여 아래쪽 줄에 모은다(fanpage-mobile-actions.css).
     document.body.classList.toggle('fanpage-tamagotchi-tab', tabKey === 'tamagotchi');
     //  모바일은 모든 디자인에서 탭 바가 한 줄 가로 스크롤이므로 선택한 탭이 항상 보이도록 가운데로 맞춘다.
