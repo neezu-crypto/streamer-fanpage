@@ -4733,6 +4733,44 @@ function fanpageTabTourSteps(page, tabKey) {
       { target: q('.tg-care-shop-btn'), optional: true, text: '보석 상점에서는 팬들이 모은 하트 보석으로 꾸미기를 살 수 있어요.' },
     ] };
   }
+  // 스트리머 편집 안내: 편집 도구가 보일 때만(팬 화면 미리보기·디자인 3 편집 모드 꺼짐이면 안내하지 않는다).
+  const ownerEditing = page.isOwner === true && editUiAllowed(page);
+  if (tabKey === 'home' && ownerEditing) {
+    return { id: 'home:owner', steps: [
+      { target: q('.weekly-schedule-board-edit'), timeout: 6000, text: '연필 버튼으로 이번 주 방송표를 편집해요. 요일별 시간·제목과 이미지를 넣으면 팬들이 홈에서 바로 봐요. (PC에서 편집할 수 있어요)' },
+      { target: q('.fanpage-fan-preview-toggle'), text: '"팬 화면으로 보기"를 누르면 팬에게 보이는 그대로 확인할 수 있어요. 비어 있는 칸은 팬에게 보이지 않아요.' },
+    ] };
+  }
+  if (tabKey === 'schedule' && ownerEditing) {
+    return { id: 'schedule:owner', steps: [
+      { target: q('.weekly-schedule-board-edit'), timeout: 6000, text: '연필 버튼으로 주간 방송표를 편집해요. 저장하면 이 탭에 크게 보여요. (PC에서 편집할 수 있어요)' },
+    ] };
+  }
+  if (tabKey === 'activity' && ownerEditing) {
+    return { id: 'activity:owner', steps: [
+      { target: q('.upbo-add-topic, .upbo-add-item-inline'), timeout: 8000, text: '업보 정리에서 팬이 신청할 수 있는 항목을 만들어요. 항목이 있어야 팬들이 신청할 수 있어요.' },
+      { target: q('#upbo-tab-pending'), text: '팬이 보낸 신청은 "팬 신청 검토"에 쌓여요. 승인한 것만 공개 기록에 올라가요.' },
+      { target: q('#upbo-tab-records'), text: '"등록된 업보 기록"에서 공개된 기록과 달성 여부를 관리해요.' },
+    ] };
+  }
+  if (tabKey === 'content' && ownerEditing) {
+    return { id: 'content:owner', steps: [
+      { target: q('.songbook-add-form'), timeout: 8000, text: '노래책이에요. YouTube 영상 링크를 붙여 넣으면 제목과 썸네일을 자동으로 불러와요.' },
+      { target: q('.played-games-add-panel'), text: '플레이한 게임을 추가해요. Steam 링크는 이름·썸네일을 자동으로 가져오고, 게임마다 다시보기를 연결할 수 있어요.' },
+      { target: q('.competition-history-add'), text: '대회 이력도 직접 추가할 수 있어요. 팬들이 활동 기록을 한눈에 볼 수 있어요.' },
+    ] };
+  }
+  if (tabKey === 'video-library' && ownerEditing) {
+    return { id: 'video-library:owner', steps: [
+      { target: q('.video-library-add-open'), timeout: 8000, text: '"＋ 추가하기"로 라이브에서 자주 보는 영상이나 YouTube 채널을 카테고리별로 모아요. 먼저 카테고리를 만들고 그 안에 영상을 넣어요.' },
+    ] };
+  }
+  if (tabKey === 'memories' && ownerEditing) {
+    return { id: 'memories:owner', steps: [
+      { target: q('.memory-moments-form input[name="title"]'), timeout: 8000, text: '100일·200일처럼 기억하고 싶은 방송의 제목을 적어요.' },
+      { target: q('.memory-moments-form input[name="url"]'), text: 'SOOP 다시보기나 YouTube 영상 링크를 붙여 넣고 "＋ 순간 추가"를 누르면 팬들에게 보여요.' },
+    ] };
+  }
   if (tabKey === 'comment-up' && page.isOwner) {
     return { id: 'comment-up:owner', steps: [
       { target: q('.comment-up-form input[type="url"]'), text: 'SOOP 방송국 게시글 주소를 복사해 여기에 붙여 넣어요. 공개·애청자 공개 게시글만 확인할 수 있어요.' },
