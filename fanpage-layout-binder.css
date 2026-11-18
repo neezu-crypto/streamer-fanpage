@@ -425,3 +425,10 @@ body.fanpage-layout-four-active dialog.account-dialog :is(.verification-status,.
 #fanPageView.fanpage-layout-4 :is(.rolling-paper-sticker-hint,.rolling-paper-status){font-size:12px}
 /* 검색으로 돌아가기: 옅은 글씨(대비 2.0)·17px 높이 → 진하게, 누름 영역 44px */
 #fanPageView.fanpage-layout-4 .back-link{display:inline-flex;align-items:center;min-height:44px;color:var(--mz-soft)}
+/* 배포 후 실제 화면 측정 보정 (2026-11-18): 모바일 누름 영역 44px */
+@media (max-width:760px){
+  #fanPageView.fanpage-layout-4 .profile-about{min-height:44px}
+  #fanPageView.fanpage-layout-4 .fanpage-tab-button{min-width:44px}
+  body.fanpage-layout-four-active :is(#fanPageView,dialog) input[type=range]{min-height:44px}
+  body.fanpage-layout-four-active #adminStatsDialog select{min-height:44px}
+}
