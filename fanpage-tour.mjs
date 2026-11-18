@@ -91,7 +91,8 @@ export async function startTour(id, steps, { force = false, noScroll = false } =
     if (nextIndex >= steps.length) { finish(true); return; }
     index = nextIndex; const step = steps[index];
     bubble.hidden = true; ring.hidden = true;
-    const el = await waitForElement(step.target, step.timeout || 4000);
+    //  사용법 버튼으로 다시 볼 때는 화면이 이미 그려져 있으므로 없는 대상(예: 모바일에서 숨는 편집 버튼)을 오래 기다리지 않는다.
+    const el = await waitForElement(step.target, force ? Math.min(step.timeout || 4000, 600) : (step.timeout || 4000));
     if (myToken !== token) return;
     if (!el) { if (step.optional !== false) { go(index + 1); } else finish(false); return; }
     //  noScroll(자동으로 뜬 안내): 화면을 끌어당기지 않는다. 대상이 화면 밖이면 사용자가 스크롤해
