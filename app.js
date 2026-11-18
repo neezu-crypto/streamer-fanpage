@@ -6033,7 +6033,7 @@ function renderFanPage(page, options = {}) {
   if (youtubeSection) view.append(renderYouTubePlayerDialog());
   fanPageQuickNavCleanup = createFanPageQuickRemote(view);
   loadLiveStatus(page.streamer.id);
-  liveStatusTimer = window.setInterval(() => loadLiveStatus(page.streamer.id), 60 * 1000);
+  //  방송 상태는 실시간일 필요가 없다: 페이지를 열 때 한 번만 확인하고 주기적으로 다시 부르지 않는다(새로고침 버튼으로 직접 확인).
 
   // 디자인 3 미리보기는 팬 화면(편집 UI 없음)으로 다시 그려지므로, 열려 있던 디자인 창은 실제 관리 권한만 있으면 유지한다.
   if ((page.isOwner || page.canManage === true) && options.preservedLayoutDesignDialog) {
@@ -7574,14 +7574,14 @@ async function loadLiveStatus(streamerId) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const state = liveStatusStateFor(streamerId);
   if (state.loading) return;
-  // 화면을 다시 그릴 때(공개 사본 → 최신본) 30초 안에 확인한 결과가 있으면 다시 부르지 않는다.
-  if (!state.forceNext && state.hasLoaded && Date.now() - (state.loadedAt || 0) < 30 * 1000) { refreshLiveSection(streamerId); return; }
+  // 화면을 다시 그릴 때(공개 사본 → 최신본) 5분 안에 확인한 결과가 있으면 다시 부르지 않는다.
+  if (!state.forceNext && state.hasLoaded && Date.now() - (state.loadedAt || 0) < 5 * 60 * 1000) { refreshLiveSection(streamerId); return; }
   state.loading = true; state.error = '';
   const button = $('liveSection')?.querySelector('.live-refresh-button');
   if (button) { button.disabled = true; button.textContent = '확인 중…'; }
   try {
-    //  1분 안에 누군가 확인한 결과가 있으면 그 파일을 쓴다(새로고침 버튼은 항상 서버 확인).
-    const shared = state.forceNext ? null : await loadPublicFanPageFile(streamerId, 'live', 60 * 1000);
+    //  5분 안에 누군가 확인한 결과가 있으면 그 파일을 쓴다(새로고침 버튼은 항상 서버 확인).
+    const shared = state.forceNext ? null : await loadPublicFanPageFile(streamerId, 'live', 5 * 60 * 1000);
     state.forceNext = false;
     const result = shared && shared.live ? shared.live : (await callLiveStatus({ streamerId })).data;
     if (!currentPage || currentPage.streamer.id !== streamerId) return;
