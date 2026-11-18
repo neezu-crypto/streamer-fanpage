@@ -5945,6 +5945,8 @@ function renderFanPage(page, options = {}) {
         clearTimeout(view._tourIdleTimer);
         view._tourIdleTimer = setTimeout(() => {
           window.removeEventListener('scroll', waitIdle);
+          //  두 장 사이에서 멈춘 상태(다음 장이 반쯤 덮는 중)면 띄우지 않고, 다시 스크롤해 한 장에 멈출 때까지 기다린다.
+          if (view.querySelector('.fanpage-binder.is-sliding')) { window.addEventListener('scroll', waitIdle, { passive: true }); return; }
           if (view.isConnected && view.dataset.fanpageActiveTab === tabKey) runFanpageTabTour(page, tabKey, false, { noScroll: true });
         }, 700);
       };
