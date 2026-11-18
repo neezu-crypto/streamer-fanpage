@@ -11,13 +11,22 @@ function markDone(id) {
   try { const done = readDone(); done[id] = Date.now(); localStorage.setItem(STORE_KEY, JSON.stringify(done)); } catch { /* 저장 불가 브라우저는 매번 안내 */ }
 }
 
-function waitForElement(resolve, timeoutMs = 4000) {
+//  quietMs: 대상이 없을 때, 화면(DOM)이 quietMs 동안 바뀌지 않으면 더 그려질 게 없다고 보고 일찍 포기한다.
+//  (사용법 다시 보기: 다 그려진 화면에서 없는 대상을 오래 기다리지 않고, 아직 불러오는 중이면 끝까지 기다린다.)
+function waitForElement(resolve, timeoutMs = 4000, { quietMs = 0 } = {}) {
   return new Promise((done) => {
     const started = performance.now();
+    let lastChange = started;
+    const mo = quietMs && typeof MutationObserver === 'function'
+      ? new MutationObserver(() => { lastChange = performance.now(); }) : null;
+    mo?.observe(document.body, { childList: true, subtree: true });
+    const end = (value) => { mo?.disconnect(); done(value); };
     (function poll() {
       const el = resolve();
-      if (el && el.isConnected && el.getClientRects().length) return done(el);
-      if (performance.now() - started > timeoutMs) return done(null);
+      if (el && el.isConnected && el.getClientRects().length) return end(el);
+      const now = performance.now();
+      if (now - started > timeoutMs) return end(null);
+      if (mo && now - lastChange > quietMs) return end(null);
       setTimeout(poll, 120);
     })();
   });
@@ -91,8 +100,9 @@ export async function startTour(id, steps, { force = false, noScroll = false } =
     if (nextIndex >= steps.length) { finish(true); return; }
     index = nextIndex; const step = steps[index];
     bubble.hidden = true; ring.hidden = true;
-    //  사용법 버튼으로 다시 볼 때는 화면이 이미 그려져 있으므로 없는 대상(예: 모바일에서 숨는 편집 버튼)을 오래 기다리지 않는다.
-    const el = await waitForElement(step.target, force ? Math.min(step.timeout || 4000, 600) : (step.timeout || 4000));
+    //  사용법 버튼으로 다시 볼 때: 화면이 다 그려졌으면 없는 대상(예: 모바일에서 숨는 편집 버튼)을 0.6초만 기다리고,
+    //  탭 데이터를 아직 불러오는 중(화면이 계속 바뀜)이면 원래 시간만큼 기다린다.
+    const el = await waitForElement(step.target, step.timeout || 4000, { quietMs: force ? 600 : 0 });
     if (myToken !== token) return;
     if (!el) { if (step.optional !== false) { go(index + 1); } else finish(false); return; }
     //  noScroll(자동으로 뜬 안내): 화면을 끌어당기지 않는다. 대상이 화면 밖이면 사용자가 스크롤해
