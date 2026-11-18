@@ -23,6 +23,22 @@ function waitForElement(resolve, timeoutMs = 4000) {
   });
 }
 
+function inView(el) {
+  const r = el.getBoundingClientRect();
+  return r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
+}
+// 대상이 화면에 (절반 이상 또는 화면 높이의 40% 이상) 들어올 때까지 기다린다. 대상이 사라지거나 취소되면 false.
+function waitUntilVisible(el, cancelled) {
+  return new Promise((resolve) => {
+    if (typeof IntersectionObserver !== 'function') { resolve(true); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { io.disconnect(); clearInterval(poll); resolve(true); }
+    }, { threshold: 0.5 });
+    io.observe(el);
+    const poll = setInterval(() => { if (cancelled() || !el.isConnected) { io.disconnect(); clearInterval(poll); resolve(false); } }, 300);
+  });
+}
+
 export function stopTour() {
   if (!active) return;
   active.cleanup();
@@ -78,10 +94,12 @@ export async function startTour(id, steps, { force = false, noScroll = false } =
     const el = await waitForElement(step.target, step.timeout || 4000);
     if (myToken !== token) return;
     if (!el) { if (step.optional !== false) { go(index + 1); } else finish(false); return; }
-    //  noScroll(바인더): 스크롤을 옮기지 않는다. 대상이 화면 밖이면 그 단계는 건너뛴다.
-    if (noScroll) {
-      const r = el.getBoundingClientRect();
-      if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) { go(index + 1); return; }
+    //  noScroll(자동으로 뜬 안내): 화면을 끌어당기지 않는다. 대상이 화면 밖이면 사용자가 스크롤해
+    //  대상이 화면에 들어올 때까지 기다렸다가 그때 보여 준다(그 사이 말풍선은 숨김).
+    if (noScroll && !inView(el)) {
+      const seen = await waitUntilVisible(el, () => myToken !== token);
+      if (myToken !== token) return;
+      if (!seen) { go(index + 1); return; }
     }
     target = el; shownAny = true; target.classList.add('fp-tour-target');
     if (!noScroll) target.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
