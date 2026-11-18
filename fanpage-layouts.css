@@ -299,7 +299,8 @@ body.fanpage-home-kawaii-active .avatar { border-color: #eadfeb; background: lin
 #fanPageView.fanpage-layout-1 .profile-tab { top: -1px; left: -1px; padding: 10px 18px 11px; border: 1px solid #fff; border-radius: 23px 0 21px 0; background: var(--kawaii-lemon); color: #64586e; font-size: 17px; }
 #fanPageView.fanpage-layout-1 .profile-avatar { border-color: #fff; box-shadow: 0 0 0 3px var(--kawaii-soft), 0 8px 22px #76617b22; }
 #fanPageView.fanpage-layout-1 .profile-name { color: #51465d; }
-#fanPageView.fanpage-layout-1 .profile-handle { color: #81758b; }
+#fanPageView.fanpage-layout-1 .profile-handle,
+#fanPageView.fanpage-layout-1 .profile-favorites { color: #81758b; }
 #fanPageView.fanpage-layout-1 .profile-identity .verified-tag {
   margin-top: 13px;
   padding: 7px 12px;
@@ -2451,6 +2452,7 @@ body.fanpage-layout-three-active .footer-feedback-link { border-bottom-color: #2
 #fanPageView.fanpage-layout-3 .profile-avatar { border: 3px solid var(--doodle-ink); box-shadow: 4px 5px 0 var(--doodle-shadow); background: #fff3e0; }
 #fanPageView.fanpage-layout-3 .profile-name,
 #fanPageView.fanpage-layout-3 .profile-handle,
+#fanPageView.fanpage-layout-3 .profile-favorites,
 #fanPageView.fanpage-layout-3 .profile-about,
 #fanPageView.fanpage-layout-3 .profile-detail-value,
 #fanPageView.fanpage-layout-3 .profile-fact,

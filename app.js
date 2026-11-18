@@ -5570,7 +5570,11 @@ function renderFanPage(page, options = {}) {
   const verified = document.createElement('span');
   verified.className = 'verified-tag';
   verified.textContent = '✓ 인증 스트리머';
-  identityCopy.append(name, handle, verified);
+  //  방송국 즐겨찾기 수: 방송 상태 확인 응답에 함께 오는 값(추가 호출 없음). 값이 없으면 숨긴다.
+  const favorites = document.createElement('p');
+  favorites.className = 'profile-favorites'; favorites.id = 'profileFavoriteCount';
+  fillProfileFavoriteCount(favorites, page.streamer.id);
+  identityCopy.append(name, handle, favorites, verified);
   identity.append(avatar, identityCopy);
 
   const facts = document.createElement('div');
@@ -7558,6 +7562,14 @@ function renderLiveSection(page) {
   return section;
 }
 
+function fillProfileFavoriteCount(element, streamerId) {
+  const count = liveStatusStateFor(streamerId).fanCount;
+  const known = Number.isFinite(count);
+  element.hidden = !known;
+  element.textContent = known ? `♥ 즐겨찾기 ${count.toLocaleString('ko-KR')}` : '';
+  if (known) element.title = 'SOOP 방송국 즐겨찾기 수'; else element.removeAttribute('title');
+}
+
 async function loadLiveStatus(streamerId) {
   if (!currentPage || currentPage.streamer.id !== streamerId) return;
   const state = liveStatusStateFor(streamerId);
@@ -7580,11 +7592,15 @@ async function loadLiveStatus(streamerId) {
     state.broadcastId = typeof result.broadcastId === 'string' ? result.broadcastId : '';
     state.streamUrl = typeof result.streamUrl === 'string' ? result.streamUrl : '';
     state.thumbnailUrl = typeof result.thumbnailUrl === 'string' ? result.thumbnailUrl : '';
+    if (Number.isFinite(result.fanCount) && result.fanCount >= 0) state.fanCount = result.fanCount;
   } catch (_) {
     if (currentPage && currentPage.streamer.id === streamerId) state.error = 'unavailable';
   } finally {
     state.loading = false;
-    if (currentPage && currentPage.streamer.id === streamerId) { refreshLiveSection(streamerId); refreshKawaiiHeroActions(); }
+    if (currentPage && currentPage.streamer.id === streamerId) {
+      refreshLiveSection(streamerId); refreshKawaiiHeroActions();
+      const favorites = document.getElementById('profileFavoriteCount'); if (favorites) fillProfileFavoriteCount(favorites, streamerId);
+    }
   }
 }
 

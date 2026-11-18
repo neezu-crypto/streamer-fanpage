@@ -33,6 +33,7 @@ body.fanpage-layout-four-active .topbar a,body.fanpage-layout-four-active .topba
 #fanPageView.fanpage-layout-4 .profile-avatar{grid-area:photo;align-self:start;justify-self:stretch;width:100%;height:auto;aspect-ratio:4/5;padding:12px;border:0;border-radius:20px;background:var(--bd-holo);box-shadow:0 20px 50px color-mix(in oklab,var(--bd-pink) 30%,transparent);object-fit:cover}
 #fanPageView.fanpage-layout-4 .profile-name{font:400 clamp(44px,7.4vw,96px)/1.02 var(--mz-serif);letter-spacing:-.01em;color:var(--mz-ink);word-break:keep-all}
 #fanPageView.fanpage-layout-4 .profile-handle{margin:0;color:var(--mz-red);font:700 14px var(--font)}
+#fanPageView.fanpage-layout-4 .profile-favorites{margin:2px 0 0;color:var(--mz-red);font:700 13px var(--font);opacity:.85}
 #fanPageView.fanpage-layout-4 .verified-tag{border-radius:999px;background:var(--mz-ink);color:#fff}
 #fanPageView.fanpage-layout-4 .fanpage-binder-characters{grid-area:chars;margin:0}
 /* 사실 칸: 둥근 파스텔 카드 4열 */
