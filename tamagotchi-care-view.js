@@ -167,11 +167,23 @@ export function mountCareView(container, {
 
   function empty(text, withShopLink) {
     root.replaceChildren();
-    const box = el('div', 'tg-care-empty'); box.append(el('p', '', text));
+    const box = el('div', 'tg-care-empty');
+    //  2026-11-19 분양 전 미리보기: 펫이 없을 때 몽실이를 진열장처럼 보여 준다. 보기만 가능하고(도구·누르기 반응 없음)
+    //  상호작용 체험은 분양소에서만 한다. 서버 호출 없이 이미 불러온 상점 모듈로 브라우저에서만 그린다.
+    if (mods?.createMongsil) {
+      const showcase = el('figure', 'tg-care-showcase'); showcase.setAttribute('aria-label', '분양 전 미리보기: 몽실이');
+      const stage = el('div', 'tg-care-showcase-pet'); stage.setAttribute('aria-hidden', 'true');
+      showcase.append(el('span', 'tg-care-showcase-badge', '미리보기'), stage, el('figcaption', '', '몽실이 · 분양소에서 만나 볼 수 있어요'));
+      box.append(showcase);
+      petApi = mods.createMongsil(stage, { color: 'cream', reduced });
+      //  모바일은 초당 30번만 그린다(공통 규칙). 화면 밖이면 아래 IntersectionObserver가 멈춘다.
+      if (window.matchMedia?.('(max-width: 760px), (pointer: coarse)').matches) petApi.setLowPower?.(true);
+    }
+    box.append(el('p', '', text));
     if (openApplication) {
       const app = el('button', 'button', '✎ 다마고치 디자인 신청'); app.type = 'button'; app.addEventListener('click', () => openApplication()); box.append(app);
     }
-    if (withShopLink) { const a = el('a', 'button button-primary', '분양소 가기 ↗'); a.href = `${SHOP_BASE}tamagotchi.html`; a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
+    { const a = el('a', `button${withShopLink ? ' button-primary' : ''}`, withShopLink ? '분양소 가기 ↗' : '분양소에서 미리 만나 보기 ↗'); a.href = `${SHOP_BASE}tamagotchi.html`; a.target = '_blank'; a.rel = 'noopener'; box.append(a); }
     root.append(box);
   }
 
