@@ -68,6 +68,7 @@ let level = 0;
 let canvas = null; let ctx = null; let toggle = null;
 let flakes = []; let raf = 0; let last = 0; let lastDraw = 0; let hourTimer = 0;
 let pile = { amount: 0, melting: false }; let pileModule = null; let pileTimer = 0;
+let fogModule = null; let fogWanted = false;
 
 function makeFlake(width, height, fromTop) {
   const r = 1 + Math.random() * (level === 2 ? 3 : 2.2);
@@ -125,9 +126,23 @@ function show() {
     document.body.append(canvas);
   }
   canvas.hidden = false; flakes = []; resize(); startAnim();
+  setFog(true);
 }
 
-function hide() { stopAnim(); if (canvas) { canvas.hidden = true; ctx.clearRect(0, 0, canvas.width, canvas.height); } }
+//  김서림(fanpage-snow-fog.js): 데스크탑에서 내리는 눈이 보일 때만 불러온다. ?fog=max 는 바로 최대(미리보기).
+async function setFog(on) {
+  fogWanted = on;
+  if (!on) { fogModule?.stopFog(); return; }
+  if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
+  try {
+    fogModule ??= await import('./fanpage-snow-fog.js?v=20261120-fog1');
+    if (!fogWanted) return;
+    fogModule.startFog();
+    if (new URLSearchParams(location.search).get('fog') === 'max') fogModule.setFogLevel(0.25);
+  } catch (_) { /* 장식이라 실패해도 무시 */ }
+}
+
+function hide() { stopAnim(); setFog(false); if (canvas) { canvas.hidden = true; ctx.clearRect(0, 0, canvas.width, canvas.height); } }
 
 function renderToggle() {
   //  내리는 눈이 있거나(동작 줄이기 아닐 때) 쌓인 눈이 보일 때 버튼을 둔다. 끄면 둘 다 사라진다.
