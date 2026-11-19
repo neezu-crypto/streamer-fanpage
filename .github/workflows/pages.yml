@@ -72,6 +72,10 @@ jobs:
           VIEWER_STATS_USAGE_REPORT_URL: ${{ steps.usage-reporter.outputs.url }}
           VIEWER_STATS_USAGE_REPORT_TOKEN: ${{ steps.usage-reporter-auth.outputs.id_token }}
           VIEWER_STATS_EXPORT_FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.full_rebuild && 'true' || '' }}
+      - name: Export Seoul hourly snow forecast
+        # 팬페이지 눈 효과용 예보(Open-Meteo). 실패해도 배포는 계속하고 예보 파일만 빠진다.
+        continue-on-error: true
+        run: node ci/export-weather.js
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Prepare Pages directory
@@ -80,6 +84,7 @@ jobs:
           git ls-files -z | tar --exclude='database.fanpage.rules.json' --exclude='AGENTS.md' --exclude='CLAUDE.md' --exclude='.github/copilot-instructions.md' --null -T - -cf - | tar -xf - -C _site
           mkdir -p _site/static-data/viewer-stats
           cp -a static-data/viewer-stats/. _site/static-data/viewer-stats/
+          if [ -f static-data/weather/seoul.json ]; then mkdir -p _site/static-data/weather && cp static-data/weather/seoul.json _site/static-data/weather/; fi
           # 서버 코드는 비공개 저장소 streamer-fanpage-functions에 있다. 내보내기 스크립트(ci/)는 사이트에 올리지 않는다.
           rm -rf _site/ci _site/functions
       - name: Guard private admin snapshots

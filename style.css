@@ -2174,3 +2174,8 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 
 /* 모바일: 프로필 편집 칸이 열려 있는 동안 오른쪽에 떠 있는 빠른 이동·전체화면 버튼이 입력란을 가리지 않게 잠시 숨긴다(모든 디자인 공통). */
 @media (max-width:760px){body:has(#fanPageView .profile-inline-editor) :is(.fan-quick-toggle,.fan-quick-fullscreen){visibility:hidden;pointer-events:none}}
+/* 2026-11-20 눈 효과(fanpage-snow.js): 서울에 눈이 오는 예보 시간에만. 클릭을 막지 않고 알림(30)·빠른 메뉴(45)보다 아래 */
+.fanpage-snow-layer{position:fixed;inset:0;width:100vw;height:100vh;z-index:25;pointer-events:none}
+.fanpage-snow-toggle{position:fixed;left:calc(12px + env(safe-area-inset-left));bottom:calc(14px + env(safe-area-inset-bottom));z-index:44;padding:6px 12px;border:1px solid rgba(255,255,255,.55);border-radius:999px;background:rgba(40,52,78,.72);color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;backdrop-filter:blur(4px)}
+.fanpage-snow-toggle:hover{background:rgba(40,52,78,.88)}
+.fanpage-snow-toggle:focus-visible{outline:2px solid #fff;outline-offset:2px}
