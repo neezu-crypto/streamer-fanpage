@@ -2179,3 +2179,10 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .fanpage-snow-toggle{position:fixed;left:calc(12px + env(safe-area-inset-left));bottom:calc(14px + env(safe-area-inset-bottom));z-index:44;padding:6px 12px;border:1px solid rgba(255,255,255,.55);border-radius:999px;background:rgba(40,52,78,.72);color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;backdrop-filter:blur(4px)}
 .fanpage-snow-toggle:hover{background:rgba(40,52,78,.88)}
 .fanpage-snow-toggle:focus-visible{outline:2px solid #fff;outline-offset:2px}
+/* 2026-11-20 쌓인 눈(fanpage-snow-pile.js): 카드·주요 버튼·탭 버튼 윗면. 클릭을 막지 않음, 위치 설정이 없는 요소에만 relative */
+.fanpage-snow-host{position:relative}
+.fanpage-snow-pile{position:absolute!important;z-index:1!important;display:block!important;margin:0!important;padding:0!important;border:0!important;background:none!important;pointer-events:none!important;overflow:visible!important;opacity:1}
+.fanpage-snow-pile svg{display:block!important;width:100%!important;height:100%!important;overflow:visible!important;margin:0!important;fill:initial;stroke:initial}
+.fanpage-snow-pile.is-growing{animation:fanpage-snow-pile-in 1.2s ease-out both}
+@keyframes fanpage-snow-pile-in{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fanpage-snow-pile.is-growing{animation:none}}
