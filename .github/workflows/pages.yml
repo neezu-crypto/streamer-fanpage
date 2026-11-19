@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      full_rebuild:
+        description: '고점체크 공개 파일을 처음부터 다시 만들기(평소에는 바뀐 VOD만 읽음)'
+        type: boolean
+        default: false
   schedule:
     - cron: '0 0 * * *'
 
@@ -66,6 +71,7 @@ jobs:
         env:
           VIEWER_STATS_USAGE_REPORT_URL: ${{ steps.usage-reporter.outputs.url }}
           VIEWER_STATS_USAGE_REPORT_TOKEN: ${{ steps.usage-reporter-auth.outputs.id_token }}
+          VIEWER_STATS_EXPORT_FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.full_rebuild && 'true' || '' }}
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Prepare Pages directory
