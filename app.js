@@ -184,6 +184,12 @@ const callVerifySearch = authenticatedCallable('streamerFanPageVerifySearch');
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
+//  2026-11-20 로그인 완료 표시: Google 연결·카카오 연결·스트리머 인증은 UID가 그대로라(익명 계정에 연결) 다른 탭(고점체크)이
+//  로그인을 알아채지 못했다. 성공한 UID를 같은 출처 저장소에 남겨 storage 이벤트로 알린다. 화면 표시용 힌트일 뿐, 허용은 서버가 판정한다.
+const LOGIN_LINKED_UID_KEY = 'streamerFanPage.loginLinkedUid';
+function markLoginLinked() {
+  try { if (auth.currentUser) localStorage.setItem(LOGIN_LINKED_UID_KEY, auth.currentUser.uid); } catch (_) { /* 저장 불가 기기 */ }
+}
 const LOGIN_ASSIST_SESSION_KEY = 'streamerFanPage.loginAssistTab';
 const LOGIN_ASSIST_QUERY = new URLSearchParams(location.search).get('login') === '1';
 let loginAssistTab = (() => {
@@ -816,6 +822,7 @@ async function loginWithGoogle() {
     if (!auth.currentUser) await waitForAuthRestore();
     await linkWithPopup(auth.currentUser, googleProvider);
     await callLinkGoogle();
+    markLoginLinked();
     showToast('Google 계정을 연결했어요.');
     completeLoginAssistTab();
   } catch (error) {
@@ -865,6 +872,7 @@ async function loginWithKakao() {
         }
         if (auth.currentUser && (action === 'linked' || action === 'already-linked')) {
           localStorage.setItem(KAKAO_LINKED_UID_KEY, auth.currentUser.uid);
+          markLoginLinked();
           completeLoginAssistTab();
         }
         renderAuthControls();
@@ -13174,6 +13182,7 @@ async function submitOrCheckStreamerVerification(checkOnly, renewOnly = false) {
     const result = (await callStreamerVerification(payload)).data || {};
     if (result.action === 'already-verified' || result.action === 'auto-approved') {
       status.textContent = '인증이 확인됐어요. 본인 팬페이지로 이동합니다.';
+      markLoginLinked();
       if (loginAssistTab) completeLoginAssistTab();
       else setTimeout(() => location.reload(), 500);
       return;

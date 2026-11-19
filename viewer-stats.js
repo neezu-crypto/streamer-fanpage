@@ -1,7 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
+import { getAuth, signInAnonymously, onAuthStateChanged, onIdTokenChanged } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { createViewerStatsVisitNotifier } from './viewer-stats-visit.mjs';
 import { countUp, celebrateRanking, celebratePeriods, celebrateVodCard, drawPeakCurve } from './viewer-stats-effects.mjs?v=20261115-fx1';
@@ -32,7 +32,7 @@ function callViewerStats(payload) {
     if (!(error && error.code === 'functions/unauthenticated' && error.details && error.details.loginRequired)) throw error;
     return new Promise((resolve, reject) => {
       let resumed = false;
-      askLoginForResult(() => { resumed = true; return rawCallViewerStats({ ...payload, loginResumed: true }).then(resolve, reject); });
+      askLoginForResult(() => { resumed = true; return callViewerStats({ ...payload, loginResumed: true }).then(resolve, reject); }); // 아직 로그인 전이면 안내가 다시 뜬다
       $('viewerLoginDialogStatus').textContent = '고점체크는 로그인한 이용자만 쓸 수 있어요. 로그인하면 하던 분석을 이어갑니다.';
       $('viewerLoginDialog').addEventListener('close', () => {
         window.setTimeout(() => { if (!resumed) reject(error); }, 150);
@@ -86,15 +86,24 @@ function openLoginTab() {
   const url = new URL('index.html', window.location.href);
   url.searchParams.set('login', '1');
   const opened = window.open(url.href, '_blank');
+  if (opened) loginTabOpenedAt = Date.now();
   if (!opened) {
     $('viewerLoginDialogStatus').textContent = '로그인 창을 열지 못했어요. 팝업 차단을 해제하고 다시 눌러 주세요.';
     $('viewerPaidStatus').textContent = '로그인 창을 열지 못했어요. 팝업 차단을 해제하고 다시 눌러 주세요.';
     setBugStatus('login-required', '로그인 창을 열지 못했어요. 팝업 차단을 해제하고 다시 눌러 주세요.');
   }
 }
+//  2026-11-20 Google·카카오 연결과 스트리머 인증은 익명 계정에 연결돼 UID가 그대로라 브라우저 계정은 계속 익명으로 보인다.
+//  팬페이지가 남긴 로그인 완료 표시(같은 UID)도 로그인으로 본다. 화면 판단용일 뿐이고 허용은 서버가 DB로 판정한다.
+const LOGIN_LINKED_UID_KEYS = ['streamerFanPage.loginLinkedUid', 'streamerFanPage.kakaoLinkedUid'];
+function isLoggedIn(user = auth.currentUser) {
+  if (!user) return false;
+  if (!user.isAnonymous) return true;
+  try { return LOGIN_LINKED_UID_KEYS.some((key) => localStorage.getItem(key) === user.uid); } catch (_) { return false; }
+}
 function updateLoginButtons() {
-  const signedIn = !!auth.currentUser && !auth.currentUser.isAnonymous;
-  const anonymous = !!auth.currentUser && auth.currentUser.isAnonymous;
+  const signedIn = isLoggedIn();
+  const anonymous = !!auth.currentUser && !signedIn;
   $('viewerPaidLogin').hidden = !anonymous;
   $('viewerBugLogin').hidden = !anonymous;
   if (signedIn && $('viewerBugStatus').dataset.state === 'login-required') setBugStatus('idle', '');
@@ -303,7 +312,7 @@ $('viewerBugForm').addEventListener('submit', async (event) => {
   $('viewerBugForm').setAttribute('aria-busy', 'true');
   try {
     await getAuthReady();
-    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+    if (!isLoggedIn()) {
       throw Object.assign(new Error('버그 제보는 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요.'), { code: 'functions/unauthenticated' });
     }
     const key = viewerBugPendingKey();
@@ -748,7 +757,7 @@ function renderPaidFeatures() {
     const actions = document.createElement('div'); actions.className = 'viewer-paid-actions'; actions.append(button, guide);
     card.append(title, description, learn, price, actions); return card;
   }));
-  const signedIn = !!auth.currentUser && !auth.currentUser.isAnonymous;
+  const signedIn = isLoggedIn();
   const adFree = unlockState.loaded && hasAnyPaidUnlock(unlockState);
   $('viewerPaidStatus').textContent = unlockState.loaded
     ? `현재 내 캐시 ${Number(unlockState.balanceCash || 0).toLocaleString('ko-KR')}캐시${adFree ? ' · 광고 없이 이용 중' : ''}`
@@ -805,7 +814,7 @@ function openPaidFeature(featureId) {
 
 async function openUnlockDialog(featureId) {
   await getAuthReady();
-  if (!auth.currentUser || auth.currentUser.isAnonymous) {
+  if (!isLoggedIn()) {
     $('viewerPaidStatus').textContent = '유료 기능 해금은 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요. 로그인 버튼을 눌러 주세요.';
     return;
   }
@@ -827,7 +836,7 @@ async function openUnlockDialog(featureId) {
 
 async function canViewPaidResult(featureId, setStatus, resume) {
   await getAuthReady();
-  if (!auth.currentUser || auth.currentUser.isAnonymous) {
+  if (!isLoggedIn()) {
     setStatus('분석 조건이 준비됐어요. 결과를 보려면 로그인이 필요해요. 로그인하면 결과 확인을 이어갑니다.', true);
     askLoginForResult(resume);
     return false;
@@ -858,7 +867,7 @@ function openPaidTutorial(featureId) {
 
 function unlockIdentity() {
   const user = auth.currentUser;
-  return user ? `${user.uid}:${user.isAnonymous}` : '';
+  return user ? `${user.uid}:${isLoggedIn(user)}` : '';
 }
 
 async function refreshUnlockAccess() {
@@ -4498,9 +4507,9 @@ let observedAuthIdentity = '';
 onAuthStateChanged(auth, (user) => {
   void notifyViewerStatsVisit(user);
 });
-onAuthStateChanged(auth, (user) => {
+function onViewerAuthChange(user) {
   if (!user) return;
-  const identity = user.uid + ':' + String(user.isAnonymous);
+  const identity = user.uid + ':' + String(!isLoggedIn(user));
   if (identity === observedAuthIdentity) return;
   observedAuthIdentity = identity;
   // 계정이 바뀌면 이전 계정의 해금 상태로 광고·카드를 판단하지 않는다.
@@ -4510,14 +4519,33 @@ onAuthStateChanged(auth, (user) => {
   updateAffiliateVisibility();
   updateLoginButtons();
   renderPaidFeatures();
-  if (!user.isAnonymous && pendingLoginResume) {
-    const resume = pendingLoginResume; pendingLoginResume = null;
-    $('viewerLoginDialog').close();
-    window.setTimeout(() => { void resume(); }, 0);
-  }
+  if (isLoggedIn(user)) resumePendingLogin();
   refreshSubscriptionStatus();
+}
+function resumePendingLogin() {
+  if (!pendingLoginResume) return;
+  const resume = pendingLoginResume; pendingLoginResume = null;
+  $('viewerLoginDialog').close();
+  window.setTimeout(() => { void resume(); }, 0);
+}
+onAuthStateChanged(auth, onViewerAuthChange);
+//  다른 탭에서 익명 계정에 Google을 연결하면 UID가 같아 위 신호가 오지 않는다. 토큰 변경 신호로도 받는다.
+onIdTokenChanged(auth, onViewerAuthChange);
+//  팬페이지 로그인 탭이 로그인 완료 표시를 남기면 바로 반영한다(카카오·스트리머 인증은 브라우저 계정이 익명 그대로).
+window.addEventListener('storage', (event) => {
+  if (!LOGIN_LINKED_UID_KEYS.includes(event.key || '')) return;
+  if (auth.currentUser) onViewerAuthChange(auth.currentUser);
 });
+//  그래도 놓친 경우: 로그인 탭에서 돌아오면 기다리던 요청을 한 번 다시 보낸다. 아직 로그인 전이면 서버가 거절해 안내가 다시 뜬다.
+let loginTabOpenedAt = 0;
+function retryAfterLoginTab() {
+  if (!pendingLoginResume || !loginTabOpenedAt || document.visibilityState !== 'visible') return;
+  loginTabOpenedAt = 0;
+  resumePendingLogin();
+}
+window.addEventListener('focus', retryAfterLoginTab);
 document.addEventListener('visibilitychange', () => {
+  retryAfterLoginTab();
   if (document.visibilityState === 'visible') refreshSubscriptionStatus();
 });
 
