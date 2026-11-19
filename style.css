@@ -2054,6 +2054,9 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 .tg-care-showcase-pet svg{width:100%;height:100%;display:block}
 .tg-care-showcase-badge{position:absolute;top:10px;left:10px;padding:2px 9px;border-radius:999px;background:rgba(47,42,44,.78);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.02em}
 .tg-care-showcase figcaption{font-size:.82rem;color:#6b4f3c;text-align:center}
+/* 디자인별 글자색 규칙(바인더 등)이 덮어쓰지 않게 진열장 안 글자색은 고정한다 */
+#fanPageView .tg-care-showcase .tg-care-showcase-badge{color:#fff!important}
+#fanPageView .tg-care-showcase figcaption{color:#6b4f3c!important}
 #fanPageView.fanpage-layout-3 .tg-care-stat-bar{border:2px solid var(--doodle-ink,#2f2a2c);box-shadow:2px 2px 0 var(--doodle-ink,#2f2a2c);height:14px}#fanPageView.fanpage-layout-3 .tg-care-tool{border:2px solid var(--doodle-ink,#2f2a2c);box-shadow:2px 2px 0 var(--doodle-ink,#2f2a2c)}
 .tamagotchi-application-dialog{width:min(640px,94vw);max-height:90vh;padding:22px;border:0;border-radius:18px;background:var(--panel,#1b1924);color:inherit}.tamagotchi-application-dialog::backdrop{background:#0008}.tamagotchi-application-dialog-close{float:right;border:0;background:none;color:inherit;font-size:1.2rem}
 @media(max-width:560px){.tg-care-tool{width:calc(25% - 6px)}.tg-care .tg-stage{min-height:380px}}
