@@ -17,7 +17,9 @@ const QUEUE_PATH = 'streamerFanPageViewerStatsExportQueue';
 const PREVIOUS_BASE_URL = 'https://neezu-crypto.github.io/streamer-fanpage/static-data/viewer-stats/';
 const QUEUE_OVERLAP_MS = 60 * 60 * 1000; // 시계 차이·늦게 커밋된 기록을 덮기 위해 지난 위치보다 1시간 앞부터 다시 읽는다
 const FULL_REBUILD_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 주 1회 전체 재생성(누락·정리된 목록 보정)
-const PREVIOUS_FETCH_CONCURRENCY = 16;
+const PREVIOUS_FETCH_CONCURRENCY = 8;
+const PREVIOUS_FETCH_ATTEMPTS = 3;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function validPoint(point) {
   return point && Number.isFinite(Number(point.second)) && Number(point.second) >= 0
@@ -105,11 +107,22 @@ async function runPool(items, concurrency, worker) {
 }
 
 // 지난 공개 파일을 Pages에서 받는다(데이터베이스 비용 없음). 하나라도 실패하면 null → 전체 재생성.
-async function fetchPreviousExport(baseUrl = PREVIOUS_BASE_URL, fetchImpl = fetch) {
+async function fetchPreviousExport(baseUrl = PREVIOUS_BASE_URL, fetchImpl = fetch, retryDelayMs = 1000) {
+  //  Pages가 잠깐 503·429를 낼 수 있어 일시 오류와 네트워크 오류는 3번까지 다시 시도한다(2026-11-19 첫 운영 실행에서 503 1건).
   const getJson = async (name) => {
-    const response = await fetchImpl(new URL(name, baseUrl), { cache: 'no-store', signal: AbortSignal.timeout(RTDB_REQUEST_TIMEOUT_MS) });
-    if (!response.ok) throw new Error('previous export ' + name + ' ' + response.status);
-    return response.json();
+    for (let attempt = 1; ; attempt += 1) {
+      let response;
+      try {
+        response = await fetchImpl(new URL(name, baseUrl), { cache: 'no-store', signal: AbortSignal.timeout(RTDB_REQUEST_TIMEOUT_MS) });
+      } catch (error) {
+        if (attempt >= PREVIOUS_FETCH_ATTEMPTS) throw error;
+        await sleep(retryDelayMs * attempt); continue;
+      }
+      if (response.ok) return response.json();
+      const transient = response.status === 429 || response.status >= 500;
+      if (!transient || attempt >= PREVIOUS_FETCH_ATTEMPTS) throw new Error('previous export ' + name + ' ' + response.status);
+      await sleep(retryDelayMs * attempt);
+    }
   };
   try {
     const index = await getJson('index.json');
