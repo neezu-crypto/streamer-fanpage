@@ -135,7 +135,7 @@ async function setFog(on) {
   if (!on) { fogModule?.stopFog(); return; }
   if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
   try {
-    fogModule ??= await import('./fanpage-snow-fog.js?v=20261120-fog1');
+    fogModule ??= await import('./fanpage-snow-fog.js?v=20261120-fog2');
     if (!fogWanted) return;
     fogModule.startFog();
     if (new URLSearchParams(location.search).get('fog') === 'max') fogModule.setFogLevel(0.25);

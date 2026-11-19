@@ -9,13 +9,14 @@ const MAX_BLUR_PX = 7;
 const MAX_HAZE = 0.42;     // 하얀 김 불투명도
 const WIPE_DIAMETER = 220; // 닦이는 원 지름(px)
 const REFOG_MS = 6000;     // 닦은 자리가 다시 끼는 데 걸리는 시간
-const MASK_SCALE = 1 / 8;  // 마스크는 낮은 해상도로 그려 가볍게(확대되며 가장자리가 부드러워짐)
-const MASK_FPS = 15;
+const MASK_FPS = 30;
+const MAX_SPOTS = 40;      // 닦인 자국 점 개수 상한(오래된 것부터 버림)
 
-let layer = null; let mask = null; let mctx = null;
+//  닦인 자리는 CSS 원형 그러데이션 마스크 여러 장을 곱해서(intersect) 뚫는다.
+//  그림 파일(blob) 마스크는 바꿔 끼울 때 불러오는 순간 김 전체가 사라져 깜빡였다(배포 후 발견) → 불러오기가 없는 그러데이션으로 바꿈.
+let layer = null;
 let level = 0; let growTimer = 0; let raf = 0; let lastMask = 0; let dialogObserver = null;
-let pointer = null; let lastPoint = null; let dirty = false; let wipedSince = 0;
-let maskUrl = ''; let running = false;
+let pointer = null; let lastPoint = null; let spots = []; let running = false;
 
 const desktop = () => !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches && innerWidth > 760;
 
@@ -33,24 +34,11 @@ function applyStrength() {
   layer.style.opacity = s > 0 ? '1' : '0';
 }
 
-function resizeMask() {
-  if (!mask) return;
-  mask.width = Math.max(8, Math.ceil(innerWidth * MASK_SCALE));
-  mask.height = Math.max(8, Math.ceil(innerHeight * MASK_SCALE));
-  mctx.fillStyle = '#000'; mctx.globalCompositeOperation = 'source-over'; mctx.globalAlpha = 1;
-  mctx.fillRect(0, 0, mask.width, mask.height); // 불투명 = 김 있음
-  dirty = true;
-}
-
-function wipeAt(x, y) {
-  const r = (WIPE_DIAMETER / 2) * MASK_SCALE;
-  const cx = x * MASK_SCALE; const cy = y * MASK_SCALE;
-  const g = mctx.createRadialGradient(cx, cy, r * 0.35, cx, cy, r);
-  g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-  mctx.globalCompositeOperation = 'destination-out'; mctx.globalAlpha = 1;
-  mctx.fillStyle = g;
-  mctx.beginPath(); mctx.arc(cx, cy, r, 0, Math.PI * 2); mctx.fill();
-  mctx.globalCompositeOperation = 'source-over';
+function addSpot(x, y, time) {
+  const last = spots[spots.length - 1];
+  if (last && Math.hypot(last.x - x, last.y - y) < WIPE_DIAMETER / 5) { last.t = time; return; }
+  spots.push({ x, y, t: time });
+  if (spots.length > MAX_SPOTS) spots.shift();
 }
 
 function onPointerMove(event) {
@@ -59,39 +47,40 @@ function onPointerMove(event) {
   startLoop();
 }
 
+function renderMask(time) {
+  spots = spots.filter((p) => time - p.t < REFOG_MS);
+  if (!spots.length) {
+    layer.style.removeProperty('-webkit-mask-image'); layer.style.removeProperty('mask-image');
+    return;
+  }
+  const r = WIPE_DIAMETER / 2;
+  const layers = spots.map((p) => {
+    const fog = Math.min(1, (time - p.t) / REFOG_MS); // 0 = 막 닦음, 1 = 다시 다 낌
+    const a = (fog * fog).toFixed(3); // 처음엔 천천히, 나중에 빨리 낌
+    return `radial-gradient(circle ${r}px at ${p.x.toFixed(0)}px ${p.y.toFixed(0)}px, rgba(0,0,0,${a}) ${(r * 0.4).toFixed(0)}px, #000 ${r}px)`;
+  }).join(',');
+  layer.style.setProperty('-webkit-mask-image', layers);
+  layer.style.setProperty('mask-image', layers);
+  layer.style.setProperty('-webkit-mask-composite', spots.map(() => 'source-in').join(','));
+  layer.style.setProperty('mask-composite', spots.map(() => 'intersect').join(','));
+}
+
 function frame(time) {
   raf = 0;
-  if (!running) return;
-  if (time - lastMask < 1000 / MASK_FPS) { raf = requestAnimationFrame(frame); return; }
-  const dt = lastMask ? Math.min(250, time - lastMask) : 0; lastMask = time;
+  if (!running || !layer) return;
+  if (time - lastMask < 1000 / MASK_FPS - 1) { raf = requestAnimationFrame(frame); return; }
+  lastMask = time;
   // 지난 위치에서 지금 위치까지 이어서 닦는다(빠르게 움직여도 끊기지 않게)
   if (pointer) {
     const from = lastPoint || pointer;
     const dist = Math.hypot(pointer.x - from.x, pointer.y - from.y);
     const steps = Math.max(1, Math.ceil(dist / (WIPE_DIAMETER / 4)));
-    for (let i = 1; i <= steps; i += 1) wipeAt(from.x + ((pointer.x - from.x) * i) / steps, from.y + ((pointer.y - from.y) * i) / steps);
-    lastPoint = pointer; pointer = null; dirty = true; wipedSince = time;
+    for (let i = 1; i <= steps; i += 1) addSpot(from.x + ((pointer.x - from.x) * i) / steps, from.y + ((pointer.y - from.y) * i) / steps, time);
+    lastPoint = pointer; pointer = null;
   }
-  // 닦은 자리가 다시 낀다(경과 시간 기준)
-  if (dt && time - wipedSince < REFOG_MS + 500) {
-    mctx.globalCompositeOperation = 'source-over';
-    mctx.globalAlpha = Math.min(1, (dt / REFOG_MS) * 1.6);
-    mctx.fillStyle = '#000'; mctx.fillRect(0, 0, mask.width, mask.height);
-    mctx.globalAlpha = 1; dirty = true;
-  }
-  if (dirty) {
-    dirty = false;
-    mask.toBlob((blob) => {
-      if (!blob || !layer) return;
-      const url = URL.createObjectURL(blob);
-      layer.style.setProperty('-webkit-mask-image', `url(${url})`);
-      layer.style.setProperty('mask-image', `url(${url})`);
-      if (maskUrl) setTimeout(URL.revokeObjectURL, 200, maskUrl);
-      maskUrl = url;
-    });
-  }
-  // 움직임이 멈추고 다시 다 끼면 쉰다(다음 마우스 움직임에 재시작)
-  if (time - wipedSince < REFOG_MS + 500) raf = requestAnimationFrame(frame);
+  renderMask(time);
+  // 다 다시 끼면 쉰다(다음 마우스 움직임에 재시작)
+  if (spots.length) raf = requestAnimationFrame(frame);
   else lastPoint = null;
 }
 
@@ -106,14 +95,12 @@ export function startFog() {
   if (!layer) {
     layer = document.createElement('div');
     layer.className = 'fanpage-fog-layer'; layer.setAttribute('aria-hidden', 'true');
-    mask = document.createElement('canvas'); mctx = mask.getContext('2d');
     document.body.append(layer);
   }
-  level = 0; resizeMask(); applyStrength();
+  level = 0; spots = []; applyStrength();
   clearInterval(growTimer);
   growTimer = setInterval(() => { if (!document.hidden) { level = Math.min(MAX, level + STEP); applyStrength(); } if (level >= MAX) clearInterval(growTimer); }, STEP_MS);
   addEventListener('pointermove', onPointerMove, { passive: true });
-  addEventListener('resize', resizeMask);
   document.addEventListener('focusin', onStateChange); document.addEventListener('focusout', onStateChange);
   document.addEventListener('visibilitychange', onStateChange);
   dialogObserver ??= new MutationObserver(onStateChange); // dialog 열림·닫힘
@@ -124,12 +111,11 @@ export function startFog() {
 export function stopFog() {
   running = false;
   clearInterval(growTimer); cancelAnimationFrame(raf); raf = 0;
-  removeEventListener('pointermove', onPointerMove); removeEventListener('resize', resizeMask);
+  removeEventListener('pointermove', onPointerMove);
   document.removeEventListener('focusin', onStateChange); document.removeEventListener('focusout', onStateChange);
   document.removeEventListener('visibilitychange', onStateChange);
   dialogObserver?.disconnect();
-  layer?.remove(); layer = null; mask = null; mctx = null; level = 0; pointer = null; lastPoint = null;
-  if (maskUrl) { URL.revokeObjectURL(maskUrl); maskUrl = ''; }
+  layer?.remove(); layer = null; level = 0; pointer = null; lastPoint = null; spots = [];
 }
 
 // 테스트용: 김 세기를 바로 지정(0~0.25)
