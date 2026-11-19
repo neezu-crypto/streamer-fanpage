@@ -135,10 +135,10 @@ async function setFog(on) {
   if (!on) { fogModule?.stopFog(); return; }
   if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
   try {
-    fogModule ??= await import('./fanpage-snow-fog.js?v=20261120-fog2');
+    fogModule ??= await import('./fanpage-snow-fog.js?v=20261120-fog5');
     if (!fogWanted) return;
     fogModule.startFog();
-    if (new URLSearchParams(location.search).get('fog') === 'max') fogModule.setFogLevel(0.25);
+    if (new URLSearchParams(location.search).get('fog') === 'max') fogModule.setFogLevel(1);
   } catch (_) { /* 장식이라 실패해도 무시 */ }
 }
 

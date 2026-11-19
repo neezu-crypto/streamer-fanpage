@@ -2187,5 +2187,7 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 @keyframes fanpage-snow-pile-in{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.fanpage-snow-pile.is-growing{animation:none}}
 /* 2026-11-20 김서림(fanpage-snow-fog.js): 데스크탑·눈 내리는 동안. 내리는 눈(25)·눈 끄기(44)보다 아래, 클릭을 막지 않음. 마스크의 투명한 곳 = 닦인 자리 */
-.fanpage-fog-layer{position:fixed;inset:0;z-index:24;pointer-events:none;opacity:0;transition:opacity .6s ease;-webkit-backdrop-filter:blur(var(--fog-blur,0px));backdrop-filter:blur(var(--fog-blur,0px));background:rgba(238,243,250,var(--fog-haze,0));-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+@property --fog-blur{syntax:'<length>';inherits:false;initial-value:0px}
+@property --fog-haze{syntax:'<number>';inherits:false;initial-value:0}
+.fanpage-fog-layer{position:fixed;inset:0;z-index:24;pointer-events:none;opacity:0;transition:opacity .6s ease,--fog-blur 3s linear,--fog-haze 3s linear;-webkit-backdrop-filter:blur(var(--fog-blur,0px));backdrop-filter:blur(var(--fog-blur,0px));background:rgba(238,243,250,var(--fog-haze,0));-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
 @media (prefers-reduced-motion:reduce){.fanpage-fog-layer{display:none}}
