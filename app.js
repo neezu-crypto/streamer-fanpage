@@ -3,6 +3,7 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken as getAppChec
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signInWithCustomToken, linkWithPopup, signOut, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
+import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket1';
 import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261119-tour7';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
@@ -1648,7 +1649,7 @@ function setVisibleView(page) {
     fanPageQuickNavCleanup();
     fanPageQuickNavCleanup = null;
   }
-  if (!page) { fanpageBinderCleanup?.(); fanpageBinderCleanup = null; }
+  if (!page) { fanpageBinderCleanup?.(); fanpageBinderCleanup = null; teardownFanpageBlanket(); }
   if (!page && liveStatusTimer) {
     window.clearInterval(liveStatusTimer);
     liveStatusTimer = 0;
@@ -1663,7 +1664,7 @@ function setVisibleView(page) {
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active', 'fanpage-tamagotchi-tab');
   $('mainContent').classList.toggle('has-fanpage-view', !!page);
-  const pageLayoutDesign = page && [1, 2, 3, 4].includes(Number(page.profile?.layoutDesign))
+  const pageLayoutDesign = page && [1, 2, 3, 4, 5].includes(Number(page.profile?.layoutDesign))
     ? Number(page.profile.layoutDesign)
     : DEFAULT_FANPAGE_LAYOUT;
   const usesKawaiiLayout = !!page && (pageLayoutDesign === 1 || pageLayoutDesign === 3);
@@ -1673,6 +1674,7 @@ function setVisibleView(page) {
   document.body.classList.toggle('fanpage-layout-one-active', !!page && pageLayoutDesign === 1);
   document.body.classList.toggle('fanpage-layout-three-active', !!page && pageLayoutDesign === 3);
   document.body.classList.toggle('fanpage-layout-four-active', !!page && pageLayoutDesign === 4);
+  document.body.classList.toggle('fanpage-layout-five-active', !!page && pageLayoutDesign === 5);
   document.body.classList.toggle('fanpage-home-kawaii-active', usesKawaiiHome);
   document.body.classList.toggle('fanpage-theme-sora-active', !!page && String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   $('homeView').classList.toggle('hidden', !!page);
@@ -4813,7 +4815,7 @@ function renderOwnerChecklist(page, selectTab) {
   };
   const items = [
     { id: 'profile', label: '프로필 채우기', get hint() { const c = profileCompletion(page); return c.filled < c.total ? `소개·생일·방송 시간 등 ${c.filled}/${c.total}칸 채웠어요. 팬에게는 채운 칸만 보여요.` : '프로필을 모두 채웠어요.'; }, done: () => { const c = profileCompletion(page); return c.filled === c.total; }, open: () => goTo('profileBoard') },
-    { id: 'design', label: '페이지 디자인 고르기', hint: '디자인 1~4 중 마음에 드는 모양으로.', done: () => [1, 2, 3, 4].includes(Number(page.profile?.layoutDesign)), open: () => { const b = document.getElementById('layoutDesignButton'); if (b) b.click(); else goTo('profileBoard'); } },
+    { id: 'design', label: '페이지 디자인 고르기', hint: '디자인 1~5 중 마음에 드는 모양으로.', done: () => [1, 2, 3, 4, 5].includes(Number(page.profile?.layoutDesign)), open: () => { const b = document.getElementById('layoutDesignButton'); if (b) b.click(); else goTo('profileBoard'); } },
     { id: 'schedule', label: '이번 주 방송 일정 올리기', hint: '홈 탭의 주간 일정표에서 편집해요.', open: () => goTo('calendarSection') },
     { id: 'songs', label: '노래·플레이한 게임 추가', hint: '콘텐츠 탭에서 YouTube·게임 링크로 추가해요.', done: () => (Array.isArray(page.songbook) && page.songbook.length > 0) || (Array.isArray(page.playedGames) && page.playedGames.length > 0), open: () => goTo('songbookSection') },
     { id: 'tamagotchi', label: '다마고치 둘러보기', hint: '분양받으면 팬들과 함께 돌보고 방송 화면에도 띄울 수 있어요.', open: () => goTo('tamagotchiSection') },
@@ -4855,7 +4857,7 @@ function renderOwnerChecklist(page, selectTab) {
 
 //  ---- 유료 디자인 이용권(디자인 3·4 각각 영구제, 100캐시) 공용 도우미 ----
 const DESIGN_PASS_PREVIEW_SECONDS = 60;
-const PAID_FANPAGE_LAYOUTS = [3, 4];
+const PAID_FANPAGE_LAYOUTS = [3, 4, 5];
 function isPaidLayout(layout) { return PAID_FANPAGE_LAYOUTS.includes(Number(layout)); }
 const DESIGN_PASS_LABELS = { 3: '디자인 3(손그림 스티커북)', 4: '디자인 4(포토카드 바인더)' };
 function designPassOwned(page, layout = 3) {
@@ -5122,7 +5124,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   status.className = 'profile-layout-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  const displayedLayout = [1, 2, 3, 4].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
+  const displayedLayout = [1, 2, 3, 4, 5].includes(Number(activeLayout)) ? Number(activeLayout) : DEFAULT_FANPAGE_LAYOUT;
   // 미리보기 중에 창이 다시 만들어진 경우에는 화면에 보이는 디자인이 아니라 마지막으로 저장된 디자인이 기준이다.
   const initialLayout = designPreviewSavedLayout(page.streamer.id) ?? displayedLayout;
   let draftLayout = displayedLayout;
@@ -5137,7 +5139,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     if (saving) return '';
     const targetPage = currentPage;
     if (!targetPage || targetPage.streamer.id !== page.streamer.id) return '';
-    const previousLayout = [1, 2, 3, 4].includes(Number(targetPage.profile?.layoutDesign))
+    const previousLayout = [1, 2, 3, 4, 5].includes(Number(targetPage.profile?.layoutDesign))
       ? Number(targetPage.profile.layoutDesign)
       : DEFAULT_FANPAGE_LAYOUT;
     draftLayout = selectedLayout;
@@ -5176,7 +5178,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     const targetPage = currentPage;
     if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
     const requestedLayout = Number(draftLayout);
-    if (![1, 2, 3, 4].includes(requestedLayout)) {
+    if (![1, 2, 3, 4, 5].includes(requestedLayout)) {
       showToast('페이지 디자인 선택을 확인해 주세요.');
       return;
     }
@@ -5250,6 +5252,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     [2, '디자인 2 · 기존 팬페이지', '차분한 어두운 톤의 기존 팬페이지 디자인'],
     [3, '디자인 3 · 손그림 스티커북', '단색 종이 바탕과 굵은 손그림 테두리'],
     [4, '디자인 4 · 포토카드 바인더', '포토카드 바인더처럼 탭이 한 장씩 넘어가는 파스텔 디자인'],
+    [5, '디자인 5 · 이불 덮어주기', '잠든 사람에게 탭마다 이불을 한 장씩 덮어 주는 침실 디자인'],
   ];
   layoutOptionsData.forEach(([value, titleText, descriptionText]) => {
     const option = document.createElement('label');
@@ -5566,7 +5569,7 @@ function renderFanPage(page, options = {}) {
     fanPageQuickNavCleanup();
     fanPageQuickNavCleanup = null;
   }
-  fanpageBinderCleanup?.(); fanpageBinderCleanup = null;
+  fanpageBinderCleanup?.(); fanpageBinderCleanup = null; teardownFanpageBlanket();
   if (stockPriceUnsubscribe) {
     stockPriceUnsubscribe();
     stockPriceUnsubscribe = null;
@@ -5581,12 +5584,12 @@ function renderFanPage(page, options = {}) {
   const previousTabStreamerId = view.dataset.fanpageTabStreamerId || '';
   const preferredTab = previousTabStreamerId === streamerIdForTabs ? view.dataset.fanpageActiveTab : 'home';
   view.dataset.fanpageTabStreamerId = streamerIdForTabs;
-  view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2', 'fanpage-layout-3', 'fanpage-layout-4');
+  view.classList.remove('has-top-banner', 'has-bottom-banner', 'fanpage-layout-1', 'fanpage-layout-2', 'fanpage-layout-3', 'fanpage-layout-4', 'fanpage-layout-5');
   view.classList.remove('has-account-top-banner');
   document.querySelector('.topbar').classList.remove('topbar-with-banner', 'topbar-account-banner-hidden');
   $('siteShell').classList.remove('has-bottom-banner');
   document.body.classList.remove('fanpage-bottom-banner-active');
-  const layoutDesign = [1, 2, 3, 4].includes(Number(page.profile?.layoutDesign))
+  const layoutDesign = [1, 2, 3, 4, 5].includes(Number(page.profile?.layoutDesign))
     ? Number(page.profile.layoutDesign)
     : DEFAULT_FANPAGE_LAYOUT;
   const usesKawaiiLayout = layoutDesign === 1 || layoutDesign === 3;
@@ -5595,10 +5598,13 @@ function renderFanPage(page, options = {}) {
   document.body.classList.toggle('fanpage-layout-one-active', layoutDesign === 1);
   document.body.classList.toggle('fanpage-layout-three-active', layoutDesign === 3);
   document.body.classList.toggle('fanpage-layout-four-active', layoutDesign === 4);
+  document.body.classList.toggle('fanpage-layout-five-active', layoutDesign === 5);
   document.body.classList.toggle('fanpage-theme-sora-active', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   document.body.classList.remove('fanpage-home-kawaii-active');
   view.classList.add(`fanpage-layout-${layoutDesign}`);
   const usesBinderLayout = layoutDesign === 4;
+  const usesBlanketLayout = layoutDesign === 5;
+  const usesStackedTabs = usesBinderLayout || usesBlanketLayout; // 탭을 모두 펼쳐 두고 스크롤로 넘기는 디자인
   view.classList.toggle('fanpage-theme-sora', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   view.replaceChildren();
   const back = document.createElement('a');
@@ -5966,7 +5972,7 @@ function renderFanPage(page, options = {}) {
       refreshRollingPaperSection(page.streamer.id);
     }
     view.dataset.fanpageActiveTab = tabKey;
-    section.hidden = !usesBinderLayout && tabKey !== 'home';
+    section.hidden = !usesStackedTabs && tabKey !== 'home';
     if (tabKey !== 'rolling-paper') {
       const stickerState = rollingPaperStateFor(page.streamer.id);
       stickerState.stickerActionMenuOpen = false; stickerState.selectedStickerMenuId = '';
@@ -5984,7 +5990,7 @@ function renderFanPage(page, options = {}) {
       const button = tabButtons.get(tab.key);
       button.setAttribute('aria-selected', String(selected));
       button.tabIndex = selected ? 0 : -1;
-      tabPanels.get(tab.key).hidden = !usesBinderLayout && !selected;
+      tabPanels.get(tab.key).hidden = !usesStackedTabs && !selected;
     });
     //  디자인 3: 사용자가 탭을 바꾸면 새 탭 종이가 살짝 기운 채 아래에서 올라와 놓인다(0.5초, 바꿀 때 한 번만).
     //  transform·opacity만 움직이고 끝나면 남기지 않는다(fill 없음 → 고정 위치 자식에 영향 없음). 동작 줄이기면 생략.
@@ -6056,6 +6062,19 @@ function renderFanPage(page, options = {}) {
       labels: binderKeys.map((key) => tabDefinition(key)?.label || key),
       onCurrent: (index) => selectFanPageTab(binderKeys[index], false, { fromBinder: true }),
       onPrefetch: (index) => loadFanPageTabData(binderKeys[index]),
+    });
+  }
+  if (usesBlanketLayout) {
+    //  디자인 5: 대문·관리 상자는 첫 이불 위에 얹고, 탭마다 이불 한 장. 탭 바는 지금 덮인 이불 위로 옮겨 단다.
+    const blanketKeys = [...tabPanels.keys()];
+    const startIndex = blanketKeys.indexOf(preferredTab);
+    setupFanpageBlanket(view, {
+      tabNav,
+      head: [ownerChecklist, section],
+      panels: [...tabPanels.values()],
+      initialIndex: startIndex > 0 ? startIndex : -1,
+      onCurrent: (index) => selectFanPageTab(blanketKeys[index], false, { fromBinder: true }),
+      onPrefetch: (index) => loadFanPageTabData(blanketKeys[index]),
     });
   }
   if (layoutDesign === 3) setupFanpageScrollReveal(tabPanels.values());
@@ -6985,7 +7004,7 @@ function profileForLinkSave(source, field, value) {
     ogqEmoticonUrl: String(profile.ogqEmoticonUrl || ''),
     // 이용권 없는 디자인 3 미리보기 중에도 다른 설정 저장에는 마지막으로 저장된 디자인을 보낸다.
     layoutDesign: designPreviewSavedLayout(currentPage?.streamer?.id)
-      ?? ([1, 2, 3, 4].includes(Number(profile.layoutDesign)) ? Number(profile.layoutDesign) : DEFAULT_FANPAGE_LAYOUT),
+      ?? ([1, 2, 3, 4, 5].includes(Number(profile.layoutDesign)) ? Number(profile.layoutDesign) : DEFAULT_FANPAGE_LAYOUT),
     topBannerImageUrls: Array.isArray(profile.topBannerImageUrls) ? profile.topBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerImageUrls: Array.isArray(profile.bottomBannerImageUrls) ? profile.bottomBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerLayout: profile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked',

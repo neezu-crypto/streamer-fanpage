@@ -1,0 +1,53 @@
+/* 디자인 5 · 이불 덮어주기 (2026-11-20)
+   탑다운 침대 위에 잠든 고정 일러스트 인물, 탭마다 이불(같은 그림을 탭 색으로 multiply)이 한 장씩 쌓인다.
+   침대는 화면 너비 가득(PC/모바일 그림 따로), 인물은 화면 높이 가득. 이불은 그림 모양대로 mask해 둥근 모서리 밖으로 색이 새지 않는다.
+   움직임은 transform 전환만 쓰고(경과 시간 기준), 동작 줄이기면 전환 없음. 창 스크롤은 쓰지 않고 이불 안에서 스크롤한다. */
+body.fanpage-layout-five-active{
+  --bk-ink:#4a3328;--bk-soft:#7a6257;--bk-accent:#d9638a;--bk-paper:#fffdfbeb;
+  --bg:#fbf4f2;--panel:#fff;--panel2:#f8efea;--line:#efe2d8;--text:var(--bk-ink);--muted:var(--bk-soft);--pink:var(--bk-accent);--lav:var(--bk-accent);
+  color-scheme:light;background:#fbf4f2;color:var(--bk-ink);overflow:hidden;
+}
+body.fanpage-layout-five-active .site-shell,body.fanpage-layout-five-active main{background:transparent}
+body.fanpage-layout-five-active .topbar{position:relative;z-index:30;background:#fffaf6e6;color:var(--bk-ink);backdrop-filter:blur(6px)}
+body.fanpage-layout-five-active .topbar a,body.fanpage-layout-five-active .topbar button{color:var(--bk-ink)}
+#fanPageView.fanpage-layout-5{color:var(--bk-ink)}
+#fanPageView.fanpage-layout-5 .fanpage-kawaii-hero{display:none}
+#fanPageView.fanpage-layout-5>.back-link{position:fixed;left:12px;bottom:12px;z-index:25;padding:8px 14px;border-radius:999px;background:#fffaf6ee;box-shadow:0 4px 14px #0002}
+
+/* ---------- 장면: 침대 + 인물 ---------- */
+.fanpage-blanket-scene{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.fanpage-blanket-bed{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top}
+.fanpage-blanket-person{position:absolute;top:0;left:50%;height:100%;transform:translateX(-50%)}
+.fanpage-blanket-person img{position:absolute;top:0;left:0;height:100%;width:auto;opacity:0;transition:opacity .5s}
+.fanpage-blanket-person img:first-child{position:relative}
+.fanpage-blanket-person img.is-on{opacity:1}
+.fanpage-blanket-hint{position:fixed;left:50%;bottom:calc(10vh + 18px);z-index:20;transform:translateX(-50%);padding:12px 22px;border:0;border-radius:999px;background:#fffaf6ee;color:var(--bk-ink);font:700 15px var(--font);box-shadow:0 8px 24px #0002;white-space:nowrap;cursor:pointer}
+.fanpage-blanket-hint span{display:inline-block;animation:fanpage-blanket-bob 1.6s ease-in-out infinite}
+@keyframes fanpage-blanket-bob{50%{transform:translateY(5px)}}
+
+/* ---------- 이불 ---------- */
+.fanpage-blanket-stack{position:fixed;inset:0;z-index:10;pointer-events:none}
+.fanpage-blanket-quilt{position:absolute;left:0;right:0;bottom:0;pointer-events:auto;transition:transform .55s cubic-bezier(.2,.8,.2,1);
+  background:#fdf7f4 url(assets/design5/duvet.webp) center var(--quilt-hemoff,0px)/100% auto no-repeat;
+  -webkit-mask:url(assets/design5/duvet.webp) center var(--quilt-hemoff,0px)/100% auto no-repeat,linear-gradient(#000,#000) 0 var(--quilt-imgend,100%)/100% 100% no-repeat;
+          mask:url(assets/design5/duvet.webp) center var(--quilt-hemoff,0px)/100% auto no-repeat,linear-gradient(#000,#000) 0 var(--quilt-imgend,100%)/100% 100% no-repeat}
+.fanpage-blanket-quilt::after{content:"";position:absolute;inset:0;background:var(--quilt-tint);mix-blend-mode:multiply;pointer-events:none}
+.fanpage-blanket-quilt.is-peeking{cursor:pointer}
+.fanpage-blanket-body{position:absolute;left:0;right:0;bottom:0;top:var(--quilt-pad,40px);z-index:1;overflow:auto;padding:12px 16px 56px;overscroll-behavior:contain;transition:opacity .35s}
+.fanpage-blanket-quilt.is-peeking .fanpage-blanket-body{opacity:0;pointer-events:none}
+.fanpage-blanket-paper{max-width:1080px;margin:0 auto;padding:14px 18px 22px;border-radius:22px;background:var(--bk-paper);box-shadow:0 6px 20px #4a332818}
+.fanpage-blanket-paper>.fanpage-tab-nav,.fanpage-blanket-paper>[role="tablist"]{position:sticky;top:-12px;z-index:3;background:var(--bk-paper);border-radius:16px}
+.fanpage-blanket-page{display:block}
+.fanpage-blanket-next{margin:22px 0 4px;text-align:center;font-size:13px;color:var(--bk-soft)}
+#fanPageView.fanpage-layout-5 :is(.content-card,.profile-board){background:#fff;border-color:var(--line);color:var(--bk-ink)}
+
+@media (max-width:760px){
+  .fanpage-blanket-body{padding:10px 10px 64px}
+  .fanpage-blanket-paper{padding:10px 10px 18px;border-radius:18px}
+}
+@media (prefers-reduced-motion:reduce){
+  .fanpage-blanket-quilt,.fanpage-blanket-person img,.fanpage-blanket-body{transition:none}
+  .fanpage-blanket-hint span{animation:none}
+}
+/* 디자인 고르기 미리보기 그림 */
+.profile-layout-thumb-5{background:linear-gradient(#fbe9ef 0 34%,#ffd3df 34% 100%)}
