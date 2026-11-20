@@ -2198,3 +2198,6 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .design-preview-bar-actions{display:flex;gap:6px;flex:none}
 .design-preview-bar .button{min-height:40px;padding:8px 13px}
 @media(max-width:520px){.design-preview-bar{flex-wrap:wrap;top:8px}.design-preview-bar-actions{width:100%}.design-preview-bar-actions .button{flex:1;min-height:44px}}
+
+/* 2026-11-20 기억의 순간: 팬이 올린 항목 표시 */
+.memory-moment-fan-badge{display:inline-block;margin-top:6px;padding:3px 8px;border-radius:99px;background:#f58cac22;border:1px solid #f58cac55;color:inherit;font-size:10px;font-weight:700;opacity:.85}

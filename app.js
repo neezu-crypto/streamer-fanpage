@@ -189,6 +189,8 @@ const KAKAO_LINKED_UID_KEY = 'streamerFanPage.kakaoLinkedUid';
 const LOGIN_LINKED_UID_KEY = 'streamerFanPage.loginLinkedUid';
 function markLoginLinked() {
   try { if (auth.currentUser) localStorage.setItem(LOGIN_LINKED_UID_KEY, auth.currentUser.uid); } catch (_) { /* 저장 불가 기기 */ }
+  //  로그인 직후 팬 등록 칸(기억의 순간)처럼 로그인 여부로 달라지는 칸을 바로 다시 그린다.
+  if (currentPage) refreshMemoriesSection(currentPage.streamer.id);
 }
 const LOGIN_ASSIST_SESSION_KEY = 'streamerFanPage.loginAssistTab';
 const LOGIN_ASSIST_QUERY = new URLSearchParams(location.search).get('login') === '1';
@@ -8904,19 +8906,33 @@ function renderMemoriesSection(page) {
   description.textContent = '100일, 200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아뒀어요.';
   section.append(description);
 
-  if (page.isOwner) {
+  //  2026-11-20 팬도 등록할 수 있다(로그인 팬, 이 스트리머의 SOOP 다시보기만, 하루 3개, 바로 공개). 판정은 서버가 한다.
+  const memoryFanMode = !page.isOwner;
+  if (memoryFanMode && !hasRecognizedFanpageAccount()) {
+    const loginRow = document.createElement('div'); loginRow.className = 'memory-moments-form';
+    const login = document.createElement('button'); login.type = 'button'; login.className = 'button button-primary';
+    login.textContent = '로그인하고 기억의 순간 추가하기';
+    login.addEventListener('click', () => showFanPageModal($('loginChoiceDialog')));
+    const hint = document.createElement('small'); hint.className = 'memory-moments-owner-hint';
+    hint.textContent = '팬도 이 스트리머의 SOOP 다시보기 중 기억하고 싶은 방송을 하루 3개까지 올릴 수 있어요.';
+    loginRow.append(login, hint);
+    section.append(loginRow);
+  } else if (page.isOwner || memoryFanMode) {
     const form = document.createElement('form'); form.className = 'memory-moments-form';
     const momentTitle = document.createElement('input'); momentTitle.type = 'text'; momentTitle.name = 'title';
     momentTitle.required = true; momentTitle.maxLength = 80; momentTitle.placeholder = '예: 100일 방송 다시보기';
     momentTitle.setAttribute('aria-label', '기억의 순간 제목');
     const videoUrl = document.createElement('input'); videoUrl.type = 'url'; videoUrl.name = 'url';
-    videoUrl.required = true; videoUrl.maxLength = 500; videoUrl.placeholder = 'SOOP 다시보기 또는 YouTube 영상 링크';
+    videoUrl.required = true; videoUrl.maxLength = 500;
+    videoUrl.placeholder = page.isOwner ? 'SOOP 다시보기 또는 YouTube 영상 링크' : '이 스트리머의 SOOP 다시보기 링크';
     videoUrl.setAttribute('aria-label', '기억의 순간 다시보기 링크');
     const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary';
     add.disabled = state.saving; add.textContent = state.saving ? '저장 중…' : '＋ 순간 추가';
     form.append(momentTitle, videoUrl, add);
     const hint = document.createElement('small'); hint.className = 'memory-moments-owner-hint';
-    hint.textContent = '인증 스트리머와 관리자만 추가·삭제할 수 있어요. SOOP 다시보기와 YouTube 영상 링크를 지원합니다.';
+    hint.textContent = page.isOwner
+      ? '팬들도 이 스트리머의 SOOP 다시보기를 하루 3개까지 올릴 수 있어요. 마음에 들지 않는 항목은 언제든 삭제할 수 있어요. SOOP 다시보기와 YouTube 영상 링크를 지원합니다.'
+      : '이 스트리머의 SOOP 다시보기만 올릴 수 있어요(하루 3개). 올리면 바로 보이고, 스트리머가 삭제할 수 있어요.';
     form.append(hint);
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -8991,7 +9007,12 @@ function renderMemoriesSection(page) {
     external.href = memory.url; external.target = '_blank'; external.rel = 'noopener noreferrer';
     external.textContent = '원본 링크 ↗';
     actions.append(play, external);
-    if (page.isOwner) {
+    if (memory.byFan) {
+      const badge = document.createElement('span'); badge.className = 'memory-moment-fan-badge';
+      badge.textContent = '팬이 올렸어요';
+      detail.append(badge);
+    }
+    if (page.isOwner || memory.mine === true || ownMemoryIds(page.streamer.id).includes(memory.id)) {
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button memory-moment-delete';
       remove.disabled = state.saving || state.deletingId === memory.id;
       remove.textContent = state.deletingId === memory.id ? '삭제 중…' : '삭제';
@@ -9008,9 +9029,24 @@ function renderMemoriesSection(page) {
   return section;
 }
 
+//  내가 올린 기억의 순간 번호(이 기기에만). 공개 파일에는 등록자 정보가 없어 삭제 버튼 표시에만 쓰고, 삭제 허용은 서버가 판정한다.
+const OWN_MEMORY_IDS_KEY = 'streamerFanPage.ownMemoryIds.v1';
+function ownMemoryIds(streamerId) {
+  try { const all = JSON.parse(localStorage.getItem(OWN_MEMORY_IDS_KEY) || '{}'); return Array.isArray(all[streamerId]) ? all[streamerId] : []; } catch (_) { return []; }
+}
+function rememberOwnMemoryIds(streamerId, memories) {
+  try {
+    const all = JSON.parse(localStorage.getItem(OWN_MEMORY_IDS_KEY) || '{}');
+    const ids = new Set([...(Array.isArray(all[streamerId]) ? all[streamerId] : []), ...memories.filter((m) => m && m.mine === true).map((m) => m.id)]);
+    const live = new Set(memories.map((m) => m && m.id));
+    all[streamerId] = [...ids].filter((id) => live.has(id)).slice(-50);
+    localStorage.setItem(OWN_MEMORY_IDS_KEY, JSON.stringify(all));
+  } catch (_) { /* 저장 불가 기기 */ }
+}
+
 async function addMemoryMoment(page, titleInput, urlInput, button) {
   const state = fanPageMemoryStateFor(page.streamer.id);
-  if (!page.isOwner || state.saving || button.disabled) return;
+  if (state.saving || button.disabled) return;
   state.saving = true; button.disabled = true; button.textContent = '저장 중…';
   try {
     const result = (await callMemories({
@@ -9018,6 +9054,7 @@ async function addMemoryMoment(page, titleInput, urlInput, button) {
     })).data;
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
     state.memories = Array.isArray(result.memories) ? result.memories : [];
+    rememberOwnMemoryIds(page.streamer.id, state.memories);
     state.loaded = true; state.error = ''; state.revision += 1;
     page.memories = state.memories;
     currentPage.memories = state.memories;
@@ -9025,6 +9062,7 @@ async function addMemoryMoment(page, titleInput, urlInput, button) {
     refreshMemoriesSection(page.streamer.id);
     showToast('기억의 순간을 추가했어요.');
   } catch (error) {
+    if (error?.details?.loginRequired) showFanPageModal($('loginChoiceDialog'));
     showToast(error.message || '기억의 순간을 추가하지 못했어요.');
   } finally {
     state.saving = false;
@@ -9067,7 +9105,7 @@ async function loadFanPageMemories(page) {
 
 async function deleteMemoryMoment(page, memory, button) {
   const state = fanPageMemoryStateFor(page.streamer.id);
-  if (!page.isOwner || state.saving || button.disabled
+  if (state.saving || button.disabled
     || !confirm(`“${memory.title}” 기억의 순간을 삭제할까요?`)) return;
   state.saving = true; state.deletingId = memory.id; button.disabled = true; button.textContent = '삭제 중…';
   try {
