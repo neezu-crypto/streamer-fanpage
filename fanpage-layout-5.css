@@ -87,3 +87,33 @@ body.fanpage-layout-five-active .topbar .auth-actions{width:auto;flex:none;flex-
 body.fanpage-layout-five-active .topbar :is(.auth-button,a.auth-button,button.auth-button){border:0!important;background:none!important;box-shadow:none!important;border-radius:0!important;color:#4a3328!important;text-decoration:none!important;font-weight:700;padding:3px 8px!important;min-height:26px;transform:none}
 body.fanpage-layout-five-active .topbar .auth-button:is(:hover,:focus-visible){color:#b23a6c!important;text-decoration:underline!important;text-underline-offset:3px}
 body.fanpage-layout-five-active .topbar .auth-button+.auth-button{position:relative}
+/* 창(dialog)·편집 칸: 디자인 1 창 색을 쓰되 흐린 글씨·작은 글씨 보정(체크리스트 1·3번) */
+body.fanpage-layout-five-active :is(dialog,.account-dialog){--muted:#6b5f73;--dialog-accent-strong:#b23a6c}
+body.fanpage-layout-five-active dialog :is(.eyebrow){color:#b23a6c}
+body.fanpage-layout-five-active dialog :is(.profile-editor-footer>small,.vod-player-footer>p,.youtube-player-volume>output,.fan-sound-settings-description,.profile-layout-dialog-intro,.profile-layout-option-copy>small,.profile-editor-hint,.edit-footer>small,.design-feedback-intro,.design-feedback-context,.account-dialog-card>p,.verification-status,.admin-stats-status,.admin-stats-note){color:#6b5f73!important}
+body.fanpage-layout-five-active dialog .tamagotchi-application-dialog-close{color:#e6dcef}
+body.fanpage-layout-five-active dialog .tamagotchi-state-message{color:#cfc6d8}
+body.fanpage-layout-five-active dialog :is(.profile-editor-footer>small,.vod-player-footer>p,.youtube-player-volume>output,.eyebrow,.profile-layout-option-copy>small,.profile-editor-hint,.edit-footer>small,.design-feedback-context label,.verification-status,.admin-stats-note,.admin-viewer-usage-heading>span,.admin-viewer-data-heading>strong,.admin-viewer-data-range,.admin-viewer-data-range>select,.admin-viewer-usage-streamers-heading>strong,.admin-viewer-usage-streamers-heading>span,.admin-viewer-usage-note,.admin-viewer-subscription-status,.admin-tamagotchi-toolbar>select,.admin-tamagotchi-admin-status,.admin-design-feedback-status){font-size:12px!important}
+@media (max-width:760px){
+  body.fanpage-layout-five-active dialog :is(input:not([type=radio],[type=checkbox],[type=range]),select,textarea){font-size:16px!important}
+  body.fanpage-layout-five-active dialog :is(button,.button,summary){min-height:44px}
+}
+body.fanpage-layout-five-active dialog .tamagotchi-state-message{color:#e2dbe9!important}
+body.fanpage-layout-five-active dialog :is(.design-feedback-context,#streamerVerifyDialog label,.admin-stats-dialog .button,#adminStatsDialog .button){font-size:12px!important}
+body.fanpage-layout-five-active #adminStatsDialog :is(span,.admin-viewer-usage-note,.admin-viewer-subscription-status,.admin-tamagotchi-admin-status,.admin-design-feedback-status):not(.button *){color:#5f536a!important}
+/* 이불 위 입력란: PC 13px 이상, 안내 글씨(placeholder)도 읽히게 */
+#fanPageView.fanpage-layout-5 .fanpage-blanket-paper :is(input:not([type=radio],[type=checkbox],[type=range]),select,textarea){font-size:max(13px,1em)}
+#fanPageView.fanpage-layout-5 .fanpage-blanket-paper :is(input,textarea)::placeholder,body.fanpage-layout-five-active dialog :is(input,textarea)::placeholder{color:#7a6e84;opacity:1}
+/* 버튼을 눌러야 나오는 칸·제휴 광고 */
+#fanPageView.fanpage-layout-5 .fanpage-blanket-paper :is(.affiliate-promo-ad-label,.affiliate-promo-brand,.affiliate-promo-description,.affiliate-promo-button,.affiliate-promo-disclosure,.upbo-request-empty-hint,.rolling-paper-note){font-size:12px}
+#fanPageView.fanpage-layout-5 .fanpage-blanket-paper :is(.affiliate-promo-brand,.affiliate-promo-description,.affiliate-promo-disclosure,.upbo-request-empty-hint,.rolling-paper-note){color:#6b5f73}
+body.fanpage-layout-five-active dialog :is(.video-library-add-dialog-description,.video-library-add-option-icon,.video-library-add-option-copy>small,.video-library-add-option-arrow){color:#6b5f73!important}
+body.fanpage-layout-five-active dialog .video-library-add-option-copy>small{font-size:12px!important}
+#fanPageView.fanpage-layout-5 .fanpage-blanket-paper .rolling-paper-topic-decoration{color:#6b5f73}
+@media (max-width:760px){
+  #fanPageView.fanpage-layout-5 .fanpage-blanket-paper :is(.fanpage-tab-label,.profile-stock-change,.messenger-link-description,.fanpage-tab-panel-heading>p){font-size:12px!important}
+  #fanPageView.fanpage-layout-5 .fanpage-blanket-paper :is(input:not([type=radio],[type=checkbox],[type=range]),select,textarea){font-size:16px!important}
+  body.fanpage-layout-five-active dialog :is(button,.button,summary){min-height:44px!important}
+}
+/* 아래 깔린 이불의 글씨가 끝단 띠 사이로 비치지 않게: 지금 이불이 아니면 내용을 숨긴다(넘어오는 이불은 is-peeking/전환 중에도 보이게 위·지금만 표시) */
+.fanpage-blanket-quilt:not(.is-current):not(.is-peeking) .fanpage-blanket-body{visibility:hidden}
