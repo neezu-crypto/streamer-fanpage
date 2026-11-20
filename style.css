@@ -1949,6 +1949,9 @@ dialog.weekly-template-preview-dialog{width:min(1100px,calc(100% - 32px));max-wi
 .design-pass-notice{margin:0;font-size:.84rem;opacity:.85;line-height:1.5}
 .design-pass-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
 .design-pass-actions .button{min-height:44px}
+.design-gift-choices{flex-direction:column;align-items:stretch;margin-bottom:12px}
+.design-gift-choices .button{justify-content:flex-start;text-align:left}
+.design-gift-group{margin:6px 0 0;font-size:12px;font-weight:700;opacity:.75}
 .design-pass-panel{display:grid;gap:8px;margin:12px 0 0;padding:12px;border:1px dashed currentColor;border-radius:12px}
 .design-pass-panel[hidden],.design-pass-admin-row[hidden],.weekly-template-buy[hidden]{display:none!important}
 .design-pass-panel-text{margin:0;font-size:.9rem;line-height:1.5}

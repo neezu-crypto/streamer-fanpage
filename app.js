@@ -33,7 +33,17 @@ const marketDb = STOCK_MARKET_DATABASE_PRIMARY ? stockDb : db;
 const functions = getFunctions(app, 'us-central1');
 function authenticatedCallable(name, options) {
   const callable = httpsCallable(functions, name, options);
-  return (data, callOptions) => ensureAuthReady().then(() => callable(data, callOptions));
+  //  서버가 로그인 필요(loginRequired)로 거절하면 로그인 창을 연다(입력한 내용은 그대로 두어 로그인 후 이어서 보낸다).
+  return (data, callOptions) => ensureAuthReady().then(() => callable(data, callOptions)).catch((error) => {
+    if (error?.details?.loginRequired) showFanPageModal($('loginChoiceDialog'));
+    throw error;
+  });
+}
+//  팬 기능(글·신청·스티커·확인)은 로그인 계정만 쓴다. 익명이면 보내지 않고 로그인 창을 연다. 최종 판정은 서버가 한다.
+function requireFanLoginUi(canManage = false) {
+  if (canManage || hasRecognizedFanpageAccount()) return true;
+  showFanPageModal($('loginChoiceDialog'));
+  return false;
 }
 const callBootstrap = httpsCallable(functions, 'streamerFanPageBootstrap');
 //  빠른 첫 화면: 공개 팬페이지 데이터는 로그인 복원을 기다리지 않고 받는다(App Check 토큰만 붙임).
@@ -192,6 +202,14 @@ function markLoginLinked() {
   try { if (auth.currentUser) localStorage.setItem(LOGIN_LINKED_UID_KEY, auth.currentUser.uid); } catch (_) { /* 저장 불가 기기 */ }
   //  로그인 직후 팬 등록 칸(기억의 순간)처럼 로그인 여부로 달라지는 칸을 바로 다시 그린다.
   if (currentPage) refreshMemoriesSection(currentPage.streamer.id);
+  syncFanLoginLabels();
+}
+//  "로그인하고 …" 버튼은 로그인하면 원래 이름으로 바꾼다(입력한 내용은 그대로 둔다).
+function syncFanLoginLabels() {
+  if (!hasRecognizedFanpageAccount()) return;
+  document.querySelectorAll('[data-fan-login-label]').forEach((button) => {
+    if (/^로그인하고 /.test(button.textContent)) button.textContent = button.dataset.fanLoginLabel;
+  });
 }
 const LOGIN_ASSIST_SESSION_KEY = 'streamerFanPage.loginAssistTab';
 const LOGIN_ASSIST_QUERY = new URLSearchParams(location.search).get('login') === '1';
@@ -652,6 +670,7 @@ async function loadDevbarLinks() {
 loadDevbarLinks();
 
 function renderAuthControls() {
+  syncFanLoginLabels();
   const user = auth.currentUser;
   const googleLinked = !!(user && user.providerData.some((provider) => provider.providerId === 'google.com'));
   const kakaoLinked = !!(user && localStorage.getItem(KAKAO_LINKED_UID_KEY) === user.uid);
@@ -2075,7 +2094,9 @@ function renderUpboRequestForm(page, state) {
   }
 
   const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary upbo-request-submit';
-  submit.textContent = state.submitting ? '신청 중…' : `선택 ${draft.lines.length}개 신청 보내기`;
+  submit.textContent = state.submitting ? '신청 중…'
+    : `${!page.canManage && !hasRecognizedFanpageAccount() ? '로그인하고 ' : ''}선택 ${draft.lines.length}개 신청 보내기`;
+  submit.dataset.fanLoginLabel = `선택 ${draft.lines.length}개 신청 보내기`;
   submit.disabled = state.submitting || !draft.lines.length;
   const note = document.createElement('p'); note.className = 'upbo-request-note';
   note.textContent = '선택한 각 항목은 스트리머 검토 목록에 따로 표시되며, 승인된 항목만 공개 기록에 등록됩니다.';
@@ -2083,6 +2104,7 @@ function renderUpboRequestForm(page, state) {
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity() || state.submitting) return;
+    if (!requireFanLoginUi(page.canManage)) return;
     state.submitting = true; submit.disabled = true; submit.textContent = '신청 중…';
     form.querySelectorAll('button, input, textarea').forEach((control) => { control.disabled = true; });
     try {
@@ -3734,7 +3756,7 @@ async function loadRollingPaperStickers(page, force = false) {
   try {
     // 로그인하지 않은 방문자(익명)는 붙일 수 없으니 공개 목록 파일만 읽는다. 로그인·관리 계정은 서버에서 내 스티커 여부까지 받는다.
     await ensureAuthReady().catch(() => null);
-    const viewerIsAnonymous = !auth.currentUser || auth.currentUser.isAnonymous;
+    const viewerIsAnonymous = !hasRecognizedFanpageAccount();
     const shared = !force && viewerIsAnonymous && !page.canManage ? await loadPublicFanPageFile(streamerId, 'stickers', 10 * 60 * 1000) : null;
     const result = shared
       ? { stickers: shared.stickers, ownStickerId: '', canPlace: false, canManage: false, stickerChoices: shared.stickerChoices }
@@ -3919,9 +3941,11 @@ function createRollingPaperComposer(page, topicId, imageActionSlot = null, isDet
   textarea.addEventListener('input', () => resizeRollingPaperTextarea(textarea));
   const formFooter = document.createElement('div'); formFooter.className = 'rolling-paper-form-footer';
   const note = document.createElement('small'); note.className = 'rolling-paper-note';
-  note.textContent = '닉네임은 입력하면 공개되고, 비워 두면 익명으로 표시돼요. 글은 최대 300자, 하루 최대 5개까지 남길 수 있어요.';
+  note.textContent = '로그인한 팬만 남길 수 있어요. 닉네임은 입력하면 공개되고, 비워 두면 익명으로 표시돼요. 글은 최대 300자, 하루 최대 5개까지 남길 수 있어요.';
   const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'button button-primary';
-  submit.textContent = state.submitting ? '등록 중…' : '메시지 남기기'; submit.disabled = state.submitting;
+  const needsLogin = !page.canManage && !hasRecognizedFanpageAccount();
+  submit.textContent = state.submitting ? '등록 중…' : needsLogin ? '로그인하고 메시지 남기기' : '메시지 남기기'; submit.disabled = state.submitting;
+  submit.dataset.fanLoginLabel = '메시지 남기기';
   formFooter.append(note, submit); form.append(nicknameInput, textarea, formFooter);
   resizeRollingPaperTextarea(textarea);
   form.addEventListener('submit', (event) => {
@@ -4041,6 +4065,7 @@ async function addRollingPaperEntry(page, nicknameInput, textarea, button, topic
   topicId = topicId || state.activeTopicId;
   const content = textarea.value.trim();
   if ((!content && !state.selectedGalleryImage) || state.submitting || !topicId) return;
+  if (!requireFanLoginUi(page.canManage)) return;
   const nickname = nicknameInput.value.trim();
   state.submitting = true; state.entryError = '';
   button.disabled = true; button.textContent = '등록 중…'; nicknameInput.disabled = true; textarea.disabled = true;
@@ -4983,7 +5008,7 @@ function startDesignPreview(page, savedLayout, layout = 3) {
   };
 }
 
-function openDesignPassPurchaseDialog(page, { onPurchased, layout = 3 } = {}) {
+function openDesignPassPurchaseDialog(page, { onPurchased, layout = 3, gift = false } = {}) {
   layout = isPaidLayout(layout) ? Number(layout) : 3;
   const passKey = `layout${layout}`;
   const streamerId = page.streamer.id;
@@ -4995,18 +5020,25 @@ function openDesignPassPurchaseDialog(page, { onPurchased, layout = 3 } = {}) {
   const card = document.createElement('div');
   card.className = 'account-dialog-card design-pass-dialog-card';
   const title = document.createElement('h2');
-  title.textContent = `디자인 ${layout} 이용권`;
+  title.textContent = gift ? `디자인 ${layout} 선물하기` : `디자인 ${layout} 이용권`;
   const lead = document.createElement('p');
   lead.className = 'design-pass-lead';
-  lead.textContent = `${priceCash}캐시로 한 번 구매하면 계속 쓸 수 있어요.`;
+  lead.textContent = gift
+    ? `내 통합 캐시 ${priceCash}캐시로 ${page.streamer.nickname || '스트리머'}님 팬페이지에 이 디자인을 열어 줘요. 한 번 열면 계속 쓸 수 있어요.`
+    : `${priceCash}캐시로 한 번 구매하면 계속 쓸 수 있어요.`;
   const list = document.createElement('ul');
   list.className = 'design-pass-benefits';
-  [
+  (gift ? [
+    `${DESIGN_PASS_LABELS[layout]} 레이아웃`,
+    '주간 일정표의 고급 템플릿 9종 전체',
+    '디자인을 바꿀지는 스트리머가 정해요',
+    '이 팬페이지에 적용되며 누가 선물했는지는 공개되지 않아요',
+  ] : [
     `${DESIGN_PASS_LABELS[layout]} 레이아웃`,
     '주간 일정표의 고급 템플릿 9종 전체 (어떤 디자인에서도 사용)',
     '다른 유료 디자인은 따로 구매해요',
     '이 팬페이지에 적용되며 다른 계정·페이지로 옮길 수 없어요',
-  ].forEach((text) => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
+  ]).forEach((text) => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
   const balance = document.createElement('p');
   balance.className = 'design-pass-balance';
   balance.setAttribute('role', 'status');
@@ -5019,7 +5051,8 @@ function openDesignPassPurchaseDialog(page, { onPurchased, layout = 3 } = {}) {
   const cancel = document.createElement('button');
   cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '닫기';
   const pay = document.createElement('button');
-  pay.type = 'button'; pay.className = 'button button-primary'; pay.textContent = `${priceCash}캐시로 구매`; pay.disabled = true;
+  const payLabel = gift ? `${priceCash}캐시로 선물` : `${priceCash}캐시로 구매`;
+  pay.type = 'button'; pay.className = 'button button-primary'; pay.textContent = payLabel; pay.disabled = true;
   const charge = document.createElement('a');
   charge.className = 'button design-pass-charge-link';
   charge.href = 'https://neezu-crypto.github.io/streamer-game-series-shop/customer-center.html?open=charge';
@@ -5042,7 +5075,7 @@ function openDesignPassPurchaseDialog(page, { onPurchased, layout = 3 } = {}) {
     callDesignPass({ action: 'status', streamerId, layout }).then((result) => {
       if (busy || !dialog.isConnected) return;
       const data = result.data || {};
-      if (data.owned) { balance.textContent = '이미 이용권이 있어요.'; pay.disabled = true; charge.hidden = true; onPurchased?.({ alreadyOwned: true }); return; }
+      if (data.owned) { balance.textContent = gift ? '이 팬페이지에는 이미 이 디자인이 열려 있어요.' : '이미 이용권이 있어요.'; pay.disabled = true; charge.hidden = true; onPurchased?.({ alreadyOwned: true }); return; }
       const cash = Number(data.balanceCash) || 0;
       balance.textContent = cash >= priceCash
         ? `현재 통합 캐시 ${cash.toLocaleString('ko-KR')}캐시`
@@ -5071,22 +5104,103 @@ function openDesignPassPurchaseDialog(page, { onPurchased, layout = 3 } = {}) {
       try { sessionStorage.removeItem(request.key); } catch (_) { /* 무시 */ }
       const data = result.data || {};
       if (data.status !== 'activated' && data.status !== 'owned') throw new Error('결제 결과를 확인하지 못했어요. 잠시 후 다시 확인해 주세요.');
-      if (currentPage?.streamer.id === streamerId) currentPage.designPass = { ...(currentPage.designPass || {}), [passKey]: true, priceCash };
-      page.designPass = { ...(page.designPass || {}), [passKey]: true, priceCash };
+      if (!gift) {
+        if (currentPage?.streamer.id === streamerId) currentPage.designPass = { ...(currentPage.designPass || {}), [passKey]: true, priceCash };
+        page.designPass = { ...(page.designPass || {}), [passKey]: true, priceCash };
+      }
       busy = false;
       dialog.close();
-      showToast(data.status === 'owned' ? '이미 이용권이 있어요.' : `디자인 ${layout} 이용권을 구매했어요.`);
+      showToast(data.status === 'owned' ? (gift ? '이미 열려 있는 디자인이에요.' : '이미 이용권이 있어요.')
+        : gift ? `디자인 ${layout} 이용권을 선물했어요. 스트리머에게 알림이 가요!` : `디자인 ${layout} 이용권을 구매했어요.`);
       onPurchased?.({ alreadyOwned: data.status === 'owned' });
     } catch (error) {
       // 확정 실패(잔액 부족·이미 환불됨 등)면 요청 번호를 버려 다음 시도가 새 번호로 결제되게 한다. 결과 불명(네트워크 등)은 같은 번호를 유지한다.
       if (shouldDiscardPaymentRequest(error)) { try { sessionStorage.removeItem(request.key); } catch (_) { /* 무시 */ } }
-      busy = false; cancel.disabled = false; pay.textContent = `${priceCash}캐시로 구매`;
+      busy = false; cancel.disabled = false; pay.textContent = payLabel;
       pay.disabled = false;
       balance.textContent = error.message || '구매하지 못했어요. 차감된 캐시는 자동으로 확인돼요.';
     }
   });
   showFanPageModal(dialog);
   return dialog;
+}
+
+//  스트리머에게 팬 선물 알림(서버가 한 번만 전달하고 지운다). 누가 보냈는지는 없다.
+function showFanGiftNotices(notices) {
+  document.getElementById('fanGiftNoticeDialog')?.remove();
+  const dialog = document.createElement('dialog');
+  dialog.id = 'fanGiftNoticeDialog'; dialog.className = 'account-dialog design-pass-dialog';
+  const card = document.createElement('div'); card.className = 'account-dialog-card design-pass-dialog-card';
+  const title = document.createElement('h2'); title.textContent = '🎁 팬이 선물을 보냈어요!';
+  const list = document.createElement('ul'); list.className = 'design-pass-benefits';
+  const format = new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  notices.forEach((notice) => {
+    const li = document.createElement('li');
+    li.textContent = `${notice.label}${notice.at ? ` · ${format.format(notice.at)}` : ''}`;
+    list.append(li);
+  });
+  const note = document.createElement('p'); note.className = 'design-pass-notice';
+  note.textContent = notices.some((n) => n.kind === 'design')
+    ? '선물받은 디자인은 🎨 디자인에서 바로 고를 수 있어요. 다마고치는 다마고치 탭에서 만날 수 있어요.'
+    : '다마고치 탭에서 새 가족을 만날 수 있어요. 이름은 한 번 무료로 바꿀 수 있어요.';
+  const actions = document.createElement('div'); actions.className = 'design-pass-actions';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'button button-primary'; close.textContent = '고마워요!';
+  close.addEventListener('click', () => dialog.close());
+  actions.append(close);
+  card.append(title, list, note, actions); dialog.append(card); document.body.append(dialog);
+  dialog.addEventListener('close', () => dialog.remove());
+  showFanPageModal(dialog);
+}
+
+function openDesignGiftChooser(page) {
+  document.getElementById('designGiftDialog')?.remove();
+  const dialog = document.createElement('dialog');
+  dialog.id = 'designGiftDialog'; dialog.className = 'account-dialog design-pass-dialog';
+  const card = document.createElement('div'); card.className = 'account-dialog-card design-pass-dialog-card';
+  const title = document.createElement('h2'); title.textContent = '팬페이지에 선물하기';
+  const lead = document.createElement('p'); lead.className = 'design-pass-lead';
+  lead.textContent = '내 통합 캐시로 유료 디자인을 열어 주거나 다마고치를 분양해 줄 수 있어요. 선물한 사람은 공개되지 않고, 스트리머에게 선물 알림이 가요.';
+  const list = document.createElement('div'); list.className = 'design-pass-actions design-gift-choices';
+  const groupHeading = (text) => { const h = document.createElement('p'); h.className = 'design-gift-group'; h.textContent = text; return h; };
+  list.append(groupHeading('팬페이지 디자인 · 여기서 바로 결제'));
+  //  이미 열린 디자인(선물받았거나 직접 산 것)은 선물할 수 없게 막는다. 확인 전에는 눌러도 결제 창에서 다시 확인한다.
+  const designChoices = new Map();
+  PAID_FANPAGE_LAYOUTS.forEach((layout) => {
+    const choice = document.createElement('button'); choice.type = 'button'; choice.className = 'button';
+    choice.textContent = `🎁 ${DESIGN_PASS_LABELS[layout]} · ${designPassPriceCash(page)}캐시`;
+    choice.title = `${DESIGN_PASS_LABELS[layout]} 이용권을 선물합니다`;
+    choice.disabled = true;
+    choice.addEventListener('click', () => { dialog.close(); openDesignPassPurchaseDialog(page, { layout, gift: true }); });
+    designChoices.set(layout, choice);
+    list.append(choice);
+  });
+  callDesignPass({ action: 'gift-status', streamerId: page.streamer.id }).then((result) => {
+    const owned = new Set((result.data?.ownedLayouts || []).map(Number));
+    designChoices.forEach((choice, layout) => {
+      if (owned.has(layout)) {
+        choice.disabled = true;
+        choice.textContent = `✓ ${DESIGN_PASS_LABELS[layout]} · 이미 열려 있어요`;
+        choice.title = '이 팬페이지에는 이미 열려 있는 디자인이라 선물할 수 없어요';
+      } else choice.disabled = false;
+    });
+  }).catch(() => { designChoices.forEach((choice) => { choice.disabled = false; }); });
+  //  다마고치 선물: 통합 상점 분양소를 선물 모드(?gift=)로 연다. 결제는 상점에서 내 통합 캐시로 한다.
+  const pet = document.createElement('a'); pet.className = 'button';
+  pet.href = `https://neezu-crypto.github.io/streamer-game-series-shop/tamagotchi.html?gift=${encodeURIComponent(page.streamer.id)}`;
+  pet.target = '_blank'; pet.rel = 'noopener noreferrer';
+  pet.textContent = '🐣 새 다마고치 분양해 주기 ↗'; pet.title = '통합 상점 분양소에서 이 스트리머에게 다마고치를 선물합니다';
+  const train = document.createElement('a'); train.className = 'button';
+  train.href = `https://neezu-crypto.github.io/streamer-game-series-shop/tamagotchi-world.html?gift=${encodeURIComponent(page.streamer.id)}#train`;
+  train.target = '_blank'; train.rel = 'noopener noreferrer';
+  train.textContent = '🎓 지금 있는 다마고치에게 재주·이름 선물 ↗'; train.title = '통합 상점 훈련소에서 이 스트리머의 다마고치에게 재주나 이름을 선물합니다';
+  list.append(groupHeading('다마고치 · 통합 상점(새 탭)에서 결제'), pet, train);
+  const actions = document.createElement('div'); actions.className = 'design-pass-actions';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'button'; close.textContent = '닫기';
+  close.addEventListener('click', () => dialog.close());
+  actions.append(close);
+  card.append(title, lead, list, actions); dialog.append(card); document.body.append(dialog);
+  dialog.addEventListener('close', () => dialog.remove());
+  showFanPageModal(dialog);
 }
 
 function renderFanPageLayoutDesignDialog(page, activeLayout) {
@@ -5714,6 +5828,12 @@ function renderFanPage(page, options = {}) {
     edit.addEventListener('click', () => showFanPageModal($('profileSettingsDialog')));
     actions.append(edit);
   } else {
+    //  팬: 내 통합 캐시로 이 팬페이지의 유료 디자인을 대신 열어 주기(선물). 로그인 계정만, 잔액 부족이면 충전 버튼이 보인다.
+    const gift = document.createElement('button');
+    gift.id = 'profileDesignGiftButton'; gift.type = 'button'; gift.className = 'button';
+    gift.textContent = '🎁 스트리머에게 선물'; gift.title = '내 통합 캐시로 이 스트리머에게 유료 디자인이나 다마고치를 선물합니다';
+    gift.addEventListener('click', () => { if (requireFanLoginUi(false)) openDesignGiftChooser(page); });
+    actions.append(gift);
     const editPrompt = createStreamerEditVerificationPrompt(page, '팬페이지 설정');
     if (editPrompt) actions.append(editPrompt);
   }
@@ -8857,7 +8977,8 @@ function renderCommentUpSection(page) {
       for (const entry of entries) {
         const card = document.createElement('article'); card.className = 'comment-up-card';
         const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = entry.visibility === 'fan' ? '애청자 게시글 원본 보기 ↗' : '게시글 원본 보기 ↗';
-        const check = document.createElement('button'); check.type = 'button'; check.className = 'button'; check.textContent = '새로고침';
+        const check = document.createElement('button'); check.type = 'button'; check.className = 'button'; check.textContent = !page.canManage && !hasRecognizedFanpageAccount() ? '로그인하고 새로고침' : '새로고침';
+        check.title = '원본 게시글의 전체 댓글을 다시 확인해요(로그인 필요)'; check.dataset.fanLoginLabel = '새로고침';
         const resultText = document.createElement('div'); resultText.setAttribute('role', 'status');
         const gauges = document.createElement('div'); gauges.className = 'comment-up-gauges';
         let lastComments = null; const prev = {};
@@ -8879,6 +9000,7 @@ function renderCommentUpSection(page) {
           });
         }
         check.addEventListener('click', async () => {
+          if (!requireFanLoginUi(page.canManage)) return;
           check.disabled = true; resultText.textContent = '전체 댓글을 확인하고 있어요.';
           try {
             const result = (await callCommentUp({ action: 'check', streamerId: page.streamer.id, id: entry.id })).data;
@@ -13051,6 +13173,7 @@ async function loadApp() {
       result = (await callBootstrap({ streamerId: requestedId })).data;
     }
     if (!needsOwnershipCheck && auth.currentUser && !auth.currentUser.isAnonymous) syncOwnStreamerHint(result);
+    if (Array.isArray(result.giftNotices) && result.giftNotices.length) window.setTimeout(() => showFanGiftNotices(result.giftNotices), 600);
     isAdminUser = result.isAdmin === true;
     verifiedStreamerUid = result.verifiedStreamer && auth.currentUser ? auth.currentUser.uid : '';
     verifiedStreamerProfile = result.verifiedStreamer || null;
@@ -13115,6 +13238,7 @@ async function loadApp() {
           renderAuthControls();
           if (!currentPage || currentPage.streamer.id !== requestedId) return;
           if (authenticated.designPass) currentPage.designPass = authenticated.designPass;
+          if (Array.isArray(authenticated.giftNotices) && authenticated.giftNotices.length) showFanGiftNotices(authenticated.giftNotices);
           const wasOwner = currentPage.isOwner;
           const wasStreamerOwner = currentPage.isStreamerOwner;
           currentPage.isStreamerOwner = !!(authenticated.verifiedStreamer
