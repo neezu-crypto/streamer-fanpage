@@ -933,12 +933,13 @@ function ensureAuthReady() {
 }
 function goHome() { location.hash = '#/'; }
 function goPage(id) { location.hash = `#/p/${encodeURIComponent(id)}`; }
-function showToast(message) {
+//  sticky: 다음 알림이 올 때까지 남긴다(서버가 늦게 깨어나도 '저장 중' 안내가 먼저 사라지지 않게).
+function showToast(message, { sticky = false } = {}) {
   const toast = $('toast');
   toast.textContent = message;
   toast.classList.add('is-visible');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
+  if (!sticky) toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
 }
 // SOOP 프로필 이미지는 계정에 따라 stimg 주소가 404인 경우가 있어, 같은 경로의 profile.img 주소를 먼저 시도하고 실패하면 stimg로 대체한다.
 const SOOP_LOGO_URL_RE = /^https:\/\/(?:stimg|profile\.img)\.sooplive\.com(\/LOGO\/[A-Za-z0-9]{2}\/[A-Za-z0-9]+\/[A-Za-z0-9]+\.jpg)$/;
@@ -5195,6 +5196,9 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     setDisabled(true);
     close.disabled = true;
     status.textContent = '선택한 디자인을 저장하고 있어요.';
+    //  고르자마자 바로 알린다. 서버가 잠들어 있으면 저장까지 몇 초 걸려도, 완료·실패 알림이 올 때까지 남는다.
+    const savingMessage = `디자인 ${requestedLayout}${requestedLayout === 3 ? '으로' : '로'} 바꿨어요. 저장하는 중…`;
+    showToast(savingMessage, { sticky: true });
     const previousProfile = { ...(targetPage.profile || {}), layoutDesign: initialLayout };
     try {
       const result = await callSave({
@@ -5229,6 +5233,8 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     } finally {
       saving = false;
       if (close.isConnected) close.disabled = false;
+      //  다른 페이지로 옮겨 가 완료 알림이 생략된 경우에도 '저장하는 중' 안내가 남지 않게 한다.
+      if ($('toast').textContent === savingMessage) $('toast').classList.remove('is-visible');
     }
   };
   close.addEventListener('click', () => void saveLayoutAndClose());
