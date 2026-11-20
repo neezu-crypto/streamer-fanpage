@@ -8918,27 +8918,9 @@ function renderMemoriesSection(page) {
     loginRow.append(login, hint);
     section.append(loginRow);
   } else if (page.isOwner || memoryFanMode) {
-    const form = document.createElement('form'); form.className = 'memory-moments-form';
-    const momentTitle = document.createElement('input'); momentTitle.type = 'text'; momentTitle.name = 'title';
-    momentTitle.required = true; momentTitle.maxLength = 80; momentTitle.placeholder = '예: 100일 방송 다시보기';
-    momentTitle.setAttribute('aria-label', '기억의 순간 제목');
-    const videoUrl = document.createElement('input'); videoUrl.type = 'url'; videoUrl.name = 'url';
-    videoUrl.required = true; videoUrl.maxLength = 500;
-    videoUrl.placeholder = page.isOwner ? 'SOOP 다시보기 또는 YouTube 영상 링크' : '이 스트리머의 SOOP 다시보기 링크';
-    videoUrl.setAttribute('aria-label', '기억의 순간 다시보기 링크');
-    const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary';
-    add.disabled = state.saving; add.textContent = state.saving ? '저장 중…' : '＋ 순간 추가';
-    form.append(momentTitle, videoUrl, add);
-    const hint = document.createElement('small'); hint.className = 'memory-moments-owner-hint';
-    hint.textContent = page.isOwner
-      ? '팬들도 이 스트리머의 SOOP 다시보기를 하루 3개까지 올릴 수 있어요. 마음에 들지 않는 항목은 언제든 삭제할 수 있어요. SOOP 다시보기와 YouTube 영상 링크를 지원합니다.'
-      : '이 스트리머의 SOOP 다시보기만 올릴 수 있어요(하루 3개). 올리면 바로 보이고, 스트리머가 삭제할 수 있어요.';
-    form.append(hint);
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (form.reportValidity()) addMemoryMoment(page, momentTitle, videoUrl, add);
-    });
-    section.append(form);
+    //  2026-11-20 추가 방식: [＋ 추가하기] → [목록에서 선택하기] / [링크로 추가하기].
+    //  목록은 이미 받아 둔 이 스트리머의 SOOP 다시보기(page.vods)를 3×3 썸네일로 보여 주고, 고르면 제목을 정해 추가한다.
+    section.append(renderMemoryAddPanel(page, state));
   }
 
   if (!memories.length) {
@@ -9029,6 +9011,208 @@ function renderMemoriesSection(page) {
   return section;
 }
 
+const MEMORY_PICKER_PAGE_SIZE = 9;
+function memoryHint(page) {
+  const hint = document.createElement('small'); hint.className = 'memory-moments-owner-hint';
+  hint.textContent = page.isOwner
+    ? '팬들도 이 스트리머의 SOOP 다시보기를 하루 3개까지 올릴 수 있어요. 마음에 들지 않는 항목은 언제든 삭제할 수 있어요. 링크로는 YouTube 영상도 추가할 수 있어요.'
+    : '이 스트리머의 SOOP 다시보기만 올릴 수 있어요(하루 3개). 올리면 바로 보이고, 스트리머가 삭제할 수 있어요.';
+  return hint;
+}
+function setMemoryAddMode(page, mode, extra = {}) {
+  const state = fanPageMemoryStateFor(page.streamer.id);
+  Object.assign(state, { addMode: mode, pickedVodId: '', pickPage: 0, pickQuery: '', pickSearch: null }, extra);
+  refreshMemoriesSection(page.streamer.id);
+}
+function renderMemoryAddPanel(page, state) {
+  const panel = document.createElement('div'); panel.className = 'memory-moments-form memory-add-panel';
+  const mode = state.addMode || '';
+  const backButton = () => {
+    const back = document.createElement('button'); back.type = 'button'; back.className = 'button';
+    back.textContent = '취소'; back.addEventListener('click', () => setMemoryAddMode(page, ''));
+    return back;
+  };
+  if (!mode) {
+    const open = document.createElement('button'); open.type = 'button'; open.className = 'button button-primary';
+    open.textContent = '＋ 추가하기';
+    open.addEventListener('click', () => setMemoryAddMode(page, 'choose'));
+    panel.append(open, memoryHint(page));
+    return panel;
+  }
+  if (mode === 'choose') {
+    const row = document.createElement('div'); row.className = 'memory-add-choices';
+    const fromList = document.createElement('button'); fromList.type = 'button'; fromList.className = 'button button-primary';
+    fromList.textContent = '목록에서 선택하기';
+    fromList.addEventListener('click', () => setMemoryAddMode(page, 'list'));
+    const byLink = document.createElement('button'); byLink.type = 'button'; byLink.className = 'button';
+    byLink.textContent = '링크로 추가하기';
+    byLink.addEventListener('click', () => setMemoryAddMode(page, 'link'));
+    row.append(fromList, byLink, backButton());
+    panel.append(row, memoryHint(page));
+    return panel;
+  }
+  const form = document.createElement('form'); form.className = 'memory-add-form';
+  const momentTitle = document.createElement('input'); momentTitle.type = 'text'; momentTitle.name = 'title';
+  momentTitle.required = true; momentTitle.maxLength = 80; momentTitle.placeholder = '예: 100일 방송 다시보기';
+  momentTitle.setAttribute('aria-label', '기억의 순간 제목');
+  const add = document.createElement('button'); add.type = 'submit'; add.className = 'button button-primary';
+  add.disabled = state.saving; add.textContent = state.saving ? '저장 중…' : '＋ 순간 추가';
+  if (mode === 'link') {
+    const videoUrl = document.createElement('input'); videoUrl.type = 'url'; videoUrl.name = 'url';
+    videoUrl.required = true; videoUrl.maxLength = 500;
+    videoUrl.placeholder = page.isOwner ? 'SOOP 다시보기 또는 YouTube 영상 링크' : '이 스트리머의 SOOP 다시보기 링크';
+    videoUrl.setAttribute('aria-label', '기억의 순간 다시보기 링크');
+    form.append(momentTitle, videoUrl, add, backButton());
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (form.reportValidity()) addMemoryMoment(page, momentTitle, videoUrl, add);
+    });
+    panel.append(form, memoryHint(page));
+    return panel;
+  }
+  // mode === 'list': 이 스트리머 방송국 다시보기를 SOOP에서 검색해 9개씩 보여 준다(서버 1회에 27개 = 3쪽).
+  const search = state.pickSearch || (state.pickSearch = { key: null, items: [], page: 0, hasMore: true, total: 0, loading: false, error: '' });
+  const picked = search.items.find((vod) => String(vod.id) === state.pickedVodId);
+  const already = new Set((state.memories || []).filter((m) => m && m.platform === 'soop').map((m) => String(m.videoId)));
+  if (picked) {
+    const chosen = document.createElement('div'); chosen.className = 'memory-picked-vod';
+    if (picked.thumbnailUrl) {
+      const img = document.createElement('img'); img.src = picked.thumbnailUrl; img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
+      chosen.append(img);
+    }
+    const label = document.createElement('span'); label.textContent = picked.title || 'SOOP 다시보기';
+    chosen.append(label);
+    momentTitle.value = state.pickedTitle ?? String(picked.title || '').slice(0, 80);
+    momentTitle.addEventListener('input', () => { state.pickedTitle = momentTitle.value; });
+    const urlHolder = { value: `https://vod.sooplive.com/player/${picked.id}` };
+    const other = document.createElement('button'); other.type = 'button'; other.className = 'button';
+    other.textContent = '다른 영상 고르기';
+    other.addEventListener('click', () => { state.pickedVodId = ''; state.pickedTitle = undefined; refreshMemoriesSection(page.streamer.id); });
+    form.append(momentTitle, add, other, backButton());
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (form.reportValidity()) addMemoryMoment(page, momentTitle, urlHolder, add);
+    });
+    panel.append(chosen, form);
+    return panel;
+  }
+  const head = document.createElement('div'); head.className = 'memory-picker-head';
+  const headText = document.createElement('strong'); headText.textContent = '기억하고 싶은 다시보기를 골라 주세요';
+  head.append(headText, backButton());
+  const searchForm = document.createElement('form'); searchForm.className = 'memory-picker-search-form';
+  const input = document.createElement('input'); input.type = 'search'; input.className = 'memory-picker-search';
+  input.placeholder = '방송국 다시보기 제목으로 검색'; input.maxLength = 40; input.value = state.pickQuery || '';
+  input.setAttribute('aria-label', '방송국 다시보기 검색'); input.enterKeyHint = 'search';
+  const go = document.createElement('button'); go.type = 'submit'; go.className = 'button'; go.textContent = '검색';
+  searchForm.append(input, go);
+  const results = document.createElement('div'); results.className = 'memory-picker-results';
+  panel.append(head, searchForm, results);
+
+  const keyOf = (query) => String(query || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const fetchMore = async () => {
+    if (search.loading || !search.hasMore) return;
+    const key = search.key;
+    search.loading = true; search.error = ''; draw();
+    try {
+      const result = await callMemories({ action: 'listVods', streamerId: page.streamer.id, keyword: state.pickQuery || '', page: search.page + 1 });
+      if (search.key !== key) return; // 그 사이 검색어가 바뀜
+      const vods = result.data?.vods || {};
+      const known = new Set(search.items.map((vod) => String(vod.id)));
+      search.items.push(...(Array.isArray(vods.items) ? vods.items : []).filter((vod) => /^\d{1,20}$/.test(String(vod?.id || '')) && !known.has(String(vod.id))));
+      search.page = Number(vods.page) || search.page + 1;
+      search.total = Number(vods.total) || search.items.length;
+      search.hasMore = !!vods.hasMore;
+    } catch (error) {
+      if (search.key !== key) return;
+      if (error?.details?.loginRequired) showFanPageModal($('loginChoiceDialog'));
+      search.error = error.message || '다시보기를 불러오지 못했어요.';
+    } finally {
+      if (search.key === key) { search.loading = false; draw(); }
+    }
+  };
+  const startSearch = (query) => {
+    state.pickQuery = query; state.pickPage = 0;
+    Object.assign(search, { key: keyOf(query), items: [], page: 0, hasMore: true, total: 0, loading: false, error: '' });
+    fetchMore();
+  };
+  let typingTimer = 0;
+  input.addEventListener('input', () => {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => { if (keyOf(input.value) !== search.key) startSearch(input.value); }, 500);
+  });
+  searchForm.addEventListener('submit', (event) => {
+    event.preventDefault(); clearTimeout(typingTimer);
+    if (keyOf(input.value) !== search.key || search.error) startSearch(input.value);
+  });
+
+  function draw() {
+    results.replaceChildren();
+    const pageCount = Math.max(1, Math.ceil(search.items.length / MEMORY_PICKER_PAGE_SIZE));
+    const pageIndex = Math.min(state.pickPage || 0, pageCount - 1);
+    const shown = search.items.slice(pageIndex * MEMORY_PICKER_PAGE_SIZE, (pageIndex + 1) * MEMORY_PICKER_PAGE_SIZE);
+    if (!shown.length) {
+      const note = document.createElement('p'); note.className = 'memory-moments-empty';
+      if (search.loading) { note.textContent = '방송국 다시보기를 찾고 있어요.'; note.classList.add('is-loading'); }
+      else if (search.error) note.textContent = search.error;
+      else note.textContent = search.key ? `'${String(state.pickQuery).trim()}'에 맞는 다시보기가 없어요.` : '방송국에 다시보기가 없어요.';
+      results.append(note);
+      if (!search.loading && search.error) {
+        const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button'; retry.textContent = '다시 시도';
+        retry.addEventListener('click', () => startSearch(state.pickQuery || ''));
+        results.append(retry);
+      }
+      if (!search.loading) {
+        const byLink = document.createElement('button'); byLink.type = 'button'; byLink.className = 'button';
+        byLink.textContent = '링크로 추가하기'; byLink.addEventListener('click', () => setMemoryAddMode(page, 'link'));
+        results.append(byLink);
+      }
+      return;
+    }
+    if (search.key) {
+      const count = document.createElement('small'); count.className = 'memory-picker-count';
+      count.textContent = `검색 결과 ${search.total.toLocaleString('ko-KR')}개`;
+      results.append(count);
+    }
+    const grid = document.createElement('div'); grid.className = 'memory-picker-grid';
+    shown.forEach((vod) => {
+      const added = already.has(String(vod.id));
+      const item = document.createElement('button'); item.type = 'button'; item.className = 'memory-picker-item';
+      item.disabled = added;
+      item.setAttribute('aria-label', `${vod.title || '다시보기'}${added ? ' (이미 추가됨)' : ' 선택'}`);
+      const frame = document.createElement('span'); frame.className = 'memory-picker-thumb';
+      if (vod.thumbnailUrl) {
+        const img = document.createElement('img'); img.src = vod.thumbnailUrl; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
+        img.addEventListener('error', () => img.remove(), { once: true });
+        frame.append(img);
+      }
+      if (added) { const tag = document.createElement('em'); tag.textContent = '추가됨'; frame.append(tag); }
+      const name = document.createElement('span'); name.className = 'memory-picker-title'; name.textContent = vod.title || 'SOOP 다시보기';
+      item.append(frame, name);
+      item.addEventListener('click', () => { state.pickedVodId = String(vod.id); state.pickedTitle = undefined; refreshMemoriesSection(page.streamer.id); });
+      grid.append(item);
+    });
+    results.append(grid);
+    const pager = document.createElement('div'); pager.className = 'memory-picker-pager';
+    const prev = document.createElement('button'); prev.type = 'button'; prev.className = 'button'; prev.textContent = '‹ 이전';
+    prev.disabled = pageIndex === 0;
+    prev.addEventListener('click', () => { state.pickPage = pageIndex - 1; draw(); });
+    const totalPages = Math.max(pageCount, Math.ceil((search.total || 0) / MEMORY_PICKER_PAGE_SIZE));
+    const info = document.createElement('span'); info.textContent = `${pageIndex + 1} / ${totalPages}`;
+    const next = document.createElement('button'); next.type = 'button'; next.className = 'button';
+    next.textContent = search.loading ? '불러오는 중…' : '다음 ›';
+    next.disabled = search.loading || (pageIndex >= pageCount - 1 && !search.hasMore);
+    next.addEventListener('click', async () => {
+      state.pickPage = pageIndex + 1;
+      if (pageIndex + 1 >= pageCount) await fetchMore(); else draw();
+    });
+    pager.append(prev, info, next);
+    results.append(pager);
+  }
+  //  처음 열면(또는 다시 그려질 때 결과가 없으면) 검색어 없이 최신 다시보기부터 불러온다.
+  if (search.key === null) startSearch(state.pickQuery || ''); else draw();
+  return panel;
+}
+
 //  내가 올린 기억의 순간 번호(이 기기에만). 공개 파일에는 등록자 정보가 없어 삭제 버튼 표시에만 쓰고, 삭제 허용은 서버가 판정한다.
 const OWN_MEMORY_IDS_KEY = 'streamerFanPage.ownMemoryIds.v1';
 function ownMemoryIds(streamerId) {
@@ -9055,6 +9239,7 @@ async function addMemoryMoment(page, titleInput, urlInput, button) {
     if (!currentPage || currentPage.streamer.id !== page.streamer.id) return;
     state.memories = Array.isArray(result.memories) ? result.memories : [];
     rememberOwnMemoryIds(page.streamer.id, state.memories);
+    state.addMode = ''; state.pickedVodId = ''; state.pickedTitle = undefined;
     state.loaded = true; state.error = ''; state.revision += 1;
     page.memories = state.memories;
     currentPage.memories = state.memories;

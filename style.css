@@ -2201,3 +2201,31 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 
 /* 2026-11-20 기억의 순간: 팬이 올린 항목 표시 */
 .memory-moment-fan-badge{display:inline-block;margin-top:6px;padding:3px 8px;border-radius:99px;background:#f58cac22;border:1px solid #f58cac55;color:inherit;font-size:10px;font-weight:700;opacity:.85}
+
+/* 2026-11-20 기억의 순간 추가: 목록에서 선택(3×3 썸네일) / 링크로 추가 */
+.memory-add-panel{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+.memory-add-panel>.button{align-self:flex-start}
+.memory-add-choices,.memory-add-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.memory-add-form input{flex:1 1 220px;min-width:0;min-height:42px}
+.memory-picker-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.memory-picker-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.memory-picker-item{display:flex;flex-direction:column;gap:6px;min-width:0;padding:6px;border:1px solid currentColor;border-color:color-mix(in srgb,currentColor 18%,transparent);border-radius:12px;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.memory-picker-item:hover:not(:disabled),.memory-picker-item:focus-visible{border-color:#f58cac}
+.memory-picker-item:disabled{opacity:.5;cursor:default}
+.memory-picker-thumb{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:8px;background:color-mix(in srgb,currentColor 10%,transparent)}
+.memory-picker-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.memory-picker-thumb em{position:absolute;right:6px;top:6px;padding:2px 7px;border-radius:99px;background:#000a;color:#fff;font-size:10px;font-style:normal}
+.memory-picker-title{font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.memory-picker-pager{display:flex;align-items:center;justify-content:center;gap:12px;font-size:12px}
+.memory-picked-vod{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700}
+.memory-picked-vod img{width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;flex:none}
+@media(max-width:520px){.memory-picker-grid{gap:6px}.memory-picker-item{padding:4px}.memory-picker-title{font-size:11px}.memory-picked-vod img{width:96px}}
+.memory-add-panel .memory-picker-head .button,.memory-add-panel .memory-picker-pager .button,.memory-add-panel>.button{flex:none;width:auto}
+.memory-picker-pager span{white-space:nowrap}
+.memory-picker-search{width:100%;min-height:42px;padding:0 14px;border:1px solid color-mix(in srgb,currentColor 20%,transparent);border-radius:999px;background:transparent;color:inherit;font:inherit;font-size:14px}
+.memory-picker-results{display:flex;flex-direction:column;gap:10px}
+.memory-picker-results>.button{align-self:center;flex:none;width:auto}
+.memory-picker-search-form{display:flex;gap:8px;align-items:center}
+.memory-picker-search-form .memory-picker-search{flex:1 1 auto;min-width:0}
+.memory-add-panel .memory-picker-search-form .button{flex:none;width:auto}
+.memory-picker-count{opacity:.7;font-size:12px}
