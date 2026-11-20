@@ -4908,6 +4908,36 @@ function designPreviewSavedLayout(streamerId) {
 function stopDesignPreview() {
   designPreview?.timer.stop();
   designPreview = null;
+  document.getElementById('designPreviewBar')?.remove();
+}
+//  2026-11-20 미리보기 띠: 이용권 없는 유료 디자인을 미리보는 동안 화면 위에 남은 시간과 [이용권 구매]·[그만 보기]를 띄운다.
+//  디자인을 고른 본인 화면에만 생긴다(방문자에게는 미리보기 자체가 없음). 서버 호출 없음, 다시 그려도 사라지지 않게 body에 둔다.
+function renderDesignPreviewBar(layout) {
+  document.getElementById('designPreviewBar')?.remove();
+  const bar = document.createElement('div');
+  bar.id = 'designPreviewBar';
+  bar.className = 'design-preview-bar';
+  bar.setAttribute('role', 'status');
+  const text = document.createElement('p');
+  text.className = 'design-preview-bar-text';
+  const buy = document.createElement('button');
+  buy.type = 'button'; buy.className = 'button button-primary'; buy.textContent = '이용권 구매';
+  const stop = document.createElement('button');
+  stop.type = 'button'; stop.className = 'button'; stop.textContent = '그만 보기';
+  const actions = document.createElement('div');
+  actions.className = 'design-preview-bar-actions';
+  actions.append(buy, stop);
+  bar.append(text, actions);
+  buy.addEventListener('click', () => {
+    if (!currentPage) return;
+    openDesignPassPurchaseDialog(currentPage, {
+      layout,
+      onPurchased: () => document.getElementById('layoutDesignDialog')?._onPassPurchased?.(layout),
+    });
+  });
+  stop.addEventListener('click', () => endDesignPreview('미리보기를 끝내고 저장된 디자인으로 돌아왔어요.'));
+  document.body.append(bar);
+  return text;
 }
 function designPreviewStatusText(remaining, layout = designPreview?.layout || 3) {
   return `디자인 ${layout} 미리보기 중이에요 (${formatPreviewRemaining(remaining)} 남음). 구매하면 저장할 수 있어요.`;
@@ -4931,14 +4961,16 @@ function endDesignPreview(message) {
 function startDesignPreview(page, savedLayout, layout = 3) {
   stopDesignPreview();
   const streamerId = page.streamer.id;
+  const barText = renderDesignPreviewBar(Number(layout));
   designPreview = {
     streamerId,
     savedLayout,
     layout: Number(layout),
     timer: startDesignPreviewTimer({
       onTick: (remaining) => {
+        barText.textContent = `디자인 ${layout} 미리보기 중 · ${formatPreviewRemaining(remaining)} 남음`;
         const el = document.querySelector('#layoutDesignDialog .profile-layout-status');
-        if (el) el.textContent = designPreviewStatusText(remaining);
+        if (el) el.textContent = designPreviewStatusText(remaining, layout);
       },
       onEnd: () => endDesignPreview('미리보기 시간이 끝나 저장된 디자인으로 돌아왔어요.'),
     }),
@@ -5076,7 +5108,7 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
 
   const intro = document.createElement('p');
   intro.className = 'profile-layout-dialog-intro';
-  intro.textContent = '디자인을 선택하면 화면에 먼저 적용돼요. 닫기 버튼을 누르면 저장됩니다.';
+  intro.textContent = '디자인을 고르면 바로 적용되고 저장돼요. 이용권이 없는 유료 디자인은 1분 동안 미리본 뒤 원래 디자인으로 돌아와요.';
   const layoutChoice = document.createElement('fieldset');
   layoutChoice.className = 'profile-layout-choice';
   const layoutLegend = document.createElement('legend');
@@ -5096,25 +5128,27 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
   const setDisabled = (disabled) => {
     layoutOptions.querySelectorAll('input').forEach((input) => { input.disabled = disabled; });
   };
+  //  2026-11-20 고르면 바로 적용하고 창을 닫는다. 무료·이용권 있는 디자인은 저장, 없는 유료 디자인은 1분 미리보기 뒤 되돌린다.
+  //  반환값: 'same'(지금 디자인) | 'preview'(이용권 없는 유료) | 'apply'(저장 대상) | ''(처리 안 함)
   const applyLayoutPreview = (selectedLayout) => {
-    if (saving) return;
+    if (saving) return '';
     const targetPage = currentPage;
-    if (!targetPage || targetPage.streamer.id !== page.streamer.id) return;
+    if (!targetPage || targetPage.streamer.id !== page.streamer.id) return '';
     const previousLayout = [1, 2, 3, 4].includes(Number(targetPage.profile?.layoutDesign))
       ? Number(targetPage.profile.layoutDesign)
       : DEFAULT_FANPAGE_LAYOUT;
     draftLayout = selectedLayout;
     if (selectedLayout === initialLayout) stopDesignPreview();
     if (selectedLayout === previousLayout) {
-      status.textContent = '현재 디자인입니다. 다른 디자인을 선택하면 미리볼 수 있어요.';
-      return;
+      status.textContent = '';
+      return 'same';
     }
     const previousProfile = { ...(targetPage.profile || {}) };
     targetPage.profile = { ...previousProfile, layoutDesign: selectedLayout };
     const previewOnly = isPaidLayout(selectedLayout) && !designPassOwned(targetPage, selectedLayout);
     status.textContent = previewOnly
       ? designPreviewStatusText(DESIGN_PASS_PREVIEW_SECONDS, selectedLayout)
-      : '미리보기를 적용했어요. 닫기 버튼을 누르면 저장됩니다.';
+      : '선택한 디자인을 저장하고 있어요.';
     syncPassPanel();
     if (previewOnly) startDesignPreview(targetPage, initialLayout, selectedLayout);
     else stopDesignPreview();
@@ -5124,8 +5158,9 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     if (dialog.open) dialog.close();
     renderFanPage(targetPage, {
       preservedLayoutDesignDialog: dialog,
-      reopenLayoutDesignDialog: true,
+      reopenLayoutDesignDialog: false,
     });
+    return previewOnly ? 'preview' : 'apply';
   };
   //  미리보기가 끝났을 때 이 창의 선택 상태를 저장된 디자인으로 맞춘다(모듈의 endDesignPreview가 호출).
   dialog._syncDraft = (layout, message) => {
@@ -5218,7 +5253,14 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     radio.checked = activeLayout === value;
     radio.setAttribute('aria-label', titleText);
     radio.addEventListener('change', () => {
-      if (radio.checked) applyLayoutPreview(Number(radio.value));
+      if (!radio.checked) return;
+      const value = Number(radio.value);
+      const result = applyLayoutPreview(value);
+      if (result === 'preview') {
+        showToast(`디자인 ${value}을 1분 동안 미리봐요. 저장하려면 디자인 창에서 이용권을 구매해 주세요.`);
+      } else if (result === 'apply' || result === 'same') {
+        void saveLayoutAndClose();
+      }
     });
     const copy = document.createElement('span');
     copy.className = 'profile-layout-option-copy';
@@ -5266,21 +5308,23 @@ function renderFanPageLayoutDesignDialog(page, activeLayout) {
     adminPassRow.hidden = isAdminUser !== true;
     adminPassButton.textContent = adminOwned ? `관리자: 디자인 ${layout} 이용권 회수` : `관리자: 디자인 ${layout} 이용권 부여`;
   }
-  buy.addEventListener('click', () => {
-    const layout = passPanelLayout();
-    openDesignPassPurchaseDialog(currentPage || page, {
-      layout,
-      onPurchased: () => {
+  const handlePassPurchased = (layout) => {
         stopDesignPreview();
         syncPassPanel();
         status.textContent = Number(draftLayout) === layout
-          ? `이용권을 구매했어요. 닫기 버튼을 누르면 디자인 ${layout}이 저장됩니다.`
-          : `이용권을 구매했어요. 이제 디자인 ${layout}을 선택해 저장할 수 있어요.`;
+          ? `이용권을 구매했어요. 디자인 ${layout}을 저장할게요.`
+          : `이용권을 구매했어요. 이제 디자인 ${layout}을 고르면 바로 저장돼요.`;
         layoutOptions.querySelectorAll('.profile-layout-option-copy small').forEach((small, index) => {
           if (layoutOptionsData[index]?.[0] === layout) small.textContent = layoutOptionsData[index][2];
         });
-      },
-    });
+        //  미리보던 디자인을 샀으면 바로 저장하고 창을 닫는다(고르면 바로 저장되는 방식과 같게).
+        if (Number(draftLayout) === layout) void saveLayoutAndClose();
+  };
+  //  미리보기 띠의 [이용권 구매]도 같은 처리(구매 후 바로 저장)를 쓴다.
+  dialog._onPassPurchased = handlePassPurchased;
+  buy.addEventListener('click', () => {
+    const layout = passPanelLayout();
+    openDesignPassPurchaseDialog(currentPage || page, { layout, onPurchased: () => handlePassPurchased(layout) });
   });
   adminPassButton.addEventListener('click', async () => {
     const target = currentPage || page;

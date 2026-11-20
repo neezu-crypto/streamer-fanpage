@@ -2191,3 +2191,10 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 @property --fog-haze{syntax:'<number>';inherits:false;initial-value:0}
 .fanpage-fog-layer{position:fixed;inset:0;z-index:24;pointer-events:none;opacity:0;transition:opacity .6s ease,--fog-blur 3s linear,--fog-haze 3s linear;-webkit-backdrop-filter:blur(var(--fog-blur,0px));backdrop-filter:blur(var(--fog-blur,0px));background:rgba(238,243,250,var(--fog-haze,0));-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
 @media (prefers-reduced-motion:reduce){.fanpage-fog-layer{display:none}}
+
+/* 2026-11-20 유료 디자인 미리보기 띠: 미리보는 동안 화면 위에 남은 시간과 구매·그만 보기(디자인과 상관없이 같은 모양) */
+.design-preview-bar{position:fixed;top:12px;left:50%;z-index:26;transform:translateX(-50%);width:min(560px,calc(100% - 24px));display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 16px;border:1px solid #f7d89066;border-radius:14px;background:#211e2af2;color:#f4f0f6;box-shadow:0 12px 36px #0006;font-family:var(--font)}
+.design-preview-bar-text{margin:0;font-size:13px;font-weight:700;color:#f7d890;font-variant-numeric:tabular-nums}
+.design-preview-bar-actions{display:flex;gap:6px;flex:none}
+.design-preview-bar .button{min-height:40px;padding:8px 13px}
+@media(max-width:520px){.design-preview-bar{flex-wrap:wrap;top:8px}.design-preview-bar-actions{width:100%}.design-preview-bar-actions .button{flex:1;min-height:44px}}
