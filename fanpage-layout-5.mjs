@@ -63,7 +63,7 @@ export function setupFanpageBlanket(view, { tabNav, head = [], panels, initialIn
     coverTop = Math.round(H * CHIN[kind]);
     stack.style.setProperty('--quilt-hemoff', `${-hem}px`);
     stack.style.setProperty('--quilt-imgend', `${imgH - hem - 2}px`);
-    stack.style.setProperty('--quilt-pad', `${Math.max(26, imgH * 0.12)}px`);
+    stack.style.setProperty('--quilt-pad', '6px'); // 본문이 이불 윗단 바로 아래까지 올라오게
     layout();
   }
   // 탭 내용을 이불 위에 얹고, 지금 이불에 탭 바를 옮겨 단다.
