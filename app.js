@@ -3,7 +3,7 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken as getAppChec
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signInWithCustomToken, linkWithPopup, signOut, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
-import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket2';
+import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket4';
 import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261119-tour7';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
@@ -1667,11 +1667,11 @@ function setVisibleView(page) {
   const pageLayoutDesign = page && [1, 2, 3, 4, 5].includes(Number(page.profile?.layoutDesign))
     ? Number(page.profile.layoutDesign)
     : DEFAULT_FANPAGE_LAYOUT;
-  const usesKawaiiLayout = !!page && (pageLayoutDesign === 1 || pageLayoutDesign === 3);
+  const usesKawaiiLayout = !!page && [1, 3, 5].includes(pageLayoutDesign);
   const usesKawaiiHome = !page;
   $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
   $('mainContent').classList.toggle('has-fanpage-home-kawaii', usesKawaiiHome);
-  document.body.classList.toggle('fanpage-layout-one-active', !!page && pageLayoutDesign === 1);
+  document.body.classList.toggle('fanpage-layout-one-active', !!page && (pageLayoutDesign === 1 || pageLayoutDesign === 5));
   document.body.classList.toggle('fanpage-layout-three-active', !!page && pageLayoutDesign === 3);
   document.body.classList.toggle('fanpage-layout-four-active', !!page && pageLayoutDesign === 4);
   document.body.classList.toggle('fanpage-layout-five-active', !!page && pageLayoutDesign === 5);
@@ -5592,16 +5592,18 @@ function renderFanPage(page, options = {}) {
   const layoutDesign = [1, 2, 3, 4, 5].includes(Number(page.profile?.layoutDesign))
     ? Number(page.profile.layoutDesign)
     : DEFAULT_FANPAGE_LAYOUT;
-  const usesKawaiiLayout = layoutDesign === 1 || layoutDesign === 3;
+  const usesKawaiiLayout = [1, 3, 5].includes(layoutDesign);
   $('mainContent').classList.toggle('has-fanpage-layout-one', usesKawaiiLayout);
   $('mainContent').classList.remove('has-fanpage-home-kawaii');
-  document.body.classList.toggle('fanpage-layout-one-active', layoutDesign === 1);
+  //  디자인 5는 디자인 1의 밝은 파스텔 스타일을 바탕으로 깔고 그 위에 이불 장면을 얹는다.
+  document.body.classList.toggle('fanpage-layout-one-active', layoutDesign === 1 || layoutDesign === 5);
   document.body.classList.toggle('fanpage-layout-three-active', layoutDesign === 3);
   document.body.classList.toggle('fanpage-layout-four-active', layoutDesign === 4);
   document.body.classList.toggle('fanpage-layout-five-active', layoutDesign === 5);
   document.body.classList.toggle('fanpage-theme-sora-active', String(page.streamer.id || '').toLowerCase() === 'yuhatty');
   document.body.classList.remove('fanpage-home-kawaii-active');
   view.classList.add(`fanpage-layout-${layoutDesign}`);
+  if (layoutDesign === 5) view.classList.add('fanpage-layout-1');
   const usesBinderLayout = layoutDesign === 4;
   const usesBlanketLayout = layoutDesign === 5;
   const usesStackedTabs = usesBinderLayout || usesBlanketLayout; // 탭을 모두 펼쳐 두고 스크롤로 넘기는 디자인
@@ -5745,7 +5747,7 @@ function renderFanPage(page, options = {}) {
       document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
-  if (usesKawaiiLayout) view.append(renderKawaiiWelcome(page, navigateToFanPageSection));
+  if (usesKawaiiLayout && layoutDesign !== 5) view.append(renderKawaiiWelcome(page, navigateToFanPageSection));
   view.append(section);
   let fanCharacterCard = null;
   if (String(page.streamer.id || '').toLowerCase() === 'yuhatty') {
@@ -6291,8 +6293,13 @@ function createFanPageQuickRemote(view) {
     ['fan-banner-bottom', '하단 배너'],
   ];
   //  디자인 4(바인더)는 탭 패널이 바인더 무대 안에 있으므로 꺼내서 같은 순서로 훑는다.
-  const topLevel = [...view.children].flatMap((element) => (element.classList.contains('fanpage-binder')
-    ? [...element.querySelectorAll(':scope > .fanpage-binder-stage > .fanpage-tab-panel')] : [element]));
+  //  디자인 5(이불)는 대문·탭 패널이 이불 안 종이에 얹혀 있으므로 그 종이 안 칸을 순서대로 꺼내고, 장면·안내는 뺀다.
+  const topLevel = [...view.children].flatMap((element) => {
+    if (element.classList.contains('fanpage-binder')) return [...element.querySelectorAll(':scope > .fanpage-binder-stage > .fanpage-tab-panel')];
+    if (element.classList.contains('fanpage-blanket-stack')) return [...element.querySelectorAll('.fanpage-blanket-paper > :not(.fanpage-blanket-next)')];
+    if (element.matches('.fanpage-blanket-scene, .fanpage-blanket-hint')) return [];
+    return [element];
+  });
   const candidates = topLevel.flatMap((element) => {
     if (element.classList.contains('fanpage-tab-nav') || element.classList.contains('fanpage-binder-photocards')) return [];
     if (element.classList.contains('fanpage-tab-panel')) {
@@ -6786,11 +6793,37 @@ function createFanPageQuickRemote(view) {
     const thumbHeight = thumb.getBoundingClientRect().height;
     const travel = Math.max(1, bounds.height - thumbHeight - 8);
     const progress = Math.max(0, Math.min(1, (clientY - bounds.top - 4 - thumbHeight / 2) / travel));
+    const blanketQuilts = view.querySelectorAll('.fanpage-blanket-quilt');
+    if (blanketQuilts.length && view._binder) { view._binder.goTo(Math.min(blanketQuilts.length - 1, Math.floor(progress * blanketQuilts.length))); scheduleUpdate(); return; }
     const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     window.scrollTo(0, progress * maxScroll);
   }
   function updateRemote() {
     scrollFrame = 0;
+    //  디자인 5(이불): 창은 스크롤되지 않는다. 덮인 이불 순서 + 지금 이불 안 스크롤로 위치를 잡고, 지금 이불 안 칸만 현재 위치로 본다.
+    const blanketBody = view.querySelector('.fanpage-blanket-quilt.is-current .fanpage-blanket-body');
+    if (view.querySelector('.fanpage-blanket-stack')) {
+      const quilts = [...view.querySelectorAll('.fanpage-blanket-quilt')];
+      const index = Math.max(0, quilts.findIndex((q) => q.classList.contains('is-current')));
+      const inner = blanketBody && blanketBody.scrollHeight > blanketBody.clientHeight
+        ? blanketBody.scrollTop / (blanketBody.scrollHeight - blanketBody.clientHeight) : 0;
+      const progress = quilts.length ? Math.min(1, (index + inner) / quilts.length) : 0;
+      const travel = Math.max(0, scrubber.clientHeight - thumb.offsetHeight - 8);
+      thumb.style.transform = `translateY(${travel * progress}px)`;
+      scrubber.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
+      scrubber.setAttribute('aria-valuetext', `${Math.round(progress * 100)}% 내려옴`);
+      let activeIndex = -1;
+      sections.forEach((section, i) => {
+        const target = document.getElementById(section.id);
+        if (!target || !blanketBody?.contains(target)) return;
+        if (activeIndex < 0 || target.getBoundingClientRect().top <= window.innerHeight * 0.4) activeIndex = i;
+      });
+      navButtons.forEach((button, i) => {
+        button.classList.toggle('is-active', i === activeIndex);
+        if (i === activeIndex) button.setAttribute('aria-current', 'location'); else button.removeAttribute('aria-current');
+      });
+      return;
+    }
     const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     const progress = maxScroll ? Math.max(0, Math.min(1, window.scrollY / maxScroll)) : 0;
     const travel = Math.max(0, scrubber.clientHeight - thumb.offsetHeight - 8);
@@ -6860,6 +6893,9 @@ function createFanPageQuickRemote(view) {
   scrubber.addEventListener('keydown', handleScrubberKeydown);
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', onResize);
+  //  디자인 5: 이불 안 스크롤(바깥으로 전달 안 됨)과 이불이 넘어간 뒤에도 위치를 갱신한다.
+  document.addEventListener('scroll', scheduleUpdate, { passive: true, capture: true });
+  view.addEventListener('transitionend', scheduleUpdate);
   if (typeof ResizeObserver === 'function') {
     resizeObserver = new ResizeObserver(scheduleUpdate);
     resizeObserver.observe(view);
@@ -6871,6 +6907,8 @@ function createFanPageQuickRemote(view) {
   syncDeviceMode();
   return () => {
     window.removeEventListener('scroll', onScroll);
+    document.removeEventListener('scroll', scheduleUpdate, { capture: true });
+    view.removeEventListener('transitionend', scheduleUpdate);
     window.removeEventListener('resize', onResize);
     document.removeEventListener('fullscreenchange', syncFullscreenButton);
     document.removeEventListener('webkitfullscreenchange', syncFullscreenButton);

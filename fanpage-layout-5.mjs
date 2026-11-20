@@ -60,7 +60,10 @@ export function setupFanpageBlanket(view, { tabNav, head = [], panels, initialIn
     loadPerson();
     const W = window.innerWidth, H = window.innerHeight;
     const imgH = W * 1024 / 1536, hem = imgH * HEM;
-    coverTop = Math.round(H * CHIN[kind]);
+    //  위쪽 메뉴 바(모바일은 두 줄로 높다) 아래부터 장면을 그려 얼굴이 메뉴에 가리지 않게 한다.
+    const topOff = Math.max(0, Math.round(document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0));
+    scene.style.top = `${topOff}px`;
+    coverTop = topOff + Math.round((H - topOff) * CHIN[kind]);
     stack.style.setProperty('--quilt-hemoff', `${-hem}px`);
     stack.style.setProperty('--quilt-imgend', `${imgH - hem - 2}px`);
     stack.style.setProperty('--quilt-pad', '6px'); // 본문이 이불 윗단 바로 아래까지 올라오게
