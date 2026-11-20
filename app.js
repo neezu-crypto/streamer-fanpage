@@ -1099,6 +1099,7 @@ const ADMIN_DESIGN_USAGE_ROWS = [
   [2, '디자인 2 · 기존 팬페이지', ''],
   [3, '디자인 3 · 손그림 스티커북', '관리자 전용 · 미공개'],
   [4, '디자인 4 · 포토카드 바인더', ''],
+  [5, '디자인 5 · 이불 덮어주기', ''],
 ];
 //  디자인별 적용 스트리머 카드. 저장된 값이 없는 스트리머는 기본 디자인(1)으로 세되 "기본"으로 표시한다.
 function renderAdminDesignUsage(streamers) {
@@ -4859,7 +4860,7 @@ function renderOwnerChecklist(page, selectTab) {
 const DESIGN_PASS_PREVIEW_SECONDS = 60;
 const PAID_FANPAGE_LAYOUTS = [3, 4, 5];
 function isPaidLayout(layout) { return PAID_FANPAGE_LAYOUTS.includes(Number(layout)); }
-const DESIGN_PASS_LABELS = { 3: '디자인 3(손그림 스티커북)', 4: '디자인 4(포토카드 바인더)' };
+const DESIGN_PASS_LABELS = { 3: '디자인 3(손그림 스티커북)', 4: '디자인 4(포토카드 바인더)', 5: '디자인 5(이불 덮어주기)' };
 function designPassOwned(page, layout = 3) {
   return isAdminUser === true || page?.designPass?.[`layout${Number(layout)}`] === true;
 }
