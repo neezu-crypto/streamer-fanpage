@@ -28,7 +28,11 @@ const rawCallViewerStats = httpsCallable(functions, 'streamerFanPageViewerStats'
 // 2026-11-18 0시부터 고점체크 분석은 로그인 이용자만 쓸 수 있다. 서버가 로그인 필요로 거절하면
 // 로그인 창을 띄우고, 로그인을 마치면 같은 요청을 이어서 보낸다(창을 닫으면 원래 오류로 끝난다).
 function callViewerStats(payload) {
-  return rawCallViewerStats(payload).catch((error) => {
+  return rawCallViewerStats(payload).then((result) => {
+    // 2026-11-18부터 분석은 로그인 계정만 서버를 통과한다. 통과했으면 이 계정은 로그인 상태다.
+    if (auth.currentUser) markServerConfirmedLogin(auth.currentUser.uid);
+    return result;
+  }, (error) => {
     if (!(error && error.code === 'functions/unauthenticated' && error.details && error.details.loginRequired)) throw error;
     return new Promise((resolve, reject) => {
       let resumed = false;
@@ -96,9 +100,26 @@ function openLoginTab() {
 //  2026-11-20 Google·카카오 연결과 스트리머 인증은 익명 계정에 연결돼 UID가 그대로라 브라우저 계정은 계속 익명으로 보인다.
 //  팬페이지가 남긴 로그인 완료 표시(같은 UID)도 로그인으로 본다. 화면 판단용일 뿐이고 허용은 서버가 DB로 판정한다.
 const LOGIN_LINKED_UID_KEYS = ['streamerFanPage.loginLinkedUid', 'streamerFanPage.kakaoLinkedUid'];
+//  2026-11-21 로그인 완료 표시가 없는 브라우저(다른 탭·기기에서 연결, 저장소 정리 등)도 있어서,
+//  서버가 이번 접속에서 로그인 계정으로 받아 준 UID(무료 분석 성공·해금 상태 조회 성공)도 로그인으로 본다.
+const serverConfirmedLoginUids = new Set();
+function markServerConfirmedLogin(uid) {
+  if (!uid || serverConfirmedLoginUids.has(uid)) return;
+  serverConfirmedLoginUids.add(uid);
+  updateLoginButtons();
+}
+//  화면 판단만으로 로그인 안내를 띄우기 전에 서버에 한 번 물어본다(해금 상태 조회는 로그인 계정만 성공한다).
+async function confirmLoggedIn() {
+  await getAuthReady();
+  if (isLoggedIn()) return true;
+  if (!auth.currentUser) return false;
+  await refreshUnlockAccess({ quiet: true });
+  return isLoggedIn();
+}
 function isLoggedIn(user = auth.currentUser) {
   if (!user) return false;
   if (!user.isAnonymous) return true;
+  if (serverConfirmedLoginUids.has(user.uid)) return true;
   try { return LOGIN_LINKED_UID_KEYS.some((key) => localStorage.getItem(key) === user.uid); } catch (_) { return false; }
 }
 function updateLoginButtons() {
@@ -311,8 +332,7 @@ $('viewerBugForm').addEventListener('submit', async (event) => {
   setBugStatus('submitting', '제보를 보내는 중이에요…');
   $('viewerBugForm').setAttribute('aria-busy', 'true');
   try {
-    await getAuthReady();
-    if (!isLoggedIn()) {
+    if (!await confirmLoggedIn()) {
       throw Object.assign(new Error('버그 제보는 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요.'), { code: 'functions/unauthenticated' });
     }
     const key = viewerBugPendingKey();
@@ -813,8 +833,7 @@ function openPaidFeature(featureId) {
 }
 
 async function openUnlockDialog(featureId) {
-  await getAuthReady();
-  if (!isLoggedIn()) {
+  if (!await confirmLoggedIn()) {
     $('viewerPaidStatus').textContent = '유료 기능 해금은 일반 로그인 또는 인증 스트리머 계정에서 이용할 수 있어요. 로그인 버튼을 눌러 주세요.';
     return;
   }
@@ -835,8 +854,7 @@ async function openUnlockDialog(featureId) {
 }
 
 async function canViewPaidResult(featureId, setStatus, resume) {
-  await getAuthReady();
-  if (!isLoggedIn()) {
+  if (!await confirmLoggedIn()) {
     setStatus('분석 조건이 준비됐어요. 결과를 보려면 로그인이 필요해요. 로그인하면 결과 확인을 이어갑니다.', true);
     askLoginForResult(resume);
     return false;
@@ -870,20 +888,24 @@ function unlockIdentity() {
   return user ? `${user.uid}:${isLoggedIn(user)}` : '';
 }
 
-async function refreshUnlockAccess() {
+async function refreshUnlockAccess({ quiet = false } = {}) {
   try {
     await getAuthReady();
+    const requestedUid = auth.currentUser?.uid || '';
     const requestedIdentity = unlockIdentity();
     const data = (await callViewerUnlocks({ action: 'access' })).data || {};
     // 응답을 기다리는 사이 계정이 바뀌었으면 이전 계정의 해금 상태를 반영하지 않는다.
-    if (requestedIdentity !== unlockIdentity()) return false;
+    if (requestedUid !== (auth.currentUser?.uid || '')) return false;
+    // 해금 상태 조회는 로그인 계정만 성공하므로, 성공했으면 로그인으로 기억한다.
+    markServerConfirmedLogin(requestedUid);
+    if (requestedIdentity !== unlockIdentity() && !serverConfirmedLoginUids.has(requestedUid)) return false;
     unlockState.loaded = true; unlockState.isAdmin = data.isAdmin === true;
     unlockState.features = { ...unlockState.features, ...(data.features || {}) };
     unlockState.prices = { ...unlockState.prices, ...(data.prices || {}) };
     unlockState.balanceCash = Math.max(0, Number(data.balanceCash) || 0);
     renderSubscriptionControls(); renderPaidFeatures(); updateAffiliateVisibility(); return true;
   } catch (error) {
-    $('viewerPaidStatus').textContent = viewerStatsErrorMessage(error, '해금 상태를 확인하지 못했습니다.');
+    if (!quiet) $('viewerPaidStatus').textContent = viewerStatsErrorMessage(error, '해금 상태를 확인하지 못했습니다.');
     renderPaidFeatures();
     updateAffiliateVisibility();
     return false;
