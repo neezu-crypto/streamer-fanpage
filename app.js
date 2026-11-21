@@ -8982,6 +8982,9 @@ function renderCommentUpSection(page) {
         check.title = '원본 게시글의 전체 댓글을 다시 확인해요(로그인 필요)'; check.dataset.fanLoginLabel = '새로고침';
         const resultText = document.createElement('div'); resultText.setAttribute('role', 'status');
         const gauges = document.createElement('div'); gauges.className = 'comment-up-gauges';
+        //  UP 누르러 가기: SOOP 게시글 주소 끝에 #comment_noti{댓글 번호}를 붙이면 그 댓글이 강조돼 열린다
+        const goUp = document.createElement('a'); goUp.className = 'button button-primary comment-up-go'; goUp.target = '_blank'; goUp.rel = 'noopener noreferrer';
+        goUp.textContent = 'UP 누르러 가기 ↗'; goUp.title = 'SOOP 게시글에서 이 스트리머 댓글을 강조해 새 창으로 열어요'; goUp.hidden = true;
         let lastComments = null; const prev = {};
         //  게이지는 UP이 가장 많은 스트리머 댓글 하나 기준, 나머지 댓글은 글자 줄
         function renderResult() {
@@ -8990,6 +8993,8 @@ function renderCommentUpSection(page) {
           const hasGoal = entry.goalRank || entry.goalUp;
           if (comments && !comments.length) resultText.textContent = '이 스트리머가 작성한 댓글을 찾지 못했어요.';
           const best = comments?.[0];
+          goUp.hidden = !(best && /^\d{1,20}$/.test(String(best.id || '')));
+          if (!goUp.hidden) goUp.href = `${String(entry.url).split('#')[0]}#comment_noti${best.id}`;
           if (hasGoal && comments) {
             if (entry.goalUp) gauges.append(renderCommentUpGauge('up', best, entry.goalUp, prev));
             if (entry.goalRank) gauges.append(renderCommentUpGauge('rank', best, entry.goalRank, prev));
@@ -9014,7 +9019,7 @@ function renderCommentUpSection(page) {
           } catch (error) { resultText.textContent = error.message || '댓글을 확인하지 못했어요.'; }
           finally { check.disabled = false; }
         });
-        card.append(link, check, gauges, resultText);
+        card.append(link, check, goUp, gauges, resultText);
         if (uiCan(result.canManage)) {
           const goalButton = document.createElement('button'); goalButton.type = 'button'; goalButton.className = 'button'; goalButton.textContent = '목표 수정';
           const goalForm = document.createElement('form'); goalForm.className = 'comment-up-goal-form'; goalForm.hidden = true;
