@@ -183,7 +183,7 @@ async function main() {
   }
 
   if (demo) {
-    const live = { nickname: '체험 몽실이', color: 'cream', condition: 'ok', bands: { full: 'good', mood: 'good', clean: 'mid', fatigue: 'good', health: 'good' }, sleeping: false, hospitalUntil: 0, gems: 12, gemMax: 60, recent: {}, commentUp: { checkedAt: Date.now() - 12 * 60000, found: true, up: 120, rank: 3, total: 245 } };
+    const live = { nickname: '체험 몽실이', color: 'cream', condition: 'ok', bands: { full: 'good', mood: 'good', clean: 'mid', fatigue: 'good', health: 'good' }, sleeping: false, hospitalUntil: 0, gems: 12, gemMax: 60, recent: {}, commentUp: { checkedAt: Date.now() - 12 * 60000, found: true, up: 120, rank: 3, total: 245, qr: { url: 'https://www.sooplive.com/station/demo/post/1#comment_noti1', size: 'm' } } };
     render(live);
     const kinds = ['bath', 'gem', 'play', 'feed', 'pet', 'groom', 'talk', 'sing', 'dance', 'cheer'];
     let i = 0;
