@@ -8976,7 +8976,7 @@ function renderCommentUpSection(page) {
       const overlayPanel = uiCan(result.canManage) && result.overlay && entries.length ? renderCommentUpOverlayPanel(page, entries, result.overlay) : null;
       if (overlayPanel) list.append(overlayPanel);
       for (const entry of entries) {
-        const card = document.createElement('article'); card.className = 'comment-up-card';
+        const card = document.createElement('article'); card.className = 'comment-up-card'; card.dataset.order = String(entries.indexOf(entry));
         //  카드 정리(2026-11-22): 제목 줄(링크·새로고침·관리 메뉴) → 큰 숫자 2개 → 목표 게이지 → UP 누르러 가기
         const stationOf = () => { try { return new URL(entry.url).pathname.split('/')[2] || ''; } catch (_) { return ''; } };
         const fallbackTitle = (visibility) => `${visibility === 'fan' ? '애청자 게시글' : '게시글'}${stationOf() ? ` · ${stationOf()}` : ''}`;
@@ -9009,6 +9009,13 @@ function renderCommentUpSection(page) {
             if (entry.goalUp) gauges.append(renderCommentUpGauge('up', best, entry.goalUp, prev));
             if (entry.goalRank) gauges.append(renderCommentUpGauge('rank', best, entry.goalRank, prev));
           }
+          //  목표를 정했고 모두 달성했으면 카드 전체를 강조
+          const achieved = !!best && !!(entry.goalUp || entry.goalRank) && (!entry.goalUp || best.likes >= entry.goalUp) && (!entry.goalRank || best.rank <= entry.goalRank);
+          card.classList.toggle('is-achieved', achieved);
+          //  미달성 카드를 위로(같은 묶음 안에서는 등록 순서 유지, 방송 오버레이 칸은 맨 위 그대로)
+          const cards = [...list.querySelectorAll(':scope > .comment-up-card')];
+          cards.sort((a, b) => Number(a.classList.contains('is-achieved')) - Number(b.classList.contains('is-achieved')) || Number(a.dataset.order) - Number(b.dataset.order));
+          if (cards.some((c, i) => list.querySelectorAll(':scope > .comment-up-card')[i] !== c)) list.append(...cards);
           others.hidden = !comments || comments.length < 2;
           if (!others.hidden) {
             const summary = document.createElement('summary'); summary.textContent = `그 밖의 내 댓글 ${comments.length - 1}개`; summary.title = '다른 스트리머 댓글의 UP과 순위 펼치기';

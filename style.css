@@ -2260,3 +2260,7 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .comment-up-card a.comment-up-go{display:flex;margin:auto 0 0;width:100%;min-height:44px}
 .comment-up-card .comment-up-goal-form{margin:0}
 @media (prefers-reduced-motion:reduce){.comment-up-icon.is-busy{animation:none;opacity:.4}}
+/* 댓글 UP 체크: 목표를 모두 달성한 카드 강조(2026-11-22) */
+.comment-up-card.is-achieved{border-color:color-mix(in srgb,#e0a72e 70%,transparent);background:linear-gradient(160deg,color-mix(in srgb,#ffd66b 22%,transparent),transparent 70%);box-shadow:0 0 0 1px color-mix(in srgb,#e0a72e 35%,transparent)}
+.comment-up-card.is-achieved .comment-up-stat{background:color-mix(in srgb,#ffd66b 26%,transparent)}
+.comment-up-card.is-achieved .comment-up-gauge-badge{background:#e0a72e}
