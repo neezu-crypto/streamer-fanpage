@@ -22,3 +22,23 @@ export function qrCanvas(text, scale = 10) {
   for (let y = 0; y < n; y += 1) for (let x = 0; x < n; x += 1) if (qr.isDark(y, x)) ctx.fillRect((x + pad) * scale, (y + pad) * scale, scale, scale);
   return canvas;
 }
+
+// PNG 저장용 카드(2026-11-22): 위·아래 문구(선택)를 QR과 함께 그린다. 글자는 넘치면 줄여서 한 줄에 맞춘다.
+export function qrCard(text, { top = '', bottom = '', font = 'sans-serif' } = {}) {
+  const qr = qrCanvas(text, 10); const W = qr.width + 80; const pad = 40;
+  const lines = [String(top).trim(), String(bottom).trim()];
+  const topH = lines[0] ? 70 : 0; const bottomH = lines[1] ? 70 : 0;
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = pad + topH + qr.height + bottomH + pad;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(qr, 40, pad + topH);
+  const write = (value, y, weight) => {
+    if (!value) return;
+    let size = 40; ctx.font = `${weight} ${size}px ${font}`;
+    while (size > 16 && ctx.measureText(value).width > W - 60) { size -= 2; ctx.font = `${weight} ${size}px ${font}`; }
+    ctx.fillStyle = '#1d1d1f'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(value, W / 2, y);
+  };
+  write(lines[0], pad + topH / 2, 800);
+  write(lines[1], pad + topH + qr.height + bottomH / 2, 700);
+  return canvas;
+}

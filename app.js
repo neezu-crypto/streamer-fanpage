@@ -8909,7 +8909,7 @@ function renderCommentUpGauge(kind, comment, goal, prev) {
 
 // 댓글 QR(2026-11-22): 하이라이트 링크 QR 보기·저장·복사, 방송 주인은 오버레이에 고정 댓글 QR 띄우기
 async function openCommentUpQrDialog({ page, entry, comments, overlayPanel, onChange }) {
-  const { qrSvg, qrCanvas } = await import('./comment-up-qr.mjs?v=20261122-qr1');
+  const { qrSvg, qrCard } = await import('./comment-up-qr.mjs?v=20261122-qr2');
   const base = String(entry.url).split('#')[0];
   const linkOf = (no) => `${base}#comment_noti${no}`;
   const state = overlayPanel?._state() || { id: '', qr: null };
@@ -8936,9 +8936,7 @@ async function openCommentUpQrDialog({ page, entry, comments, overlayPanel, onCh
   card.append(head, pickWrap, box, linkText, tools);
   const draw = () => { box.replaceChildren(qrSvg(linkOf(commentNo), { title: '댓글 하이라이트 링크 QR 코드' })); linkText.textContent = linkOf(commentNo); };
   pick.addEventListener('change', () => { commentNo = pick.value; draw(); renderOverlay(); });
-  save.addEventListener('click', () => {
-    const a = document.createElement('a'); a.href = qrCanvas(linkOf(commentNo), 10).toDataURL('image/png'); a.download = `comment-qr-${commentNo}.png`; a.click();
-  });
+  save.addEventListener('click', () => openCommentUpQrSaveDialog({ link: linkOf(commentNo), commentNo, qrCard, streamerName: page.streamer.nickname || page.streamer.name || '' }));
   copy.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(linkOf(commentNo)); status.textContent = '링크를 복사했어요.'; } catch (_) { status.textContent = '복사하지 못했어요. 링크를 길게 눌러 복사해 주세요.'; }
   });
@@ -8982,6 +8980,39 @@ async function openCommentUpQrDialog({ page, entry, comments, overlayPanel, onCh
   dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   dialog.addEventListener('close', () => dialog.remove());
   draw(); dialog.showModal();
+}
+
+// QR PNG 저장 창(2026-11-22): 위·아래 문구를 직접 적고 미리보기를 보면서 내려받는다(문구는 저장하지 않음)
+function openCommentUpQrSaveDialog({ link, commentNo, qrCard, streamerName }) {
+  const dialog = document.createElement('dialog'); dialog.className = 'comment-up-qr-dialog comment-up-qr-save'; dialog.setAttribute('aria-label', 'QR 이미지 저장');
+  const card = document.createElement('div'); card.className = 'comment-up-qr-card';
+  const head = document.createElement('div'); head.className = 'comment-up-qr-head';
+  const h = document.createElement('h3'); h.textContent = 'QR 이미지 저장';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'comment-up-icon'; close.textContent = '×'; close.title = '닫기'; close.setAttribute('aria-label', '저장 창 닫기');
+  head.append(h, close);
+  const field = (label, value, placeholder) => {
+    const wrap = document.createElement('label'); wrap.className = 'comment-up-qr-field';
+    const input = document.createElement('input'); input.type = 'text'; input.maxLength = 40; input.value = value; input.placeholder = placeholder; input.autocomplete = 'off';
+    wrap.append(label, input); return [wrap, input];
+  };
+  const [topWrap, topInput] = field('위 문구 (선택)', streamerName ? `${streamerName} 댓글 UP 부탁해요!` : '', '예: 댓글 UP 부탁해요!');
+  const [bottomWrap, bottomInput] = field('아래 문구 (선택)', '📱 찍고 UP 눌러 주세요!', '예: 찍고 UP 눌러 주세요!');
+  const preview = document.createElement('div'); preview.className = 'comment-up-qr-preview'; preview.setAttribute('aria-label', '저장될 이미지 미리보기');
+  const tools = document.createElement('div'); tools.className = 'comment-up-qr-tools';
+  const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 다운로드'; download.title = '미리보기 그대로 PNG 파일로 저장해요';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소'; cancel.title = '저장하지 않고 닫기';
+  tools.append(cancel, download);
+  card.append(head, topWrap, bottomWrap, preview, tools);
+  const font = getComputedStyle(document.body).fontFamily || 'sans-serif';
+  let canvas = null;
+  const draw = () => { canvas = qrCard(link, { top: topInput.value, bottom: bottomInput.value, font }); preview.replaceChildren(canvas); };
+  topInput.addEventListener('input', draw); bottomInput.addEventListener('input', draw);
+  download.addEventListener('click', () => { const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = `comment-qr-${commentNo}.png`; a.click(); dialog.close(); });
+  close.addEventListener('click', () => dialog.close()); cancel.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.append(card); document.body.append(dialog);
+  draw(); dialog.showModal(); topInput.focus();
 }
 
 // 댓글 UP 체크 → 다마고치 방송 오버레이 표시(게시글 하나, 순위·UP 선택). 오버레이 값은 이 화면에서 새로고침할 때만 바뀐다.

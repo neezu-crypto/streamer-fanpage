@@ -2281,3 +2281,7 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .comment-up-qr-tools select{padding:8px;border:1px solid #cbbdcc;border-radius:10px;background:#fff;color:inherit}
 .comment-up-qr-overlay{display:grid;gap:8px;margin:0;padding:12px;border:1px dashed #d9cad6;border-radius:14px}.comment-up-qr-overlay legend{padding:0 6px;font-weight:700;font-size:14px}
 .comment-up-qr-status{margin:0;font-size:13px;line-height:1.5;opacity:.85;text-align:center}.comment-up-qr-status:empty{display:none}
+.comment-up-qr-field{display:grid;gap:4px;font-size:13px;font-weight:700}
+.comment-up-qr-field input{padding:10px 12px;border:1px solid #cbbdcc;border-radius:10px;background:#fff;color:#302735;font:inherit;font-size:16px;font-weight:400}
+.comment-up-qr-preview{justify-self:center;width:min(260px,70vw);padding:6px;border:1px solid #e6dbe3;border-radius:12px;background:#f7f3f6}
+.comment-up-qr-preview canvas{display:block;width:100%;height:auto;border-radius:6px}
