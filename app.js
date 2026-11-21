@@ -4812,11 +4812,15 @@ function fanpageTabTourSteps(page, tabKey) {
     ] };
   }
   if (tabKey === 'comment-up' && page.isOwner) {
-    return { id: 'comment-up:owner', steps: [
+    //  2026-11-22: 카드 정리·UP 누르러 가기·QR·관리 메뉴 반영(아이디를 바꿔 이미 본 스트리머에게도 한 번 더 보여 줌)
+    return { id: 'comment-up:owner-v2', steps: [
       { target: q('.comment-up-form input[type="url"]'), text: 'SOOP 방송국 게시글 주소를 복사해 여기에 붙여 넣어요. 공개·애청자 공개 게시글만 확인할 수 있어요.' },
       { target: q('.comment-up-form .comment-up-goal-input'), text: '목표 등수나 UP 수를 적으면 게이지로 얼마나 남았는지 보여 줘요. 비워 둬도 돼요.' },
       { target: q('.comment-up-form button[type="submit"]'), text: '"게시글 추가"를 누르면 그 글에 내가 남긴 댓글의 UP과 순위를 자동으로 찾아요.' },
-      { target: q('.comment-up-list'), optional: true, text: '등록한 게시글은 여기 쌓이고, "새로고침"으로 최신 순위를 다시 확인해요.' },
+      { target: q('.comment-up-list'), optional: true, text: '등록한 게시글은 카드로 쌓여요. 아직 목표를 못 채운 글이 위에, 목표를 달성한 글은 금색으로 아래에 놓여요.' },
+      { target: q('.comment-up-card .comment-up-icon'), optional: true, text: '↻를 누르면 최신 UP과 순위를 다시 확인해요. 옆 ⋯ 메뉴에서 목표 수정과 삭제를 할 수 있어요.' },
+      { target: q('.comment-up-card .comment-up-go'), optional: true, text: '"UP 누르러 가기"는 SOOP 게시글을 열고 내 댓글을 강조해서 바로 보여 줘요.' },
+      { target: q('.comment-up-card .comment-up-qr-open'), optional: true, text: '"QR코드 생성"으로 내 댓글 링크를 QR로 만들어요. 문구를 넣어 PNG로 저장하거나, 다마고치가 있으면 방송 오버레이에 띄울 수 있어요.' },
     ] };
   }
   return null;
