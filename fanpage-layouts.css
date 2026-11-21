@@ -2097,7 +2097,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .rolling-paper-en
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-heading>p:last-child{color:#81758b}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid{grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);gap:20px}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.content-card,.live-section,.messenger-link-section,.fan-character-ogq-pair){min-width:0;margin:0}
-#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section,.rolling-paper-section,.memory-moments-section){grid-column:1/-1}
+#fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>:is(.fan-character-ogq-pair,.vod-section,.fan-gallery-section,.competition-history-section,.rolling-paper-section,.memory-moments-section,.comment-up-section){grid-column:1/-1}
 #fanPageView.fanpage-layout-1 .fanpage-tab-panel-grid>.video-library-section{grid-column:1/-1;min-width:0;margin:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-columns{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);align-items:start;gap:20px;min-width:0}
 #fanPageView.fanpage-layout-1 .fanpage-tab-column{display:grid;align-content:start;gap:20px;min-width:0}

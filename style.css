@@ -2232,3 +2232,31 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .memory-picker-search-form .memory-picker-search{flex:1 1 auto;min-width:0}
 .memory-add-panel .memory-picker-search-form .button{flex:none;width:auto}
 .memory-picker-count{opacity:.7;font-size:12px}
+/* 댓글 UP 체크: 카드 칸이 넓으면 게시글 카드를 2열로(2026-11-22) */
+.comment-up-section{container-type:inline-size}
+@container (min-width:860px){.comment-up-list{grid-template-columns:repeat(2,minmax(0,1fr))}.comment-up-list>.comment-up-overlay{grid-column:1/-1}}
+/* 댓글 UP 체크 카드 정리(2026-11-22): 제목 줄 → 큰 숫자 → 게이지 → UP 누르러 가기 */
+.comment-up-card{display:flex;flex-direction:column;gap:12px;padding:16px 16px 14px}
+.comment-up-card-head{display:flex;align-items:flex-start;gap:6px}
+.comment-up-card a.comment-up-title{flex:1;min-width:0;margin:0;color:inherit;font-weight:700;line-height:1.45;text-decoration:none;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.comment-up-card a.comment-up-title:hover{text-decoration:underline;text-underline-offset:3px}
+.comment-up-icon{flex:0 0 auto;display:inline-grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:10px;background:transparent;color:inherit;font-size:18px;line-height:1;cursor:pointer;list-style:none;opacity:.7}
+.comment-up-icon::-webkit-details-marker{display:none}
+.comment-up-icon:hover,.comment-up-menu[open]>.comment-up-icon{opacity:1;background:color-mix(in srgb,var(--cu-accent) 14%,transparent)}
+.comment-up-icon.is-busy{animation:cu-spin 1s linear infinite}@keyframes cu-spin{to{transform:rotate(360deg)}}
+.comment-up-menu{position:relative}
+.comment-up-menu-box{position:absolute;right:0;top:40px;z-index:5;display:grid;min-width:120px;padding:6px;border:1px solid #d9cad6;border-radius:12px;background:#fff;box-shadow:0 10px 28px #0002}
+.comment-up-menu-box button{padding:9px 12px;border:0;border-radius:8px;background:none;color:#302735;text-align:left;font-size:13px;cursor:pointer}
+.comment-up-menu-box button:hover{background:color-mix(in srgb,var(--cu-accent) 12%,transparent)}
+.comment-up-menu-box .is-danger{color:#c0262d}
+.comment-up-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.comment-up-stats:empty{display:none}
+.comment-up-stat{display:grid;gap:2px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--cu-accent) 9%,transparent)}
+.comment-up-stat strong{font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--cu-accent-2)}
+.comment-up-stat small{font-size:12px;opacity:.75}
+.comment-up-card .comment-up-gauges{margin:0}.comment-up-gauges:empty,.comment-up-note:empty{display:none}
+.comment-up-note{font-size:13px;opacity:.8}
+.comment-up-others{font-size:13px}.comment-up-others summary{cursor:pointer;opacity:.75}.comment-up-others p{margin:6px 0 0}
+.comment-up-card a.comment-up-go{display:flex;margin:auto 0 0;width:100%;min-height:44px}
+.comment-up-card .comment-up-goal-form{margin:0}
+@media (prefers-reduced-motion:reduce){.comment-up-icon.is-busy{animation:none;opacity:.4}}
