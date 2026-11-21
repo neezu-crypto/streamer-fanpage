@@ -5045,7 +5045,7 @@ function openDesignPassPurchaseDialog(page, { onPurchased, layout = 3, gift = fa
   balance.textContent = '통합 캐시 잔액을 확인하고 있어요.';
   const notice = document.createElement('p');
   notice.className = 'design-pass-notice';
-  notice.textContent = '구매 즉시 적용되며 일반 취소·환불은 되지 않아요. 결제 오류나 이중 차감은 자동으로 환불돼요. 통합 캐시는 별풍선 1개 = 1캐시예요.';
+  notice.textContent = '구매 즉시 적용되며 일반 취소·환불은 되지 않아요. 결제 오류나 이중 차감은 자동으로 환불돼요. 통합 캐시는 100원 = 1캐시예요.';
   const actions = document.createElement('div');
   actions.className = 'design-pass-actions';
   const cancel = document.createElement('button');
