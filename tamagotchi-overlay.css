@@ -39,3 +39,10 @@ html, body.tgo-body { margin: 0; background: transparent !important; overflow: h
 .tgo.pos-bl .tgo-stage:not(.tg-stage), .tgo.pos-br .tgo-stage:not(.tg-stage) { padding-top: calc(var(--size) * .2); }
 .tgo.pos-bl .tgo-stage:not(.tg-stage) .tgo-bubble, .tgo.pos-br .tgo-stage:not(.tg-stage) .tgo-bubble { top: 0; transform: translate(-50%, -6px); }
 .tgo.pos-bl .tgo-stage:not(.tg-stage) .tgo-bubble.is-on, .tgo.pos-br .tgo-stage:not(.tg-stage) .tgo-bubble.is-on { transform: translate(-50%, 0); }
+/* 댓글 QR(2026-11-22) */
+.tgo-qr { display: grid; justify-items: center; gap: 4px; padding: 6px; border-radius: 12px; background: #1b1924cc; }
+.tgo-qr[hidden] { display: none; }
+.tgo-qr svg { display: block; width: 130px; height: 130px; border-radius: 6px; }
+.tgo-qr[data-size="s"] svg { width: 100px; height: 100px; }
+.tgo-qr[data-size="l"] svg { width: 180px; height: 180px; }
+.tgo-qr-text { color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; }

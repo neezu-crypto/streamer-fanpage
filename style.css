@@ -2264,3 +2264,20 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .comment-up-card.is-achieved{border-color:color-mix(in srgb,#e0a72e 70%,transparent);background:linear-gradient(160deg,color-mix(in srgb,#ffd66b 22%,transparent),transparent 70%);box-shadow:0 0 0 1px color-mix(in srgb,#e0a72e 35%,transparent)}
 .comment-up-card.is-achieved .comment-up-stat{background:color-mix(in srgb,#ffd66b 26%,transparent)}
 .comment-up-card.is-achieved .comment-up-gauge-badge{background:#e0a72e}
+/* 댓글 UP QR(2026-11-22) */
+.comment-up-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:auto}
+.comment-up-actions[hidden]{display:none}
+.comment-up-card .comment-up-actions a.comment-up-go{margin:0}
+.comment-up-qr-open{min-height:44px;white-space:nowrap}
+.comment-up-qr-note{margin:0;font-size:13px;opacity:.85}.comment-up-qr-note.is-warn{color:#b4541a;opacity:1}
+.comment-up-qr-dialog{width:min(420px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:0;border:1px solid #d9cad6;border-radius:18px;background:#fff;color:#302735;box-shadow:0 18px 50px #0004}
+.comment-up-qr-dialog::backdrop{background:#0006}
+.comment-up-qr-card{display:grid;gap:12px;padding:18px;overflow:auto}
+.comment-up-qr-head{display:flex;align-items:center;justify-content:space-between}.comment-up-qr-head h3{margin:0;font-size:18px}
+.comment-up-qr-pick{display:flex;align-items:center;gap:8px;font-size:13px}.comment-up-qr-pick[hidden]{display:none}.comment-up-qr-pick select{flex:1;min-width:0;padding:8px;border:1px solid #cbbdcc;border-radius:10px;background:#fff;color:inherit}
+.comment-up-qr-box{justify-self:center;width:min(240px,70vw);aspect-ratio:1}.comment-up-qr-box svg{display:block;width:100%;height:100%}
+.comment-up-qr-link{margin:0;font-size:12px;opacity:.7;overflow-wrap:anywhere;text-align:center}
+.comment-up-qr-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
+.comment-up-qr-tools select{padding:8px;border:1px solid #cbbdcc;border-radius:10px;background:#fff;color:inherit}
+.comment-up-qr-overlay{display:grid;gap:8px;margin:0;padding:12px;border:1px dashed #d9cad6;border-radius:14px}.comment-up-qr-overlay legend{padding:0 6px;font-weight:700;font-size:14px}
+.comment-up-qr-status{margin:0;font-size:13px;line-height:1.5;opacity:.85;text-align:center}.comment-up-qr-status:empty{display:none}

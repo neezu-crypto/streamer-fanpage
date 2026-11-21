@@ -8907,6 +8907,83 @@ function renderCommentUpGauge(kind, comment, goal, prev) {
   return wrap;
 }
 
+// 댓글 QR(2026-11-22): 하이라이트 링크 QR 보기·저장·복사, 방송 주인은 오버레이에 고정 댓글 QR 띄우기
+async function openCommentUpQrDialog({ page, entry, comments, overlayPanel, onChange }) {
+  const { qrSvg, qrCanvas } = await import('./comment-up-qr.mjs?v=20261122-qr1');
+  const base = String(entry.url).split('#')[0];
+  const linkOf = (no) => `${base}#comment_noti${no}`;
+  const state = overlayPanel?._state() || { id: '', qr: null };
+  const pinnedHere = state.id === entry.id && state.qr && !state.qr.missing ? state.qr : null;
+  let commentNo = pinnedHere && comments.some(c => c.id === pinnedHere.commentNo) ? pinnedHere.commentNo : comments[0]?.id;
+  if (!commentNo) return;
+  const dialog = document.createElement('dialog'); dialog.className = 'comment-up-qr-dialog'; dialog.setAttribute('aria-label', '댓글 QR 코드');
+  const card = document.createElement('div'); card.className = 'comment-up-qr-card';
+  const head = document.createElement('div'); head.className = 'comment-up-qr-head';
+  const h = document.createElement('h3'); h.textContent = '댓글 QR 코드';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'comment-up-icon'; close.textContent = '×'; close.title = '닫기'; close.setAttribute('aria-label', 'QR 창 닫기');
+  head.append(h, close);
+  const pickWrap = document.createElement('label'); pickWrap.className = 'comment-up-qr-pick'; pickWrap.hidden = comments.length < 2;
+  const pick = document.createElement('select'); pick.title = 'QR로 만들 내 댓글 고르기';
+  comments.forEach((c, i) => { const o = document.createElement('option'); o.value = c.id; o.textContent = `${i === 0 ? '★ ' : ''}UP ${c.likes} · 공동 ${c.rank}위 댓글`; pick.append(o); });
+  pick.value = commentNo; pickWrap.append('댓글 고르기 ', pick);
+  const box = document.createElement('div'); box.className = 'comment-up-qr-box';
+  const linkText = document.createElement('p'); linkText.className = 'comment-up-qr-link';
+  const tools = document.createElement('div'); tools.className = 'comment-up-qr-tools';
+  const save = document.createElement('button'); save.type = 'button'; save.className = 'button'; save.textContent = 'PNG 저장'; save.title = 'QR 코드를 그림 파일로 저장해요';
+  const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'button'; copy.textContent = '링크 복사'; copy.title = '하이라이트 링크를 복사해요';
+  const status = document.createElement('p'); status.className = 'comment-up-qr-status'; status.setAttribute('role', 'status');
+  tools.append(save, copy);
+  card.append(head, pickWrap, box, linkText, tools);
+  const draw = () => { box.replaceChildren(qrSvg(linkOf(commentNo), { title: '댓글 하이라이트 링크 QR 코드' })); linkText.textContent = linkOf(commentNo); };
+  pick.addEventListener('change', () => { commentNo = pick.value; draw(); renderOverlay(); });
+  save.addEventListener('click', () => {
+    const a = document.createElement('a'); a.href = qrCanvas(linkOf(commentNo), 10).toDataURL('image/png'); a.download = `comment-qr-${commentNo}.png`; a.click();
+  });
+  copy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(linkOf(commentNo)); status.textContent = '링크를 복사했어요.'; } catch (_) { status.textContent = '복사하지 못했어요. 링크를 길게 눌러 복사해 주세요.'; }
+  });
+  //  방송 오버레이(방송 주인 + 다마고치 분양 시에만 패널이 있다)
+  const ov = document.createElement('fieldset'); ov.className = 'comment-up-qr-overlay';
+  const legend = document.createElement('legend'); legend.textContent = '📺 방송 오버레이';
+  const sizeLabel = document.createElement('label'); const size = document.createElement('select'); size.title = '오버레이에 보일 QR 크기';
+  [['s', '작게'], ['m', '보통'], ['l', '크게']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; size.append(o); });
+  size.value = pinnedHere?.size || 'm'; sizeLabel.append('크기 ', size);
+  const on = document.createElement('button'); on.type = 'button'; on.className = 'button button-primary';
+  const off = document.createElement('button'); off.type = 'button'; off.className = 'button'; off.textContent = '오버레이에서 내리기'; off.title = '방송 오버레이에서 QR을 내려요';
+  const ovNote = document.createElement('p'); ovNote.className = 'comment-up-qr-status';
+  const ovRow = document.createElement('div'); ovRow.className = 'comment-up-qr-tools'; ovRow.append(sizeLabel, on, off);
+  ov.append(legend, ovRow, ovNote);
+  function renderOverlay() {
+    const cur = overlayPanel._state();
+    const live = cur.id === entry.id && cur.qr && !cur.qr.missing ? cur.qr : null;
+    const sameComment = live && live.commentNo === commentNo;
+    on.textContent = live ? (sameComment ? 'QR 크기 바꾸기' : '이 댓글로 바꿔 띄우기') : '오버레이에 띄우기';
+    on.title = '고른 댓글로 고정한 QR을 방송 오버레이에 띄워요';
+    off.hidden = !(cur.id === entry.id && cur.qr);
+    ovNote.textContent = live ? (sameComment ? '지금 이 댓글 QR을 띄우고 있어요. 댓글이 지워지면 다음 새로고침 때 자동으로 내려가요.' : '지금은 다른 댓글 QR을 띄우고 있어요.')
+      : cur.id && cur.id !== entry.id ? '지금 오버레이는 다른 게시글을 보여 주고 있어요. 띄우면 이 게시글로 바뀌어요(순위·UP 표시 설정은 그대로).'
+      : 'QR은 고른 댓글로 고정돼요. UP 순위가 바뀌어도 QR은 그대로예요.';
+  }
+  const send = async (payload, button) => {
+    on.disabled = off.disabled = true; ovNote.textContent = '저장하고 있어요. 댓글을 확인하는 데 몇 초 걸릴 수 있어요.';
+    try {
+      const saved = (await callCommentUp({ action: 'qr', streamerId: page.streamer.id, id: entry.id, ...payload })).data.overlay;
+      overlayPanel._apply(saved); onChange?.(saved.id === entry.id ? saved.qr || null : null); renderOverlay();
+    } catch (error) { ovNote.textContent = error.message || '저장하지 못했어요.'; }
+    finally { on.disabled = off.disabled = false; button.focus(); }
+  };
+  on.addEventListener('click', () => send({ on: true, commentNo, size: size.value }, on));
+  off.addEventListener('click', () => send({ on: false }, off));
+  if (overlayPanel) { card.append(ov); renderOverlay(); }
+  else if (page.canManage) { const tip = document.createElement('p'); tip.className = 'comment-up-qr-status'; tip.textContent = '다마고치를 분양받으면 이 QR을 방송 오버레이에 띄울 수 있어요.'; card.append(tip); }
+  card.append(status);
+  dialog.append(card); document.body.append(dialog);
+  close.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  dialog.addEventListener('close', () => dialog.remove());
+  draw(); dialog.showModal();
+}
+
 // 댓글 UP 체크 → 다마고치 방송 오버레이 표시(게시글 하나, 순위·UP 선택). 오버레이 값은 이 화면에서 새로고침할 때만 바뀐다.
 function renderCommentUpOverlayPanel(page, entries, overlay) {
   const panel = document.createElement('form'); panel.className = 'comment-up-overlay';
@@ -8928,26 +9005,35 @@ function renderCommentUpOverlayPanel(page, entries, overlay) {
   const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary'; save.textContent = '저장';
   const note = document.createElement('p'); note.className = 'comment-up-overlay-note'; note.setAttribute('role', 'status');
   let checkedAt = Number(overlay.checkedAt) || 0;
+  let qrState = overlay.qr || null; // QR은 오버레이와 같은 게시글에만 붙는다
   const describe = () => {
     if (!select.value) { note.textContent = '다마고치 방송 오버레이에 댓글 UP을 띄우지 않아요.'; return; }
-    note.textContent = checkedAt
+    const qrText = qrState ? (qrState.missing ? ' · QR: 고정한 댓글이 없어 내려짐' : ' · QR 표시 중') : '';
+    note.textContent = (checkedAt
       ? `마지막 갱신 ${new Date(checkedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · 이 화면에서 새로고침할 때만 오버레이도 바뀌어요.`
-      : '아직 확인한 값이 없어요. 아래에서 그 게시글을 새로고침하면 오버레이에 나타나요.';
+      : '아직 확인한 값이 없어요. 아래에서 그 게시글을 새로고침하면 오버레이에 나타나요.') + qrText;
   };
   const sync = () => { rankBox.disabled = upBox.disabled = !select.value; };
+  let overlayId = overlay.id || '';
+  function apply(saved) {
+    overlayId = saved.id || ''; select.value = overlayId; rankBox.checked = saved.showRank !== false; upBox.checked = saved.showUp !== false;
+    checkedAt = Number(saved.checkedAt) || 0; qrState = saved.qr || null; sync(); describe();
+  }
   select.addEventListener('change', sync); sync(); describe();
   panel.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (select.value && !rankBox.checked && !upBox.checked) { note.textContent = '순위와 UP 수 중 하나 이상 골라 주세요.'; return; }
+    if (select.value && !rankBox.checked && !upBox.checked && !(qrState && overlayId === select.value)) { note.textContent = '순위와 UP 수 중 하나 이상 골라 주세요.'; return; }
     save.disabled = true; note.textContent = '저장하고 있어요.';
     try {
       const saved = (await callCommentUp({ action: 'overlay', streamerId: page.streamer.id, id: select.value, showRank: rankBox.checked, showUp: upBox.checked })).data.overlay;
-      select.value = saved.id || ''; checkedAt = Number(saved.checkedAt) || 0; sync(); describe();
+      apply(saved);
     } catch (error) { note.textContent = error.message || '저장하지 못했어요.'; }
     finally { save.disabled = false; }
   });
   panel._titled = (id, text) => { const option = options.get(id); if (option && text) option.textContent = text.slice(0, 40); };
-  panel._checked = (at) => { if (select.value) { checkedAt = at; describe(); } };
+  panel._checked = (at, qr) => { if (select.value) { checkedAt = at; qrState = qr || null; describe(); } };
+  panel._state = () => ({ id: overlayId, qr: qrState });
+  panel._apply = (saved) => apply(saved);
   const row = document.createElement('div'); row.className = 'comment-up-overlay-row';
   row.append(select, rankLabel, upLabel, save);
   panel.append(title, row, note);
@@ -8994,6 +9080,18 @@ function renderCommentUpSection(page) {
         //  UP 누르러 가기: SOOP 게시글 주소 끝에 #comment_noti{댓글 번호}를 붙이면 그 댓글이 강조돼 열린다
         const goUp = document.createElement('a'); goUp.className = 'button button-primary comment-up-go'; goUp.target = '_blank'; goUp.rel = 'noopener noreferrer';
         goUp.textContent = 'UP 누르러 가기 ↗'; goUp.title = 'SOOP 게시글에서 이 스트리머 댓글을 강조해 새 창으로 열어요'; goUp.hidden = true;
+        const qrButton = document.createElement('button'); qrButton.type = 'button'; qrButton.className = 'button comment-up-qr-open';
+        qrButton.textContent = 'QR코드 생성'; qrButton.title = '이 댓글 하이라이트 링크를 QR 코드로 만들어요(방송 오버레이에 띄우기 가능)';
+        const actions = document.createElement('div'); actions.className = 'comment-up-actions'; actions.hidden = true; actions.append(goUp, qrButton);
+        const qrNote = document.createElement('p'); qrNote.className = 'comment-up-qr-note'; qrNote.hidden = true;
+        const showQrNote = (qr) => {
+          const mine = qr && overlayPanel?._state().id === entry.id;
+          qrNote.hidden = !mine;
+          qrNote.textContent = !mine ? '' : qr.missing ? '⚠ 오버레이 QR에 고정한 댓글을 찾지 못해 QR을 내렸어요. QR코드를 다시 만들어 주세요.' : '📺 방송 오버레이에 이 게시글 QR을 띄우고 있어요.';
+          qrNote.classList.toggle('is-warn', !!(mine && qr.missing));
+        };
+        showQrNote(overlayPanel?._state().qr);
+        qrButton.addEventListener('click', () => openCommentUpQrDialog({ page, entry, comments: [...(lastComments || [])].sort((a, b) => b.likes - a.likes), overlayPanel, onChange: showQrNote }));
         let lastComments = null; const prev = {};
         //  게이지·큰 숫자는 UP이 가장 많은 스트리머 댓글 하나 기준, 나머지 댓글은 접힌 목록
         function renderResult() {
@@ -9001,7 +9099,7 @@ function renderCommentUpSection(page) {
           const comments = Array.isArray(lastComments) ? [...lastComments].sort((a, b) => b.likes - a.likes) : null;
           if (comments) resultText.textContent = comments.length ? '' : '이 스트리머가 작성한 댓글을 찾지 못했어요.';
           const best = comments?.[0];
-          goUp.hidden = !(best && /^\d{1,20}$/.test(String(best.id || '')));
+          goUp.hidden = !(best && /^\d{1,20}$/.test(String(best.id || ''))); actions.hidden = goUp.hidden;
           if (!goUp.hidden) goUp.href = `${String(entry.url).split('#')[0]}#comment_noti${best.id}`;
           if (best) {
             const stat = (value, label) => { const box = document.createElement('div'); box.className = 'comment-up-stat'; const strong = document.createElement('strong'); strong.textContent = value; const small = document.createElement('small'); small.textContent = label; box.append(strong, small); return box; };
@@ -9031,11 +9129,11 @@ function renderCommentUpSection(page) {
             link.textContent = `${result.title || fallbackTitle(result.visibility)} ↗`;
             lastComments = result.comments; renderResult();
             overlayPanel?._titled(entry.id, result.title);
-            if (result.overlayCheckedAt) overlayPanel?._checked(result.overlayCheckedAt);
+            if (result.overlayCheckedAt) { overlayPanel?._checked(result.overlayCheckedAt, result.overlayQr || null); showQrNote(result.overlayQr || null); }
           } catch (error) { resultText.textContent = error.message || '댓글을 확인하지 못했어요.'; }
           finally { check.disabled = false; check.classList.remove('is-busy'); }
         });
-        card.append(head, stats, gauges, resultText, others, goUp);
+        card.append(head, stats, gauges, resultText, others, qrNote, actions);
         if (uiCan(result.canManage)) {
           const menu = document.createElement('details'); menu.className = 'comment-up-menu';
           const menuSummary = document.createElement('summary'); menuSummary.className = 'comment-up-icon'; menuSummary.textContent = '⋯'; menuSummary.title = '목표 수정·삭제 메뉴'; menuSummary.setAttribute('aria-label', '게시글 관리 메뉴');
@@ -9068,7 +9166,7 @@ function renderCommentUpSection(page) {
             try { await callCommentUp({ action: 'delete', streamerId: page.streamer.id, id: entry.id }); loaded = false; await load(); }
             catch (error) { status.textContent = error.message || '삭제하지 못했어요.'; remove.disabled = false; }
           });
-          card.insertBefore(goalForm, goUp);
+          card.insertBefore(goalForm, actions);
         }
         list.append(card);
         check.click();

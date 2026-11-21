@@ -66,10 +66,12 @@ async function main() {
   stage.append(steam, petEl, water, bubble, badge);
   const info = el('div', 'tgo-info'); const name = el('span', 'tgo-name'); const gems = el('span', 'tgo-gems'); info.append(name, gems);
   const commentUp = el('div', 'tgo-cu'); commentUp.hidden = true;
+  //  댓글 QR(2026-11-22): 스트리머가 고정한 댓글 하이라이트 링크. QR 모듈은 QR이 켜졌을 때만 불러온다.
+  const qrWrap = el('div', 'tgo-qr'); qrWrap.hidden = true;
   const stats = el('div', 'tgo-stats');
   const rings = {};
   for (const [k, e] of STAT_EMOJI) { const r = el('span', 'tgo-ring'); r.append(el('span', '', e)); stats.append(r); rings[k] = r; }
-  root.append(stage, info, commentUp, stats);
+  root.append(stage, info, commentUp, qrWrap, stats);
 
   let pet = null; let scene = null; let color = '';
   const sound = opt.sound ? createSound() : null;
@@ -107,7 +109,19 @@ async function main() {
     if (min < 1) return '방금 갱신'; if (min < 60) return `${min}분 전 갱신`;
     const h = Math.floor(min / 60); return h < 24 ? `${h}시간 전 갱신` : `${Math.floor(h / 24)}일 전 갱신`;
   }
+  let qrUrl = '';
+  async function renderQr(qr) {
+    const url = opt.cu && qr && /^https:\/\/www\.sooplive\.com\/station\/[a-z0-9_-]+\/post\/\d+#comment_noti\d+$/.test(String(qr.url || '')) ? qr.url : '';
+    qrWrap.dataset.size = ['s', 'm', 'l'].includes(qr?.size) ? qr.size : 'm';
+    if (url === qrUrl) return; qrUrl = url;
+    if (!url) { qrWrap.hidden = true; qrWrap.replaceChildren(); return; }
+    const { qrSvg } = await import('./comment-up-qr.mjs?v=20261122-qr1');
+    if (url !== qrUrl) return;
+    qrWrap.replaceChildren(qrSvg(url, { title: '댓글 UP 누르러 가기 QR 코드' }), el('span', 'tgo-qr-text', '📱 찍고 UP 눌러 주세요!'));
+    qrWrap.hidden = false;
+  }
   function renderCommentUp(cu) {
+    renderQr(cu?.qr);
     if (!opt.cu || !cu || !cu.checkedAt || !cu.found || (cu.up == null && cu.rank == null)) { commentUp.hidden = true; cuAt = 0; return; }
     const parts = [];
     if (cu.up != null) parts.push(`UP ${Number(cu.up).toLocaleString('ko-KR')}`);
