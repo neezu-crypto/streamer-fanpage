@@ -103,10 +103,14 @@ const LOGIN_LINKED_UID_KEYS = ['streamerFanPage.loginLinkedUid', 'streamerFanPag
 //  2026-11-21 로그인 완료 표시가 없는 브라우저(다른 탭·기기에서 연결, 저장소 정리 등)도 있어서,
 //  서버가 이번 접속에서 로그인 계정으로 받아 준 UID(무료 분석 성공·해금 상태 조회 성공)도 로그인으로 본다.
 const serverConfirmedLoginUids = new Set();
+let observedAuthIdentity = '';
 function markServerConfirmedLogin(uid) {
   if (!uid || serverConfirmedLoginUids.has(uid)) return;
   serverConfirmedLoginUids.add(uid);
+  //  같은 계정이 로그인으로 확인된 것뿐이므로, 다음 토큰 갱신 때 계정 변경으로 오인해 해금 상태를 지우지 않게 맞춰 둔다.
+  if (auth.currentUser?.uid === uid && observedAuthIdentity === `${uid}:true`) observedAuthIdentity = `${uid}:false`;
   updateLoginButtons();
+  if (pendingLoginResume && auth.currentUser?.uid === uid) resumePendingLogin();
 }
 //  화면 판단만으로 로그인 안내를 띄우기 전에 서버에 한 번 물어본다(해금 상태 조회는 로그인 계정만 성공한다).
 async function confirmLoggedIn() {
@@ -4525,7 +4529,6 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-let observedAuthIdentity = '';
 onAuthStateChanged(auth, (user) => {
   void notifyViewerStatsVisit(user);
 });
