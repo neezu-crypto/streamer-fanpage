@@ -5,6 +5,7 @@ import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket4';
 import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261119-tour7';
+import { setupBugReport } from './bug-report.js?v=20261121-bug1';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
@@ -400,7 +401,7 @@ function getUiSoundTarget(target) {
 }
 function isModalOpenTrigger(button) {
   const directTriggers = [
-    '#profileSettingsButton', '#profileDesignButton', '#layoutDesignButton', '#openAdminStats', '#openLoginOptions', '#openDesignFeedback',
+    '#profileSettingsButton', '#profileDesignButton', '#layoutDesignButton', '#openAdminStats', '#openLoginOptions', '#openDesignFeedback', '#openBugReport',
     '#openStreamerVerification', '.search-empty-verify', '.profile-verification-prompt', '.fan-quick-sound-settings',
     '.upbo-add-topic', '.upbo-add-item-inline', '.competition-history-add',
     '.calendar-add-button', '.vod-card', '.upbo-image-zoomable',
@@ -13288,6 +13289,14 @@ $('retryButton').addEventListener('click', () => {
   loadApp();
 });
 $('openLoginOptions').addEventListener('click', () => showFanPageModal($('loginChoiceDialog')));
+//  2026-11-21 공용 버그 제보 창(팬페이지·갤러리·상점 공통). 서버가 로그인 계정인지 판정한다.
+setupBugReport({
+  service: 'fanpage',
+  call: httpsCallable(functions, 'streamerFanPageViewerStatsBugReports'),
+  getUid: () => auth.currentUser?.uid || '',
+  openLogin: () => showFanPageModal($('loginChoiceDialog')),
+  trigger: $('openBugReport'),
+});
 $('closeLoginChoices').addEventListener('click', () => $('loginChoiceDialog').close());
 $('choiceGoogleLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithGoogle(); });
 $('choiceKakaoLogin').addEventListener('click', () => { $('loginChoiceDialog').close(); loginWithKakao(); });
