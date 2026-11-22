@@ -22,11 +22,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # 2026-11-23: 업로드와 배포를 다른 작업으로 나눔. 같은 작업에서 바로 배포하면 방금 올린 묶음을 못 찾는 일이 있다(actions/deploy-pages#451).
+  build:
     timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -94,9 +92,18 @@ jobs:
             exit 1
           fi
       - name: Upload static site
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+
+  deploy:
+    needs: build
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

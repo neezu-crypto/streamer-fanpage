@@ -11802,7 +11802,7 @@ function renderWeeklyScheduleDialog(page) {
   const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
   footerActions.append(download); footer.append(saveHint, footerTextWarning, footerActions);
   dayHeading.hidden = true; previewHeading.hidden = true;
-  form.append(meta, templateControls, previewFrame, linkedEventsToggle, linkedEventsPanel, footer);
+  form.append(meta, templateControls, footer, previewFrame, linkedEventsToggle, linkedEventsPanel); // 2026-11-23 PNG 저장 줄을 미리보기 위로
   card.append(header, form); dialog.append(card, imageTools);
 
   const templateImages = new Map();
