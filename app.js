@@ -9075,6 +9075,25 @@ function renderCommentUpOverlayPanel(page, entries, overlay) {
   return panel;
 }
 
+//  미리보기 예시 카드(2026-11-23): 등록한 게시글이 없을 때 카드가 어떻게 보이는지 보여 준다. 실제 데이터·서버 호출 없음.
+function renderCommentUpSampleCard(canManage) {
+  const card = document.createElement('article'); card.className = 'comment-up-card comment-up-sample'; card.setAttribute('aria-label', '댓글 UP 카드 미리보기 예시');
+  const badge = document.createElement('span'); badge.className = 'comment-up-sample-badge'; badge.textContent = '미리보기 예시';
+  const head = document.createElement('div'); head.className = 'comment-up-card-head';
+  const title = document.createElement('span'); title.className = 'comment-up-title'; title.textContent = '게시글 · 예시 방송국';
+  head.append(title);
+  const stat = (value, label) => { const box = document.createElement('div'); box.className = 'comment-up-stat'; const strong = document.createElement('strong'); strong.textContent = value; const small = document.createElement('small'); small.textContent = label; box.append(strong, small); return box; };
+  const stats = document.createElement('div'); stats.className = 'comment-up-stats';
+  const sample = { likes: 128, rank: 3, total: 245 };
+  stats.append(stat('128', 'UP'), stat('3위', '공동 순위 · 댓글 245개'));
+  const gauges = document.createElement('div'); gauges.className = 'comment-up-gauges';
+  gauges.append(renderCommentUpGauge('up', sample, 200, {}), renderCommentUpGauge('rank', sample, 1, {}));
+  const note = document.createElement('p'); note.className = 'comment-up-note';
+  note.textContent = canManage ? '위에 SOOP 게시글 링크를 넣으면 이런 카드가 생겨요. 내 댓글의 UP 수와 순위, 목표까지 남은 양을 보여 줘요.' : '스트리머가 게시글을 등록하면 이런 카드로 댓글 UP과 순위를 볼 수 있어요.';
+  card.append(badge, head, stats, gauges, note);
+  return card;
+}
+
 function renderCommentUpSection(page) {
   const section = document.createElement('section'); section.id = 'commentUpSection'; section.className = 'content-card comment-up-section';
   const note = document.createElement('p'); note.textContent = '공개·애청자 공개 게시글의 댓글을 확인합니다. 같은 UP 수는 공동 순위로 표시해요.';
@@ -9094,6 +9113,7 @@ function renderCommentUpSection(page) {
       form.hidden = !uiCan(result.canManage); list.replaceChildren();
       const entries = Array.isArray(result.entries) ? result.entries : [];
       status.textContent = entries.length ? '' : '등록된 게시글이 없어요.';
+      if (!entries.length) list.append(renderCommentUpSampleCard(uiCan(result.canManage)));
       const overlayPanel = uiCan(result.canManage) && result.overlay && entries.length ? renderCommentUpOverlayPanel(page, entries, result.overlay) : null;
       if (overlayPanel) list.append(overlayPanel);
       for (const entry of entries) {

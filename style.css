@@ -2285,3 +2285,7 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .comment-up-qr-field input{padding:10px 12px;border:1px solid #cbbdcc;border-radius:10px;background:#fff;color:#302735;font:inherit;font-size:16px;font-weight:400}
 .comment-up-qr-preview{justify-self:center;width:min(260px,70vw);padding:6px;border:1px solid #e6dbe3;border-radius:12px;background:#f7f3f6}
 .comment-up-qr-preview canvas{display:block;width:100%;height:auto;border-radius:6px}
+/* 댓글 UP 미리보기 예시 카드(2026-11-23): 게시글이 없을 때만, 실제 카드와 구분되게 점선·흐리게 */
+.comment-up-card.comment-up-sample{position:relative;border-style:dashed;opacity:.82;pointer-events:none;user-select:none}
+.comment-up-sample .comment-up-title{flex:1;min-width:0;font-weight:700;line-height:1.45}
+.comment-up-sample-badge{align-self:flex-start;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--cu-accent,#8a5cf6) 16%,transparent);font-size:12px;font-weight:700}
