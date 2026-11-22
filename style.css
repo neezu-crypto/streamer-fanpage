@@ -2302,3 +2302,10 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .tg-care-preview-tools .tg-care-tool[data-tip]:first-child::after{left:0;transform:none}
 .tg-care-preview-tools .tg-care-tool[data-tip]:last-child::after{left:auto;right:0;transform:none}
 @media(max-width:560px){.tg-care-preview-tools .tg-care-tool[data-tip]:nth-child(6n+1)::after{left:0;transform:none}.tg-care-preview-tools .tg-care-tool[data-tip]:nth-child(6n)::after{left:auto;right:0;transform:none}}
+/* 펫을 그리지 않는 미리보기: 빈 펫 자리에 실제 펫과 같은 비율을 줘야 방 배율이 분양 후와 같아진다(높이 0이면 방석만 크게 확대됨) */
+.tg-care-room-preview .tg-stage-pet{aspect-ratio:1250/1100}
+
+.server-history-ongoing{display:flex;align-items:center;gap:6px;color:inherit;font-size:12px;font-weight:600;cursor:pointer}.server-history-ongoing input{width:16px;height:16px;margin:0}
+.server-history-dialog input[type="month"]:disabled{opacity:.45}
+.fanpage-tab-column > .server-history-section{margin-top:18px}
+.server-history-mode{justify-self:start;min-height:32px;padding:0 12px;font-size:11px}.server-history-bulk{display:grid;gap:8px}.server-history-bulk[hidden],.competition-history-form-grid[hidden]{display:none}.server-history-bulk textarea{min-height:150px;resize:vertical;line-height:1.6}.server-history-bulk-help{margin:0;font-size:11px;line-height:1.6;opacity:.75}.server-history-bulk-count{margin:0;font-size:12px;font-weight:700}.server-history-bulk-count:empty{display:none}.server-history-bulk-count.is-error{color:#c0262d}

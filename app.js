@@ -4367,6 +4367,278 @@ async function saveCompetitionHistory(page, entries, successMessage = '대회 �
   showToast(successMessage);
 }
 
+//  참여한 서버(2026-11-23): 대회 이력과 같은 모양·저장 경로(profile.serverHistory, 최대 30개).
+function serverHistoryEntries(page) {
+  return (Array.isArray(page.profile?.serverHistory) ? page.profile.serverHistory : [])
+    .filter((entry) => entry && typeof entry === 'object' && typeof entry.id === 'string' && typeof entry.serverName === 'string');
+}
+
+function formatServerHistoryPeriod(entry) {
+  const start = formatCompetitionHistoryDate(entry.startDate);
+  const end = formatCompetitionHistoryDate(entry.endDate);
+  if (start && end) return start === end ? start : `${start} ~ ${end}`;
+  if (start) return `${start} ~ 진행 중`;
+  return end ? `~ ${end}` : '';
+}
+
+function renderServerHistorySection(page) {
+  const section = document.createElement('section');
+  section.className = 'competition-history-section server-history-section content-card';
+  section.id = 'serverHistorySection';
+
+  const heading = document.createElement('div'); heading.className = 'competition-history-heading';
+  const headingCopy = document.createElement('div');
+  const eyebrow = document.createElement('p'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'SERVER RECORD';
+  const title = document.createElement('h2'); title.textContent = '참여한 서버';
+  const subtitle = document.createElement('p'); subtitle.className = 'competition-history-subtitle';
+  subtitle.textContent = '함께한 서버와 맡았던 역할';
+  headingCopy.append(eyebrow, title, subtitle);
+  const headingActions = document.createElement('div'); headingActions.className = 'competition-history-heading-actions';
+  const count = document.createElement('span'); count.className = 'competition-history-count';
+  const add = page.isOwner ? document.createElement('button') : null;
+  if (add) {
+    add.type = 'button'; add.className = 'button button-primary competition-history-add server-history-add';
+    add.textContent = '+ 참여한 서버 추가';
+    add.title = '참여했거나 참여 중인 서버를 추가해요';
+    add.addEventListener('click', () => openServerHistoryDialog(page));
+  }
+  headingActions.append(count);
+  if (add) headingActions.append(add);
+  else {
+    const addPrompt = createStreamerEditVerificationPrompt(page, '참여한 서버');
+    if (addPrompt) headingActions.append(addPrompt);
+  }
+  heading.append(headingCopy, headingActions);
+
+  const list = document.createElement('div'); list.className = 'competition-history-list';
+  //  진행 중(종료 없음) 먼저, 그다음 최근 시작 순.
+  const isOngoing = (entry) => Boolean(entry.startDate && !entry.endDate);
+  const entries = serverHistoryEntries(page).sort((a, b) => (isOngoing(a) ? 0 : 1) - (isOngoing(b) ? 0 : 1)
+    || String(b.startDate || '').localeCompare(String(a.startDate || '')) || a.serverName.localeCompare(b.serverName, 'ko'));
+  count.textContent = `${entries.length}개`;
+  if (add && entries.length >= 30) { add.disabled = true; add.title = '참여한 서버는 최대 30개까지 등록할 수 있어요.'; }
+
+  if (!entries.length) {
+    const empty = document.createElement('p'); empty.className = 'competition-history-empty';
+    empty.textContent = page.isOwner ? '참여한 서버를 추가해 팬들에게 활동을 알려 보세요.' : '아직 공개된 참여 서버가 없어요.';
+    list.append(empty);
+  } else {
+    entries.forEach((entry) => {
+      const item = document.createElement('article'); item.className = 'competition-history-item';
+      const itemHeading = document.createElement('div'); itemHeading.className = 'competition-history-item-heading';
+      const copy = document.createElement('div'); copy.className = 'competition-history-item-copy';
+      const name = document.createElement('h3'); name.textContent = entry.serverName;
+      const meta = document.createElement('div'); meta.className = 'competition-history-meta';
+      const period = formatServerHistoryPeriod(entry);
+      if (period) { const date = document.createElement('span'); date.className = 'competition-history-date'; date.textContent = period; meta.append(date); }
+      if (entry.game) { const game = document.createElement('span'); game.className = 'competition-history-category'; game.textContent = entry.game; meta.append(game); }
+      copy.append(name);
+      if (meta.childElementCount) copy.append(meta);
+      itemHeading.append(copy);
+      if (entry.role || isOngoing(entry)) {
+        const role = document.createElement('span'); role.className = 'competition-history-result';
+        role.textContent = entry.role || '참여 중';
+        itemHeading.append(role);
+      }
+      item.append(itemHeading);
+      if (entry.memo) {
+        const memo = document.createElement('p'); memo.className = 'competition-history-description';
+        memo.textContent = entry.memo; item.append(memo);
+      }
+      const footer = document.createElement('div'); footer.className = 'competition-history-item-footer';
+      if (entry.link) {
+        const link = document.createElement('a'); link.className = 'competition-history-link';
+        link.href = entry.link; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '서버 정보 보기 ↗';
+        link.title = '서버 소개 페이지를 새 창으로 열어요';
+        footer.append(link);
+      }
+      if (page.isOwner) {
+        const actions = document.createElement('div'); actions.className = 'competition-history-item-actions';
+        const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'button'; edit.textContent = '수정';
+        edit.title = '이 서버 정보를 고쳐요';
+        edit.addEventListener('click', () => openServerHistoryDialog(page, entry));
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button competition-history-delete'; remove.textContent = '삭제';
+        remove.title = '이 서버를 목록에서 지워요';
+        remove.addEventListener('click', async () => {
+          if (!window.confirm(`“${entry.serverName}” 서버를 목록에서 삭제할까요?`)) return;
+          remove.disabled = true; remove.textContent = '삭제 중…';
+          try {
+            await saveServerHistory(page, serverHistoryEntries(page).filter((candidate) => candidate.id !== entry.id), '참여한 서버를 삭제했어요.');
+          } catch (error) {
+            showToast(error.message || '참여한 서버를 삭제하지 못했어요.');
+            remove.disabled = false; remove.textContent = '삭제';
+          }
+        });
+        actions.append(edit, remove); footer.append(actions);
+      }
+      if (footer.childElementCount) item.append(footer);
+      list.append(item);
+    });
+  }
+  section.append(heading, list);
+  return section;
+}
+
+function openServerHistoryDialog(page, existingEntry = null) {
+  if (!page.isOwner) return;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'account-dialog competition-history-dialog server-history-dialog';
+  dialog.setAttribute('aria-labelledby', 'serverHistoryEditorTitle');
+  const form = document.createElement('form'); form.className = 'account-dialog-card competition-history-form';
+  const heading = document.createElement('div'); heading.className = 'profile-editor-heading';
+  const title = document.createElement('h2'); title.id = 'serverHistoryEditorTitle';
+  title.textContent = existingEntry ? '참여한 서버 수정' : '참여한 서버 추가';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'button profile-settings-close';
+  close.setAttribute('aria-label', '참여한 서버 창 닫기'); close.title = '창 닫기'; close.textContent = '×'; close.addEventListener('click', () => dialog.close());
+  const isTouchLayout = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  if (isTouchLayout) close.autofocus = true;
+  heading.append(title, close);
+
+  const fields = document.createElement('div'); fields.className = 'competition-history-form-grid';
+  const makeField = (labelText, name, options = {}) => {
+    const label = document.createElement('label'); label.className = `profile-editor-field${options.wide ? ' competition-history-field-wide' : ''}`;
+    label.textContent = labelText;
+    const input = options.multiline ? document.createElement('textarea') : document.createElement('input');
+    input.name = name; input.maxLength = options.maxLength || 100; input.placeholder = options.placeholder || '';
+    if (options.multiline) input.rows = 3; else input.type = options.type || 'text';
+    if (options.required) input.required = true;
+    input.value = String(existingEntry?.[name] || '');
+    label.append(input);
+    return { label, input };
+  };
+  const serverName = makeField('서버명', 'serverName', { required: true, maxLength: 100, wide: true, placeholder: '예: 스트리머 마인크래프트 서버' });
+  const game = makeField('게임', 'game', { maxLength: 50, placeholder: '예: GTA5, 마인크래프트' });
+  const role = makeField('역할 / 캐릭터', 'role', { maxLength: 50, placeholder: '예: 경찰, 시장, 상인' });
+  const startDate = makeField('시작', 'startDate', { type: 'month' });
+  const endDate = makeField('종료', 'endDate', { type: 'month' });
+  const ongoingLabel = document.createElement('label'); ongoingLabel.className = 'server-history-ongoing competition-history-field-wide';
+  const ongoing = document.createElement('input'); ongoing.type = 'checkbox';
+  ongoing.checked = existingEntry ? !existingEntry.endDate : true;
+  ongoingLabel.title = '아직 참여 중이면 켜 두세요. 종료 시기는 비워져요.';
+  ongoingLabel.append(ongoing, document.createTextNode(' 지금도 참여 중'));
+  const syncOngoing = () => { endDate.input.disabled = ongoing.checked; if (ongoing.checked) endDate.input.value = ''; };
+  ongoing.addEventListener('change', syncOngoing); syncOngoing();
+  const memo = makeField('메모', 'memo', { multiline: true, wide: true, maxLength: 200, placeholder: '서버에서의 활동이나 기억에 남는 일을 짧게 적어 주세요.' });
+  const link = makeField('서버 정보 링크 (선택)', 'link', { type: 'url', wide: true, maxLength: 500, placeholder: 'https://example.com' });
+  fields.append(serverName.label, game.label, role.label, startDate.label, endDate.label, ongoingLabel, memo.label, link.label);
+
+  //  여러 줄로 한 번에 추가(새로 추가할 때만): 한 줄에 서버 하나, "서버명, 게임, 역할" 순서로 쉼표·탭·| 구분.
+  const remaining = Math.max(0, 30 - serverHistoryEntries(page).length);
+  const bulk = document.createElement('div'); bulk.className = 'server-history-bulk'; bulk.hidden = true;
+  const bulkLabel = document.createElement('label'); bulkLabel.className = 'profile-editor-field';
+  bulkLabel.textContent = `한 줄에 서버 하나씩 (최대 ${remaining}개)`;
+  const bulkInput = document.createElement('textarea'); bulkInput.rows = 7; bulkInput.maxLength = 6000;
+  bulkInput.placeholder = '스트리머 GTA 서버, GTA5, 경찰\n마인크래프트 야생 서버, 마인크래프트, 상인\n발로란트 내전 서버';
+  bulkLabel.append(bulkInput);
+  const bulkHelp = document.createElement('p'); bulkHelp.className = 'server-history-bulk-help';
+  bulkHelp.textContent = '“서버명, 게임, 역할” 순서로 적어요. 게임·역할은 빼도 돼요. 기간·메모·링크는 추가한 뒤 하나씩 수정해서 넣을 수 있어요.';
+  const bulkCount = document.createElement('p'); bulkCount.className = 'server-history-bulk-count'; bulkCount.setAttribute('aria-live', 'polite');
+  bulk.append(bulkLabel, bulkHelp, bulkCount);
+  const parseBulk = () => bulkInput.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const [name = '', gameText = '', roleText = ''] = line.split(/\s*[,\t|]\s*/);
+    return { serverName: name.slice(0, 100), game: gameText.slice(0, 50), role: roleText.slice(0, 50) };
+  }).filter((item) => item.serverName);
+  bulkInput.addEventListener('input', () => {
+    const n = parseBulk().length;
+    bulkCount.textContent = n ? `${n}개 추가 예정${n > remaining ? ` · ${remaining}개까지만 추가할 수 있어요` : ''}` : '';
+    bulkCount.classList.toggle('is-error', n > remaining);
+  });
+  let bulkMode = false;
+  const modeToggle = existingEntry ? null : document.createElement('button');
+  if (modeToggle) {
+    modeToggle.type = 'button'; modeToggle.className = 'button server-history-mode';
+    modeToggle.textContent = '여러 줄로 한 번에 추가'; modeToggle.title = '여러 서버를 한 줄에 하나씩 적어 한 번에 추가해요';
+    modeToggle.disabled = remaining < 2;
+    modeToggle.addEventListener('click', () => {
+      bulkMode = !bulkMode;
+      fields.hidden = bulkMode; bulk.hidden = !bulkMode;
+      serverName.input.required = !bulkMode;
+      modeToggle.textContent = bulkMode ? '하나씩 자세히 추가' : '여러 줄로 한 번에 추가';
+      modeToggle.title = bulkMode ? '서버 하나를 기간·메모까지 자세히 적어요' : '여러 서버를 한 줄에 하나씩 적어 한 번에 추가해요';
+      (bulkMode ? bulkInput : serverName.input).focus();
+    });
+  }
+
+  const note = document.createElement('p'); note.className = 'competition-history-note';
+  note.textContent = '참여한 서버는 팬페이지에 공개되며 최대 30개까지 등록할 수 있어요.';
+  const status = document.createElement('p'); status.className = 'competition-history-form-status';
+  status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+  const footer = document.createElement('div'); footer.className = 'profile-editor-footer competition-history-form-footer';
+  const hint = document.createElement('small'); hint.textContent = '서버에 안전하게 저장됩니다.';
+  const actions = document.createElement('div'); actions.className = 'profile-editor-footer-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'button'; cancel.textContent = '취소';
+  cancel.title = '저장하지 않고 닫아요';
+  cancel.addEventListener('click', () => dialog.close());
+  const saveLabel = existingEntry ? '변경 저장' : '참여한 서버 추가';
+  const save = document.createElement('button'); save.type = 'submit'; save.className = 'button button-primary competition-history-save';
+  save.textContent = saveLabel; save.title = '팬페이지에 저장해요';
+  actions.append(cancel, save); footer.append(hint, actions);
+  form.append(heading, ...(modeToggle ? [modeToggle] : []), fields, bulk, note, status, footer);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity() || save.disabled) return;
+    if (bulkMode) {
+      const items = parseBulk();
+      status.textContent = ''; status.classList.remove('is-error');
+      const fail = (text) => { status.textContent = text; status.classList.add('is-error'); };
+      if (!items.length) return fail('추가할 서버를 한 줄에 하나씩 적어 주세요.');
+      if (items.length > remaining) return fail(`지금은 ${remaining}개까지만 더 추가할 수 있어요. 줄 수를 줄여 주세요.`);
+      const added = items.map((item) => ({ id: createCompetitionHistoryId(), ...item, startDate: '', endDate: '', link: '', memo: '' }));
+      save.disabled = true; save.textContent = '저장 중…'; save.setAttribute('aria-busy', 'true');
+      try {
+        await saveServerHistory(page, [...added, ...serverHistoryEntries(page)], `참여한 서버 ${added.length}개를 추가했어요.`);
+        dialog.close();
+      } catch (error) {
+        fail(error.message || '참여한 서버를 저장하지 못했어요.');
+      } finally {
+        if (save.isConnected) { save.disabled = false; save.removeAttribute('aria-busy'); save.textContent = saveLabel; }
+      }
+      return;
+    }
+    const entry = {
+      id: existingEntry?.id || createCompetitionHistoryId(),
+      serverName: serverName.input.value.trim(), game: game.input.value.trim(), role: role.input.value.trim(),
+      startDate: startDate.input.value, endDate: ongoing.checked ? '' : endDate.input.value,
+      link: link.input.value.trim(), memo: memo.input.value.trim(),
+    };
+    status.textContent = ''; status.classList.remove('is-error');
+    if (entry.startDate && entry.endDate && entry.endDate < entry.startDate) {
+      status.textContent = '종료 시기가 시작보다 빨라요.'; status.classList.add('is-error'); return;
+    }
+    const current = serverHistoryEntries(page);
+    const nextEntries = existingEntry ? current.map((candidate) => candidate.id === existingEntry.id ? entry : candidate) : [entry, ...current];
+    save.disabled = true; save.textContent = '저장 중…'; save.setAttribute('aria-busy', 'true');
+    try {
+      await saveServerHistory(page, nextEntries);
+      dialog.close();
+    } catch (error) {
+      status.textContent = error.message || '참여한 서버를 저장하지 못했어요.';
+      status.classList.add('is-error');
+    } finally {
+      if (save.isConnected) { save.disabled = false; save.removeAttribute('aria-busy'); save.textContent = saveLabel; }
+    }
+  });
+  dialog.append(form);
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  document.body.append(dialog);
+  showFanPageModal(dialog);
+  if (!isTouchLayout) serverName.input.focus();
+}
+
+async function saveServerHistory(page, entries, successMessage = '참여한 서버를 저장했어요.') {
+  const result = await callSave({
+    streamerId: page.streamer.id,
+    profile: profileForLinkSave(page.profile, 'serverHistory', entries),
+  });
+  if (currentPage?.streamer.id === page.streamer.id) {
+    currentPage.profile = result.data.page.profile;
+    renderFanPage(currentPage);
+  } else {
+    page.profile = result.data.page.profile;
+  }
+  showToast(successMessage);
+}
+
 function renderAffiliatePromoCard() {
   const productUrl = 'https://bitl.bz/4aO8WU';
   const imageUrl = 'https://sitem.ssgcdn.com/49/33/50/item/1000815503349_i1_1200.jpg';
@@ -4797,7 +5069,8 @@ function fanpageTabTourSteps(page, tabKey) {
     return { id: 'content:owner', steps: [
       { target: q('.songbook-add-form'), timeout: 8000, text: '노래책이에요. YouTube 영상 링크를 붙여 넣으면 제목과 썸네일을 자동으로 불러와요.' },
       { target: q('.played-games-add-panel'), text: '플레이한 게임을 추가해요. Steam 링크는 이름·썸네일을 자동으로 가져오고, 게임마다 다시보기를 연결할 수 있어요.' },
-      { target: q('.competition-history-add'), text: '대회 이력도 직접 추가할 수 있어요. 팬들이 활동 기록을 한눈에 볼 수 있어요.' },
+      { target: q('.competition-history-add:not(.server-history-add)'), text: '대회 이력도 직접 추가할 수 있어요. 팬들이 활동 기록을 한눈에 볼 수 있어요.' },
+      { target: q('.server-history-add'), text: '참여한 서버도 추가할 수 있어요. 서버명·게임·역할·기간을 적으면 팬들이 활동을 한눈에 봐요.' },
     ] };
   }
   if (tabKey === 'video-library' && ownerEditing) {
@@ -5918,12 +6191,13 @@ function renderFanPage(page, options = {}) {
   const rollingPaperSection = renderRollingPaperSection(page);
   const memoriesSection = renderMemoriesSection(page);
   const competitionHistorySection = renderCompetitionHistorySection(page);
+  const serverHistorySection = renderServerHistorySection(page);
   const tamagotchiSection = renderTamagotchiSection(page);
   const videoLibrarySection = renderVideoLibrarySection(page);
   const tabDefinitions = [
     { key: 'home', label: '홈', eyebrow: 'YOUR HOME', title: '방송과 최신 소식', description: '방송 상태와 일정, 최근 다시보기를 모아 보여드려요.' },
     { key: 'activity', label: '팬 활동', eyebrow: 'FAN ACTIVITY', title: '팬들과 함께하는 공간', description: '팬 참여와 소통, 함께 만든 추억을 둘러보세요.' },
-    { key: 'content', label: '콘텐츠', eyebrow: 'STREAMER CONTENTS', title: '다시보기와 활동 기록', description: '영상, 대회 이력, 플레이한 게임을 모아봤어요.' },
+    { key: 'content', label: '콘텐츠', eyebrow: 'STREAMER CONTENTS', title: '다시보기와 활동 기록', description: '영상, 대회 이력, 참여한 서버, 플레이한 게임을 모아봤어요.' },
     { key: 'video-library', label: '즐겨찾기', eyebrow: 'FAVORITES', title: '즐겨찾기', description: '스트리머가 라이브에서 자주 시청하는 영상을 모았습니다.' },
     { key: 'rolling-paper', label: '롤링페이퍼', eyebrow: 'ROLLING PAPER', title: '주제별 롤링페이퍼', description: '기념일과 특별한 순간마다 응원 메시지를 남겨 보세요.' },
     { key: 'memories', label: '기억의 순간', eyebrow: 'MEMORY MOMENTS', title: '기억의 순간', description: '100일·200일 방송처럼 오래 간직하고 싶은 기념 다시보기를 모아봤어요.' },
@@ -6035,9 +6309,9 @@ function renderFanPage(page, options = {}) {
     ['content', createFanPageTabPanel(tabDefinition('content'), usesColumnLayout
       ? [
         createFanPageColumnStacks('fanpage-content-columns fanpage-content-overview-columns', [youtubeSection], [songbookSection, cafeSection]),
-        createFanPageColumnStacks('fanpage-content-columns fanpage-game-history-columns', [playedGamesSection], [competitionHistorySection]),
+        createFanPageColumnStacks('fanpage-content-columns fanpage-game-history-columns', [playedGamesSection], [competitionHistorySection, serverHistorySection]),
       ]
-      : [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection])],
+      : [youtubeSection, songbookSection, playedGamesSection, cafeSection, competitionHistorySection, serverHistorySection])],
     ['video-library', createFanPageTabPanel(tabDefinition('video-library'), [videoLibrarySection])],
     ['rolling-paper', createFanPageTabPanel(tabDefinition('rolling-paper'), [rollingPaperSection])],
     ['memories', createFanPageTabPanel(tabDefinition('memories'), [memoriesSection])],
@@ -6369,6 +6643,7 @@ function renderFanPage(page, options = {}) {
             topBannerImageUrls, bottomBannerImageUrls,
             bottomBannerLayout: bottomBannerLayout.value === 'grid-2x3' ? 'grid-2x3' : 'stacked',
             competitionHistory: Array.isArray(currentPage.profile?.competitionHistory) ? currentPage.profile.competitionHistory : [],
+            serverHistory: Array.isArray(currentPage.profile?.serverHistory) ? currentPage.profile.serverHistory : [],
           },
         });
         currentPage.intro = result.data.page.intro;
@@ -7173,6 +7448,7 @@ function profileForLinkSave(source, field, value) {
     bottomBannerImageUrls: Array.isArray(profile.bottomBannerImageUrls) ? profile.bottomBannerImageUrls.filter((item) => typeof item === 'string').slice(0, MAX_BANNER_IMAGE_ITEMS) : [],
     bottomBannerLayout: profile.bottomBannerLayout === 'grid-2x3' ? 'grid-2x3' : 'stacked',
     competitionHistory: Array.isArray(profile.competitionHistory) ? profile.competitionHistory.slice(0, 30) : [],
+    serverHistory: Array.isArray(profile.serverHistory) ? profile.serverHistory.slice(0, 30) : [],
   };
   saved[field] = value;
   return saved;
