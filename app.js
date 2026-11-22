@@ -11770,7 +11770,7 @@ function renderWeeklyScheduleDialog(page) {
   motionToggle.addEventListener('click', () => { if (!state.canUseStarlight || !weeklyTemplateOf(state).motion) return; state.animationEnabled = !state.animationEnabled; syncMotionToggle(); markWeeklyDirty(); });
   const templateHint = document.createElement('small'); templateHint.setAttribute('role', 'status');
   const templateBuy = document.createElement('button'); templateBuy.type = 'button'; templateBuy.className = 'button button-primary weekly-template-buy'; templateBuy.hidden = true;
-  templateLabel.append(templateSelect); templateControls.append(templateLabel, motionToggle, templateBuy, templateHint);
+  templateLabel.append(templateSelect);
   const previewHeading = document.createElement('div'); previewHeading.className = 'weekly-schedule-preview-heading';
   const previewTitle = document.createElement('h3'); previewTitle.textContent = '미리보기';
   const previewNote = document.createElement('small'); previewNote.textContent = '템플릿 이미지는 새로 제작한 팬페이지 전용 배경입니다.';
@@ -11798,11 +11798,12 @@ function renderWeeklyScheduleDialog(page) {
   const footer = document.createElement('div'); footer.className = 'profile-editor-footer weekly-schedule-footer';
   const saveHint = document.createElement('small'); saveHint.textContent = '내용은 주차별로 서버에 자동 저장돼요.';
   const footerTextWarning = document.createElement('small'); footerTextWarning.className = 'weekly-schedule-footer-text-warning'; footerTextWarning.setAttribute('role', 'status'); footerTextWarning.hidden = true;
-  const footerActions = document.createElement('div'); footerActions.className = 'profile-editor-footer-actions';
-  const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장';
-  footerActions.append(download); footer.append(saveHint, footerTextWarning, footerActions);
+  const download = document.createElement('button'); download.type = 'button'; download.className = 'button button-primary'; download.textContent = 'PNG 이미지 저장'; download.title = '미리보기 그대로 주간 방송표를 PNG 그림 파일로 저장해요';
+  // 2026-11-23 PNG 저장 버튼은 '특수효과 끄기' 옆(디자인 줄)에 둔다.
+  templateControls.append(templateLabel, motionToggle, download, templateBuy, templateHint);
+  footer.append(saveHint, footerTextWarning);
   dayHeading.hidden = true; previewHeading.hidden = true;
-  form.append(meta, templateControls, footer, previewFrame, linkedEventsToggle, linkedEventsPanel); // 2026-11-23 PNG 저장 줄을 미리보기 위로
+  form.append(meta, templateControls, previewFrame, linkedEventsToggle, linkedEventsPanel, footer);
   card.append(header, form); dialog.append(card, imageTools);
 
   const templateImages = new Map();
