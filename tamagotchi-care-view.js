@@ -183,6 +183,7 @@ export function mountCareView(container, {
       if (mods.createScene) {
         scene = mods.createScene({ stage, pet: petEl, reduced, maxPetRatio: window.matchMedia('(max-width: 560px)').matches ? 0.56 : Infinity });
         stage.classList.add('has-home'); requestAnimationFrame(() => scene?.alignHome?.());
+        window.addEventListener('resize', onResize); // 창 크기가 바뀌면 방을 다시 맞춘다(destroy에서 해제)
       }
       //  분양 후 쓸 수 있는 돌봄 도구·상태를 같은 모양으로, 누를 수 없게 보여 준다(서버 호출 없음).
       if (mods.TOOLS) {

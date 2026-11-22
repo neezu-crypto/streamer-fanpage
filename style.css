@@ -2290,8 +2290,8 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .comment-up-sample .comment-up-title{flex:1;min-width:0;font-weight:700;line-height:1.45}
 .comment-up-sample-badge{align-self:flex-start;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--cu-accent,#8a5cf6) 16%,transparent);font-size:12px;font-weight:700}
 /* 다마고치 분양 전 방 미리보기(2026-11-23): 분양 후와 같은 방을 보기 전용으로 */
-.tg-care-showcase.tg-care-room-preview{padding:0;border:0;background:none;justify-items:stretch;gap:8px}
-.tg-care-room-preview .tg-stage{pointer-events:none;user-select:none}
+.tg-care-showcase.tg-care-room-preview{max-width:none;width:100%;padding:0;border:0;background:none;justify-items:stretch;gap:8px}
+.tg-care-room-preview .tg-stage{width:100%;pointer-events:none;user-select:none}
 .tg-care-room-preview .tg-care-showcase-badge{z-index:3}
 .tg-care-preview-tools .tg-care-tool[aria-disabled="true"]{opacity:.55;cursor:not-allowed;filter:grayscale(.35)}
 .tg-care-preview-stats{opacity:.75}
