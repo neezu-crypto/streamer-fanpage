@@ -4717,7 +4717,7 @@ function renderTamagotchiSection(page) {
     // ?tgpreview=1: 관리자 전용 미리보기(메모리 DB, 운영 저장 없음)
     const preview = isAdminUser === true && new URLSearchParams(location.search).get('tgpreview') === '1';
     Promise.all([
-      import('./tamagotchi-care-view.js?v=20261119-tgshow1'),
+      import('./tamagotchi-care-view.js?v=20261123-tgroom2'),
       preview ? import('./tamagotchi-care-preview.js?v=20261118-full72').then((m) => m.createCarePreview(page)) : null,
     ]).then(([{ mountCareView }, mock]) => {
       if (currentPage?.streamer.id !== page.streamer.id) return;
@@ -4817,7 +4817,7 @@ function fanpageTabTourSteps(page, tabKey) {
       { target: q('.comment-up-form input[type="url"]'), text: 'SOOP 방송국 게시글 주소를 복사해 여기에 붙여 넣어요. 공개·애청자 공개 게시글만 확인할 수 있어요.' },
       { target: q('.comment-up-form .comment-up-goal-input'), text: '목표 등수나 UP 수를 적으면 게이지로 얼마나 남았는지 보여 줘요. 비워 둬도 돼요.' },
       { target: q('.comment-up-form button[type="submit"]'), text: '"게시글 추가"를 누르면 그 글에 내가 남긴 댓글의 UP과 순위를 자동으로 찾아요.' },
-      { target: q('.comment-up-list'), optional: true, text: '등록한 게시글은 카드로 쌓여요. 아직 목표를 못 채운 글이 위에, 목표를 달성한 글은 금색으로 아래에 놓여요.' },
+      { target: q('.comment-up-list'), optional: true, get text() { return document.querySelector('.comment-up-list .comment-up-sample') ? '게시글을 추가하면 이 예시처럼 카드가 생겨요. 목표를 못 채운 글이 위에, 달성한 글은 금색으로 아래에 놓여요.' : '등록한 게시글은 카드로 쌓여요. 아직 목표를 못 채운 글이 위에, 목표를 달성한 글은 금색으로 아래에 놓여요.'; } },
       { target: q('.comment-up-card .comment-up-icon'), optional: true, text: '↻를 누르면 최신 UP과 순위를 다시 확인해요. 옆 ⋯ 메뉴에서 목표 수정과 삭제를 할 수 있어요.' },
       { target: q('.comment-up-card .comment-up-go'), optional: true, text: '"UP 누르러 가기"는 SOOP 게시글을 열고 내 댓글을 강조해서 바로 보여 줘요.' },
       { target: q('.comment-up-card .comment-up-qr-open'), optional: true, text: '"QR코드 생성"으로 내 댓글 링크를 QR로 만들어요. 문구를 넣어 PNG로 저장하거나, 다마고치가 있으면 방송 오버레이에 띄울 수 있어요.' },
