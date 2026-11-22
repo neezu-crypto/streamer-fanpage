@@ -2293,5 +2293,9 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .tg-care-showcase.tg-care-room-preview{max-width:none;width:100%;padding:0;border:0;background:none;justify-items:stretch;gap:8px}
 .tg-care-room-preview .tg-stage{width:100%;pointer-events:none;user-select:none}
 .tg-care-room-preview .tg-care-showcase-badge{z-index:3}
-.tg-care-preview-tools .tg-care-tool[aria-disabled="true"]{opacity:.55;cursor:not-allowed;filter:grayscale(.35)}
+.tg-care-preview-tools .tg-care-tool[aria-disabled="true"]{cursor:not-allowed}.tg-care-preview-tools .tg-care-tool[aria-disabled="true"]>*{opacity:.55;filter:grayscale(.35)}
 .tg-care-preview-stats{opacity:.75}
+/* 분양 전 도구 미리보기 툴팁(2026-11-23): 마우스를 올리거나 키보드로 고르면 바로 뜬다 */
+.tg-care-preview-tools .tg-care-tool{position:relative}
+.tg-care-preview-tools .tg-care-tool[data-tip]::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 6px);z-index:20;transform:translateX(-50%);padding:5px 9px;border-radius:8px;background:rgba(47,42,44,.92);color:#fff;font-size:12px;font-weight:600;line-height:1.3;white-space:nowrap;pointer-events:none;opacity:0;visibility:hidden}
+.tg-care-preview-tools .tg-care-tool[data-tip]:is(:hover,:focus-visible)::after{opacity:1;visibility:visible}

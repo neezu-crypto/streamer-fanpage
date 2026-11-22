@@ -172,14 +172,13 @@ export function mountCareView(container, {
     //  상호작용 체험은 분양소에서만 한다. 서버 호출 없이 이미 불러온 상점 모듈로 브라우저에서만 그린다.
     //  2026-11-23: 몽실이만 보이던 진열장 대신, 분양 후와 같은 방(무대·집)에 몽실이를 앉혀 미리 보여 준다. 도구·누르기 반응은 없다.
     if (mods?.createMongsil) {
-      const showcase = el('figure', 'tg-care-showcase tg-care-room-preview'); showcase.setAttribute('aria-label', '분양 전 미리보기: 몽실이가 지낼 방');
+      const showcase = el('figure', 'tg-care-showcase tg-care-room-preview'); showcase.setAttribute('aria-label', '분양 전 미리보기: 다마고치가 지낼 방');
       const stage = el('section', 'tg-stage tg-care-stage'); stage.setAttribute('aria-hidden', 'true');
       const petEl = el('div', 'tg-stage-pet'); stage.append(petEl);
       showcase.append(stage, el('span', 'tg-care-showcase-badge', '미리보기'), el('figcaption', '', '분양받으면 이 방에서 팬들과 함께 돌봐요'));
       box.append(showcase);
-      petApi = mods.createMongsil(petEl, { color: 'cream', reduced });
-      //  모바일은 초당 30번만 그린다(공통 규칙). 화면 밖이면 아래 IntersectionObserver가 멈춘다.
-      if (window.matchMedia?.('(max-width: 760px), (pointer: coarse)').matches) petApi.setLowPower?.(true);
+      //  2026-11-23: 분양 전에는 펫 모습을 숨기고 방만 보여 준다(펫을 그리지 않음, 빈 자리만 둠).
+      petEl.style.visibility = 'hidden';
       if (mods.createScene) {
         scene = mods.createScene({ stage, pet: petEl, reduced, maxPetRatio: window.matchMedia('(max-width: 560px)').matches ? 0.56 : Infinity });
         stage.classList.add('has-home'); requestAnimationFrame(() => scene?.alignHome?.());
@@ -191,7 +190,7 @@ export function mountCareView(container, {
         tools.append(...Object.entries(mods.TOOLS).map(([id, tool]) => {
           const b = el('button', 'tg-action tg-care-tool'); b.type = 'button'; b.setAttribute('aria-disabled', 'true'); b.dataset.tool = id;
           const img = el('img'); img.src = tool.src; img.alt = ''; img.draggable = false; img.decoding = 'async';
-          b.append(img, el('span', '', tool.label)); b.title = `${tool.label} · 분양받으면 쓸 수 있어요`; b.setAttribute('aria-label', `${tool.label} (분양 후 사용 가능)`);
+          b.append(img, el('span', '', tool.label)); b.dataset.tip = `${tool.label} · 분양받으면 쓸 수 있어요`; b.setAttribute('aria-label', `${tool.label} (분양 후 사용 가능)`);
           return b;
         }));
         box.append(tools);
