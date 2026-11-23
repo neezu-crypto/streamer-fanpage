@@ -6,7 +6,7 @@ import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebase
 import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket4';
 import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261119-tour7';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
-import { renderIntroDeckSection } from './intro-deck-view.js?v=20261123-intro5';
+import { renderIntroDeckSection } from './intro-deck-view.js?v=20261123-intro6';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
@@ -6335,7 +6335,8 @@ function renderFanPage(page, options = {}) {
         if (!target || view._binder?.reveal(target)) return;
         const key = target.closest('[role="tabpanel"]')?.id?.replace(/^fanpagePanel-/, '');
         if (key) selectFanPageTab(key, false, { fromUser: true });
-        requestAnimationFrame(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
+        //  탭 전환·탭 튜토리얼이 스크롤을 옮긴 뒤에 그 칸으로 간다.
+        setTimeout(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }), 500);
         if (type === 'links') showToast('프로필의 ⚙ 설정에서 YouTube·팬카페 링크를 넣을 수 있어요.');
       },
       onPublicChange: (isPublic) => { if (currentPage?.streamer.id === page.streamer.id) currentPage.introDeckPublic = isPublic; page.introDeckPublic = isPublic; },

@@ -332,9 +332,9 @@ function openEditor(page, deps, deck, onSaved) {
       check.disabled = !slide.on && onCount() >= MAX_SLIDES;
       check.addEventListener('change', () => { slide.on = check.checked; current = i; refresh(); });
       const pick = el('button', 'intro-editor-slide-name', TYPE_INFO[slide.type].label); pick.type = 'button';
-      pick.title = `${TYPE_INFO[slide.type].label} 장을 오른쪽에서 보고 고쳐요`;
+      pick.title = `${TYPE_INFO[slide.type].label} 장을 미리 보고 고쳐요`;
       pick.append(el('span', 'intro-editor-slide-go', '고치기 ›'));
-      pick.addEventListener('click', () => { current = i; refresh(); });
+      pick.addEventListener('click', () => { current = i; refresh(); if (window.matchMedia('(max-width: 760px)').matches) previewBox.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' }); });
       const up = el('button', 'intro-editor-move', '↑'); up.type = 'button'; up.title = '앞으로'; up.setAttribute('aria-label', `${TYPE_INFO[slide.type].label} 앞으로`);
       const down = el('button', 'intro-editor-move', '↓'); down.type = 'button'; down.title = '뒤로'; down.setAttribute('aria-label', `${TYPE_INFO[slide.type].label} 뒤로`);
       up.disabled = i === 0; down.disabled = i === state.slides.length - 1;
@@ -411,7 +411,7 @@ function openEditor(page, deps, deck, onSaved) {
   }
 
   const countNote = el('span', 'intro-editor-count');
-  side.append(el('strong', 'intro-editor-label', '디자인'), designRow, el('strong', 'intro-editor-label', '넣을 장과 순서'), el('small', 'intro-editor-guide', '☑ 체크로 넣고 빼요 · 이름을 누르면 오른쪽에서 고쳐요 · ↑↓로 순서'), list, countNote);
+  side.append(el('strong', 'intro-editor-label', '디자인'), designRow, el('strong', 'intro-editor-label', '넣을 장과 순서'), el('small', 'intro-editor-guide', '☑ 체크로 넣고 빼요 · 이름을 누르면 미리보기와 글 고치기가 열려요 · ↑↓로 순서'), list, countNote);
   const main = el('div', 'intro-editor-main');
   main.append(previewBox, detail);
   body.append(side, main);
