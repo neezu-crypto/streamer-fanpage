@@ -1656,7 +1656,7 @@ dialog[open]{overscroll-behavior:contain}
 @media(max-width:720px){.registered-section{margin-top:28px}.registered-section-actions{gap:7px}.registered-streamers-toggle{min-height:31px;padding:5px 9px;font-size:9px}}
 
 /* Fanpage content is grouped into four focused views. */
-#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+#fanPageView .fanpage-tab-nav{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(var(--tab-count,8),minmax(0,1fr));gap:6px;margin:20px 0 22px;padding:6px;border:1px solid #ffffff20;border-radius:18px;background:#1b1924eF;box-shadow:0 8px 24px #0002;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 #fanPageView .fanpage-tab-button{min-width:0;min-height:44px;padding:8px 12px;border:1px solid transparent;border-radius:13px;background:transparent;color:#c7c0cf;font:700 13px var(--font);cursor:pointer;transition:background .16s,border-color .16s,color .16s,box-shadow .16s}
 #fanPageView .fanpage-tab-button:hover{border-color:#ffffff24;background:#ffffff0b;color:var(--text)}
 #fanPageView .fanpage-tab-button[aria-selected=true]{border-color:#ffffff26;background:linear-gradient(180deg,#ffffff18,#ffffff0b);color:var(--text);box-shadow:inset 0 1px 0 #ffffff22}
@@ -2309,3 +2309,130 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .server-history-dialog input[type="month"]:disabled{opacity:.45}
 .fanpage-tab-column > .server-history-section{margin-top:18px}
 .server-history-mode{justify-self:start;min-height:32px;padding:0 12px;font-size:11px}.server-history-bulk{display:grid;gap:8px}.server-history-bulk[hidden],.competition-history-form-grid[hidden]{display:none}.server-history-bulk textarea{min-height:150px;resize:vertical;line-height:1.6}.server-history-bulk-help{margin:0;font-size:11px;line-height:1.6;opacity:.75}.server-history-bulk-count{margin:0;font-size:12px;font-weight:700}.server-history-bulk-count:empty{display:none}.server-history-bulk-count.is-error{color:#c0262d}
+
+/* ===== 자기소개 탭(2026-11-23) ===== 슬라이드 안 글자 크기는 슬라이드 폭 기준(cqw)이라 어디서나 같은 구도 */
+.intro-deck-section{min-width:0}
+.intro-deck-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.intro-deck-head .eyebrow{margin:0 0 5px}
+.intro-deck-head h2{margin:0}
+.intro-deck-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.intro-deck-public-badge{padding:5px 10px;border-radius:99px;background:#8881;font-size:12px;font-weight:700}
+.intro-deck-public-badge.is-public{background:#2e9e5b22;color:#1f7a44}
+.intro-deck-empty{margin:0 0 12px;font-size:13px;line-height:1.6;opacity:.85}
+.intro-deck-viewer{display:grid;gap:10px;width:100%;max-width:960px;margin-inline:auto}
+.intro-deck-stage{position:relative;border-radius:14px;overflow:hidden;outline-offset:3px;touch-action:pan-y}
+.intro-deck-viewer.is-sample .intro-deck-stage{outline:2px dashed #c9a0c4;outline-offset:3px}
+.intro-deck-sample-badge{position:absolute;top:10px;left:10px;z-index:3;padding:4px 10px;border-radius:99px;background:#fff;color:#7a3d70;font-size:12px;font-weight:800;box-shadow:0 2px 8px #0002}
+.intro-deck-bar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.intro-deck-nav{min-width:44px;min-height:44px;padding:0;font-size:22px;line-height:1}
+.intro-deck-counter{min-width:52px;text-align:center;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.intro-deck-present-open{min-height:44px}
+.intro-deck-text{font-size:13px}
+.intro-deck-text summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:700}
+.intro-deck-text-list{margin:6px 0 0;padding-left:22px;line-height:1.7}
+.intro-deck-text-list ul{margin:2px 0 8px;padding-left:18px}
+.intro-deck-text-list p{margin:2px 0 8px}
+
+/* 슬라이드 */
+.intro-slide{position:relative;container-type:inline-size;aspect-ratio:16/9;width:100%;overflow:hidden;font-family:var(--font,'Gowun Dodum',sans-serif);text-align:left;line-height:1.35;user-select:none}
+.intro-slide *{box-sizing:border-box}
+.intro-slide-bg{position:absolute;inset:0}
+.intro-slide-panel{position:absolute;inset:6cqw 7cqw;display:flex;flex-direction:column;justify-content:center;gap:1.4cqw;padding:3.4cqw 4cqw;border-radius:2.4cqw}
+.intro-slide-eyebrow{font-size:1.5cqw;font-weight:800;letter-spacing:.3em}
+.intro-slide-title{font-size:4.6cqw;font-weight:800;line-height:1.15;overflow-wrap:anywhere}
+.intro-slide-subtitle{font-size:2.1cqw;font-weight:700;opacity:.85}
+.intro-slide-note{font-size:1.9cqw;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.intro-slide-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.1cqw 1.6cqw;margin-top:.6cqw}
+.intro-slide-items.is-dense{grid-template-columns:repeat(3,minmax(0,1fr));gap:.8cqw 1.2cqw}
+.intro-slide-item{display:grid;gap:.3cqw;min-width:0;padding:1.1cqw 1.4cqw;border-radius:1.4cqw}
+.intro-slide-item-label{font-size:1.9cqw;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.intro-slide-item-value{font-size:1.5cqw;opacity:.85;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.intro-slide-items.is-dense .intro-slide-item-label{font-size:1.6cqw}
+.intro-slide-items.is-dense .intro-slide-item-value{font-size:1.3cqw}
+.intro-slide-page{position:absolute;right:2.4cqw;bottom:1.8cqw;font-size:1.3cqw;font-weight:700;opacity:.6}
+.intro-slide-cover .intro-slide-panel,.intro-slide-closing .intro-slide-panel{align-items:center;text-align:center}
+.intro-slide-cover .intro-slide-title{font-size:6.4cqw}
+.intro-slide-closing .intro-slide-title{font-size:7cqw}
+.intro-slide-avatar{width:13cqw;height:13cqw;border-radius:50%;object-fit:cover;border:.6cqw solid #fff;box-shadow:0 1cqw 3cqw #0003}
+.intro-slide-links .intro-slide-item-value{-webkit-line-clamp:1;word-break:break-all}
+.intro-slide.is-entering{animation:intro-slide-in .28s ease-out}
+@keyframes intro-slide-in{from{opacity:0;transform:translateX(1.5%)}to{opacity:1;transform:none}}
+
+/* 무료 디자인 1: 파스텔 */
+.intro-slide-pastel{color:#3a2b45}
+.intro-slide-pastel .intro-slide-bg{background:radial-gradient(circle at 12% 18%,#ffd6e7 0 14%,transparent 15%),radial-gradient(circle at 88% 82%,#dcd3ff 0 18%,transparent 19%),radial-gradient(circle at 92% 12%,#fff1c9 0 8%,transparent 9%),linear-gradient(135deg,#fff3f8,#f1edff)}
+.intro-slide-pastel .intro-slide-panel{background:#ffffffc7;box-shadow:0 1cqw 3cqw #a07ab022}
+.intro-slide-pastel .intro-slide-eyebrow{color:#c0558a}
+.intro-slide-pastel .intro-slide-item{background:#f7eefb}
+.intro-slide-pastel .intro-slide-item-label{color:#4a2f5c}
+
+/* 무료 디자인 2: 미드나잇 */
+.intro-slide-midnight{color:#f4f1ff}
+.intro-slide-midnight .intro-slide-bg{background:radial-gradient(circle at 20% 30%,#fff 0 .15cqw,transparent .25cqw),radial-gradient(circle at 70% 15%,#fff 0 .2cqw,transparent .3cqw),radial-gradient(circle at 85% 60%,#ffe9a8 0 .2cqw,transparent .3cqw),radial-gradient(circle at 35% 85%,#fff 0 .15cqw,transparent .25cqw),radial-gradient(ellipse at 80% 110%,#5b3ea8 0,transparent 55%),linear-gradient(160deg,#141832,#232a55)}
+.intro-slide-midnight .intro-slide-panel{background:#0b0e2299;border:.15cqw solid #ffffff22}
+.intro-slide-midnight .intro-slide-eyebrow{color:#ffb4d6}
+.intro-slide-midnight .intro-slide-item{background:#ffffff14}
+
+/* 전체화면 발표(아이폰은 고정 창으로 대신) */
+html.intro-present-open,html.intro-present-open body{overflow:hidden}
+.intro-present{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#000;outline:0}
+.intro-present-holder{width:min(100vw,calc(100dvh * 16 / 9));cursor:pointer;touch-action:pan-y}
+.intro-present-close{position:absolute;top:calc(env(safe-area-inset-top) + 10px);right:calc(env(safe-area-inset-right) + 10px);z-index:2;width:44px;height:44px;border:0;border-radius:50%;background:#ffffff26;color:#fff;font-size:20px;cursor:pointer;opacity:.6}
+.intro-present-close:hover,.intro-present-close:focus-visible{opacity:1}
+.intro-present-rotate{display:none;position:absolute;bottom:calc(env(safe-area-inset-bottom) + 18px);left:50%;transform:translateX(-50%);padding:8px 14px;border-radius:99px;background:#ffffff26;color:#fff;font-size:13px;white-space:nowrap;pointer-events:none}
+@media (orientation:portrait) and (max-width:760px){.intro-present-rotate{display:block}}
+
+/* 편집 창 */
+.intro-editor-dialog{box-sizing:border-box;width:min(1040px,calc(100vw - 28px));max-width:calc(100vw - 28px);max-height:calc(100dvh - 28px);overflow:auto}
+.intro-editor{display:grid;gap:14px}
+.intro-editor .profile-editor-heading{margin-bottom:0}
+.intro-editor-body{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;align-items:start}
+.intro-editor-side{display:grid;gap:8px}
+.intro-editor-label{font-size:13px}
+.intro-editor-designs{display:flex;gap:6px;flex-wrap:wrap}
+.intro-editor-design{min-height:40px}
+.intro-editor-design[aria-checked=true]{outline:2px solid currentColor;outline-offset:1px;font-weight:800}
+.intro-editor-slides{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.intro-editor-slide{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:10px}
+.intro-editor-slide.is-current{background:#c0558a1f}
+.intro-editor-slide.is-off .intro-editor-slide-name{opacity:.55}
+.intro-editor-slide input{width:18px;height:18px;margin:0;flex:none}
+.intro-editor-slide-name{flex:1;min-height:40px;padding:0 6px;border:0;background:none;color:inherit;font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.intro-editor-slide-count{font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
+.intro-editor-move{width:32px;height:36px;border:1px solid #8884;border-radius:8px;background:none;color:inherit;cursor:pointer}
+.intro-editor-move:disabled{opacity:.3;cursor:default}
+.intro-editor-count{font-size:12px;opacity:.8}
+.intro-editor-main{display:grid;gap:12px;min-width:0}
+.intro-editor-preview{position:relative;border-radius:12px;overflow:hidden}
+.intro-editor-detail{display:grid;gap:10px}
+.intro-editor-detail-title{font-size:15px}
+.intro-editor-help{margin:0;font-size:13px;opacity:.8}
+.intro-editor-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin:0;padding:10px;border:1px solid #8884;border-radius:10px}
+.intro-editor-items legend{padding:0 4px;font-size:13px;font-weight:700}
+.intro-editor-item{display:flex;align-items:center;gap:8px;min-height:40px;font-size:13px;cursor:pointer}
+.intro-editor-item input{width:18px;height:18px;margin:0;flex:none}
+.intro-editor-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.intro-editor-public{display:flex;align-items:center;gap:8px;min-height:44px;font-size:14px;font-weight:700;cursor:pointer}
+.intro-editor-public input{width:20px;height:20px;margin:0}
+.intro-editor-status{display:none;margin:0;font-size:13px}
+.intro-editor-status.is-error{display:block;color:#d0304a}
+.intro-editor-footer{align-items:center}
+.intro-editor-footer small{font-size:12px;opacity:.8}
+@media (max-width:760px){
+  .intro-editor-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
+  .intro-editor-body{grid-template-columns:1fr}
+  .intro-editor-main{order:-1}
+  .intro-editor input[type=text],.intro-editor textarea{font-size:16px}
+  .intro-editor-footer{flex-direction:column;align-items:stretch}
+  .intro-deck-head h2{font-size:20px}
+}
+@media (prefers-reduced-motion:reduce){.intro-slide.is-entering{animation:none}}
+#fanPageView.fanpage-layout-2 .fanpage-tab-panel-grid>.intro-deck-section{grid-column:1/-1}
+
+/* 자기소개 바로가기 카드(프로필 아래) */
+.profile-intro-link{grid-column:1/-1;display:flex;align-items:center;gap:12px;width:100%;margin:0;box-sizing:border-box;padding:12px 16px;border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:14px;background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;font:inherit;text-align:left;cursor:pointer;min-height:48px}
+.profile-intro-link:hover{background:color-mix(in srgb,currentColor 10%,transparent)}
+.profile-intro-link:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.profile-intro-link-icon{font-size:1.4em}
+.profile-intro-link-text{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.profile-intro-link-text small{opacity:.72;font-size:.85em}

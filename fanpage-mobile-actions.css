@@ -78,8 +78,9 @@
 
 /* ===== 모바일 탭 바·다마고치 탭 떠 있는 버튼 (2026-11-13) =====
    디자인 1·2도 디자인 3처럼 탭 바를 한 줄 가로 스크롤로 둔다(3줄 약 144px → 한 줄).
-   선택한 탭 가운데 정렬은 app.js selectFanPageTab이 모든 디자인에서 맡는다. */
-@media (max-width: 560px) {
+   선택한 탭 가운데 정렬은 app.js selectFanPageTab이 모든 디자인에서 맡는다.
+   2026-11-23: 탭이 9개가 되면(자기소개) 4칸 격자에서 한 칸만 아랫줄로 떨어지므로 900px 이하 전체를 한 줄로 둔다. */
+@media (max-width: 900px) {
   #fanPageView:not(.fanpage-layout-3) .fanpage-tab-nav {
     display: flex;
     flex-wrap: nowrap;

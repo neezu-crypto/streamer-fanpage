@@ -6,6 +6,7 @@ import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebase
 import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket4';
 import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261119-tour7';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
+import { renderIntroDeckSection } from './intro-deck-view.js?v=20261123-intro1';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
@@ -157,6 +158,7 @@ const callAdminStats = authenticatedCallable('streamerFanPageAdminStats');
 const callDesignFeedback = authenticatedCallable('streamerFanPageDesignFeedback');
 const callAdminViewerSubscriptionRequests = authenticatedCallable('streamerFanPageAdminViewerSubscriptionRequests');
 const callSave = authenticatedCallable('streamerFanPageSave');
+const callIntroDeck = authenticatedCallable('streamerFanPageIntroDeck');
 const callSongbook = authenticatedCallable('streamerFanPageSongbook');
 const callPlayedGames = authenticatedCallable('streamerFanPagePlayedGames');
 const callMemories = authenticatedCallable('streamerFanPageMemories');
@@ -5065,6 +5067,12 @@ function fanpageTabTourSteps(page, tabKey) {
       { target: q('#upbo-tab-records'), text: '"등록된 업보 기록"에서 공개된 기록과 달성 여부를 관리해요.' },
     ] };
   }
+  if (tabKey === 'intro' && ownerEditing) {
+    return { id: 'intro:owner', steps: [
+      { target: q('.intro-deck-edit'), timeout: 8000, text: '팬페이지에 적은 프로필·게임·대회·서버 정보로 자기소개 슬라이드를 만들어요. 넣을 장과 항목을 고르고 글을 고칠 수 있어요.' },
+      { target: q('.intro-deck-present-open'), text: '"전체화면 발표"로 합방·대회 자리에서 바로 소개해요. ←/→·스페이스로 넘기고 Esc로 끝내요.' },
+    ] };
+  }
   if (tabKey === 'content' && ownerEditing) {
     return { id: 'content:owner', steps: [
       { target: q('.songbook-add-form'), timeout: 8000, text: '노래책이에요. YouTube 영상 링크를 붙여 넣으면 제목과 썸네일을 자동으로 불러와요.' },
@@ -6123,6 +6131,15 @@ function renderFanPage(page, options = {}) {
   if (facts.childElementCount) section.append(facts);
   if (about) section.append(about);
   if (details.childElementCount) section.append(details);
+  //  자기소개 바로가기(2026-11-23): 자기소개 탭이 보일 때만(스트리머 본인 또는 공개됨) 프로필 아래에 둔다.
+  if (page.isOwner === true || page.introDeckPublic === true) {
+    const introLink = document.createElement('button');
+    introLink.type = 'button'; introLink.className = 'profile-intro-link';
+    introLink.title = page.introDeckPublic ? '자기소개 슬라이드 탭으로 이동해요' : '자기소개 슬라이드를 만들고 팬에게 공개할 수 있어요';
+    introLink.innerHTML = `<span class="profile-intro-link-icon" aria-hidden="true">🎞️</span><span class="profile-intro-link-text"><strong>자기소개 보기</strong><small>${page.introDeckPublic ? '슬라이드로 한눈에 알아보기' : '아직 팬에게 비공개예요 · 만들고 공개하기'}</small></span><span aria-hidden="true">→</span>`;
+    introLink.addEventListener('click', () => { const panel = document.getElementById('fanpagePanel-intro'); if (!(panel && view._binder?.reveal(panel))) { view._selectFanPageTab?.('intro', false, { fromUser: true }); document.getElementById('fanpageTabNav')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); } });
+    section.append(introLink);
+  }
   section.append(stockCard, actions);
   const topBanner = renderBannerSection(page, 'top');
   if (topBanner) {
@@ -6204,6 +6221,9 @@ function renderFanPage(page, options = {}) {
     { key: 'comment-up', label: '댓글 UP 체크', eyebrow: 'COMMENT UP', title: '댓글 UP 체크', description: '등록한 게시글에서 남긴 댓글의 UP과 순위를 확인해요.' },
     { key: 'tamagotchi', label: '다마고치', eyebrow: 'STREAMER TAMAGOTCHI', title: '다마고치', description: '통합 상점에서 분양받은 다마고치를 팬과 함께 돌보고 키워요.' },
   ];
+  //  자기소개(2026-11-23): 스트리머 본인은 항상, 팬은 공개된 자기소개가 있을 때만 홈 바로 뒤에 보인다.
+  const showIntroTab = page.isOwner === true || page.introDeckPublic === true;
+  if (showIntroTab) tabDefinitions.splice(1, 0, { key: 'intro', label: '자기소개', eyebrow: 'SELF INTRODUCTION', title: '자기소개', description: '스트리머를 한눈에 알 수 있는 소개 슬라이드예요. 전체화면으로 발표할 수도 있어요.' });
   //  디자인 4(바인더): 주간일정표를 홈에서 떼어 단독 탭(두 번째 장)으로 둔다.
   if (usesBinderLayout) tabDefinitions.splice(1, 0, { key: 'schedule', label: '주간일정표', eyebrow: 'WEEKLY SCHEDULE', title: '이번 주 방송', description: '스트리머가 올린 주간 일정표를 크게 보여드려요.' });
   const tabDefinition = (key) => tabDefinitions.find((tab) => tab.key === key);
@@ -6315,6 +6335,14 @@ function renderFanPage(page, options = {}) {
     ['video-library', createFanPageTabPanel(tabDefinition('video-library'), [videoLibrarySection])],
     ['rolling-paper', createFanPageTabPanel(tabDefinition('rolling-paper'), [rollingPaperSection])],
     ['memories', createFanPageTabPanel(tabDefinition('memories'), [memoriesSection])],
+    ...(showIntroTab ? [['intro', createFanPageTabPanel(tabDefinition('intro'), [renderIntroDeckSection(page, {
+      call: (data) => callIntroDeck(data),
+      loadPublicFile: loadPublicFanPageFile,
+      playedGames: (p) => (Array.isArray(p.playedGames) ? p.playedGames : fanPageContentStateFor(p.streamer.id).playedGames),
+      showModal: showFanPageModal,
+      toast: showToast,
+      onPublicChange: (isPublic) => { if (currentPage?.streamer.id === page.streamer.id) currentPage.introDeckPublic = isPublic; page.introDeckPublic = isPublic; },
+    })])]] : []),
     ['comment-up', createFanPageTabPanel(tabDefinition('comment-up'), [renderCommentUpSection(page)])],
     ['tamagotchi', createFanPageTabPanel(tabDefinition('tamagotchi'), [tamagotchiSection])],
   ]);
@@ -6447,6 +6475,8 @@ function renderFanPage(page, options = {}) {
   }
   view._selectFanPageTab = selectFanPageTab;
   const ownerChecklist = renderOwnerChecklist(page, selectFanPageTab);
+  //  PC 탭 바는 탭 수만큼 같은 폭 칸(자기소개 탭이 팬에게 숨겨지면 8칸, 보이면 9칸).
+  tabNav.style.setProperty('--tab-count', String(tabNav.querySelectorAll('.fanpage-tab-button').length || 8));
   view.append(...(ownerChecklist ? [ownerChecklist] : []), tabNav, tabAnnouncer, ...tabPanels.values());
   if (usesBinderLayout) {
     //  스트리머 관리 상자는 대문 위, 팬 캐릭터·OGQ는 대문 안(제목 밑), 대문 아래에 포카 바인더 바로가기.

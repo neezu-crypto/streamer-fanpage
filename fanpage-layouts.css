@@ -4023,7 +4023,7 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .vod-refresh-butt
    up a second ticket/ribbon layer or the mobile overflow behavior. */
 #fanPageView.fanpage-layout-3 .fanpage-tab-nav {
   display: grid !important;
-  grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(var(--tab-count, 8), minmax(0, 1fr)) !important;
   align-items: stretch !important;
   justify-content: stretch !important;
   gap: 10px !important;
@@ -5269,4 +5269,18 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 [data-reveal="sho
 }
 @media (prefers-reduced-motion: reduce) {
   body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 [data-reveal] { opacity: 1; translate: none; transition: none; }
+}
+
+/* 2026-11-23 디자인 3: 721~900px도 탭 바를 한 줄 가로 스크롤로(4칸 격자에서 9번째 탭이 혼자 아랫줄로 떨어지지 않게). */
+@media (min-width: 721px) and (max-width: 900px) {
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-nav {
+    display: flex !important; flex-wrap: nowrap !important; grid-template-columns: none !important; justify-content: flex-start !important;
+    gap: 6px !important; padding: 8px 10px !important; overflow-x: auto !important; overflow-y: hidden !important;
+    scroll-snap-type: x proximity; scrollbar-width: none;
+  }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .fanpage-tab-nav::-webkit-scrollbar { display: none; }
+  body.fanpage-layout-three-active #fanPageView.fanpage-layout-3
+    :is(.fanpage-tab-button, .fanpage-tab-button:hover, .fanpage-tab-button:focus-visible, .fanpage-tab-button:active) {
+    flex: 0 0 auto !important; width: auto !important; min-width: 88px !important; padding-inline: 14px !important; scroll-snap-align: center; white-space: nowrap !important;
+  }
 }
