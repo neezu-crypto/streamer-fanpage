@@ -6,7 +6,7 @@ import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebase
 import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket4';
 import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261119-tour7';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
-import { renderIntroDeckSection } from './intro-deck-view.js?v=20261123-intro1';
+import { renderIntroDeckSection } from './intro-deck-view.js?v=20261123-intro5';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
@@ -5068,9 +5068,11 @@ function fanpageTabTourSteps(page, tabKey) {
     ] };
   }
   if (tabKey === 'intro' && ownerEditing) {
-    return { id: 'intro:owner', steps: [
-      { target: q('.intro-deck-edit'), timeout: 8000, text: '팬페이지에 적은 프로필·게임·대회·서버 정보로 자기소개 슬라이드를 만들어요. 넣을 장과 항목을 고르고 글을 고칠 수 있어요.' },
-      { target: q('.intro-deck-present-open'), text: '"전체화면 발표"로 합방·대회 자리에서 바로 소개해요. ←/→·스페이스로 넘기고 Esc로 끝내요.' },
+    //  2026-11-23 v2: 정보 없는 장 안내·공개 버튼 둘·저장 뒤 고정 안내 반영
+    return { id: 'intro:owner-v2', steps: [
+      { target: q('.intro-deck-stage'), timeout: 8000, optional: true, text: '팬페이지에 적어 둔 프로필·게임·대회·서버 정보로 슬라이드를 자동으로 만들어 보여 줘요. 정보가 없는 장은 빠져 있어요.' },
+      { target: q('.intro-deck-edit'), timeout: 8000, text: '여기서 넣을 장·순서·글을 고르고, "저장하고 팬에게 공개"를 누르면 팬에게도 자기소개 탭이 보여요. "나만 보기로 저장"은 나에게만 보여요.' },
+      { target: q('.intro-deck-present-open'), text: '"전체화면 발표"로 합방·대회 자리에서 바로 소개해요. ←/→·스페이스로 넘기고 Esc로 끝내요. 저장한 뒤 팬페이지 정보를 바꾸면 여기서 다시 저장해야 슬라이드에 들어가요.' },
     ] };
   }
   if (tabKey === 'content' && ownerEditing) {
@@ -6327,6 +6329,15 @@ function renderFanPage(page, options = {}) {
       playedGames: (p) => (Array.isArray(p.playedGames) ? p.playedGames : fanPageContentStateFor(p.streamer.id).playedGames),
       showModal: showFanPageModal,
       toast: showToast,
+      goToSource: (type) => {
+        const sectionId = { games: 'playedGamesSection', competitions: 'competitionHistorySection', servers: 'serverHistorySection' }[type] || 'profileBoard';
+        const target = document.getElementById(sectionId);
+        if (!target || view._binder?.reveal(target)) return;
+        const key = target.closest('[role="tabpanel"]')?.id?.replace(/^fanpagePanel-/, '');
+        if (key) selectFanPageTab(key, false, { fromUser: true });
+        requestAnimationFrame(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
+        if (type === 'links') showToast('프로필의 ⚙ 설정에서 YouTube·팬카페 링크를 넣을 수 있어요.');
+      },
       onPublicChange: (isPublic) => { if (currentPage?.streamer.id === page.streamer.id) currentPage.introDeckPublic = isPublic; page.introDeckPublic = isPublic; },
     })])]] : []),
     ['activity', createFanPageTabPanel(tabDefinition('activity'), usesBinderLayout

@@ -24,6 +24,15 @@ const PROFILE_FIELDS = [
   ['mbti', 'MBTI'], ['birthday', '생일'], ['debutDate', '데뷔'], ['major', '전공·특기'],
   ['fanNickname', '팬 애칭'], ['fandomName', '팬덤'], ['contents', '주요 콘텐츠'],
 ];
+//  정보가 비어 있을 때 어디서 채우는지(버튼 글·팬페이지 위치).
+const SOURCE_HINT = {
+  profile: { where: '프로필', what: 'MBTI·생일·팬덤 같은 프로필 칸' },
+  games: { where: '콘텐츠 탭 › 플레이한 게임', what: '플레이한 게임' },
+  competitions: { where: '콘텐츠 탭 › 대회 이력', what: '대회 이력' },
+  servers: { where: '콘텐츠 탭 › 참여한 서버', what: '참여한 서버' },
+  schedule: { where: '프로필 › 방송 시간', what: '방송 시간' },
+  links: { where: '프로필 설정', what: 'YouTube·팬카페 링크' },
+};
 const FANPAGE_BASE = 'https://neezu-crypto.github.io/streamer-fanpage/';
 const decks = new Map(); // streamerId → { loaded, loading, deck, error }
 
@@ -77,6 +86,7 @@ function sourceItems(page, games) {
   };
 }
 
+const slideHasData = (type, src) => Boolean(src.items.length || src.note || ['cover', 'closing'].includes(type));
 // 저장본(있으면)과 지금 정보로 편집 상태를 만든다.
 function editorStateFrom(page, games, deck) {
   const source = sourceItems(page, games);
@@ -85,13 +95,13 @@ function editorStateFrom(page, games, deck) {
   const order = [...(deck?.slides || []).map((slide) => slide.type).filter((type) => TYPE_INFO[type]), ...TYPE_ORDER.filter((type) => !saved.has(type))];
   const slides = order.map((type) => {
     const src = source[type]; const old = saved.get(type);
-    const hasData = src.items.length || src.note || ['cover', 'closing'].includes(type);
+    const hasData = slideHasData(type, src);
     const shown = deck ? src.items.filter((item) => picks.has(`${type}:${item.key}`)).map((item) => item.key)
       : src.items.slice(0, DEFAULT_ITEMS).map((item) => item.key);
     return {
       type, on: deck ? saved.has(type) : Boolean(hasData),
       title: old?.title || src.title, subtitle: old ? old.subtitle : src.subtitle, note: old ? old.note : src.note,
-      items: src.items, shown: new Set(shown),
+      items: src.items, shown: new Set(shown), hasData,
     };
   });
   return { design: deck?.design || 'pastel', public: deck ? deck.public === true : false, slides };
@@ -108,6 +118,18 @@ function deckFromEditor(state) {
     })),
     picks: on.flatMap((slide) => slide.items.filter((item) => slide.shown.has(item.key)).map((item) => `${slide.type}:${item.key}`)).slice(0, 200),
   };
+}
+
+// 저장본의 항목 글이 지금 팬페이지 정보와 다른지(저장 뒤 정보를 고쳤는지). 게임 목록을 아직 못 불러왔으면 게임 장은 비교하지 않는다.
+function deckIsStale(page, games, deck) {
+  if (!deck?.slides?.length) return false;
+  const fresh = deckFromEditor(editorStateFrom(page, games, deck));
+  const gamesKnown = Array.isArray(games) && games.length > 0;
+  return deck.slides.some((slide, i) => {
+    if (slide.type === 'games' && !gamesKnown) return false;
+    const now = fresh.slides[i];
+    return !now || JSON.stringify(slide.items || []) !== JSON.stringify(now.items || []);
+  });
 }
 
 // ---------- 슬라이드 그리기(16:9, 글자 크기는 슬라이드 폭 기준 cqw) ----------
@@ -310,15 +332,18 @@ function openEditor(page, deps, deck, onSaved) {
       check.disabled = !slide.on && onCount() >= MAX_SLIDES;
       check.addEventListener('change', () => { slide.on = check.checked; current = i; refresh(); });
       const pick = el('button', 'intro-editor-slide-name', TYPE_INFO[slide.type].label); pick.type = 'button';
-      pick.title = `${TYPE_INFO[slide.type].label} 장 고치기`;
+      pick.title = `${TYPE_INFO[slide.type].label} 장을 오른쪽에서 보고 고쳐요`;
+      pick.append(el('span', 'intro-editor-slide-go', '고치기 ›'));
       pick.addEventListener('click', () => { current = i; refresh(); });
       const up = el('button', 'intro-editor-move', '↑'); up.type = 'button'; up.title = '앞으로'; up.setAttribute('aria-label', `${TYPE_INFO[slide.type].label} 앞으로`);
       const down = el('button', 'intro-editor-move', '↓'); down.type = 'button'; down.title = '뒤로'; down.setAttribute('aria-label', `${TYPE_INFO[slide.type].label} 뒤로`);
       up.disabled = i === 0; down.disabled = i === state.slides.length - 1;
       const move = (d) => { const [s] = state.slides.splice(i, 1); state.slides.splice(i + d, 0, s); current = i + d; refresh(); };
       up.addEventListener('click', () => move(-1)); down.addEventListener('click', () => move(1));
-      const count = slide.items.length ? el('span', 'intro-editor-slide-count', `${slide.shown.size}/${slide.items.length}`) : null;
-      li.append(check, pick, ...(count ? [count] : []), up, down);
+      let tag = null;
+      if (!slide.hasData) { tag = el('span', 'intro-editor-slide-tag is-empty', '정보 없음'); tag.title = `팬페이지에 ${SOURCE_HINT[slide.type]?.what || '정보'}을 먼저 채우면 이 장을 만들 수 있어요`; }
+      else if (slide.items.length) { tag = el('span', 'intro-editor-slide-tag', `항목 ${slide.shown.size}/${slide.items.length}`); tag.title = `팬페이지 항목 ${slide.items.length}개 중 ${slide.shown.size}개를 보여 줘요`; }
+      li.append(check, pick, ...(tag ? [tag] : []), up, down);
       list.append(li);
     });
   }
@@ -335,11 +360,30 @@ function openEditor(page, deps, deck, onSaved) {
   function renderDetail() {
     const slide = state.slides[current];
     detail.replaceChildren(el('strong', 'intro-editor-detail-title', `${TYPE_INFO[slide.type].label} 장`));
-    if (!slide.on) { detail.append(el('p', 'intro-editor-help', '왼쪽 체크를 켜면 이 장이 들어가요.')); return; }
+    const fillButton = () => {
+      const hint = SOURCE_HINT[slide.type];
+      if (!hint || !deps.goToSource) return null;
+      const go = el('button', 'button intro-editor-fill', `${hint.where}에서 채우기 →`); go.type = 'button';
+      go.title = '이 창을 닫고 팬페이지의 그 칸으로 이동해요. 채운 뒤 다시 "자기소개 만들기"를 눌러 주세요.';
+      go.addEventListener('click', () => { dialog.close(); deps.goToSource(slide.type); });
+      return go;
+    };
+    if (!slide.hasData) {
+      detail.append(el('p', 'intro-editor-help is-warning', `팬페이지에 아직 ${SOURCE_HINT[slide.type]?.what || '정보'}이 없어서 이 장은 비어 있어요. 먼저 채우면 여기 자동으로 들어와요.`));
+      const go = fillButton(); if (go) detail.append(go);
+      if (!slide.on) return;
+    } else if (!slide.on) {
+      const add = el('button', 'button intro-editor-fill', '＋ 이 장 넣기'); add.type = 'button';
+      add.title = '이 장을 자기소개에 넣어요';
+      add.disabled = onCount() >= MAX_SLIDES;
+      add.addEventListener('click', () => { slide.on = true; refresh(); });
+      detail.append(el('p', 'intro-editor-help', '지금은 빠져 있는 장이에요.'), add);
+      return;
+    }
     detail.append(textField('제목', 'title', 40), textField('부제목', 'subtitle', 80), textField('하고 싶은 말', 'note', 200, true));
     if (slide.items.length) {
       const box = el('fieldset', 'intro-editor-items');
-      box.append(el('legend', '', `보여 줄 항목 (최대 ${MAX_ITEMS}개)`));
+      box.append(el('legend', '', `이 장에 보여 줄 항목 (최대 ${MAX_ITEMS}개)`));
       slide.items.forEach((item) => {
         const label = el('label', 'intro-editor-item');
         const check = el('input'); check.type = 'checkbox'; check.checked = slide.shown.has(item.key);
@@ -350,8 +394,6 @@ function openEditor(page, deps, deck, onSaved) {
         box.append(label);
       });
       detail.append(box);
-    } else if (['profile', 'games', 'competitions', 'servers', 'links'].includes(slide.type)) {
-      detail.append(el('p', 'intro-editor-help', '팬페이지에 등록된 항목이 없어요. 팬페이지에 먼저 추가하면 여기서 고를 수 있어요.'));
     }
   }
   function renderPreview() {
@@ -369,41 +411,42 @@ function openEditor(page, deps, deck, onSaved) {
   }
 
   const countNote = el('span', 'intro-editor-count');
-  side.append(el('strong', 'intro-editor-label', '디자인'), designRow, el('strong', 'intro-editor-label', '장 순서·넣을 장'), list, countNote);
+  side.append(el('strong', 'intro-editor-label', '디자인'), designRow, el('strong', 'intro-editor-label', '넣을 장과 순서'), el('small', 'intro-editor-guide', '☑ 체크로 넣고 빼요 · 이름을 누르면 오른쪽에서 고쳐요 · ↑↓로 순서'), list, countNote);
   const main = el('div', 'intro-editor-main');
   main.append(previewBox, detail);
   body.append(side, main);
 
-  const publicLabel = el('label', 'intro-editor-public');
-  const publicCheck = el('input'); publicCheck.type = 'checkbox'; publicCheck.checked = state.public;
-  publicCheck.addEventListener('change', () => { state.public = publicCheck.checked; });
-  publicLabel.title = '켜면 팬페이지에 "자기소개" 탭이 생겨 팬도 넘겨 보고 전체화면으로 볼 수 있어요.';
-  publicLabel.append(publicCheck, document.createTextNode(' 팬에게 공개 (팬페이지에 자기소개 탭이 보여요)'));
   const status = el('p', 'intro-editor-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const footer = el('div', 'profile-editor-footer intro-editor-footer');
-  const hint = el('small', '', '글은 저장할 때의 팬페이지 정보로 만들어져요. 정보를 바꾸면 여기서 다시 저장해 주세요.');
+  const hint = el('small', '', state.public ? '지금 팬에게 공개 중이에요. 저장하면 팬 화면도 바로 바뀌어요.' : '"나만 보기"는 나에게만 보여요. 팬에게 보여 주려면 "저장하고 팬에게 공개"를 눌러 주세요.');
   const actions = el('div', 'profile-editor-footer-actions');
   const cancel = el('button', 'button', '취소'); cancel.type = 'button'; cancel.title = '저장하지 않고 닫아요';
   cancel.addEventListener('click', () => dialog.close());
-  const save = el('button', 'button button-primary', '저장'); save.type = 'submit'; save.title = '자기소개를 저장해요';
-  actions.append(cancel, save); footer.append(hint, actions);
-  form.append(head, body, publicLabel, status, footer);
+  const privateSave = el('button', 'button', state.public ? '공개 끄고 저장' : '나만 보기로 저장'); privateSave.type = 'submit'; privateSave.value = 'private';
+  privateSave.title = state.public ? '팬에게서 자기소개 탭을 숨기고 저장해요' : '팬에게는 보이지 않게 저장해요. 나중에 공개할 수 있어요';
+  const save = el('button', 'button button-primary', state.public ? '저장 (공개 유지)' : '저장하고 팬에게 공개'); save.type = 'submit'; save.value = 'public';
+  save.title = '저장하고 팬페이지에 자기소개 탭을 보여 줘요';
+  const saveLabels = new Map([[privateSave, privateSave.textContent], [save, save.textContent]]);
+  actions.append(cancel, privateSave, save); footer.append(hint, actions);
+  form.append(head, body, status, footer);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (save.disabled) return;
+    const clicked = event.submitter === privateSave ? privateSave : save;
+    state.public = clicked === save;
     const next = deckFromEditor(state);
     status.textContent = ''; status.classList.remove('is-error');
     if (!next.slides.length) { status.textContent = '넣을 장을 하나 이상 골라 주세요.'; status.classList.add('is-error'); return; }
-    save.disabled = true; save.textContent = '저장 중…'; save.setAttribute('aria-busy', 'true');
+    save.disabled = true; privateSave.disabled = true; clicked.textContent = '저장 중…'; clicked.setAttribute('aria-busy', 'true');
     try {
       const result = await deps.call({ action: 'save', streamerId: page.streamer.id, deck: next });
       dialog.close();
       onSaved(result.data.deck);
-      deps.toast(next.public ? '자기소개를 저장하고 팬에게 공개했어요.' : '자기소개를 저장했어요. 아직 팬에게는 보이지 않아요.');
+      deps.toast(next.public ? '자기소개를 저장하고 팬에게 공개했어요.' : '자기소개를 저장했어요. "나만 보기"라 팬에게는 아직 보이지 않아요.');
     } catch (error) {
       status.textContent = error.message || '자기소개를 저장하지 못했어요.'; status.classList.add('is-error');
     } finally {
-      if (save.isConnected) { save.disabled = false; save.removeAttribute('aria-busy'); save.textContent = '저장'; }
+      if (save.isConnected) saveLabels.forEach((text, button) => { button.disabled = false; button.removeAttribute('aria-busy'); button.textContent = text; });
     }
   });
   dialog.append(form);
@@ -425,7 +468,7 @@ export function renderIntroDeckSection(page, deps) {
   const draw = () => {
     const head = el('div', 'intro-deck-head');
     const copy = el('div');
-    copy.append(el('p', 'eyebrow', 'SELF INTRODUCTION'), el('h2', '', `${page.streamer.nickname} 자기소개`));
+    copy.append(el('p', 'eyebrow', 'SELF INTRODUCTION'), el('h2', '', '자기소개 슬라이드'));
     head.append(copy);
     const tools = el('div', 'intro-deck-tools');
     if (canEdit && entry.loaded) {
@@ -450,12 +493,25 @@ export function renderIntroDeckSection(page, deps) {
       return;
     }
     if (entry.deck && entry.deck.slides?.length) {
+      if (canEdit && !entry.deck.public) section.append(el('p', 'intro-deck-notice', '🔒 "나만 보기"로 저장돼 있어요. 팬에게 보여 주려면 "자기소개 고치기" › "저장하고 팬에게 공개"를 눌러 주세요.'));
+      if (canEdit && deckIsStale(page, deps.playedGames(page), entry.deck)) {
+        const stale = el('div', 'intro-deck-notice is-stale');
+        stale.append(el('span', '', '✏️ 저장한 뒤 팬페이지 정보가 바뀌었어요. 슬라이드는 저장할 때 내용 그대로라, 다시 저장해야 새 정보가 들어가요.'));
+        const again = el('button', 'button', '새 정보로 고치기'); again.type = 'button';
+        again.title = '편집 창을 열어 새 정보를 확인하고 저장해요';
+        again.addEventListener('click', () => section.querySelector('.intro-deck-edit')?.click());
+        stale.append(again);
+        section.append(stale);
+      }
       section.append(createViewer(entry.deck, page), renderTextList(entry.deck));
       return;
     }
     if (canEdit) {
       const sample = deckFromEditor(editorStateFrom(page, deps.playedGames(page), null));
-      section.append(el('p', 'intro-deck-empty', '아직 만든 자기소개가 없어요. 아래는 지금 팬페이지 정보로 만든 견본이에요. "자기소개 만들기"로 고르고 저장해 보세요.'));
+      const state = editorStateFrom(page, deps.playedGames(page), null);
+      const missing = state.slides.filter((slide) => !slide.hasData).map((slide) => TYPE_INFO[slide.type].label);
+      section.append(el('p', 'intro-deck-empty', '아직 만든 자기소개가 없어요. 아래는 팬페이지에 적어 둔 정보로 자동으로 만든 견본이에요. "자기소개 만들기"를 눌러 장을 고르고 저장하면 팬에게 보여 줄 수 있어요.'));
+      if (missing.length) section.append(el('p', 'intro-deck-notice', `💡 ${missing.join('·')} 정보가 아직 없어 견본에서 빠졌어요. 팬페이지에 채우면 장이 늘어나요.`));
       if (sample.slides.length) section.append(createViewer(sample, page, { sample: true }));
     } else {
       section.append(el('p', 'intro-deck-empty', '아직 공개된 자기소개가 없어요.'));
