@@ -1,4 +1,4 @@
-// 자기소개 탭(2026-11-23): 팬페이지 정보로 소개 슬라이드를 만들고, 저장·공개·전체화면 발표를 한다.
+// PPT 탭(2026-11-23): 팬페이지 정보로 소개 슬라이드를 만들고, 저장·공개·전체화면 발표를 한다.
 // 서버 호출: 스트리머 화면에서 탭을 처음 그릴 때 get 1번, 저장 1번(streamerFanPageIntroDeck). 팬은 공개 파일 intro-deck.json만 읽는다.
 // 슬라이드 안은 h·p·button 대신 div·span만 써서 디자인 1~5의 공통 글자·버튼 규칙이 닿지 않게 한다.
 
@@ -214,7 +214,7 @@ function createViewer(deck, page, { sample = false } = {}) {
   const stage = el('div', 'intro-deck-stage');
   stage.tabIndex = 0;
   stage.setAttribute('aria-roledescription', '슬라이드');
-  stage.setAttribute('aria-label', '자기소개 슬라이드. 왼쪽·오른쪽 방향키로 넘겨요.');
+  stage.setAttribute('aria-label', 'PPT. 왼쪽·오른쪽 방향키로 넘겨요.');
   const counter = el('span', 'intro-deck-counter');
   counter.setAttribute('aria-live', 'polite');
   const prev = el('button', 'button intro-deck-nav', '‹'); prev.type = 'button';
@@ -264,7 +264,7 @@ function openPresentation(deck, page, startIndex = 0) {
   const overlay = el('div', 'intro-present');
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', '자기소개 발표');
+  overlay.setAttribute('aria-label', 'PPT 발표');
   overlay.tabIndex = -1;
   const holder = el('div', 'intro-present-holder');
   const close = el('button', 'intro-present-close', '✕'); close.type = 'button';
@@ -319,9 +319,9 @@ function openEditor(page, deps, deck, onSaved) {
   dialog.setAttribute('aria-labelledby', 'introEditorTitle');
   const form = el('form', 'account-dialog-card intro-editor');
   const head = el('div', 'profile-editor-heading');
-  const title = el('h2', '', deck ? '자기소개 고치기' : '자기소개 만들기'); title.id = 'introEditorTitle';
+  const title = el('h2', '', deck ? 'PPT 고치기' : 'PPT 만들기'); title.id = 'introEditorTitle';
   const close = el('button', 'button profile-settings-close', '×'); close.type = 'button';
-  close.title = '창 닫기'; close.setAttribute('aria-label', '자기소개 창 닫기');
+  close.title = '창 닫기'; close.setAttribute('aria-label', 'PPT 창 닫기');
   close.addEventListener('click', () => dialog.close());
   head.append(title, close);
 
@@ -387,7 +387,7 @@ function openEditor(page, deps, deck, onSaved) {
       const hint = SOURCE_HINT[slide.type];
       if (!hint || !deps.goToSource) return null;
       const go = el('button', 'button intro-editor-fill', `${hint.where}에서 채우기 →`); go.type = 'button';
-      go.title = '이 창을 닫고 팬페이지의 그 칸으로 이동해요. 채운 뒤 다시 "자기소개 만들기"를 눌러 주세요.';
+      go.title = '이 창을 닫고 팬페이지의 그 칸으로 이동해요. 채운 뒤 다시 "PPT 만들기"를 눌러 주세요.';
       go.addEventListener('click', () => { dialog.close(); deps.goToSource(slide.type); });
       return go;
     };
@@ -397,13 +397,14 @@ function openEditor(page, deps, deck, onSaved) {
       if (!slide.on) return;
     } else if (!slide.on) {
       const add = el('button', 'button intro-editor-fill', '＋ 이 장 넣기'); add.type = 'button';
-      add.title = '이 장을 자기소개에 넣어요';
+      add.title = '이 장을 PPT에 넣어요';
       add.disabled = onCount() >= MAX_SLIDES;
       add.addEventListener('click', () => { slide.on = true; refresh(); });
       detail.append(el('p', 'intro-editor-help', '지금은 빠져 있는 장이에요.'), add);
       return;
     }
     detail.append(textField('제목', 'title', 40), textField('부제목', 'subtitle', 80), textField('하고 싶은 말', 'note', 200, true));
+    if (slide.type === 'links') detail.append(el('p', 'intro-editor-help', '링크 장은 QR이 먼저예요. 링크가 많을 때 하고 싶은 말이 길면 슬라이드에서 잘릴 수 있어요(전체 글은 "글로 보기"에 나와요).'));
     if (slide.items.length) {
       const box = el('fieldset', 'intro-editor-items');
       box.append(el('legend', '', `이 장에 보여 줄 항목 (최대 ${MAX_ITEMS}개)`));
@@ -446,9 +447,9 @@ function openEditor(page, deps, deck, onSaved) {
   const cancel = el('button', 'button', '취소'); cancel.type = 'button'; cancel.title = '저장하지 않고 닫아요';
   cancel.addEventListener('click', () => dialog.close());
   const privateSave = el('button', 'button', state.public ? '공개 끄고 저장' : '나만 보기로 저장'); privateSave.type = 'submit'; privateSave.value = 'private';
-  privateSave.title = state.public ? '팬에게서 자기소개 탭을 숨기고 저장해요' : '팬에게는 보이지 않게 저장해요. 나중에 공개할 수 있어요';
+  privateSave.title = state.public ? '팬에게서 PPT 탭을 숨기고 저장해요' : '팬에게는 보이지 않게 저장해요. 나중에 공개할 수 있어요';
   const save = el('button', 'button button-primary', state.public ? '저장 (공개 유지)' : '저장하고 팬에게 공개'); save.type = 'submit'; save.value = 'public';
-  save.title = '저장하고 팬페이지에 자기소개 탭을 보여 줘요';
+  save.title = '저장하고 팬페이지에 PPT 탭을 보여 줘요';
   const saveLabels = new Map([[privateSave, privateSave.textContent], [save, save.textContent]]);
   actions.append(cancel, privateSave, save); footer.append(hint, actions);
   form.append(head, body, status, footer);
@@ -465,9 +466,9 @@ function openEditor(page, deps, deck, onSaved) {
       const result = await deps.call({ action: 'save', streamerId: page.streamer.id, deck: next });
       dialog.close();
       onSaved(result.data.deck);
-      deps.toast(next.public ? '자기소개를 저장하고 팬에게 공개했어요.' : '자기소개를 저장했어요. "나만 보기"라 팬에게는 아직 보이지 않아요.');
+      deps.toast(next.public ? 'PPT를 저장하고 팬에게 공개했어요.' : 'PPT를 저장했어요. "나만 보기"라 팬에게는 아직 보이지 않아요.');
     } catch (error) {
-      status.textContent = error.message || '자기소개를 저장하지 못했어요.'; status.classList.add('is-error');
+      status.textContent = error.message || 'PPT를 저장하지 못했어요.'; status.classList.add('is-error');
     } finally {
       if (save.isConnected) saveLabels.forEach((text, button) => { button.disabled = false; button.removeAttribute('aria-busy'); button.textContent = text; });
     }
@@ -491,16 +492,16 @@ export function renderIntroDeckSection(page, deps) {
   const draw = () => {
     const head = el('div', 'intro-deck-head');
     const copy = el('div');
-    copy.append(el('p', 'eyebrow', 'SELF INTRODUCTION'), el('h2', '', '자기소개 슬라이드'));
+    copy.append(el('p', 'eyebrow', 'PRESENTATION'), el('h2', '', 'PPT'));
     head.append(copy);
     const tools = el('div', 'intro-deck-tools');
     if (canEdit && entry.loaded) {
       if (entry.deck) {
         const badge = el('span', `intro-deck-public-badge${entry.deck.public ? ' is-public' : ''}`, entry.deck.public ? '팬에게 공개 중' : '나만 보기');
-        badge.title = entry.deck.public ? '팬도 자기소개 탭에서 볼 수 있어요' : '아직 팬에게는 자기소개 탭이 보이지 않아요';
+        badge.title = entry.deck.public ? '팬도 PPT 탭에서 볼 수 있어요' : '아직 팬에게는 PPT 탭이 보이지 않아요';
         tools.append(badge);
       }
-      const edit = el('button', 'button button-primary intro-deck-edit', entry.deck ? '자기소개 고치기' : '자기소개 만들기'); edit.type = 'button';
+      const edit = el('button', 'button button-primary intro-deck-edit', entry.deck ? 'PPT 고치기' : 'PPT 만들기'); edit.type = 'button';
       edit.title = '팬페이지 정보로 슬라이드를 고르고 고쳐요';
       edit.addEventListener('click', () => openEditor(page, deps, entry.deck, (deck) => {
         entry.deck = deck;
@@ -512,11 +513,11 @@ export function renderIntroDeckSection(page, deps) {
     head.append(tools);
     section.replaceChildren(head);
     if (!entry.loaded) {
-      section.append(el('div', 'loading-card loading-bar intro-deck-loading', entry.error || '자기소개를 불러오고 있어요…'));
+      section.append(el('div', 'loading-card loading-bar intro-deck-loading', entry.error || 'PPT를 불러오고 있어요…'));
       return;
     }
     if (entry.deck && entry.deck.slides?.length) {
-      if (canEdit && !entry.deck.public) section.append(el('p', 'intro-deck-notice', '🔒 "나만 보기"로 저장돼 있어요. 팬에게 보여 주려면 "자기소개 고치기" › "저장하고 팬에게 공개"를 눌러 주세요.'));
+      if (canEdit && !entry.deck.public) section.append(el('p', 'intro-deck-notice', '🔒 "나만 보기"로 저장돼 있어요. 팬에게 보여 주려면 "PPT 고치기" › "저장하고 팬에게 공개"를 눌러 주세요.'));
       if (canEdit && deckIsStale(page, deps.playedGames(page), entry.deck)) {
         const stale = el('div', 'intro-deck-notice is-stale');
         stale.append(el('span', '', '✏️ 저장한 뒤 팬페이지 정보가 바뀌었어요. 슬라이드는 저장할 때 내용 그대로라, 다시 저장해야 새 정보가 들어가요.'));
@@ -533,11 +534,11 @@ export function renderIntroDeckSection(page, deps) {
       const sample = deckFromEditor(editorStateFrom(page, deps.playedGames(page), null));
       const state = editorStateFrom(page, deps.playedGames(page), null);
       const missing = state.slides.filter((slide) => !slide.hasData).map((slide) => TYPE_INFO[slide.type].label);
-      section.append(el('p', 'intro-deck-empty', '아직 만든 자기소개가 없어요. 아래는 팬페이지에 적어 둔 정보로 자동으로 만든 견본이에요. "자기소개 만들기"를 눌러 장을 고르고 저장하면 팬에게 보여 줄 수 있어요.'));
+      section.append(el('p', 'intro-deck-empty', '아직 만든 PPT가 없어요. 아래는 팬페이지에 적어 둔 정보로 자동으로 만든 견본이에요. "PPT 만들기"를 눌러 장을 고르고 저장하면 팬에게 보여 줄 수 있어요.'));
       if (missing.length) section.append(el('p', 'intro-deck-notice', `💡 ${missing.join('·')} 정보가 아직 없어 견본에서 빠졌어요. 팬페이지에 채우면 장이 늘어나요.`));
       if (sample.slides.length) section.append(createViewer(sample, page, { sample: true }));
     } else {
-      section.append(el('p', 'intro-deck-empty', '아직 공개된 자기소개가 없어요.'));
+      section.append(el('p', 'intro-deck-empty', '아직 공개된 PPT가 없어요.'));
     }
   };
 
@@ -548,7 +549,7 @@ export function renderIntroDeckSection(page, deps) {
       ? deps.call({ action: 'get', streamerId: id }).then((result) => result.data.deck || null)
       : deps.loadPublicFile(id, 'intro-deck', 365 * 24 * 60 * 60 * 1000).then((file) => file?.deck || null);
     load.then((deck) => { entry.deck = deck; entry.loaded = true; })
-      .catch((error) => { entry.error = error?.message || '자기소개를 불러오지 못했어요.'; entry.loaded = true; })
+      .catch((error) => { entry.error = error?.message || 'PPT를 불러오지 못했어요.'; entry.loaded = true; })
       .finally(() => { entry.loading = false; entry.waiters.forEach((fn) => fn()); entry.waiters.clear(); });
   }
   draw();

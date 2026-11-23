@@ -2356,13 +2356,19 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .intro-slide-closing .intro-slide-title{font-size:7cqw}
 .intro-slide-avatar{width:13cqw;height:13cqw;border-radius:50%;object-fit:cover;border:.6cqw solid #fff;box-shadow:0 1cqw 3cqw #0003}
 .intro-slide-links .intro-slide-item-value{-webkit-line-clamp:1;word-break:break-all}
-.intro-slide-items.is-qr{display:flex;flex-wrap:nowrap;justify-content:center;gap:2cqw;margin-top:1.2cqw}
-.intro-slide-qr-card{flex:0 1 20cqw;justify-items:center;text-align:center;padding:1.4cqw}
+.intro-slide-items.is-qr{display:flex;flex-wrap:nowrap;justify-content:center;align-items:flex-start;gap:2cqw;margin-top:1.2cqw;flex:0 1 auto;min-height:0}
+.intro-slide-qr-card{flex:0 1 20cqw;justify-items:center;text-align:center;padding:1.4cqw;max-height:100%;min-height:0;grid-template-rows:minmax(0,1fr) auto auto;box-sizing:border-box}
 .intro-slide-items.is-qr-1 .intro-slide-qr-card,.intro-slide-items.is-qr-2 .intro-slide-qr-card{flex-basis:24cqw}
-.intro-slide-qr{width:15cqw;aspect-ratio:1;border-radius:1cqw;overflow:hidden;background:#fff}
-.intro-slide-items.is-qr-1 .intro-slide-qr,.intro-slide-items.is-qr-2 .intro-slide-qr{width:19cqw}
+/* QR은 남는 높이에 맞춰 줄어든다(최대 15·19cqw, 최소 11cqw: 발표 화면에서 휴대폰으로 찍히는 크기). 모자라면 "하고 싶은 말"이 먼저 줄어든다. */
+.intro-slide-qr{height:100%;max-width:15cqw;max-height:15cqw;min-height:11cqw;aspect-ratio:1;border-radius:1cqw;overflow:hidden;background:#fff}
+.intro-slide-items.is-qr-1 .intro-slide-qr,.intro-slide-items.is-qr-2 .intro-slide-qr{max-width:19cqw;max-height:19cqw}
 .intro-slide-qr svg{display:block;width:100%;height:100%}
 .intro-slide-qr-card .intro-slide-item-value{font-size:1.15cqw;max-width:100%}
+.intro-slide-links .intro-slide-panel>.intro-slide-note{flex-shrink:6;min-height:2.2cqw;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* 마지막 안전장치: 어떤 장이든 글이 많아도 패널 밖으로 넘치지 않게 한다(전체 글은 "글로 보기"에 있다). */
+.intro-slide-panel{overflow:hidden;min-height:0}
+.intro-slide-panel>*{flex-shrink:0}
+.intro-slide-panel>.intro-slide-note{flex-shrink:1;min-height:0;overflow:hidden}
 .intro-slide.is-entering{animation:intro-slide-in .28s ease-out}
 @keyframes intro-slide-in{from{opacity:0;transform:translateX(1.5%)}to{opacity:1;transform:none}}
 
