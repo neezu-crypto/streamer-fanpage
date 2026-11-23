@@ -1,7 +1,7 @@
 // 팬페이지 다마고치 탭: 돌봄 화면(3-C). 펫·도구·소리·무대 배치는 상점 모듈을 그대로 불러 쓰고, 스탯은 서버(Care)가 계산한다.
 // 설계: docs/다마고치_3C_팬페이지_돌봄_화면_설계.md
 export const SHOP_BASE = 'https://neezu-crypto.github.io/streamer-game-series-shop/';
-const SHOP_V = '?v=20261114-tg-wear2';
+const SHOP_V = '?v=20261124-tg-dry1';
 export const SEND_EVERY_MS = 6000; // 서버 전송 간격(화면은 예측값으로 바로 반응)
 const REFRESH_MS = 60000; // 다른 팬이 돌본 결과 반영
 const BLOCK_DIM_MS = 10000;
@@ -529,6 +529,8 @@ export function mountCareView(container, {
     const label = mods.TOOLS[event.tool]?.label || '';
     if (event.type === 'select') { say(`${label} 선택 중 — 펫을 눌러 보세요`); scene?.setBath(event.tool === 'bath'); }
     if (event.type === 'clear') { scene?.setBath(false); say('도구를 골라 돌봐 주세요'); void flush(); }
+    if (event.type === 'phase') say(event.tip);
+    if (event.type === 'dried') say(event.text);
     if (event.type === 'blocked') say(BLOCK_TEXT[event.condition] || '지금은 할 수 없어요.');
     if (event.type === 'act') {
       const mult = rate.use(event.tool, 1, Date.now());
