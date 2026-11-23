@@ -13,10 +13,41 @@ const TYPE_INFO = {
   closing: { label: '마무리', eyebrow: 'THANK YOU' },
 };
 const TYPE_ORDER = Object.keys(TYPE_INFO);
+//  디자인(2026-11-24): 무료 2종은 바로, 나머지 8종도 무료지만 미션을 달성하면 열린다.
+//  미션 기준은 서버(functions/index.js INTRO_DECK_MISSIONS)와 같다. 화면은 진행도만 보여 주고, 실제 해금은 저장할 때 서버가 정한다.
 const DESIGNS = [
   { id: 'pastel', label: '파스텔', hint: '밝은 분홍·보라 배경' },
   { id: 'midnight', label: '미드나잇', hint: '어두운 남색 배경과 별' },
+  { id: 'paper', label: '크라프트', hint: '종이 질감과 마스킹테이프', mission: { text: '프로필 칸 5개 채우기', source: 'profile', goal: 5, count: (f) => f.profileCount } },
+  { id: 'neon', label: '네온', hint: '어두운 배경에 빛나는 네온', mission: { text: '플레이한 게임 3개 등록', source: 'games', goal: 3, count: (f) => f.gameCount } },
+  { id: 'trophy', label: '트로피', hint: '금색 대회 배너', mission: { text: '대회 이력 1개 등록', source: 'competitions', goal: 1, count: (f) => f.competitionCount } },
+  { id: 'pixel', label: '픽셀', hint: '레트로 게임 화면', mission: { text: '참여한 서버 1개 등록', source: 'servers', goal: 1, count: (f) => f.serverCount } },
+  { id: 'chalk', label: '칠판', hint: '초록 칠판과 분필 글씨', mission: { text: '소개 한 줄과 방송 시간 적기', source: 'schedule', goal: 2, count: (f) => f.introAndSchedule } },
+  { id: 'sunset', label: '노을', hint: '주황·보라 노을 그라데이션', mission: { text: 'PPT를 팬에게 공개하기', goal: 1, count: (f) => (f.deckPublic ? 1 : 0) } },
+  { id: 'film', label: '필름', hint: '필름 프레임과 흑백 사진 느낌', mission: { text: 'YouTube나 팬카페 링크 넣기', source: 'links', goal: 1, count: (f) => f.extraLinks } },
+  { id: 'mono', label: '모노', hint: '흰 배경 굵은 글씨 미니멀', mission: { text: 'PPT 6장 이상으로 저장', goal: 6, count: (f) => f.slideCount } },
 ];
+const FREE_DESIGNS = new Set(['pastel', 'midnight']);
+function missionFacts(page, games, deckLike) {
+  const p = page.profile || {};
+  const filled = (v) => (Array.isArray(v) ? v.length > 0 : String(v || '').trim() !== '');
+  return {
+    profileCount: ['mbti', 'birthday', 'debutDate', 'major', 'fanNickname', 'fandomName', 'contents'].filter((k) => filled(p[k])).length,
+    gameCount: Array.isArray(games) ? games.length : 0,
+    competitionCount: Array.isArray(p.competitionHistory) ? p.competitionHistory.length : 0,
+    serverCount: Array.isArray(p.serverHistory) ? p.serverHistory.length : 0,
+    introAndSchedule: (filled(page.intro) ? 1 : 0) + (filled(p.scheduleText) ? 1 : 0),
+    extraLinks: (filled(p.youtubeChannelUrl) || filled(p.cafeUrl)) ? 1 : 0,
+    deckPublic: deckLike?.public === true,
+    slideCount: deckLike?.slides?.length || 0,
+  };
+}
+// 'free' | 'unlocked'(서버가 연 것) | 'ready'(미션 달성, 저장하면 열림) | 'locked'
+function designStatus(design, facts, unlocked) {
+  if (FREE_DESIGNS.has(design.id)) return 'free';
+  if (unlocked.has(design.id)) return 'unlocked';
+  return design.mission.count(facts) >= design.mission.goal ? 'ready' : 'locked';
+}
 const MAX_SLIDES = 10;
 const MAX_ITEMS = 12;
 const DEFAULT_ITEMS = 6;
@@ -332,16 +363,52 @@ function openEditor(page, deps, deck, onSaved) {
   let current = state.slides.findIndex((slide) => slide.on);
   if (current < 0) current = 0;
 
+  const unlocked = new Set(Array.isArray(deck?.unlocked) ? deck.unlocked : []);
   const designRow = el('div', 'intro-editor-designs');
   designRow.setAttribute('role', 'radiogroup'); designRow.setAttribute('aria-label', '디자인');
-  DESIGNS.forEach((design) => {
-    const b = el('button', 'button intro-editor-design', design.label); b.type = 'button';
-    b.title = `${design.label} 디자인 · ${design.hint}`;
-    b.setAttribute('role', 'radio');
-    b.addEventListener('click', () => { state.design = design.id; refresh(); });
-    b.dataset.design = design.id;
-    designRow.append(b);
-  });
+  const designNote = el('div', 'intro-editor-design-note');
+  function renderDesigns() {
+    const facts = missionFacts(page, games, { public: true, slides: state.slides.filter((x) => x.on) });
+    facts.deckPublic = state.public || deck?.public === true;
+    designRow.replaceChildren();
+    DESIGNS.forEach((design) => {
+      const status = designStatus(design, facts, unlocked);
+      const b = el('button', `button intro-editor-design is-${status}`); b.type = 'button';
+      b.dataset.design = design.id;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(state.design === design.id));
+      b.append(el('span', 'intro-editor-design-swatch intro-swatch-' + design.id), el('span', '', design.label));
+      if (status === 'locked') b.append(el('span', 'intro-editor-design-lock', '🔒'));
+      if (status === 'ready') b.append(el('span', 'intro-editor-design-lock', '✨'));
+      const m = design.mission;
+      b.title = status === 'locked' ? `${design.label} · ${design.hint}\n🔒 미션: ${m.text} (${Math.min(m.count(facts), m.goal)}/${m.goal}) · 미리보기는 할 수 있어요`
+        : status === 'ready' ? `${design.label} · ${design.hint}\n✨ 미션 달성! 저장하면 열려요`
+          : `${design.label} 디자인 · ${design.hint}`;
+      b.addEventListener('click', () => { state.design = design.id; refresh(); });
+      designRow.append(b);
+    });
+    //  고른 디자인이 잠겨 있으면 미션과 채우러 가기를 보여 준다.
+    const picked = DESIGNS.find((d) => d.id === state.design);
+    const status = designStatus(picked, facts, unlocked);
+    designNote.replaceChildren();
+    designNote.className = `intro-editor-design-note is-${status}`;
+    if (status === 'locked') {
+      const m = picked.mission;
+      designNote.append(el('span', '', `🔒 ${picked.label}: ${m.text} (${Math.min(m.count(facts), m.goal)}/${m.goal}) 미션을 달성하면 저장할 수 있어요. 지금은 미리보기만 돼요.`));
+      if (m.source && SOURCE_HINT[m.source] && deps.goToSource) {
+        const go = el('button', 'button intro-editor-fill', `${SOURCE_HINT[m.source].where}에서 채우기 →`); go.type = 'button';
+        go.title = '이 창을 닫고 팬페이지의 그 칸으로 이동해요';
+        go.addEventListener('click', () => { dialog.close(); deps.goToSource(m.source); });
+        designNote.append(go);
+      }
+    } else if (status === 'ready') {
+      designNote.append(el('span', '', `✨ ${picked.label} 미션을 달성했어요. 저장하면 이 디자인이 열려요.`));
+    } else {
+      const done = DESIGNS.filter((d) => !FREE_DESIGNS.has(d.id) && unlocked.has(d.id)).length;
+      designNote.append(el('span', '', `미션 디자인 ${done}/${DESIGNS.length - FREE_DESIGNS.size}개 열림 · 🔒 디자인은 미션을 달성하면 무료로 열려요.`));
+    }
+    return status;
+  }
 
   const list = el('ol', 'intro-editor-slides');
   const onCount = () => state.slides.filter((slide) => slide.on).length;
@@ -429,13 +496,13 @@ function openEditor(page, deps, deck, onSaved) {
     if (!slide.on) previewBox.append(el('span', 'intro-deck-sample-badge', '빠진 장'));
   }
   function refresh() {
-    designRow.querySelectorAll('[data-design]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.design === state.design)));
+    renderDesigns();
     renderList(); renderDetail(); renderPreview();
     countNote.textContent = `${onCount()}장 / 최대 ${MAX_SLIDES}장`;
   }
 
   const countNote = el('span', 'intro-editor-count');
-  side.append(el('strong', 'intro-editor-label', '디자인'), designRow, el('strong', 'intro-editor-label', '넣을 장과 순서'), el('small', 'intro-editor-guide', '☑ 체크로 넣고 빼요 · 이름을 누르면 미리보기와 글 고치기가 열려요 · ↑↓로 순서'), list, countNote);
+  side.append(el('strong', 'intro-editor-label', '디자인'), designRow, designNote, el('strong', 'intro-editor-label', '넣을 장과 순서'), el('small', 'intro-editor-guide', '☑ 체크로 넣고 빼요 · 이름을 누르면 미리보기와 글 고치기가 열려요 · ↑↓로 순서'), list, countNote);
   const main = el('div', 'intro-editor-main');
   main.append(previewBox, detail);
   body.append(side, main);
@@ -461,11 +528,14 @@ function openEditor(page, deps, deck, onSaved) {
     const next = deckFromEditor(state);
     status.textContent = ''; status.classList.remove('is-error');
     if (!next.slides.length) { status.textContent = '넣을 장을 하나 이상 골라 주세요.'; status.classList.add('is-error'); return; }
+    if (renderDesigns() === 'locked') { status.textContent = '고른 디자인이 아직 잠겨 있어요. 미션을 달성하거나 다른 디자인을 골라 주세요.'; status.classList.add('is-error'); return; }
     save.disabled = true; privateSave.disabled = true; clicked.textContent = '저장 중…'; clicked.setAttribute('aria-busy', 'true');
     try {
       const result = await deps.call({ action: 'save', streamerId: page.streamer.id, deck: next });
       dialog.close();
+      const opened = (result.data.deck?.unlocked || []).filter((d) => !unlocked.has(d));
       onSaved(result.data.deck);
+      if (opened.length) setTimeout(() => deps.toast(`🎉 새 디자인이 열렸어요: ${opened.map((d) => DESIGNS.find((x) => x.id === d)?.label || d).join(', ')}`), 1800);
       deps.toast(next.public ? 'PPT를 저장하고 팬에게 공개했어요.' : 'PPT를 저장했어요. "나만 보기"라 팬에게는 아직 보이지 않아요.');
     } catch (error) {
       status.textContent = error.message || 'PPT를 저장하지 못했어요.'; status.classList.add('is-error');

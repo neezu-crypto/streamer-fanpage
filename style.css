@@ -2387,6 +2387,76 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .intro-slide-midnight .intro-slide-eyebrow{color:#ffb4d6}
 .intro-slide-midnight .intro-slide-item{background:#ffffff14}
 
+/* 미션 디자인 8종(2026-11-24): 이미지 없이 그라데이션만 쓴다. 글자 크기·배치는 공통 규칙 그대로. */
+.intro-slide-paper{color:#3b2f22}
+.intro-slide-paper .intro-slide-bg{background:linear-gradient(100deg,transparent 46%,#f7d26b99 46% 54%,transparent 54%) 8% -1cqw/22cqw 6cqw no-repeat,linear-gradient(80deg,transparent 46%,#9fd3c799 46% 54%,transparent 54%) 92% -1cqw/22cqw 6cqw no-repeat,repeating-linear-gradient(0deg,#00000006 0 .2cqw,transparent .2cqw .6cqw),linear-gradient(135deg,#e9d8bb,#d9c19a)}
+.intro-slide-paper .intro-slide-panel{background:#fffaf0;box-shadow:.4cqw .6cqw 0 #00000018;border-radius:.6cqw}
+.intro-slide-paper .intro-slide-eyebrow{color:#b5652d}
+.intro-slide-paper .intro-slide-item{background:#f3e6cc;border:.12cqw dashed #c9a877}
+
+.intro-slide-neon{color:#f5f3ff}
+.intro-slide-neon .intro-slide-bg{background:radial-gradient(ellipse at 15% 20%,#ff2bd633 0,transparent 40%),radial-gradient(ellipse at 85% 80%,#00e5ff33 0,transparent 45%),linear-gradient(160deg,#0a0614,#150b2b)}
+.intro-slide-neon .intro-slide-panel{background:#0d0820cc;border:.2cqw solid #ff4fd8;box-shadow:0 0 1.6cqw #ff4fd888,inset 0 0 1.2cqw #00e5ff33}
+.intro-slide-neon .intro-slide-eyebrow{color:#00e5ff;text-shadow:0 0 .8cqw #00e5ff}
+.intro-slide-neon .intro-slide-title{text-shadow:0 0 1cqw #ff4fd8aa}
+.intro-slide-neon .intro-slide-item{background:#ffffff0d;border:.12cqw solid #00e5ff66}
+
+.intro-slide-trophy{color:#2b2110}
+.intro-slide-trophy .intro-slide-bg{background:repeating-conic-gradient(from 0deg at 50% 120%,#ffe08a 0 6deg,#ffd15c 6deg 12deg),#ffd15c}
+.intro-slide-trophy .intro-slide-panel{background:#fffdf5f2;border:.35cqw solid #c9962b;box-shadow:0 1cqw 3cqw #7a560f33}
+.intro-slide-trophy .intro-slide-eyebrow{color:#a4741a;letter-spacing:.4em}
+.intro-slide-trophy .intro-slide-item{background:#fff3cf;border-left:.5cqw solid #c9962b}
+
+.intro-slide-pixel{color:#e8ffe8;font-family:"DungGeunMo","Galmuri11",ui-monospace,monospace}
+.intro-slide-pixel .intro-slide-bg{background:linear-gradient(#ffffff0a 1px,transparent 1px) 0 0/2cqw 2cqw,linear-gradient(90deg,#ffffff0a 1px,transparent 1px) 0 0/2cqw 2cqw,linear-gradient(180deg,#1b2a6b,#3a1f6b)}
+.intro-slide-pixel .intro-slide-panel{background:#101a3a;border:.5cqw solid #e8ffe8;border-radius:0;box-shadow:.8cqw .8cqw 0 #000}
+.intro-slide-pixel .intro-slide-eyebrow{color:#ffd23f}
+.intro-slide-pixel .intro-slide-item{background:#1f2d5c;border-radius:0;border:.2cqw solid #6fe36f}
+
+.intro-slide-chalk{color:#f2f5ee}
+.intro-slide-chalk .intro-slide-bg{background:linear-gradient(#5b3a1e,#5b3a1e) 0 0/100% 2.4cqw no-repeat,linear-gradient(#5b3a1e,#5b3a1e) 0 100%/100% 2.4cqw no-repeat,radial-gradient(ellipse at 30% 40%,#ffffff10 0,transparent 50%),linear-gradient(160deg,#2f5240,#24443a)}
+.intro-slide-chalk .intro-slide-panel{background:transparent;border:.18cqw dashed #ffffff66}
+.intro-slide-chalk .intro-slide-eyebrow{color:#ffe59a}
+.intro-slide-chalk .intro-slide-item{background:#ffffff12}
+
+.intro-slide-sunset{color:#fff8f0}
+.intro-slide-sunset .intro-slide-bg{background:radial-gradient(circle at 50% 105%,#ffd58a 0 12%,transparent 30%),linear-gradient(180deg,#3d2b6b 0%,#a2457a 45%,#f08a5d 80%,#ffc27a 100%)}
+.intro-slide-sunset .intro-slide-panel{background:#2a1a3d66;backdrop-filter:blur(.6cqw);border:.15cqw solid #ffffff33}
+.intro-slide-sunset .intro-slide-eyebrow{color:#ffd58a}
+.intro-slide-sunset .intro-slide-item{background:#ffffff1f}
+
+.intro-slide-film{color:#f1f1f1}
+.intro-slide-film .intro-slide-bg{background:repeating-linear-gradient(90deg,#f1f1f1 0 1.4cqw,transparent 1.4cqw 3cqw) 0 1.2cqw/100% 1.6cqw no-repeat,repeating-linear-gradient(90deg,#f1f1f1 0 1.4cqw,transparent 1.4cqw 3cqw) 0 calc(100% - 1.2cqw)/100% 1.6cqw no-repeat,#151515}
+.intro-slide-film .intro-slide-panel{background:linear-gradient(160deg,#3a3a3a,#1f1f1f);border-radius:.4cqw}
+.intro-slide-film .intro-slide-eyebrow{color:#e0b46a}
+.intro-slide-film .intro-slide-item{background:#ffffff12}
+
+.intro-slide-mono{color:#111}
+.intro-slide-mono .intro-slide-bg{background:#fff}
+.intro-slide-mono .intro-slide-panel{background:#fff;border:.35cqw solid #111;border-radius:0}
+.intro-slide-mono .intro-slide-eyebrow{color:#111;font-weight:900}
+.intro-slide-mono .intro-slide-title{font-weight:900;letter-spacing:-.02em}
+.intro-slide-mono .intro-slide-item{background:#f2f2f2;border-radius:0}
+
+/* 편집 창 디자인 버튼: 색 견본·잠금 */
+.intro-editor-design{display:inline-flex;align-items:center;gap:6px;padding:0 10px}
+.intro-editor-design-swatch{width:16px;height:16px;border-radius:50%;flex:none;border:1px solid #0002}
+.intro-editor-design.is-locked{opacity:.6}
+.intro-editor-design-lock{font-size:12px}
+.intro-swatch-pastel{background:linear-gradient(135deg,#ffd6e7,#dcd3ff)}
+.intro-swatch-midnight{background:linear-gradient(135deg,#141832,#5b3ea8)}
+.intro-swatch-paper{background:linear-gradient(135deg,#e9d8bb,#c9a877)}
+.intro-swatch-neon{background:linear-gradient(135deg,#ff4fd8,#00e5ff)}
+.intro-swatch-trophy{background:linear-gradient(135deg,#ffe08a,#c9962b)}
+.intro-swatch-pixel{background:linear-gradient(135deg,#1b2a6b,#6fe36f)}
+.intro-swatch-chalk{background:linear-gradient(135deg,#2f5240,#ffe59a)}
+.intro-swatch-sunset{background:linear-gradient(180deg,#3d2b6b,#f08a5d)}
+.intro-swatch-film{background:linear-gradient(135deg,#151515,#e0b46a)}
+.intro-swatch-mono{background:linear-gradient(135deg,#fff 50%,#111 50%)}
+.intro-editor-design-note{margin:6px 0 4px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,currentColor 6%,transparent);font-size:12px;line-height:1.5;display:grid;gap:6px}
+.intro-editor-design-note.is-locked{background:#fff6e2;color:#6b4a00}
+.intro-editor-design-note.is-ready{background:#e8f8ea;color:#1f5a2a}
+
 /* 전체화면 발표(아이폰은 고정 창으로 대신) */
 html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .intro-present{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#000;outline:0}
