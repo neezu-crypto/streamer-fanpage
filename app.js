@@ -6,7 +6,7 @@ import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebase
 import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket4';
 import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261119-tour7';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
-import { renderIntroDeckSection } from './intro-deck-view.js?v=20261124-qrpre1';
+import { renderIntroDeckSection } from './intro-deck-view.js?v=20261124-cursor3';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 

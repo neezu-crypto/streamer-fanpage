@@ -290,6 +290,33 @@ function attachSwipe(target, onSwipe) {
   }, { passive: true });
 }
 
+// 발표 중 마우스 포인터: 디자인마다 다른 아기자기한 그림(통통한 화살표+얼굴·반짝이).
+// 화면 왼쪽 절반에서는 왼쪽(이전 장), 오른쪽 절반에서는 오른쪽(다음 장)을 가리킨다.
+// 그림은 오른쪽을 가리키게 그리고(끝점 x=41.6, y=22), 왼쪽은 좌우를 뒤집어 쓴다.
+const CHUBBY = 'M6 15.5H24V9.6Q24 6.8 26.3 8.5L40.3 19.6Q42 22 40.3 24.4L26.3 35.5Q24 37.2 24 34.4V28.5H6Q3 28.5 3 25.5V18.5Q3 15.5 6 15.5Z';
+const sparkle = (x, y, r, c) => `<path d="M${x} ${y - r}Q${x} ${y} ${x + r} ${y}Q${x} ${y} ${x} ${y + r}Q${x} ${y} ${x - r} ${y}Q${x} ${y} ${x} ${y - r}Z" fill="${c}"/>`;
+const cuteFace = (eye, blush, cx = 30.5, cy = 22) => `<circle cx="${cx - 2.6}" cy="${cy - 1.4}" r="1.35" fill="${eye}"/><circle cx="${cx + 2.6}" cy="${cy - 1.4}" r="1.35" fill="${eye}"/><path d="M${cx - 1.4} ${cy + 1.4}Q${cx} ${cy + 2.9} ${cx + 1.4} ${cy + 1.4}" fill="none" stroke="${eye}" stroke-width="1.1" stroke-linecap="round"/><circle cx="${cx - 4.6}" cy="${cy + 1.6}" r="1.4" fill="${blush}" opacity=".7"/><circle cx="${cx + 4.6}" cy="${cy + 1.6}" r="1.4" fill="${blush}" opacity=".7"/>`;
+const chubby = (fill, stroke, extra = '') => `<path d="${CHUBBY}" fill="${fill}" stroke="${stroke}" stroke-width="2.2" stroke-linejoin="round"${extra}/>`;
+const PRESENT_CURSOR_ART = {
+  pastel: chubby('#ffc4de', '#8a4a9e') + '<path d="M5.5 18.5H21" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>' + cuteFace('#5a2a6b', '#ff7fb0') + '<path d="M11 26.2C8.2 24.2 8.2 21.2 10 21.2C10.8 21.2 11 22 11 22C11 22 11.2 21.2 12 21.2C13.8 21.2 13.8 24.2 11 26.2Z" fill="#fff"/>' + sparkle(8, 8, 4, '#fff1a8') + sparkle(15, 4.5, 2.4, '#fff'),
+  midnight: '<g stroke="#9fb4ff" stroke-linecap="round" stroke-dasharray="0.1 4" stroke-width="2.6"><path d="M17 17L3 14"/><path d="M16 22H1"/><path d="M17 27L3 30"/></g>' + `<path d="M41.5 22.0 L34.5 25.3 L33.6 32.9 L28.3 27.3 L20.7 28.8 L24.4 22.0 L20.7 15.2 L28.3 16.7 L33.6 11.1 L34.5 18.7Z" fill="#ffe58a" stroke="#2a2f6b" stroke-width="2" stroke-linejoin="round"/>` + '<path d="M26.3 20.3q1.3 1.1 2.6 0M31.4 20.3q1.3 1.1 2.6 0" fill="none" stroke="#2a2f6b" stroke-width="1.1" stroke-linecap="round"/><path d="M28.8 24q1.4 1.3 2.8 0" fill="none" stroke="#2a2f6b" stroke-width="1.1" stroke-linecap="round"/><circle cx="25.6" cy="23.6" r="1.2" fill="#ff9db8" opacity=".75"/><circle cx="34.6" cy="23.6" r="1.2" fill="#ff9db8" opacity=".75"/>' + sparkle(7, 7, 3, '#fff') + sparkle(9, 37, 2.2, '#ffe58a'),
+  paper: '<path d="M2 33Q8 29 6 35Q4 40 11 37" fill="none" stroke="#b5652d" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="2 2.2"/><path d="M41.5 22L4 9L13.5 22Z" fill="#fffaf0" stroke="#3b2f22" stroke-width="1.8" stroke-linejoin="round"/><path d="M41.5 22L13.5 22L9 34Z" fill="#f1dfbf" stroke="#3b2f22" stroke-width="1.8" stroke-linejoin="round"/><path d="M20.5 16.6C18.3 15 18.6 12.6 20.2 12.9C20.9 13 21 13.7 21 13.7C21 13.7 21.4 13.1 22.1 13.2C23.7 13.5 23.2 15.9 20.5 16.6Z" fill="#ff8fab" stroke="#3b2f22" stroke-width=".7"/>' + sparkle(36, 9, 3, '#f7d26b'),
+  neon: chubby('#1a0f33', '#ff4fd8', ' filter="url(#g)"') + cuteFace('#00e5ff', '#ff4fd8') + sparkle(9, 8, 3.6, '#00e5ff') + sparkle(38, 37, 2.6, '#ff4fd8') + sparkle(15, 38, 1.8, '#fff'),
+  trophy: chubby('#ffd15c', '#8a6214') + '<path d="M5.5 18.5H21" stroke="#fff7d6" stroke-width="1.6" stroke-linecap="round"/>' + cuteFace('#5a3e08', '#ff9d5c') + '<path d="M7 13.5L8 6.5L11 10L13 5L15 10L18 6.5L19 13.5Z" fill="#ffe08a" stroke="#8a6214" stroke-width="1.5" stroke-linejoin="round"/><circle cx="13" cy="5" r="1.2" fill="#ff6b8a"/>' + sparkle(36, 7, 3, '#fff'),
+  pixel: '<path d="M4 15H22V6H24V8H26V10H28V12H30V14H32V16H34V18H36V20H38V24H36V26H34V28H32V30H30V32H28V34H26V36H24V38H22V29H4Z" fill="#ffd6ec" stroke="#1b2a6b" stroke-width="2" shape-rendering="crispEdges"/><g fill="#1b2a6b" shape-rendering="crispEdges"><rect x="26" y="18" width="2" height="2"/><rect x="31" y="18" width="2" height="2"/><rect x="28" y="23" width="3" height="1.4"/></g><g fill="#ff7fb0" shape-rendering="crispEdges"><rect x="24" y="22" width="2" height="1.4"/><rect x="33" y="22" width="2" height="1.4"/></g><g fill="#ff4f8b" shape-rendering="crispEdges"><rect x="6" y="5" width="2" height="2"/><rect x="10" y="5" width="2" height="2"/><rect x="4" y="7" width="10" height="2"/><rect x="6" y="9" width="6" height="2"/><rect x="8" y="11" width="2" height="2"/></g><rect x="6" y="19" width="2" height="2" fill="#fff" shape-rendering="crispEdges"/>',
+  chalk: chubby('#2f5240', '#f2f5ee', ' stroke-dasharray="5 1.4"') + cuteFace('#f2f5ee', '#ffb3c8') + '<path d="M8 6l1 2.4 2.6.3-2 1.7.6 2.6L8 11.6 5.8 13l.6-2.6-2-1.7L7 8.4Z" fill="none" stroke="#ffe59a" stroke-width="1" stroke-linejoin="round"/><g fill="#f2f5ee"><circle cx="13" cy="36" r=".9"/><circle cx="17" cy="38.5" r=".7"/><circle cx="9" cy="39" r=".6"/></g>',
+  sunset: '<defs><linearGradient id="s" x1="0" x2="1"><stop offset="0" stop-color="#c25b8c"/><stop offset=".55" stop-color="#f08a5d"/><stop offset="1" stop-color="#ffc27a"/></linearGradient></defs>' + chubby('url(#s)', '#4a2f72') + cuteFace('#4a2f72', '#ffe0b0') + '<g stroke="#ffb35c" stroke-width="1.4" stroke-linecap="round"><path d="M9 2.5V4.3M9 13.7v1.8M2.5 9h1.8M13.7 9h1.8M4.4 4.4l1.3 1.3M12.3 12.3l1.3 1.3M4.4 13.6l1.3-1.3M12.3 5.7l1.3-1.3"/></g><circle cx="9" cy="9" r="3.6" fill="#ffd58a" stroke="#4a2f72" stroke-width="1.1"/>',
+  film: chubby('#262626', '#f1f1f1') + '<g fill="#f1f1f1"><rect x="6" y="17" width="2.6" height="2" rx=".6"/><rect x="11" y="17" width="2.6" height="2" rx=".6"/><rect x="16" y="17" width="2.6" height="2" rx=".6"/><rect x="6" y="25" width="2.6" height="2" rx=".6"/><rect x="11" y="25" width="2.6" height="2" rx=".6"/><rect x="16" y="25" width="2.6" height="2" rx=".6"/></g>' + cuteFace('#ffe9b8', '#e0b46a') + sparkle(9, 8, 3.4, '#e0b46a') + sparkle(16, 5, 1.8, '#fff'),
+  mono: chubby('#fff', '#111') + cuteFace('#111', '#c8c8c8') + sparkle(9, 8, 3.4, '#111') + sparkle(16, 4.5, 1.8, '#111'),
+};
+function presentCursor(design, left) {
+  const art = PRESENT_CURSOR_ART[design] || PRESENT_CURSOR_ART.pastel;
+  const glow = '<filter id="g" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="1.3" flood-color="#ff4fd8"/></filter>';
+  const flip = left ? ' transform="translate(44 0) scale(-1 1)"' : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">${glow}<g${flip}>${art}</g></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${left ? 2 : 41} 22, ${left ? 'w-resize' : 'e-resize'}`;
+}
+
 // ---------- 전체화면 발표 ----------
 // 아이폰 Safari는 일반 요소 전체화면을 지원하지 않아 화면을 덮는 고정 창으로 대신한다.
 function openPresentation(deck, page, startIndex = 0) {
@@ -330,9 +357,20 @@ function openPresentation(deck, page, startIndex = 0) {
   const onFullscreenChange = () => { if (!document.fullscreenElement && overlay.isConnected && overlay.dataset.fs === '1') end(); };
   holder.addEventListener('click', (event) => {
     const rect = holder.getBoundingClientRect();
-    show(index + (event.clientX < rect.left + rect.width * 0.3 ? -1 : 1));
+    show(index + (event.clientX < rect.left + rect.width / 2 ? -1 : 1));
   });
   attachSwipe(holder, (dir) => show(index + dir));
+  //  발표 중에는 글자 선택·사진 끌기를 막는다(클릭·스와이프 넘기기는 그대로).
+  overlay.addEventListener('dragstart', (event) => event.preventDefault());
+  overlay.addEventListener('selectstart', (event) => event.preventDefault());
+  const cursorNext = presentCursor(deck.design, false);
+  const cursorBack = presentCursor(deck.design, true);
+  holder.style.cursor = cursorNext;
+  holder.addEventListener('mousemove', (event) => {
+    const rect = holder.getBoundingClientRect();
+    const want = event.clientX < rect.left + rect.width / 2 ? cursorBack : cursorNext;
+    if (holder.style.cursor !== want) holder.style.cursor = want;
+  });
   close.addEventListener('click', end);
   document.addEventListener('keydown', onKey, true);
   document.addEventListener('fullscreenchange', onFullscreenChange);
