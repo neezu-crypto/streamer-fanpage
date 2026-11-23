@@ -132,6 +132,18 @@ function deckIsStale(page, games, deck) {
   });
 }
 
+// 링크 장 QR(2026-11-24): 발표 화면에서 시청자가 휴대폰으로 찍어 바로 들어가게 링크마다 QR을 그린다.
+// 브라우저에서만 그린다(외부 QR 사이트·서버 호출 없음). QR 모듈은 링크 장을 처음 그릴 때만 불러온다.
+let qrModule = null;
+const loadQr = () => (qrModule ||= import('./comment-up-qr.mjs?v=20261122-qr2'));
+const linkUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`);
+function fillQr(holder, value, label) {
+  loadQr().then(({ qrSvg }) => {
+    if (!holder.isConnected && !holder.parentNode) return;
+    holder.replaceChildren(qrSvg(linkUrl(value), { title: `${label} QR 코드` }));
+  }).catch(() => holder.remove());
+}
+
 // ---------- 슬라이드 그리기(16:9, 글자 크기는 슬라이드 폭 기준 cqw) ----------
 function renderSlide(slide, design, page, index, total) {
   const box = el('div', `intro-slide intro-slide-${design} intro-slide-${slide.type}`);
@@ -149,7 +161,18 @@ function renderSlide(slide, design, page, index, total) {
   }
   panel.append(el('div', 'intro-slide-eyebrow', TYPE_INFO[slide.type]?.eyebrow || ''), el('div', 'intro-slide-title', slide.title || ''));
   if (slide.subtitle) panel.append(el('div', 'intro-slide-subtitle', slide.subtitle));
-  if (slide.items?.length) {
+  if (slide.type === 'links' && slide.items?.length) {
+    const list = el('div', `intro-slide-items is-qr is-qr-${Math.min(slide.items.length, 4)}`);
+    slide.items.slice(0, 4).forEach((item) => {
+      const card = el('div', 'intro-slide-item intro-slide-qr-card');
+      const holder = el('div', 'intro-slide-qr');
+      if (item.value) fillQr(holder, item.value, item.label);
+      card.append(holder, el('span', 'intro-slide-item-label', item.label));
+      if (item.value) card.append(el('span', 'intro-slide-item-value', item.value));
+      list.append(card);
+    });
+    panel.append(list);
+  } else if (slide.items?.length) {
     const list = el('div', `intro-slide-items${slide.items.length > 6 ? ' is-dense' : ''}`);
     slide.items.forEach((item) => {
       const card = el('div', 'intro-slide-item');

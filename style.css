@@ -2356,6 +2356,13 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 .intro-slide-closing .intro-slide-title{font-size:7cqw}
 .intro-slide-avatar{width:13cqw;height:13cqw;border-radius:50%;object-fit:cover;border:.6cqw solid #fff;box-shadow:0 1cqw 3cqw #0003}
 .intro-slide-links .intro-slide-item-value{-webkit-line-clamp:1;word-break:break-all}
+.intro-slide-items.is-qr{display:flex;flex-wrap:nowrap;justify-content:center;gap:2cqw;margin-top:1.2cqw}
+.intro-slide-qr-card{flex:0 1 20cqw;justify-items:center;text-align:center;padding:1.4cqw}
+.intro-slide-items.is-qr-1 .intro-slide-qr-card,.intro-slide-items.is-qr-2 .intro-slide-qr-card{flex-basis:24cqw}
+.intro-slide-qr{width:15cqw;aspect-ratio:1;border-radius:1cqw;overflow:hidden;background:#fff}
+.intro-slide-items.is-qr-1 .intro-slide-qr,.intro-slide-items.is-qr-2 .intro-slide-qr{width:19cqw}
+.intro-slide-qr svg{display:block;width:100%;height:100%}
+.intro-slide-qr-card .intro-slide-item-value{font-size:1.15cqw;max-width:100%}
 .intro-slide.is-entering{animation:intro-slide-in .28s ease-out}
 @keyframes intro-slide-in{from{opacity:0;transform:translateX(1.5%)}to{opacity:1;transform:none}}
 
