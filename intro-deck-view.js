@@ -256,6 +256,7 @@ function createViewer(deck, page, { sample = false } = {}) {
   present.title = '화면을 꽉 채워 발표해요. ←/→·스페이스로 넘기고 Esc로 끝내요.';
   let index = 0;
   const total = deck.slides.length;
+  if (deck.slides.some((s) => s.type === 'links')) setTimeout(loadQr, 0); //  넘겨 보기에서도 링크 장 전에 미리 불러 둔다
   const show = (i) => {
     index = Math.max(0, Math.min(total - 1, i));
     stage.replaceChildren(renderSlide(deck.slides[index], deck.design, page, index, total));
@@ -304,6 +305,8 @@ function openPresentation(deck, page, startIndex = 0) {
   overlay.append(holder, close, hint);
   let index = startIndex;
   const total = deck.slides.length;
+  //  링크 장이 있으면 발표를 시작할 때 QR 도구를 미리 불러와, 처음 보는 휴대폰·느린 망에서도 링크 장이 빈 채로 뜨지 않게 한다.
+  if (deck.slides.some((s) => s.type === 'links')) loadQr();
   const show = (i) => {
     index = Math.max(0, Math.min(total - 1, i));
     const slide = renderSlide(deck.slides[index], deck.design, page, index, total);
