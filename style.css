@@ -2312,6 +2312,7 @@ body:is(.fanpage-layout-one-active,.fanpage-layout-three-active,.fanpage-home-ka
 
 /* ===== 자기소개 탭(2026-11-23) ===== 슬라이드 안 글자 크기는 슬라이드 폭 기준(cqw)이라 어디서나 같은 구도 */
 .intro-deck-section{min-width:0}
+.fanpage-tab-panel-grid>.intro-deck-section{grid-column:1/-1}
 .intro-deck-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .intro-deck-head .eyebrow{margin:0 0 5px}
 .intro-deck-head h2{margin:0}
