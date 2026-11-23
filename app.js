@@ -6321,6 +6321,14 @@ function renderFanPage(page, options = {}) {
   const tabPanels = new Map([
     ['home', homePanel],
     ...(usesBinderLayout ? [['schedule', createFanPageTabPanel(tabDefinition('schedule'), [calendarSection])]] : []),
+    ...(showIntroTab ? [['intro', createFanPageTabPanel(tabDefinition('intro'), [renderIntroDeckSection(page, {
+      call: (data) => callIntroDeck(data),
+      loadPublicFile: loadPublicFanPageFile,
+      playedGames: (p) => (Array.isArray(p.playedGames) ? p.playedGames : fanPageContentStateFor(p.streamer.id).playedGames),
+      showModal: showFanPageModal,
+      toast: showToast,
+      onPublicChange: (isPublic) => { if (currentPage?.streamer.id === page.streamer.id) currentPage.introDeckPublic = isPublic; page.introDeckPublic = isPublic; },
+    })])]] : []),
     ['activity', createFanPageTabPanel(tabDefinition('activity'), usesBinderLayout
       ? [createFanPageColumnStacks('fanpage-activity-columns', [upboSection, messengerSection], [rouletteSection]), gallerySection]
       : usesColumnLayout
@@ -6335,14 +6343,6 @@ function renderFanPage(page, options = {}) {
     ['video-library', createFanPageTabPanel(tabDefinition('video-library'), [videoLibrarySection])],
     ['rolling-paper', createFanPageTabPanel(tabDefinition('rolling-paper'), [rollingPaperSection])],
     ['memories', createFanPageTabPanel(tabDefinition('memories'), [memoriesSection])],
-    ...(showIntroTab ? [['intro', createFanPageTabPanel(tabDefinition('intro'), [renderIntroDeckSection(page, {
-      call: (data) => callIntroDeck(data),
-      loadPublicFile: loadPublicFanPageFile,
-      playedGames: (p) => (Array.isArray(p.playedGames) ? p.playedGames : fanPageContentStateFor(p.streamer.id).playedGames),
-      showModal: showFanPageModal,
-      toast: showToast,
-      onPublicChange: (isPublic) => { if (currentPage?.streamer.id === page.streamer.id) currentPage.introDeckPublic = isPublic; page.introDeckPublic = isPublic; },
-    })])]] : []),
     ['comment-up', createFanPageTabPanel(tabDefinition('comment-up'), [renderCommentUpSection(page)])],
     ['tamagotchi', createFanPageTabPanel(tabDefinition('tamagotchi'), [tamagotchiSection])],
   ]);
