@@ -731,7 +731,7 @@ function openEditor(page, deps, deck, onSaved, variant = 'fan', sharedUnlocked =
   }
   function renderDetail() {
     const slide = state.slides[current];
-    detail.replaceChildren(el('strong', 'intro-editor-detail-title', `${slideLabel(slide)} 장`));
+    detail.replaceChildren(el('strong', 'intro-editor-detail-title', /장$/.test(slideLabel(slide)) ? slideLabel(slide) : `${slideLabel(slide)} 장`));
     if (slide.type === 'free') { renderFreeDetail(slide); return; }
     const fillButton = () => {
       const hint = SOURCE_HINT[slide.type];

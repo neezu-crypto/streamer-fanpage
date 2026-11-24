@@ -2472,6 +2472,11 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .intro-editor{display:grid;gap:14px}
 .intro-editor .profile-editor-heading{margin-bottom:0}
 .intro-editor-body{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}
+/* 편집 창 정리(2026-11-24): 아래 칸을 고치는 동안 미리보기가 위에 남게, 장 목록 줄이 붐비지 않게 */
+.intro-editor-body{grid-template-columns:340px minmax(0,1fr)}
+.intro-editor-preview{position:sticky;top:-1px;z-index:3;box-shadow:0 6px 18px #0002}
+.intro-editor-slide-go{display:none}
+.intro-editor-slide-name{overflow:hidden;text-overflow:ellipsis}
 .intro-editor-side{display:grid;gap:8px}
 .intro-editor-label{font-size:13px}
 .intro-editor-designs{display:flex;gap:6px;flex-wrap:wrap}
@@ -2519,6 +2524,7 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
   .intro-editor-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
   .intro-editor-body{grid-template-columns:1fr}
   .intro-editor-main{order:-1}
+  .intro-editor-preview{position:relative;top:auto}
   .intro-editor input[type=text],.intro-editor textarea{font-size:16px}
   .intro-editor-footer{flex-direction:column;align-items:stretch}
   .intro-deck-head h2{font-size:20px}
@@ -2558,12 +2564,19 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .intro-slide-layout-side .intro-slide-photos.is-n2{grid-template-rows:1fr 1fr}
 .intro-slide-layout-side .intro-slide-photos.is-n3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .intro-slide-layout-side .intro-slide-photos.is-n3 .intro-slide-photo:first-child{grid-column:1/-1}
-.intro-slide-layout-top .intro-slide-photos{top:5cqw;left:7cqw;right:7cqw;height:22cqw;grid-auto-flow:column;grid-auto-columns:1fr}
-.intro-slide-layout-top .intro-slide-panel{top:29cqw;bottom:4cqw;justify-content:flex-start;gap:1cqw;padding-block:2.2cqw}
+.intro-slide-layout-top .intro-slide-photos{top:4cqw;left:7cqw;right:7cqw;height:19cqw;grid-auto-flow:column;grid-auto-columns:1fr}
+.intro-slide-layout-top .intro-slide-panel{top:25.5cqw;bottom:3.5cqw;justify-content:flex-start;gap:.8cqw;padding-block:1.8cqw}
 .intro-slide-layout-photo .intro-slide-photos{inset:0;gap:.6cqw;grid-auto-flow:column;grid-auto-columns:1fr}
 .intro-slide-layout-photo .intro-slide-photo{border-radius:0;box-shadow:none}
 .intro-slide-layout-photo .intro-slide-panel{top:auto;bottom:3cqw;left:5cqw;right:5cqw;max-height:30cqw;z-index:2;gap:.6cqw;padding:2cqw 3cqw;justify-content:flex-end}
 .intro-slide-layout-photo .intro-slide-eyebrow{display:none}
+/* 사진 크게: 띠가 사진에 비쳐 글이 흐려지지 않게 디자인별 진한 바탕 + 흐림 */
+.intro-slide-layout-photo .intro-slide-panel{background:color-mix(in srgb,var(--intro-photo-band,#fffdfb) 90%,transparent);backdrop-filter:blur(1cqw);-webkit-backdrop-filter:blur(1cqw)}
+.intro-slide-midnight{--intro-photo-band:#0b0e22}.intro-slide-neon{--intro-photo-band:#0d0820}.intro-slide-pixel{--intro-photo-band:#101a3a}
+.intro-slide-chalk{--intro-photo-band:#24443a}.intro-slide-sunset{--intro-photo-band:#3d2b6b}.intro-slide-film{--intro-photo-band:#1f1f1f}
+/* 각진 디자인은 사진도 각지게 */
+.intro-slide-pixel .intro-slide-photo,.intro-slide-mono .intro-slide-photo{border-radius:0}
+.intro-slide-pixel .intro-slide-photo{box-shadow:.6cqw .6cqw 0 #000}.intro-slide-mono .intro-slide-photo{box-shadow:none;outline:.3cqw solid #111}
 /* 자유 장 글 강조 */
 .intro-slide-note.is-rich{display:flex;flex-direction:column;gap:.5cqw;white-space:normal}
 .intro-slide-line{display:block;white-space:pre-wrap}
