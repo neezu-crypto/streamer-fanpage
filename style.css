@@ -2562,7 +2562,7 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .intro-slide-layout-top .intro-slide-panel{top:29cqw;bottom:4cqw;justify-content:flex-start;gap:1cqw;padding-block:2.2cqw}
 .intro-slide-layout-photo .intro-slide-photos{inset:0;gap:.6cqw;grid-auto-flow:column;grid-auto-columns:1fr}
 .intro-slide-layout-photo .intro-slide-photo{border-radius:0;box-shadow:none}
-.intro-slide-layout-photo .intro-slide-panel{top:auto;bottom:3cqw;left:5cqw;right:5cqw;max-height:19cqw;z-index:2;gap:.6cqw;padding:2cqw 3cqw;justify-content:flex-end}
+.intro-slide-layout-photo .intro-slide-panel{top:auto;bottom:3cqw;left:5cqw;right:5cqw;max-height:30cqw;z-index:2;gap:.6cqw;padding:2cqw 3cqw;justify-content:flex-end}
 .intro-slide-layout-photo .intro-slide-eyebrow{display:none}
 /* 자유 장 글 강조 */
 .intro-slide-note.is-rich{display:flex;flex-direction:column;gap:.5cqw;white-space:normal}
