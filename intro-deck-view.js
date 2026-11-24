@@ -11,8 +11,22 @@ const TYPE_INFO = {
   schedule: { label: '방송 시간', eyebrow: 'SCHEDULE' },
   links: { label: '링크', eyebrow: 'LINKS' },
   closing: { label: '마무리', eyebrow: 'THANK YOU' },
+  free: { label: '자유 장', eyebrow: 'STORY' },
 };
-const TYPE_ORDER = Object.keys(TYPE_INFO);
+//  자유 장(2026-11-24)은 여러 장 넣을 수 있어 고정 순서에서 뺀다.
+const TYPE_ORDER = Object.keys(TYPE_INFO).filter((type) => type !== 'free');
+const MAX_FREE = 4;
+const FREE_NOTE_MAX = 400;
+const FREE_MAX_IMAGES = 3;
+const FREE_LAYOUTS = [
+  { id: 'side', label: '사진 오른쪽', hint: '왼쪽 글, 오른쪽 사진' },
+  { id: 'top', label: '사진 위', hint: '사진을 위에 나란히, 글은 아래' },
+  { id: 'photo', label: '사진 크게', hint: '사진이 화면을 채우고 글은 아래 띠에' },
+];
+//  면접용(2026-11-24): 크루·동아리 면접에서 쓰는 PPT. 팬용과 따로 저장하고 언제나 나만 보기.
+const VARIANT_LABEL = { fan: '팬용', interview: '면접용' };
+const FAN_ONLY_PROFILE = new Set(['fanNickname', 'fandomName']);
+const slideLabel = (slide) => (slide.type === 'free' ? (cut(slide.title, 20) || '자유 장') : TYPE_INFO[slide.type]?.label || '');
 //  디자인(2026-11-24): 무료 2종은 바로, 나머지 8종도 무료지만 미션을 달성하면 열린다.
 //  미션 기준은 서버(functions/index.js INTRO_DECK_MISSIONS)와 같다. 화면은 진행도만 보여 주고, 실제 해금은 저장할 때 서버가 정한다.
 const DESIGNS = [
@@ -78,6 +92,39 @@ const cut = (value, max) => String(value || '').trim().slice(0, max);
 const monthText = (value) => { const m = /^(\d{4})-(\d{2})$/.exec(String(value || '')); return m ? `${Number(m[1])}.${Number(m[2])}` : ''; };
 const itemKey = (value, index) => (/^[A-Za-z0-9_-]{1,64}$/.test(String(value || '')) ? String(value) : `i${index}`);
 
+// ---------- 최근 30일 방송 시간(2026-11-24) ----------
+// SOOP 다시보기 목록(팬페이지 다시보기 칸이 이미 받아 둔 것)의 영상 길이를 더한다. 실제 생방송 시간과는
+// 다를 수 있다(다시보기를 지웠거나 저장하지 않은 방송은 빠짐). 저장할 때 값이 PPT에 고정된다.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const AIR_LABELS = { total: '최근 30일 방송 합계', avg: '방송한 날 평균' };
+const vodTime = (regDate) => { const t = Date.parse(String(regDate || '').trim().replace(' ', 'T') + '+09:00'); return Number.isFinite(t) ? t : NaN; };
+const hoursText = (ms) => { const m = Math.round(ms / 60000); const h = Math.floor(m / 60); return h ? `${h}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`; };
+export function airtimeStats(vods, now = Date.now()) {
+  const items = Array.isArray(vods?.items) ? vods.items : [];
+  const since = now - 30 * DAY_MS;
+  let total = 0; const days = new Set(); let oldest = Infinity;
+  items.forEach((vod) => {
+    const t = vodTime(vod?.regDate); if (!Number.isFinite(t)) return;
+    oldest = Math.min(oldest, t);
+    const ms = Number(vod?.durationMs) || 0;
+    if (t < since || t > now + DAY_MS || ms <= 0) return;
+    total += ms;
+    days.add(new Date(t + 9 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  });
+  if (!total) return null;
+  return { totalMs: total, days: days.size, avgMs: total / days.size, complete: oldest < since || vods?.hasMore !== true, refreshedAt: Number(vods?.refreshedAt) || null };
+}
+function airtimeItems(page) {
+  const stats = airtimeStats(page.vods);
+  if (!stats) return [];
+  const about = stats.complete ? '' : '약 ';
+  return [
+    { key: 'air30total', label: AIR_LABELS.total, value: `${about}${hoursText(stats.totalMs)}` },
+    { key: 'air30avg', label: AIR_LABELS.avg, value: `${about}${hoursText(stats.avgMs)} (${stats.days}일 방송)` },
+  ];
+}
+const isAirItem = (item) => item?.label === AIR_LABELS.total || item?.label === AIR_LABELS.avg;
+
 // ---------- 팬페이지 정보 → 고를 수 있는 항목 ----------
 function sourceItems(page, games) {
   const p = page.profile || {};
@@ -111,7 +158,7 @@ function sourceItems(page, games) {
     games: { items: gameItems, title: '플레이한 게임', subtitle: '', note: '' },
     competitions: { items: competitions, title: '대회 이력', subtitle: '', note: '' },
     servers: { items: servers, title: '참여한 서버', subtitle: '', note: '' },
-    schedule: { items: [], title: '방송 시간', subtitle: '', note: cut(p.scheduleText, 200) },
+    schedule: { items: airtimeItems(page), title: '방송 시간', subtitle: '', note: cut(p.scheduleText, 200) },
     links: { items: links, title: '여기서 만나요', subtitle: '', note: '' },
     closing: { items: [], title: '감사합니다', subtitle: `${nickname} 많이 사랑해 주세요`, note: '' },
   };
@@ -119,23 +166,53 @@ function sourceItems(page, games) {
 
 const slideHasData = (type, src) => Boolean(src.items.length || src.note || ['cover', 'closing'].includes(type));
 // 저장본(있으면)과 지금 정보로 편집 상태를 만든다.
-function editorStateFrom(page, games, deck) {
+let freeSeq = 0;
+const newFreeSlide = (init = {}) => ({
+  type: 'free', key: `free${++freeSeq}`, on: true, title: init.title || '', subtitle: init.subtitle || '', note: init.note || '',
+  images: (Array.isArray(init.images) ? init.images : []).filter((img) => img && img.id && img.url).slice(0, FREE_MAX_IMAGES).map((img) => ({ id: img.id, url: img.url })),
+  layout: FREE_LAYOUTS.some((l) => l.id === init.layout) ? init.layout : 'side',
+  placeholder: init.placeholder || '', items: [], shown: new Set(), hasData: true,
+});
+//  면접용 처음 틀: 지원 동기·목표 자유 장이 들어가고, 팬 전용 항목(팬 애칭·팬덤)과 프로필 장은 빠진다.
+const INTERVIEW_TEMPLATE = ['cover', 'free:motive', 'games', 'competitions', 'servers', 'free:goal', 'schedule', 'links', 'closing'];
+const INTERVIEW_FREE = {
+  motive: { title: '지원 동기', placeholder: '왜 이 크루·동아리에 들어오고 싶은지 적어 주세요.' },
+  goal: { title: '들어가서 하고 싶은 것', placeholder: '함께하고 싶은 콘텐츠, 맡고 싶은 역할, 목표를 적어 주세요.' },
+};
+
+// 저장본(있으면)과 지금 정보로 편집 상태를 만든다. variant: 'fan' | 'interview'
+function editorStateFrom(page, games, deck, variant = 'fan') {
   const source = sourceItems(page, games);
-  const saved = new Map((deck?.slides || []).map((slide) => [slide.type, slide]));
+  const interview = variant === 'interview';
+  if (interview) {
+    source.cover = { ...source.cover, subtitle: '지원자 소개' };
+    source.schedule = { ...source.schedule, title: '활동 가능 시간' };
+    source.closing = { ...source.closing, title: '잘 부탁드립니다', subtitle: '함께하고 싶어요' };
+  }
+  const saved = new Map((deck?.slides || []).filter((slide) => slide.type !== 'free').map((slide) => [slide.type, slide]));
   const picks = new Set(Array.isArray(deck?.picks) ? deck.picks : []);
-  const order = [...(deck?.slides || []).map((slide) => slide.type).filter((type) => TYPE_INFO[type]), ...TYPE_ORDER.filter((type) => !saved.has(type))];
-  const slides = order.map((type) => {
+  const fixedSlide = (type) => {
     const src = source[type]; const old = saved.get(type);
     const hasData = slideHasData(type, src);
-    const shown = deck ? src.items.filter((item) => picks.has(`${type}:${item.key}`)).map((item) => item.key)
-      : src.items.slice(0, DEFAULT_ITEMS).map((item) => item.key);
+    const defaults = src.items.filter((item) => !(interview && type === 'profile' && FAN_ONLY_PROFILE.has(item.key))).slice(0, DEFAULT_ITEMS);
+    const shown = deck ? src.items.filter((item) => picks.has(`${type}:${item.key}`)).map((item) => item.key) : defaults.map((item) => item.key);
     return {
-      type, on: deck ? saved.has(type) : Boolean(hasData),
+      type, key: type, on: deck ? saved.has(type) : Boolean(hasData) && !(interview && type === 'profile'),
       title: old?.title || src.title, subtitle: old ? old.subtitle : src.subtitle, note: old ? old.note : src.note,
       items: src.items, shown: new Set(shown), hasData,
     };
-  });
-  return { design: deck?.design || 'pastel', public: deck ? deck.public === true : false, slides };
+  };
+  let slides;
+  if (deck) {
+    slides = (deck.slides || []).map((slide) => (slide.type === 'free' ? newFreeSlide(slide) : TYPE_INFO[slide.type] ? fixedSlide(slide.type) : null)).filter(Boolean);
+    TYPE_ORDER.filter((type) => !saved.has(type)).forEach((type) => slides.push(fixedSlide(type)));
+  } else if (interview) {
+    slides = INTERVIEW_TEMPLATE.map((entry) => (entry.startsWith('free:') ? newFreeSlide(INTERVIEW_FREE[entry.slice(5)]) : fixedSlide(entry)));
+    TYPE_ORDER.filter((type) => !INTERVIEW_TEMPLATE.includes(type)).forEach((type) => { const slide = fixedSlide(type); slide.on = false; slides.push(slide); });
+  } else {
+    slides = TYPE_ORDER.map(fixedSlide);
+  }
+  return { variant, design: deck?.design || 'pastel', public: !interview && deck ? deck.public === true : false, slides };
 }
 
 function deckFromEditor(state) {
@@ -143,10 +220,12 @@ function deckFromEditor(state) {
   return {
     design: state.design,
     public: state.public,
-    slides: on.map((slide) => ({
-      type: slide.type, title: cut(slide.title, 40), subtitle: cut(slide.subtitle, 80), note: cut(slide.note, 200),
-      items: slide.items.filter((item) => slide.shown.has(item.key)).slice(0, MAX_ITEMS).map((item) => ({ label: item.label, value: item.value })),
-    })),
+    slides: on.map((slide) => (slide.type === 'free'
+      ? { type: 'free', title: cut(slide.title, 40), subtitle: cut(slide.subtitle, 80), note: cut(slide.note, FREE_NOTE_MAX), items: [], layout: slide.layout || 'side', ...(slide.images?.length ? { images: slide.images.slice(0, FREE_MAX_IMAGES).map((img) => ({ id: img.id, url: img.url })) } : {}) }
+      : {
+        type: slide.type, title: cut(slide.title, 40), subtitle: cut(slide.subtitle, 80), note: cut(slide.note, 200),
+        items: slide.items.filter((item) => slide.shown.has(item.key)).slice(0, MAX_ITEMS).map((item) => ({ label: item.label, value: item.value })),
+      })),
     picks: on.flatMap((slide) => slide.items.filter((item) => slide.shown.has(item.key)).map((item) => `${slide.type}:${item.key}`)).slice(0, 200),
   };
 }
@@ -159,7 +238,9 @@ function deckIsStale(page, games, deck) {
   return deck.slides.some((slide, i) => {
     if (slide.type === 'games' && !gamesKnown) return false;
     const now = fresh.slides[i];
-    return !now || JSON.stringify(slide.items || []) !== JSON.stringify(now.items || []);
+    //  방송 시간 통계는 날마다 바뀌어 저장본과 늘 달라지므로 비교에서 뺀다.
+    const keep = (items) => JSON.stringify((items || []).filter((item) => !isAirItem(item)));
+    return !now || keep(slide.items) !== keep(now.items);
   });
 }
 
@@ -176,8 +257,36 @@ function fillQr(holder, value, label) {
 }
 
 // ---------- 슬라이드 그리기(16:9, 글자 크기는 슬라이드 폭 기준 cqw) ----------
+//  자유 장 글 강조: **굵게**, 줄 앞 "- "는 목록. HTML은 쓰지 않고 글자 노드로만 만든다.
+function richLine(text) {
+  const line = el('span', 'intro-slide-line');
+  String(text).split(/(\*\*[^*]+\*\*)/).forEach((part) => {
+    if (!part) return;
+    if (/^\*\*[^*]+\*\*$/.test(part)) line.append(el('span', 'intro-slide-strong', part.slice(2, -2)));
+    else line.append(document.createTextNode(part));
+  });
+  return line;
+}
+function richNote(note) {
+  const box = el('div', 'intro-slide-note is-rich');
+  let list = null;
+  String(note).split('\n').forEach((raw) => {
+    const bullet = /^\s*[-•]\s+(.*)$/.exec(raw);
+    if (bullet) {
+      if (!list) { list = el('div', 'intro-slide-bullets'); box.append(list); }
+      const item = el('div', 'intro-slide-bullet'); item.append(richLine(bullet[1])); list.append(item);
+    } else {
+      list = null;
+      if (raw.trim()) box.append(richLine(raw)); else box.append(el('span', 'intro-slide-gap'));
+    }
+  });
+  return box;
+}
+const plainNote = (note) => String(note || '').replace(/\*\*([^*]+)\*\*/g, '$1');
+
 function renderSlide(slide, design, page, index, total) {
-  const box = el('div', `intro-slide intro-slide-${design} intro-slide-${slide.type}`);
+  const photos = slide.type === 'free' && Array.isArray(slide.images) ? slide.images.filter((img) => img?.url).slice(0, FREE_MAX_IMAGES) : [];
+  const box = el('div', `intro-slide intro-slide-${design} intro-slide-${slide.type}${photos.length ? ` has-photo intro-slide-layout-${slide.layout || 'side'}` : ''}`);
   box.setAttribute('role', 'img');
   box.setAttribute('aria-label', `${index + 1}번째 장: ${slide.title || TYPE_INFO[slide.type]?.label || ''}`);
   box.append(el('div', 'intro-slide-bg'));
@@ -191,6 +300,18 @@ function renderSlide(slide, design, page, index, total) {
     panel.append(avatar);
   }
   panel.append(el('div', 'intro-slide-eyebrow', TYPE_INFO[slide.type]?.eyebrow || ''), el('div', 'intro-slide-title', slide.title || ''));
+  if (photos.length) {
+    //  자유 장 사진: 내 공개 갤러리 썸네일(서버가 저장할 때 확인). 최대 3장.
+    const wall = el('div', `intro-slide-photos is-n${photos.length}`);
+    photos.forEach((img) => {
+      const photo = el('img', 'intro-slide-photo');
+      photo.alt = ''; photo.decoding = 'async'; photo.loading = 'lazy'; photo.referrerPolicy = 'no-referrer'; photo.draggable = false;
+      photo.src = img.url;
+      photo.addEventListener('error', () => photo.remove(), { once: true });
+      wall.append(photo);
+    });
+    box.append(wall);
+  }
   if (slide.subtitle) panel.append(el('div', 'intro-slide-subtitle', slide.subtitle));
   if (slide.type === 'links' && slide.items?.length) {
     const list = el('div', `intro-slide-items is-qr is-qr-${Math.min(slide.items.length, 4)}`);
@@ -213,7 +334,7 @@ function renderSlide(slide, design, page, index, total) {
     });
     panel.append(list);
   }
-  if (slide.note) panel.append(el('div', 'intro-slide-note', slide.note));
+  if (slide.note) panel.append(slide.type === 'free' ? richNote(slide.note) : el('div', 'intro-slide-note', slide.note));
   box.append(panel, el('span', 'intro-slide-page', `${index + 1} / ${total}`));
   return box;
 }
@@ -232,7 +353,7 @@ function renderTextList(deck) {
       slide.items.forEach((item) => ul.append(el('li', '', [item.label, item.value].filter(Boolean).join(': '))));
       li.append(ul);
     }
-    if (slide.note) li.append(el('p', '', slide.note));
+    if (slide.note) li.append(el('p', '', plainNote(slide.note)));
     list.append(li);
   });
   details.append(list);
@@ -384,14 +505,15 @@ function openPresentation(deck, page, startIndex = 0) {
 }
 
 // ---------- 편집 창 ----------
-function openEditor(page, deps, deck, onSaved) {
+function openEditor(page, deps, deck, onSaved, variant = 'fan', sharedUnlocked = []) {
   const games = deps.playedGames(page);
-  const state = editorStateFrom(page, games, deck);
+  const state = editorStateFrom(page, games, deck, variant);
+  const interview = variant === 'interview';
   const dialog = el('dialog', 'account-dialog intro-editor-dialog');
   dialog.setAttribute('aria-labelledby', 'introEditorTitle');
   const form = el('form', 'account-dialog-card intro-editor');
   const head = el('div', 'profile-editor-heading');
-  const title = el('h2', '', deck ? 'PPT 고치기' : 'PPT 만들기'); title.id = 'introEditorTitle';
+  const title = el('h2', '', `${interview ? '면접용 ' : ''}${deck ? 'PPT 고치기' : 'PPT 만들기'}`); title.id = 'introEditorTitle';
   const close = el('button', 'button profile-settings-close', '×'); close.type = 'button';
   close.title = '창 닫기'; close.setAttribute('aria-label', 'PPT 창 닫기');
   close.addEventListener('click', () => dialog.close());
@@ -404,7 +526,8 @@ function openEditor(page, deps, deck, onSaved) {
   let current = state.slides.findIndex((slide) => slide.on);
   if (current < 0) current = 0;
 
-  const unlocked = new Set(Array.isArray(deck?.unlocked) ? deck.unlocked : []);
+  //  미션 디자인은 팬용·면접용이 함께 쓴다(서버도 두 저장본을 합쳐 판정).
+  const unlocked = new Set([...(Array.isArray(deck?.unlocked) ? deck.unlocked : []), ...sharedUnlocked]);
   const designRow = el('div', 'intro-editor-designs');
   designRow.setAttribute('role', 'radiogroup'); designRow.setAttribute('aria-label', '디자인');
   const designNote = el('div', 'intro-editor-design-note');
@@ -459,24 +582,140 @@ function openEditor(page, deps, deck, onSaved) {
       const li = el('li', `intro-editor-slide${i === current ? ' is-current' : ''}${slide.on ? '' : ' is-off'}`);
       const check = el('input'); check.type = 'checkbox'; check.checked = slide.on;
       check.title = slide.on ? '이 장을 빼요' : '이 장을 넣어요';
-      check.setAttribute('aria-label', `${TYPE_INFO[slide.type].label} 장 넣기`);
+      check.setAttribute('aria-label', `${slideLabel(slide)} 장 넣기`);
       check.disabled = !slide.on && onCount() >= MAX_SLIDES;
       check.addEventListener('change', () => { slide.on = check.checked; current = i; refresh(); });
-      const pick = el('button', 'intro-editor-slide-name', TYPE_INFO[slide.type].label); pick.type = 'button';
-      pick.title = `${TYPE_INFO[slide.type].label} 장을 미리 보고 고쳐요`;
+      const pick = el('button', `intro-editor-slide-name${slide.type === 'free' ? ' is-free' : ''}`, slide.type === 'free' ? `✍ ${slideLabel(slide)}` : slideLabel(slide)); pick.type = 'button';
+      pick.title = `${slideLabel(slide)} 장을 미리 보고 고쳐요`;
       pick.append(el('span', 'intro-editor-slide-go', '고치기 ›'));
       pick.addEventListener('click', () => { current = i; refresh(); if (window.matchMedia('(max-width: 760px)').matches) previewBox.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' }); });
-      const up = el('button', 'intro-editor-move', '↑'); up.type = 'button'; up.title = '앞으로'; up.setAttribute('aria-label', `${TYPE_INFO[slide.type].label} 앞으로`);
-      const down = el('button', 'intro-editor-move', '↓'); down.type = 'button'; down.title = '뒤로'; down.setAttribute('aria-label', `${TYPE_INFO[slide.type].label} 뒤로`);
+      const up = el('button', 'intro-editor-move', '↑'); up.type = 'button'; up.title = '앞으로'; up.setAttribute('aria-label', `${slideLabel(slide)} 앞으로`);
+      const down = el('button', 'intro-editor-move', '↓'); down.type = 'button'; down.title = '뒤로'; down.setAttribute('aria-label', `${slideLabel(slide)} 뒤로`);
       up.disabled = i === 0; down.disabled = i === state.slides.length - 1;
       const move = (d) => { const [s] = state.slides.splice(i, 1); state.slides.splice(i + d, 0, s); current = i + d; refresh(); };
       up.addEventListener('click', () => move(-1)); down.addEventListener('click', () => move(1));
       let tag = null;
-      if (!slide.hasData) { tag = el('span', 'intro-editor-slide-tag is-empty', '정보 없음'); tag.title = `팬페이지에 ${SOURCE_HINT[slide.type]?.what || '정보'}을 먼저 채우면 이 장을 만들 수 있어요`; }
+      if (slide.type === 'free' && !String(slide.note || '').trim() && !slide.images.length) { tag = el('span', 'intro-editor-slide-tag is-empty', '글 비어 있음'); tag.title = '하고 싶은 말을 적거나 사진을 넣어 주세요'; }
+      else if (!slide.hasData) { tag = el('span', 'intro-editor-slide-tag is-empty', '정보 없음'); tag.title = `팬페이지에 ${SOURCE_HINT[slide.type]?.what || '정보'}을 먼저 채우면 이 장을 만들 수 있어요`; }
       else if (slide.items.length) { tag = el('span', 'intro-editor-slide-tag', `항목 ${slide.shown.size}/${slide.items.length}`); tag.title = `팬페이지 항목 ${slide.items.length}개 중 ${slide.shown.size}개를 보여 줘요`; }
       li.append(check, pick, ...(tag ? [tag] : []), up, down);
       list.append(li);
     });
+    const freeCount = state.slides.filter((slide) => slide.type === 'free').length;
+    addFree.disabled = freeCount >= MAX_FREE || onCount() >= MAX_SLIDES;
+    addFree.title = freeCount >= MAX_FREE ? `자유 장은 ${MAX_FREE}장까지 넣을 수 있어요` : onCount() >= MAX_SLIDES ? `장은 최대 ${MAX_SLIDES}장이에요. 다른 장을 빼고 넣어 주세요` : '제목·글·사진을 직접 넣는 장을 추가해요';
+  }
+  const addFree = el('button', 'button intro-editor-add-free', `＋ 자유 장 추가 (최대 ${MAX_FREE}장)`); addFree.type = 'button';
+  addFree.addEventListener('click', () => {
+    const at = Math.min(current + 1, state.slides.length);
+    state.slides.splice(at, 0, newFreeSlide({ title: '' }));
+    current = at; refresh();
+  });
+  //  자유 장: 제목·부제목·하고 싶은 말(최대 400자)·사진 1장(내 공개 갤러리에서 고르기)·장 지우기.
+  const gallery = { items: [], loading: false, error: '', hasMore: false, nextOffset: 0, open: false };
+  const uploadState = { busy: false, message: '' };
+  function renderFreeDetail(slide) {
+    detail.append(textField('제목', 'title', 40), textField('부제목', 'subtitle', 80), textField(`하고 싶은 말 (최대 ${FREE_NOTE_MAX}자)`, 'note', FREE_NOTE_MAX, true),
+      el('small', 'intro-editor-help', '✨ **두 별표** 사이 글은 굵게, 줄 앞에 "- "를 쓰면 목록이 돼요.'));
+    const photoBox = el('div', 'intro-editor-photo');
+    photoBox.append(el('strong', 'intro-editor-label', `사진 (선택, 최대 ${FREE_MAX_IMAGES}장)`));
+    if (slide.images.length) {
+      const strip = el('div', 'intro-editor-photo-strip');
+      slide.images.forEach((img, i) => {
+        const cell = el('div', 'intro-editor-photo-cell');
+        const thumb = el('img', 'intro-editor-photo-thumb'); thumb.alt = `${i + 1}번째 사진`; thumb.referrerPolicy = 'no-referrer'; thumb.src = img.url;
+        const remove = el('button', 'button intro-editor-photo-remove', '빼기'); remove.type = 'button'; remove.title = `${i + 1}번째 사진을 빼요`;
+        remove.addEventListener('click', () => { slide.images.splice(i, 1); refresh(); });
+        cell.append(thumb, remove); strip.append(cell);
+      });
+      photoBox.append(strip);
+      const layouts = el('div', 'intro-editor-layouts');
+      layouts.setAttribute('role', 'radiogroup'); layouts.setAttribute('aria-label', '사진 배치');
+      FREE_LAYOUTS.forEach((layout) => {
+        const b = el('button', `button intro-editor-layout${slide.layout === layout.id ? ' is-active' : ''}`, layout.label); b.type = 'button';
+        b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(slide.layout === layout.id)); b.title = layout.hint;
+        b.addEventListener('click', () => { slide.layout = layout.id; refresh(); });
+        layouts.append(b);
+      });
+      photoBox.append(el('small', 'intro-editor-help', '사진 배치'), layouts);
+    }
+    const full = slide.images.length >= FREE_MAX_IMAGES;
+    const buttons = el('div', 'intro-editor-photo-actions');
+    if (deps.loadGallery) {
+      const pickPhoto = el('button', 'button', '갤러리에서 고르기'); pickPhoto.type = 'button'; pickPhoto.disabled = full;
+      pickPhoto.title = full ? `사진은 ${FREE_MAX_IMAGES}장까지예요` : '내 팬페이지 갤러리에 공개된 사진 중에서 골라요';
+      pickPhoto.addEventListener('click', () => { gallery.open = !gallery.open; if (gallery.open && !gallery.items.length) loadGalleryPage(false); else renderDetail(); });
+      buttons.append(pickPhoto);
+    }
+    if (deps.uploadGalleryImage) {
+      const file = el('input'); file.type = 'file'; file.accept = 'image/jpeg,image/png,image/webp,image/gif'; file.hidden = true;
+      const upload = el('button', 'button', uploadState.busy ? '올리는 중…' : '내 컴퓨터에서 올리기'); upload.type = 'button'; upload.disabled = full || uploadState.busy;
+      upload.title = '사진을 내 팬페이지 갤러리(공개)에 올리고 이 장에 넣어요';
+      upload.addEventListener('click', () => file.click());
+      file.addEventListener('change', async () => {
+        const picked = file.files?.[0]; if (!picked) return;
+        uploadState.busy = true; uploadState.message = '갤러리에 올리는 중…'; renderDetail();
+        try {
+          const image = await deps.uploadGalleryImage(picked, (message) => { uploadState.message = message; if (dialog.open) renderDetail(); });
+          if (slide.images.length < FREE_MAX_IMAGES && !slide.images.some((img) => img.id === image.id)) slide.images.push(image);
+          gallery.items = [{ id: image.id, thumbUrl: image.url, categoryLabel: '기타' }, ...gallery.items.filter((item) => item.id !== image.id)];
+          uploadState.message = '갤러리에 올리고 이 장에 넣었어요.';
+        } catch (error) {
+          uploadState.message = error?.message || '사진을 올리지 못했어요.';
+        } finally { uploadState.busy = false; if (dialog.open) refresh(); }
+      });
+      buttons.append(upload, file);
+    }
+    photoBox.append(buttons);
+    if (uploadState.message) photoBox.append(el('small', 'intro-editor-help', uploadState.message));
+    if (gallery.open && !full) photoBox.append(galleryGrid(slide));
+    photoBox.append(el('small', 'intro-editor-help', '사진은 내 팬페이지 갤러리 사진만 써요. 직접 올린 사진도 갤러리에 공개로 올라가고, 슬라이드에는 갤러리 미리보기 크기(긴 변 480px)로 들어가요.'));
+    const removeSlide = el('button', 'button intro-editor-remove-free', '이 자유 장 지우기'); removeSlide.type = 'button';
+    removeSlide.title = '이 장을 PPT에서 지워요(저장해야 반영돼요)';
+    removeSlide.addEventListener('click', () => { state.slides.splice(current, 1); current = Math.max(0, Math.min(current, state.slides.length - 1)); refresh(); });
+    detail.append(photoBox, removeSlide);
+  }
+  function galleryGrid(slide) {
+    const wrap = el('div', 'intro-editor-gallery');
+    if (gallery.loading && !gallery.items.length) { wrap.append(el('p', 'intro-editor-help', '갤러리를 불러오고 있어요…')); return wrap; }
+    if (gallery.error) wrap.append(el('p', 'intro-editor-help is-warning', gallery.error));
+    const grid = el('div', 'intro-editor-gallery-grid');
+    gallery.items.forEach((item) => {
+      const picked = slide.images.some((img) => img.id === item.id);
+      const b = el('button', `intro-editor-gallery-item${picked ? ' is-picked' : ''}`); b.type = 'button'; b.setAttribute('aria-pressed', String(picked));
+      b.title = `${item.categoryLabel || '사진'} 사진 고르기`; b.setAttribute('aria-label', `${item.categoryLabel || '사진'} 사진 고르기`);
+      const img = el('img'); img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer'; img.src = item.thumbUrl;
+      b.append(img);
+      b.addEventListener('click', () => {
+        const at = slide.images.findIndex((img) => img.id === item.id);
+        if (at >= 0) slide.images.splice(at, 1);
+        else if (slide.images.length < FREE_MAX_IMAGES) slide.images.push({ id: item.id, url: item.thumbUrl });
+        if (slide.images.length >= FREE_MAX_IMAGES) gallery.open = false;
+        refresh();
+      });
+      grid.append(b);
+    });
+    wrap.append(grid);
+    if (gallery.hasMore) {
+      const more = el('button', 'button', gallery.loading ? '불러오는 중…' : '사진 더 보기'); more.type = 'button'; more.disabled = gallery.loading;
+      more.addEventListener('click', () => loadGalleryPage(true));
+      wrap.append(more);
+    }
+    return wrap;
+  }
+  async function loadGalleryPage(append) {
+    if (gallery.loading) return;
+    gallery.loading = true; gallery.error = ''; renderDetail();
+    try {
+      const result = await deps.loadGallery(append ? gallery.nextOffset : 0);
+      const items = Array.isArray(result?.items) ? result.items.filter((item) => item && item.id && item.thumbUrl) : [];
+      gallery.items = append ? [...gallery.items, ...items] : items;
+      gallery.nextOffset = Number(result?.nextOffset) || gallery.items.length;
+      gallery.hasMore = result?.hasMore === true;
+      if (!gallery.items.length) gallery.error = result?.linked === false ? '연결된 갤러리를 찾지 못했어요.' : '갤러리에 공개된 사진이 아직 없어요.';
+    } catch (error) {
+      gallery.error = error?.message || '갤러리를 불러오지 못했어요.';
+    } finally { gallery.loading = false; if (dialog.open) renderDetail(); }
   }
   function textField(labelText, key, max, multiline = false) {
     const slide = state.slides[current];
@@ -484,13 +723,16 @@ function openEditor(page, deps, deck, onSaved) {
     const input = el(multiline ? 'textarea' : 'input');
     if (multiline) input.rows = 3; else input.type = 'text';
     input.maxLength = max; input.value = slide[key] || '';
+    if (key === 'note' && slide.placeholder) input.placeholder = slide.placeholder;
+    if (key === 'title') input.addEventListener('input', () => renderList());
     input.addEventListener('input', () => { slide[key] = input.value; renderPreview(); });
     label.append(input);
     return label;
   }
   function renderDetail() {
     const slide = state.slides[current];
-    detail.replaceChildren(el('strong', 'intro-editor-detail-title', `${TYPE_INFO[slide.type].label} 장`));
+    detail.replaceChildren(el('strong', 'intro-editor-detail-title', `${slideLabel(slide)} 장`));
+    if (slide.type === 'free') { renderFreeDetail(slide); return; }
     const fillButton = () => {
       const hint = SOURCE_HINT[slide.type];
       if (!hint || !deps.goToSource) return null;
@@ -512,6 +754,13 @@ function openEditor(page, deps, deck, onSaved) {
       return;
     }
     detail.append(textField('제목', 'title', 40), textField('부제목', 'subtitle', 80), textField('하고 싶은 말', 'note', 200, true));
+    if (slide.type === 'schedule') {
+      const stats = airtimeStats(page.vods);
+      const age = stats?.refreshedAt ? Math.floor((Date.now() - stats.refreshedAt) / DAY_MS) : null;
+      detail.append(el('p', `intro-editor-help${stats && (age >= 3 || !stats.complete) ? ' is-warning' : ''}`, !stats
+        ? '최근 30일 방송 시간은 팬페이지 다시보기 목록으로 계산해요. 다시보기 목록을 갱신하면 항목이 생겨요.'
+        : `최근 30일 방송 시간은 SOOP 다시보기 길이를 더한 값이에요(지우거나 저장 안 한 방송은 빠져요).${age >= 3 ? ` 다시보기 목록을 ${age}일 전에 갱신했어요. 최신으로 하려면 다시보기 칸에서 목록을 갱신해 주세요.` : ''}${stats.complete ? '' : ' 다시보기를 다 불러오지 못해 "약"으로 표시했어요.'} 저장할 때 값이 고정돼요.`));
+    }
     if (slide.type === 'links') detail.append(el('p', 'intro-editor-help', '링크 장은 QR이 먼저예요. 링크가 많을 때 하고 싶은 말이 길면 슬라이드에서 잘릴 수 있어요(전체 글은 "글로 보기"에 나와요).'));
     if (slide.items.length) {
       const box = el('fieldset', 'intro-editor-items');
@@ -543,14 +792,15 @@ function openEditor(page, deps, deck, onSaved) {
   }
 
   const countNote = el('span', 'intro-editor-count');
-  side.append(el('strong', 'intro-editor-label', '디자인'), designRow, designNote, el('strong', 'intro-editor-label', '넣을 장과 순서'), el('small', 'intro-editor-guide', '☑ 체크로 넣고 빼요 · 이름을 누르면 미리보기와 글 고치기가 열려요 · ↑↓로 순서'), list, countNote);
+  side.append(el('strong', 'intro-editor-label', '디자인'), designRow, designNote, el('strong', 'intro-editor-label', '넣을 장과 순서'), el('small', 'intro-editor-guide', '☑ 체크로 넣고 빼요 · 이름을 누르면 미리보기와 글 고치기가 열려요 · ↑↓로 순서'), list, addFree, countNote);
   const main = el('div', 'intro-editor-main');
   main.append(previewBox, detail);
   body.append(side, main);
 
   const status = el('p', 'intro-editor-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const footer = el('div', 'profile-editor-footer intro-editor-footer');
-  const hint = el('small', '', state.public ? '지금 팬에게 공개 중이에요. 저장하면 팬 화면도 바로 바뀌어요.' : '"나만 보기"는 나에게만 보여요. 팬에게 보여 주려면 "저장하고 팬에게 공개"를 눌러 주세요.');
+  const hint = el('small', '', interview ? '면접용 PPT는 언제나 나만 볼 수 있어요. 면접에서는 "전체화면 발표"로 화면 공유해 주세요. 팬용 PPT와는 따로 저장돼요.'
+    : state.public ? '지금 팬에게 공개 중이에요. 저장하면 팬 화면도 바로 바뀌어요.' : '"나만 보기"는 나에게만 보여요. 팬에게 보여 주려면 "저장하고 팬에게 공개"를 눌러 주세요.');
   const actions = el('div', 'profile-editor-footer-actions');
   const cancel = el('button', 'button', '취소'); cancel.type = 'button'; cancel.title = '저장하지 않고 닫아요';
   cancel.addEventListener('click', () => dialog.close());
@@ -559,25 +809,28 @@ function openEditor(page, deps, deck, onSaved) {
   const save = el('button', 'button button-primary', state.public ? '저장 (공개 유지)' : '저장하고 팬에게 공개'); save.type = 'submit'; save.value = 'public';
   save.title = '저장하고 팬페이지에 PPT 탭을 보여 줘요';
   const saveLabels = new Map([[privateSave, privateSave.textContent], [save, save.textContent]]);
+  if (interview) { privateSave.hidden = true; save.textContent = '저장 (나만 보기)'; save.title = '면접용 PPT를 저장해요. 팬에게는 보이지 않아요'; saveLabels.set(save, save.textContent); }
   actions.append(cancel, privateSave, save); footer.append(hint, actions);
   form.append(head, body, status, footer);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (save.disabled) return;
     const clicked = event.submitter === privateSave ? privateSave : save;
-    state.public = clicked === save;
+    state.public = !interview && clicked === save;
+    const emptyFree = state.slides.find((slide) => slide.on && slide.type === 'free' && !String(slide.title || '').trim() && !String(slide.subtitle || '').trim() && !String(slide.note || '').trim() && !slide.images.length);
+    if (emptyFree) { current = state.slides.indexOf(emptyFree); refresh(); status.textContent = '비어 있는 자유 장이 있어요. 글이나 사진을 넣거나 지워 주세요.'; status.classList.add('is-error'); return; }
     const next = deckFromEditor(state);
     status.textContent = ''; status.classList.remove('is-error');
     if (!next.slides.length) { status.textContent = '넣을 장을 하나 이상 골라 주세요.'; status.classList.add('is-error'); return; }
     if (renderDesigns() === 'locked') { status.textContent = '고른 디자인이 아직 잠겨 있어요. 미션을 달성하거나 다른 디자인을 골라 주세요.'; status.classList.add('is-error'); return; }
     save.disabled = true; privateSave.disabled = true; clicked.textContent = '저장 중…'; clicked.setAttribute('aria-busy', 'true');
     try {
-      const result = await deps.call({ action: 'save', streamerId: page.streamer.id, deck: next });
+      const result = await deps.call({ action: 'save', streamerId: page.streamer.id, variant, deck: next });
       dialog.close();
       const opened = (result.data.deck?.unlocked || []).filter((d) => !unlocked.has(d));
       onSaved(result.data.deck);
       if (opened.length) setTimeout(() => deps.toast(`🎉 새 디자인이 열렸어요: ${opened.map((d) => DESIGNS.find((x) => x.id === d)?.label || d).join(', ')}`), 1800);
-      deps.toast(next.public ? 'PPT를 저장하고 팬에게 공개했어요.' : 'PPT를 저장했어요. "나만 보기"라 팬에게는 아직 보이지 않아요.');
+      deps.toast(interview ? '면접용 PPT를 저장했어요. 나만 볼 수 있어요.' : next.public ? 'PPT를 저장하고 팬에게 공개했어요.' : 'PPT를 저장했어요. "나만 보기"라 팬에게는 아직 보이지 않아요.');
     } catch (error) {
       status.textContent = error.message || 'PPT를 저장하지 못했어요.'; status.classList.add('is-error');
     } finally {
@@ -598,7 +851,10 @@ export function renderIntroDeckSection(page, deps) {
   const id = page.streamer.id;
   const canEdit = page.isOwner === true;
   let entry = decks.get(id);
-  if (!entry) { entry = { loaded: false, loading: false, deck: null, error: '', waiters: new Set() }; decks.set(id, entry); }
+  if (!entry) { entry = { loaded: false, loading: false, deck: null, interviewDeck: null, variant: 'fan', error: '', waiters: new Set() }; decks.set(id, entry); }
+  if (!canEdit) entry.variant = 'fan';
+  const currentDeck = () => (entry.variant === 'interview' ? entry.interviewDeck : entry.deck);
+  const unlockedOf = (deck) => (Array.isArray(deck?.unlocked) ? deck.unlocked : []);
 
   const draw = () => {
     const head = el('div', 'intro-deck-head');
@@ -606,30 +862,57 @@ export function renderIntroDeckSection(page, deps) {
     copy.append(el('p', 'eyebrow', 'PRESENTATION'), el('h2', '', 'PPT'));
     head.append(copy);
     const tools = el('div', 'intro-deck-tools');
+    const interview = entry.variant === 'interview';
+    const deckNow = currentDeck();
     if (canEdit && entry.loaded) {
-      if (entry.deck) {
-        const badge = el('span', `intro-deck-public-badge${entry.deck.public ? ' is-public' : ''}`, entry.deck.public ? '팬에게 공개 중' : '나만 보기');
-        badge.title = entry.deck.public ? '팬도 PPT 탭에서 볼 수 있어요' : '아직 팬에게는 PPT 탭이 보이지 않아요';
+      if (deckNow) {
+        const isPublic = !interview && deckNow.public;
+        const badge = el('span', `intro-deck-public-badge${isPublic ? ' is-public' : ''}`, isPublic ? '팬에게 공개 중' : '나만 보기');
+        badge.title = interview ? '면접용 PPT는 나만 볼 수 있어요' : isPublic ? '팬도 PPT 탭에서 볼 수 있어요' : '아직 팬에게는 PPT 탭이 보이지 않아요';
         tools.append(badge);
       }
-      const edit = el('button', 'button button-primary intro-deck-edit', entry.deck ? 'PPT 고치기' : 'PPT 만들기'); edit.type = 'button';
-      edit.title = '팬페이지 정보로 슬라이드를 고르고 고쳐요';
-      edit.addEventListener('click', () => openEditor(page, deps, entry.deck, (deck) => {
-        entry.deck = deck;
-        deps.onPublicChange(deck.public === true);
-        section.replaceChildren(); draw();
-      }));
+      const edit = el('button', 'button button-primary intro-deck-edit', `${interview ? '면접용 ' : ''}${deckNow ? 'PPT 고치기' : 'PPT 만들기'}`); edit.type = 'button';
+      edit.title = interview ? '지원 동기·목표 장이 들어간 면접용 틀로 슬라이드를 고르고 고쳐요' : '팬페이지 정보로 슬라이드를 고르고 고쳐요';
+      edit.addEventListener('click', async () => {
+        const variant = entry.variant;
+        //  방송 시간 통계용: 다시보기가 최근 30일을 다 덮지 못하면 몇 쪽 더 받아 온다(편집 창을 열 때만).
+        if (deps.ensureRecentVods && !edit.disabled) {
+          edit.disabled = true; const label = edit.textContent; edit.textContent = '불러오는 중…';
+          try { await deps.ensureRecentVods(page, Date.now() - 30 * DAY_MS); } catch { /* 통계만 빠지고 편집은 연다 */ }
+          edit.disabled = false; edit.textContent = label;
+        }
+        const other = variant === 'interview' ? entry.deck : entry.interviewDeck;
+        openEditor(page, deps, currentDeck(), (deck) => {
+          if (variant === 'interview') entry.interviewDeck = deck;
+          else { entry.deck = deck; deps.onPublicChange(deck.public === true); }
+          section.replaceChildren(); draw();
+        }, variant, unlockedOf(other));
+      });
       tools.append(edit);
     }
     head.append(tools);
     section.replaceChildren(head);
+    if (canEdit && entry.loaded) {
+      //  팬용·면접용 전환(스트리머 본인만). 팬은 팬용 공개본만 본다.
+      const switcher = el('div', 'intro-deck-variants');
+      switcher.setAttribute('role', 'tablist'); switcher.setAttribute('aria-label', 'PPT 종류');
+      ['fan', 'interview'].forEach((variant) => {
+        const b = el('button', `intro-deck-variant${entry.variant === variant ? ' is-active' : ''}`, `${VARIANT_LABEL[variant]} PPT`); b.type = 'button';
+        b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(entry.variant === variant));
+        b.title = variant === 'interview' ? '크루·동아리 면접에서 화면 공유로 쓰는 PPT예요. 나만 볼 수 있어요' : '팬에게 공개할 수 있는 소개 PPT예요';
+        b.addEventListener('click', () => { if (entry.variant === variant) return; entry.variant = variant; section.replaceChildren(); draw(); });
+        switcher.append(b);
+      });
+      section.append(switcher);
+    }
     if (!entry.loaded) {
       section.append(el('div', 'loading-card loading-bar intro-deck-loading', entry.error || 'PPT를 불러오고 있어요…'));
       return;
     }
-    if (entry.deck && entry.deck.slides?.length) {
-      if (canEdit && !entry.deck.public) section.append(el('p', 'intro-deck-notice', '🔒 "나만 보기"로 저장돼 있어요. 팬에게 보여 주려면 "PPT 고치기" › "저장하고 팬에게 공개"를 눌러 주세요.'));
-      if (canEdit && deckIsStale(page, deps.playedGames(page), entry.deck)) {
+    if (deckNow && deckNow.slides?.length) {
+      if (canEdit && interview) section.append(el('p', 'intro-deck-notice', '🔒 면접용 PPT는 나만 볼 수 있어요. 면접에서는 "⛶ 전체화면 발표"를 눌러 화면 공유해 주세요.'));
+      else if (canEdit && !deckNow.public) section.append(el('p', 'intro-deck-notice', '🔒 "나만 보기"로 저장돼 있어요. 팬에게 보여 주려면 "PPT 고치기" › "저장하고 팬에게 공개"를 눌러 주세요.'));
+      if (canEdit && deckIsStale(page, deps.playedGames(page), deckNow)) {
         const stale = el('div', 'intro-deck-notice is-stale');
         stale.append(el('span', '', '✏️ 저장한 뒤 팬페이지 정보가 바뀌었어요. 슬라이드는 저장할 때 내용 그대로라, 다시 저장해야 새 정보가 들어가요.'));
         const again = el('button', 'button', '새 정보로 고치기'); again.type = 'button';
@@ -638,14 +921,17 @@ export function renderIntroDeckSection(page, deps) {
         stale.append(again);
         section.append(stale);
       }
-      section.append(createViewer(entry.deck, page), renderTextList(entry.deck));
+      section.append(createViewer(deckNow, page), renderTextList(deckNow));
       return;
     }
     if (canEdit) {
-      const sample = deckFromEditor(editorStateFrom(page, deps.playedGames(page), null));
-      const state = editorStateFrom(page, deps.playedGames(page), null);
-      const missing = state.slides.filter((slide) => !slide.hasData).map((slide) => TYPE_INFO[slide.type].label);
-      section.append(el('p', 'intro-deck-empty', '아직 만든 PPT가 없어요. 아래는 팬페이지에 적어 둔 정보로 자동으로 만든 견본이에요. "PPT 만들기"를 눌러 장을 고르고 저장하면 팬에게 보여 줄 수 있어요.'));
+      const state = editorStateFrom(page, deps.playedGames(page), null, entry.variant);
+      //  견본에는 글이 빈 자유 장을 넣지 않는다(편집 창에서 채우면 들어간다).
+      const sample = deckFromEditor({ ...state, slides: state.slides.filter((slide) => slide.type !== 'free') });
+      const missing = state.slides.filter((slide) => slide.type !== 'free' && !slide.hasData).map((slide) => TYPE_INFO[slide.type].label);
+      section.append(el('p', 'intro-deck-empty', interview
+        ? '아직 면접용 PPT가 없어요. "면접용 PPT 만들기"를 누르면 지원 동기·하고 싶은 것 장이 들어간 면접용 틀이 열려요. 팬 애칭·팬덤 같은 팬 전용 항목은 빠져 있어요. 아래는 팬페이지 정보로 만든 견본이에요.'
+        : '아직 만든 PPT가 없어요. 아래는 팬페이지에 적어 둔 정보로 자동으로 만든 견본이에요. "PPT 만들기"를 눌러 장을 고르고 저장하면 팬에게 보여 줄 수 있어요.'));
       if (missing.length) section.append(el('p', 'intro-deck-notice', `💡 ${missing.join('·')} 정보가 아직 없어 견본에서 빠졌어요. 팬페이지에 채우면 장이 늘어나요.`));
       if (sample.slides.length) section.append(createViewer(sample, page, { sample: true }));
     } else {
@@ -657,7 +943,7 @@ export function renderIntroDeckSection(page, deps) {
   if (!entry.loaded && !entry.loading) {
     entry.loading = true;
     const load = canEdit
-      ? deps.call({ action: 'get', streamerId: id }).then((result) => result.data.deck || null)
+      ? deps.call({ action: 'get', streamerId: id }).then((result) => { entry.interviewDeck = result.data.interviewDeck || null; return result.data.deck || null; })
       : deps.loadPublicFile(id, 'intro-deck', 365 * 24 * 60 * 60 * 1000).then((file) => file?.deck || null);
     load.then((deck) => { entry.deck = deck; entry.loaded = true; })
       .catch((error) => { entry.error = error?.message || 'PPT를 불러오지 못했어요.'; entry.loaded = true; })

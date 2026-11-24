@@ -6,7 +6,7 @@ import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebase
 import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket4';
 import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261119-tour7';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
-import { renderIntroDeckSection } from './intro-deck-view.js?v=20261124-cursor3';
+import { renderIntroDeckSection } from './intro-deck-view.js?v=20261124-airtime';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
@@ -4040,6 +4040,44 @@ async function createRollingPaperTopic(page, input, button) {
   }
 }
 
+//  PPT 자유 장 사진 올리기(2026-11-24): 방송표와 같은 갤러리 업로드 경로로 내 팬페이지 갤러리(기타)에 공개 등록하고,
+//  슬라이드에는 공개 썸네일 주소만 넣는다(원본은 갤러리 정책대로 비공개).
+async function uploadIntroDeckGalleryImage(page, file, onStatus = () => {}) {
+  const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+  if (!file || !allowed.has(file.type)) throw new Error('jpg/png/webp/gif 이미지만 올릴 수 있어요.');
+  if (file.size <= 0 || file.size > 15 * 1024 * 1024) throw new Error('이미지 용량은 15MB 이하여야 해요.');
+  onStatus('갤러리 형식의 썸네일을 만드는 중…');
+  const thumb = await new Promise((resolve, reject) => {
+    const image = new Image(); const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const width = image.naturalWidth; const height = image.naturalHeight;
+      const scale = Math.min(1, 480 / Math.max(width, height));
+      const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(width * scale)); canvas.height = Math.max(1, Math.round(height * scale));
+      canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => (blob ? resolve({ blob, width, height }) : reject(new Error('썸네일 생성에 실패했어요.'))), 'image/jpeg', 0.82);
+    };
+    image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('이미지를 읽을 수 없어요.')); };
+    image.src = objectUrl;
+  });
+  onStatus('갤러리 저장 공간을 준비하는 중…');
+  const target = (await callGalleryUploadTarget({ streamerId: page.streamer.id, view: 'upload-target' })).data;
+  const prepared = (await callGalleryUploadPrepare({ contentType: file.type, fileSize: file.size, thumbFileSize: thumb.blob.size })).data;
+  onStatus('사진을 갤러리에 올리는 중…');
+  const imagePut = await fetch(prepared.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+  if (!imagePut.ok) throw new Error(`원본 업로드에 실패했어요 (${imagePut.status}).`);
+  const thumbPut = await fetch(prepared.thumbUploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: thumb.blob });
+  if (!thumbPut.ok) throw new Error(`썸네일 업로드에 실패했어요 (${thumbPut.status}).`);
+  onStatus('갤러리에 등록하는 중…');
+  const registered = (await callGalleryImageRegister({
+    imageId: prepared.imageId, key: prepared.key, thumbKey: prepared.thumbKey,
+    streamerId: target.streamerId, streamerName: target.streamerName, category: 'etc',
+    width: thumb.width, height: thumb.height,
+  })).data;
+  if (!registered?.imageId || !registered?.thumbUrl) throw new Error('갤러리 등록 결과를 확인하지 못했어요.');
+  return { id: registered.imageId, url: registered.thumbUrl };
+}
+
 async function loadRollingPaperGallery(page, append = false) {
   const state = rollingPaperStateFor(page.streamer.id);
   if (state.galleryLoading) return;
@@ -6338,6 +6376,22 @@ function renderFanPage(page, options = {}) {
         //  탭 전환·탭 튜토리얼이 스크롤을 옮긴 뒤에 그 칸으로 간다.
         setTimeout(() => target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }), 500);
         if (type === 'links') showToast('프로필의 ⚙ 설정에서 YouTube·팬카페 링크를 넣을 수 있어요.');
+      },
+      //  PPT 자유 장 사진: 내 공개 갤러리(롤링페이퍼와 같은 고르기 목록)를 장 편집 창에서 열 때만 부른다.
+      loadGallery: (offset) => callGalleryUploadTarget({ streamerId: page.streamer.id, view: 'rolling-paper-picker', offset }).then((result) => result.data),
+      uploadGalleryImage: (file, onStatus) => uploadIntroDeckGalleryImage(page, file, onStatus),
+      //  PPT 방송 시간 통계: 받아 둔 다시보기가 기준일보다 최근 것뿐이면 다시보기 칸의 "더 보기"와 같은 호출로 최대 3쪽 더 받는다.
+      ensureRecentVods: async (p, sinceMs) => {
+        for (let i = 0; i < 3; i += 1) {
+          const vods = currentPage?.streamer.id === p.streamer.id ? currentPage.vods : p.vods;
+          if (!vods?.hasMore || !Array.isArray(vods.items) || !vods.items.length) return;
+          const oldest = Math.min(...vods.items.map((vod) => Date.parse(String(vod.regDate || '').trim().replace(' ', 'T') + '+09:00')).filter(Number.isFinite));
+          if (oldest < sinceMs) return;
+          const before = vods.items.length;
+          await loadMoreVods(p.streamer.id, vods);
+          if (currentPage?.streamer.id === p.streamer.id) p.vods = currentPage.vods;
+          if ((p.vods?.items?.length || 0) <= before) return;
+        }
       },
       onPublicChange: (isPublic) => { if (currentPage?.streamer.id === page.streamer.id) currentPage.introDeckPublic = isPublic; page.introDeckPublic = isPublic; },
     })])]] : []),

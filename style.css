@@ -2533,3 +2533,51 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .profile-intro-link-icon{font-size:1.4em}
 .profile-intro-link-text{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
 .profile-intro-link-text small{opacity:.72;font-size:.85em}
+
+/* ===== PPT 자유 장·면접용(2026-11-24) ===== */
+.intro-deck-variants{display:inline-flex;gap:4px;padding:4px;margin:0 0 12px;border-radius:999px;background:color-mix(in srgb,currentColor 7%,transparent)}
+.intro-deck-variant{min-height:40px;padding:0 16px;border:0;border-radius:999px;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.intro-deck-variant.is-active{background:var(--surface,#fff);box-shadow:0 2px 8px #0002}
+.intro-deck-variant:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.intro-slide-free .intro-slide-note{font-size:1.75cqw}
+.intro-editor-add-free{justify-self:start;min-height:40px;margin-top:6px}
+.intro-editor-slide-name.is-free{font-style:normal}
+.intro-editor-photo{display:grid;gap:8px;margin-top:10px}
+.intro-editor-gallery{display:grid;gap:8px}
+.intro-editor-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;max-height:260px;overflow:auto}
+.intro-editor-gallery-item{padding:0;border:2px solid transparent;border-radius:10px;overflow:hidden;background:none;cursor:pointer;aspect-ratio:1}
+.intro-editor-gallery-item img{width:100%;height:100%;object-fit:cover;display:block}
+.intro-editor-gallery-item.is-picked{border-color:var(--accent,#c45b9a)}
+.intro-editor-gallery-item:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.intro-editor-remove-free{justify-self:start;margin-top:12px;min-height:40px;color:#b3261e}
+/* 자유 장 사진 배치(최대 3장): side 오른쪽 · top 위 · photo 사진 크게 */
+.intro-slide-photos{position:absolute;display:grid;gap:1.4cqw;z-index:1}
+.intro-slide-photo{width:100%;height:100%;min-height:0;object-fit:cover;border-radius:2cqw;box-shadow:0 1cqw 3cqw #0003;-webkit-user-drag:none;background:#0001}
+.intro-slide-layout-side .intro-slide-panel{right:47cqw}
+.intro-slide-layout-side .intro-slide-photos{top:6cqw;bottom:6cqw;right:7cqw;width:37cqw}
+.intro-slide-layout-side .intro-slide-photos.is-n2{grid-template-rows:1fr 1fr}
+.intro-slide-layout-side .intro-slide-photos.is-n3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.intro-slide-layout-side .intro-slide-photos.is-n3 .intro-slide-photo:first-child{grid-column:1/-1}
+.intro-slide-layout-top .intro-slide-photos{top:5cqw;left:7cqw;right:7cqw;height:22cqw;grid-auto-flow:column;grid-auto-columns:1fr}
+.intro-slide-layout-top .intro-slide-panel{top:29cqw;bottom:4cqw;justify-content:flex-start;gap:1cqw;padding-block:2.2cqw}
+.intro-slide-layout-photo .intro-slide-photos{inset:0;gap:.6cqw;grid-auto-flow:column;grid-auto-columns:1fr}
+.intro-slide-layout-photo .intro-slide-photo{border-radius:0;box-shadow:none}
+.intro-slide-layout-photo .intro-slide-panel{top:auto;bottom:3cqw;left:5cqw;right:5cqw;max-height:19cqw;z-index:2;gap:.6cqw;padding:2cqw 3cqw;justify-content:flex-end}
+.intro-slide-layout-photo .intro-slide-eyebrow{display:none}
+/* 자유 장 글 강조 */
+.intro-slide-note.is-rich{display:flex;flex-direction:column;gap:.5cqw;white-space:normal}
+.intro-slide-line{display:block;white-space:pre-wrap}
+.intro-slide-strong{font-weight:800}
+.intro-slide-bullets{display:flex;flex-direction:column;gap:.4cqw}
+.intro-slide-bullet{position:relative;padding-left:2.2cqw}
+.intro-slide-bullet::before{content:'';position:absolute;left:.5cqw;top:.75em;width:.8cqw;height:.8cqw;border-radius:50%;background:currentColor;opacity:.7;transform:translateY(-50%)}
+.intro-slide-gap{display:block;height:.6cqw}
+/* 편집 창 사진 */
+.intro-editor-photo-strip{display:flex;gap:8px;flex-wrap:wrap}
+.intro-editor-photo-cell{display:grid;gap:4px;justify-items:start}
+.intro-editor-photo-thumb{width:110px;aspect-ratio:4/3;object-fit:cover;border-radius:10px}
+.intro-editor-photo-remove{min-height:32px;padding:0 10px;font-size:12px}
+.intro-editor-photo-actions{display:flex;gap:8px;flex-wrap:wrap}
+.intro-editor-layouts{display:flex;gap:6px;flex-wrap:wrap}
+.intro-editor-layout{min-height:36px;padding:0 12px;font-size:12px}
+.intro-editor-layout.is-active{background:var(--accent,#c45b9a);color:#fff;border-color:transparent}
