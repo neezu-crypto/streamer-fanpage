@@ -4,7 +4,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, signIn
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js';
 import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js';
 import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.mjs?v=20261120-blanket4';
-import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261119-tour7';
+import { startTour, stopTour, createTourReplayButton } from './fanpage-tour.mjs?v=20261124-tour8';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
 import { renderIntroDeckSection } from './intro-deck-view.js?v=20261124-editor1';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
@@ -5068,7 +5068,7 @@ function fanpageTabTourSteps(page, tabKey) {
       return { id: 'rolling-paper:owner', steps: [
         { target: q('.rolling-paper-topic-add-card-button, .rolling-paper-topic-add-form'), timeout: 8000, waitClick: true, action: '"+ 주제 추가"를 눌러 보세요.', text: '롤링페이퍼는 주제별로 열려요. 생일·100일처럼 팬들이 메시지를 남길 주제를 먼저 만들어요.' },
         { target: q('#rollingPaperTopicTitle'), text: '주제 이름을 적고 "주제 페이지 만들기"를 누르면 팬들이 바로 메시지를 남길 수 있어요. 지금은 취소해도 괜찮아요.' },
-        { target: q('.rolling-paper-topic-view'), text: '만든 주제의 "메시지 보기"에서 팬들이 남긴 메시지와 스티커를 확인해요.' },
+        { target: q('.rolling-paper-topic-view'), waitClick: true, action: '"메시지 보기"를 눌러 보세요.', text: '만든 주제의 "메시지 보기"에서 팬들이 남긴 메시지와 스티커를 확인해요.' },
       ] };
     }
     return { id: 'rolling-paper:viewer', steps: [
@@ -5082,34 +5082,34 @@ function fanpageTabTourSteps(page, tabKey) {
     return { id: 'tamagotchi:owner', steps: [
       { target: q('.tg-care-name'), timeout: 8000, text: '팬페이지의 다마고치예요. 팬들이 도구를 골라 함께 돌보고, 모은 하트 보석으로 꾸밀 수 있어요.' },
       { target: q('.tg-care-rename'), text: '"이름 바꾸기"를 누르면 통합 상점 훈련소에서 새 이름을 정할 수 있어요. 분양 후 첫 1회는 무료예요.' },
-      { target: q('.tg-care-shop-btn'), optional: true, text: '보석 상점에서는 팬들이 모은 하트 보석으로 꾸미기를 살 수 있어요.' },
+      { target: q('.tg-care-shop-btn'), optional: true, waitClick: true, action: '보석 상점을 열어 보세요. 구경만 하고 닫아도 돼요.', text: '보석 상점에서는 팬들이 모은 하트 보석으로 꾸미기를 살 수 있어요.' },
     ] };
   }
   // 스트리머 편집 안내: 편집 도구가 보일 때만(팬 화면 미리보기·디자인 3 편집 모드 꺼짐이면 안내하지 않는다).
   const ownerEditing = page.isOwner === true && editUiAllowed(page);
   if (tabKey === 'home' && ownerEditing) {
     return { id: 'home:owner', steps: [
-      { target: q('.weekly-schedule-board-edit'), timeout: 6000, text: '연필 버튼으로 이번 주 방송표를 편집해요. 요일별 시간·제목과 이미지를 넣으면 팬들이 홈에서 바로 봐요. (PC에서 편집할 수 있어요)' },
-      { target: q('.fanpage-fan-preview-toggle'), text: '"팬 화면으로 보기"를 누르면 팬에게 보이는 그대로 확인할 수 있어요. 비어 있는 칸은 팬에게 보이지 않아요.' },
+      { target: q('.weekly-schedule-board-edit'), timeout: 6000, waitClick: true, pcOnly: true, action: '연필 버튼을 눌러 보세요. 둘러보고 닫으면 다음 안내가 이어져요.', text: '연필 버튼으로 이번 주 방송표를 편집해요. 요일별 시간·제목과 이미지를 넣으면 팬들이 홈에서 바로 봐요. (PC에서 편집할 수 있어요)' },
+      { target: q('.fanpage-fan-preview-toggle'), waitClick: true, action: '"팬 화면으로 보기"를 눌러 보세요. 다시 누르면 편집 화면으로 돌아와요.', text: '"팬 화면으로 보기"를 누르면 팬에게 보이는 그대로 확인할 수 있어요. 비어 있는 칸은 팬에게 보이지 않아요.' },
     ] };
   }
   if (tabKey === 'schedule' && ownerEditing) {
     return { id: 'schedule:owner', steps: [
-      { target: q('.weekly-schedule-board-edit'), timeout: 6000, text: '연필 버튼으로 주간 방송표를 편집해요. 저장하면 이 탭에 크게 보여요. (PC에서 편집할 수 있어요)' },
+      { target: q('.weekly-schedule-board-edit'), timeout: 6000, waitClick: true, pcOnly: true, action: '연필 버튼을 눌러 보세요. 저장하지 않고 닫아도 돼요.', text: '연필 버튼으로 주간 방송표를 편집해요. 저장하면 이 탭에 크게 보여요. (PC에서 편집할 수 있어요)' },
     ] };
   }
   if (tabKey === 'activity' && ownerEditing) {
     return { id: 'activity:owner', steps: [
-      { target: q('.upbo-add-topic, .upbo-add-item-inline'), timeout: 8000, text: '업보 정리에서 팬이 신청할 수 있는 항목을 만들어요. 항목이 있어야 팬들이 신청할 수 있어요.' },
-      { target: q('#upbo-tab-pending'), text: '팬이 보낸 신청은 "팬 신청 검토"에 쌓여요. 승인한 것만 공개 기록에 올라가요.' },
-      { target: q('#upbo-tab-records'), text: '"등록된 업보 기록"에서 공개된 기록과 달성 여부를 관리해요.' },
+      { target: q('.upbo-add-topic, .upbo-add-item-inline'), timeout: 8000, waitClick: true, action: '항목 추가를 눌러 보세요. 둘러보고 닫으면 다음 안내가 이어져요.', text: '업보 정리에서 팬이 신청할 수 있는 항목을 만들어요. 항목이 있어야 팬들이 신청할 수 있어요.' },
+      { target: q('#upbo-tab-pending'), waitClick: true, action: '"팬 신청 검토"를 눌러 보세요.', text: '팬이 보낸 신청은 "팬 신청 검토"에 쌓여요. 승인한 것만 공개 기록에 올라가요.' },
+      { target: q('#upbo-tab-records'), waitClick: true, action: '"등록된 업보 기록"을 눌러 보세요.', text: '"등록된 업보 기록"에서 공개된 기록과 달성 여부를 관리해요.' },
     ] };
   }
   if (tabKey === 'intro' && ownerEditing) {
     //  2026-11-23 v2: 정보 없는 장 안내·공개 버튼 둘·저장 뒤 고정 안내 반영
     return { id: 'intro:owner-v2', steps: [
       { target: q('.intro-deck-stage'), timeout: 8000, optional: true, text: '팬페이지에 적어 둔 프로필·게임·대회·서버 정보로 슬라이드를 자동으로 만들어 보여 줘요. 정보가 없는 장은 빠져 있어요.' },
-      { target: q('.intro-deck-edit'), timeout: 8000, text: '여기서 넣을 장·순서·글을 고르고, "저장하고 팬에게 공개"를 누르면 팬에게도 PPT 탭이 보여요. "나만 보기로 저장"은 나에게만 보여요.' },
+      { target: q('.intro-deck-edit'), timeout: 8000, waitClick: true, action: '"PPT 만들기"를 눌러 보세요. 저장하지 않고 닫아도 돼요.', text: '여기서 넣을 장·순서·글을 고르고, "저장하고 팬에게 공개"를 누르면 팬에게도 PPT 탭이 보여요. "나만 보기로 저장"은 나에게만 보여요.' },
       { target: q('.intro-deck-present-open'), text: '"전체화면 발표"로 합방·대회 자리에서 바로 소개해요. ←/→·스페이스로 넘기고 Esc로 끝내요. 저장한 뒤 팬페이지 정보를 바꾸면 여기서 다시 저장해야 슬라이드에 들어가요.' },
     ] };
   }
@@ -5117,13 +5117,13 @@ function fanpageTabTourSteps(page, tabKey) {
     return { id: 'content:owner', steps: [
       { target: q('.songbook-add-form'), timeout: 8000, text: '노래책이에요. YouTube 영상 링크를 붙여 넣으면 제목과 썸네일을 자동으로 불러와요.' },
       { target: q('.played-games-add-panel'), text: '플레이한 게임을 추가해요. Steam 링크는 이름·썸네일을 자동으로 가져오고, 게임마다 다시보기를 연결할 수 있어요.' },
-      { target: q('.competition-history-add:not(.server-history-add)'), text: '대회 이력도 직접 추가할 수 있어요. 팬들이 활동 기록을 한눈에 볼 수 있어요.' },
-      { target: q('.server-history-add'), text: '참여한 서버도 추가할 수 있어요. 서버명·게임·역할·기간을 적으면 팬들이 활동을 한눈에 봐요.' },
+      { target: q('.competition-history-add:not(.server-history-add)'), waitClick: true, action: '"+ 대회 이력 추가"를 눌러 보세요. 둘러보고 닫으면 다음 안내가 이어져요.', text: '대회 이력도 직접 추가할 수 있어요. 팬들이 활동 기록을 한눈에 볼 수 있어요.' },
+      { target: q('.server-history-add'), waitClick: true, action: '"+ 참여한 서버 추가"를 눌러 보세요. 지금은 취소해도 괜찮아요.', text: '참여한 서버도 추가할 수 있어요. 서버명·게임·역할·기간을 적으면 팬들이 활동을 한눈에 봐요.' },
     ] };
   }
   if (tabKey === 'video-library' && ownerEditing) {
     return { id: 'video-library:owner', steps: [
-      { target: q('.video-library-add-open'), timeout: 8000, text: '"＋ 추가하기"로 라이브에서 자주 보는 영상이나 YouTube 채널을 카테고리별로 모아요. 먼저 카테고리를 만들고 그 안에 영상을 넣어요.' },
+      { target: q('.video-library-add-open'), timeout: 8000, waitClick: true, action: '"＋ 추가하기"를 눌러 보세요. 지금은 취소해도 괜찮아요.', text: '"＋ 추가하기"로 라이브에서 자주 보는 영상이나 YouTube 채널을 카테고리별로 모아요. 먼저 카테고리를 만들고 그 안에 영상을 넣어요.' },
     ] };
   }
   if (tabKey === 'memories' && ownerEditing) {
@@ -5141,7 +5141,7 @@ function fanpageTabTourSteps(page, tabKey) {
       { target: q('.comment-up-list'), optional: true, get text() { return document.querySelector('.comment-up-list .comment-up-sample') ? '게시글을 추가하면 이 예시처럼 카드가 생겨요. 목표를 못 채운 글이 위에, 달성한 글은 금색으로 아래에 놓여요.' : '등록한 게시글은 카드로 쌓여요. 아직 목표를 못 채운 글이 위에, 목표를 달성한 글은 금색으로 아래에 놓여요.'; } },
       { target: q('.comment-up-card .comment-up-icon'), optional: true, text: '↻를 누르면 최신 UP과 순위를 다시 확인해요. 옆 ⋯ 메뉴에서 목표 수정과 삭제를 할 수 있어요.' },
       { target: q('.comment-up-card .comment-up-go'), optional: true, text: '"UP 누르러 가기"는 SOOP 게시글을 열고 내 댓글을 강조해서 바로 보여 줘요.' },
-      { target: q('.comment-up-card .comment-up-qr-open'), optional: true, text: '"QR코드 생성"으로 내 댓글 링크를 QR로 만들어요. 문구를 넣어 PNG로 저장하거나, 다마고치가 있으면 방송 오버레이에 띄울 수 있어요.' },
+      { target: q('.comment-up-card .comment-up-qr-open'), optional: true, waitClick: true, action: '"QR코드 생성"을 눌러 보세요.', text: '"QR코드 생성"으로 내 댓글 링크를 QR로 만들어요. 문구를 넣어 PNG로 저장하거나, 다마고치가 있으면 방송 오버레이에 띄울 수 있어요.' },
     ] };
   }
   return null;

@@ -70,9 +70,12 @@ export async function startTour(id, steps, { force = false, noScroll = false } =
   actions.append(skip, next); bubble.append(stepLabel, text, hint, actions);
   document.body.append(ring, bubble);
 
+  //  클릭형(2026-11-24): 휴대폰·좁은 화면에서는 PC 전용 단계(pcOnly)를 설명형으로 보여 준다.
+  const narrow = window.matchMedia?.('(max-width: 760px), (pointer: coarse)').matches;
+  let nextTimer = 0;
   let index = -1; let shownAny = false; let target = null; let detachClick = null; let raf = 0; let token = 0;
   const state = { cleanup() {
-    token += 1; cancelAnimationFrame(raf); detachClick?.(); target?.classList.remove('fp-tour-target');
+    token += 1; cancelAnimationFrame(raf); clearTimeout(nextTimer); detachClick?.(); target?.classList.remove('fp-tour-target');
     ring.remove(); bubble.remove(); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true);
     document.removeEventListener('keydown', onKey);
   } };
@@ -96,12 +99,17 @@ export async function startTour(id, steps, { force = false, noScroll = false } =
 
   async function go(nextIndex) {
     const myToken = ++token;
-    detachClick?.(); detachClick = null; target?.classList.remove('fp-tour-target');
+    detachClick?.(); detachClick = null; clearTimeout(nextTimer); target?.classList.remove('fp-tour-target');
     if (nextIndex >= steps.length) { finish(true); return; }
     index = nextIndex; const step = steps[index];
     bubble.hidden = true; ring.hidden = true;
     //  사용법 버튼으로 다시 볼 때: 화면이 다 그려졌으면 없는 대상(예: 모바일에서 숨는 편집 버튼)을 0.6초만 기다리고,
     //  탭 데이터를 아직 불러오는 중(화면이 계속 바뀜)이면 원래 시간만큼 기다린다.
+    //  클릭형 단계가 창(dialog)을 열었으면, 사용자가 둘러보고 닫을 때까지 다음 안내를 미룬다(창에 가려지지 않게).
+    while (document.querySelector('dialog[open]')) {
+      await new Promise((r) => setTimeout(r, 300));
+      if (myToken !== token) return;
+    }
     const el = await waitForElement(step.target, step.timeout || 4000, { quietMs: force ? 600 : 0 });
     if (myToken !== token) return;
     if (!el) { if (step.optional !== false) { go(index + 1); } else finish(false); return; }
@@ -116,17 +124,22 @@ export async function startTour(id, steps, { force = false, noScroll = false } =
     if (!noScroll) target.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
     stepLabel.textContent = `${index + 1} / ${steps.length}`;
     text.textContent = step.text;
-    hint.textContent = step.waitClick ? `👉 ${step.action || '강조된 버튼을 직접 눌러 보세요.'}` : '';
-    hint.hidden = !step.waitClick;
-    next.textContent = index === steps.length - 1 ? '다 봤어요' : (step.waitClick ? '건너뛰기' : '다음');
-    if (step.waitClick) {
+    const waitClick = step.waitClick && !(step.pcOnly && narrow);
+    hint.textContent = waitClick ? `👆 ${step.action || '강조된 버튼을 직접 눌러 보세요.'}` : '';
+    hint.hidden = !waitClick;
+    ring.classList.toggle('is-click', !!waitClick);
+    //  클릭형: 처음엔 "다음"을 숨겨 직접 누르게 하고, 6초 동안 안 누르면 "다음"을 보여 준다. "그만 보기"는 늘 있다.
+    next.textContent = index === steps.length - 1 ? '다 봤어요' : '다음';
+    next.hidden = !!waitClick;
+    if (waitClick) nextTimer = setTimeout(() => { next.hidden = false; place(); }, 6000);
+    if (waitClick) {
       const onClick = () => setTimeout(() => go(index + 1), 60);
       el.addEventListener('click', onClick, { once: true, capture: true });
       detachClick = () => el.removeEventListener('click', onClick, { capture: true });
     }
     bubble.hidden = false; ring.hidden = false;
     place(); setTimeout(place, 350);
-    next.focus({ preventScroll: true });
+    (next.hidden ? skip : next).focus({ preventScroll: true });
   }
   next.addEventListener('click', () => go(index + 1));
   skip.addEventListener('click', () => finish(false));

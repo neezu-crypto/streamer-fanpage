@@ -2149,7 +2149,11 @@ body.fanpage-layout-three-active #fanPageView.fanpage-layout-3 .tg-care .tg-care
 .fp-tour-actions .button { min-height: 36px; }
 .fp-tour-target { position: relative; z-index: 1; }
 .fp-tour-replay { min-height: 34px; font-size: 13px; }
-@media (prefers-reduced-motion: reduce) { .fp-tour-ring { transition: none; } }
+.fp-tour-ring.is-click { border-color: #c0558a; box-shadow: 0 0 0 4px rgba(192, 85, 138, .3), 0 0 0 100vmax rgba(29, 16, 24, .32); animation: fp-tour-pulse 1.4s ease-in-out infinite; }
+@keyframes fp-tour-pulse { 50% { box-shadow: 0 0 0 9px rgba(192, 85, 138, .45), 0 0 0 100vmax rgba(29, 16, 24, .32); } }
+.fp-tour-bubble .fp-tour-hint { padding: 6px 10px; border-radius: 10px; background: #fde7f1; color: #8c2a5c; }
+.fp-tour-actions .button[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .fp-tour-ring { transition: none; } .fp-tour-ring.is-click { animation: none; } }
 /* 프로필 빈 칸(관리 화면)·완성도 막대·팬 화면 다시보기 링크 */
 .profile-field-empty .profile-field-value{color:var(--pink);font-weight:600;opacity:.85}
 .profile-field-empty{border-style:dashed}
