@@ -5127,9 +5127,10 @@ function fanpageTabTourSteps(page, tabKey) {
     ] };
   }
   if (tabKey === 'memories' && ownerEditing) {
-    return { id: 'memories:owner', steps: [
-      { target: q('.memory-moments-form input[name="title"]'), timeout: 8000, text: '100일·200일처럼 기억하고 싶은 방송의 제목을 적어요.' },
-      { target: q('.memory-moments-form input[name="url"]'), text: 'SOOP 다시보기나 YouTube 영상 링크를 붙여 넣고 "＋ 순간 추가"를 누르면 팬들에게 보여요.' },
+    //  2026-11-24 v2: 입력칸이 "＋ 추가하기" 버튼 뒤로 바뀌어 예전 안내가 뜨지 않던 문제 수정
+    return { id: 'memories:owner-v2', steps: [
+      { target: q('.memory-add-panel > .button-primary'), timeout: 8000, waitClick: true, action: '"＋ 추가하기"를 눌러 보세요.', text: '100일·200일처럼 기억하고 싶은 방송 다시보기를 모아요.' },
+      { target: q('.memory-add-choices'), timeout: 4000, optional: true, text: '"목록에서 선택하기"는 최근 다시보기에서 고르고, "링크로 추가하기"는 SOOP·YouTube 링크를 붙여 넣어요. 지금은 취소해도 괜찮아요.' },
     ] };
   }
   if (tabKey === 'comment-up' && page.isOwner) {
