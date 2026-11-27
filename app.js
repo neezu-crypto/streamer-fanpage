@@ -5061,9 +5061,9 @@ function ownerChecklistStore(streamerId) {
 }
 //  탭 사용법 영상(2026-11-27, SOOP 다시보기 · 관리자 방송국): 보는 사람(스트리머 편집/팬)에 맞는 영상만 고른다.
 const TUTORIAL_VODS = {
-  'rolling-paper:owner': '213712599', 'rolling-paper:viewer': '213712601', 'tamagotchi:owner': '213712603',
-  'home:owner': '213712605', 'activity:owner': '213712607', 'intro:owner': '213712609', 'content:owner': '213712611',
-  'video-library:owner': '213712613', 'memories:owner': '213712615', 'comment-up:owner': '213712617',
+  'rolling-paper:owner': '213794035', 'rolling-paper:viewer': '213794037', 'tamagotchi:owner': '213794039',
+  'home:owner': '213794041', 'activity:owner': '213794043', 'intro:owner': '213794045', 'content:owner': '213794047',
+  'video-library:owner': '213794049', 'memories:owner': '213794051', 'comment-up:owner': '213794053',
 };
 function fanpageTabTutorialVideo(page, tabKey, title) {
   const ownerEditing = page.isOwner === true && editUiAllowed(page);
