@@ -7,6 +7,7 @@ import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.
 import { createTutorialVideoButton, closeTutorialVideo } from './fanpage-tutorial-video.mjs?v=20261127-video1';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
 import { renderIntroDeckSection } from './intro-deck-view.js?v=20261124-editor1';
+import { renderBestStreamerCard } from './best-streamer-check.mjs?v=20261128-best3';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
@@ -8081,6 +8082,9 @@ function renderLiveSection(page) {
       warning.textContent = '방송 상태를 새로 확인하지 못해 이전 정보를 표시하고 있어요.'; content.append(warning);
     }
   }
+  // 베스트 스트리머 도전 현황(공개 수치 기준 예상, 방송 상태 응답 재사용)
+  const bestCard = renderBestStreamerCard({ fanCount: state.fanCount, totalBroadHours: state.totalBroadHours, isBest: state.isBest === true, vodCount: state.vodCount, vodCountedAt: state.vodCountedAt });
+  if (bestCard) content.append(bestCard);
   section.append(heading, content);
   return section;
 }
@@ -8104,9 +8108,11 @@ async function loadLiveStatus(streamerId) {
   if (button) { button.disabled = true; button.textContent = '확인 중…'; }
   try {
     //  5분 안에 누군가 확인한 결과가 있으면 그 파일을 쓴다(새로고침 버튼은 항상 서버 확인).
-    const shared = state.forceNext ? null : await loadPublicFanPageFile(streamerId, 'live', 5 * 60 * 1000);
+    //  스트리머 본인은 서버를 불러 베스트 VOD 수 집계(하루 1번)를 맡긴다.
+    const owner = currentPage.isStreamerOwner === true;
+    const shared = (state.forceNext || owner) ? null : await loadPublicFanPageFile(streamerId, 'live', 5 * 60 * 1000);
     state.forceNext = false;
-    const result = shared && shared.live ? shared.live : (await callLiveStatus({ streamerId })).data;
+    const result = shared && shared.live ? shared.live : (await callLiveStatus(owner ? { streamerId, owner: true } : { streamerId })).data;
     if (!currentPage || currentPage.streamer.id !== streamerId) return;
     state.hasLoaded = true; state.loadedAt = Date.now();
     state.isLive = result.isLive === true;
@@ -8116,6 +8122,9 @@ async function loadLiveStatus(streamerId) {
     state.streamUrl = typeof result.streamUrl === 'string' ? result.streamUrl : '';
     state.thumbnailUrl = typeof result.thumbnailUrl === 'string' ? result.thumbnailUrl : '';
     if (Number.isFinite(result.fanCount) && result.fanCount >= 0) state.fanCount = result.fanCount;
+    if (Number.isFinite(result.totalBroadHours) && result.totalBroadHours >= 0) state.totalBroadHours = result.totalBroadHours;
+    if (typeof result.isBest === 'boolean') state.isBest = result.isBest;
+    if (Number.isFinite(result.vodCount) && result.vodCount >= 0) { state.vodCount = result.vodCount; state.vodCountedAt = Number(result.vodCountedAt) || 0; }
   } catch (_) {
     if (currentPage && currentPage.streamer.id === streamerId) state.error = 'unavailable';
   } finally {

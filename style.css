@@ -2598,3 +2598,21 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .intro-editor-layouts{display:flex;gap:6px;flex-wrap:wrap}
 .intro-editor-layout{min-height:36px;padding:0 12px;font-size:12px}
 .intro-editor-layout.is-active{background:var(--accent,#c45b9a);color:#fff;border-color:transparent}
+
+/* 베스트 스트리머 도전 현황(best-streamer-check.mjs) */
+.best-check { margin-top: 14px; padding: 12px 14px; border: 1px solid rgba(127,127,127,.28); border-radius: 14px; background: rgba(127,127,127,.08); color: inherit; display: grid; gap: 8px; font-size: 14px; }
+.best-check-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.best-check-link { font-size: 12px; font-weight: 700; color: inherit; opacity: .7; }
+.best-check-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.best-check-list li { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 6px; }
+.best-check-list b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.best-check-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 800; color: #fff; background: #b8b0a6; }
+.best-check-list .is-ok .best-check-mark { background: #2fa66a; }
+.best-check-list .is-no .best-check-mark { background: #e2554f; }
+.best-check-goal { margin: 0; font-weight: 700; }
+.best-check-next { margin: 0; font-size: 13px; opacity: .85; }
+.best-check-note { margin: 0; font-size: 12px; opacity: .65; }
+.best-check-sum { display: grid; gap: 2px; }
+.best-check-how { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.best-check-how li { display: grid; grid-template-columns: 4.5em 1fr; gap: 6px; }
+.best-check-how b { font-weight: 800; }
