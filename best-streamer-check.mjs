@@ -69,36 +69,64 @@ export function renderBestStreamerCard(state) {
   head.append(link); box.append(head);
   if (state.isBest) { box.append(el('p', 'best-check-note', '지금 SOOP 베스트 스트리머예요.')); return box; }
   const r = evaluate(state);
-  const list = el('ul', 'best-check-list');
-  const row = (ok, label, value) => { const li = el('li', ok === true ? 'is-ok' : ok === false ? 'is-no' : 'is-unknown'); li.append(el('span', 'best-check-mark', ok === true ? '✓' : ok === false ? '✕' : '?'), el('span', '', label), el('b', '', value)); list.append(li); };
-  row(r.apply.fans, '애청자', `${n(r.fans)} / ${n(APPLY.fans)}명 · ${r.fanScore}점`);
-  row(r.apply.hours, '누적 방송', `${n(r.hours)} / ${n(APPLY.hours)}시간 · ${r.hourScore}점`);
-  row(null, '방송 일수·교육·정지 기록', '본인 확인');
-  box.append(list);
-  // 확인된 점수(애청자·방송 시간)와 75점까지 부족한 점수, 채우는 방법
-  const hasVod = Number.isFinite(state.vodCount);
-  const vb = hasVod ? vodBonus(state.vodCount) : 0;
-  const base = r.fanScore * WEIGHTS.fans + r.hourScore * WEIGHTS.hours + vb;
-  const gap = Math.max(0, PASS_SCORE - base);
-  const sum = el('div', 'best-check-sum');
-  sum.append(el('p', 'best-check-goal', `확인된 점수 ${fmt(base)}점 · 75점까지 ${fmt(gap)}점 더 필요`));
-  sum.append(el('p', 'best-check-next', `애청자 ${r.fanScore}점×40% = ${fmt(r.fanScore * WEIGHTS.fans)} · 방송 시간 ${r.hourScore}점×20% = ${fmt(r.hourScore * WEIGHTS.hours)}${hasVod ? ` · VOD ${n(state.vodCount)}개 가산 +${vb}` : ''} (평균 동접·${hasVod ? '나머지 가산점' : '가산점'}은 빠져 있어요)`));
-  box.append(sum);
-  const how = el('ul', 'best-check-how');
-  const item = (label, text) => { const li = el('li'); li.append(el('b', '', label), el('span', '', text)); how.append(li); };
-  // 평균 동접(최대 40점): 가산점 0·5·10·15점일 때 각각 필요한 최근 3개월 평균 동접
-  const rest = BONUS_MAX - vb; // 아직 모르는 가산점(VOD를 셌으면 나머지 둘)
-  const steps = [...new Set([0, 5, 10].filter((x) => x < rest).concat(rest))];
-  const needs = steps.map((bonus) => [bonus, viewersNeeded(r.fanScore, r.hourScore, bonus + vb)]);
-  item('평균 동접', needs.map(([bonus, v]) => `${hasVod ? '추가 ' : ''}가산 ${bonus}점이면 ${v == null ? '불가' : v === 0 ? '조건 없음' : `${n(v)}명`}`).join(' · '));
-  item('가산점', hasVod
-    ? `VOD ${n(state.vodCount)}개 +${vb}${vb < 5 ? ` (13개면 +5)` : ''} · 다시보기 유지율 90% 이상 +5 · 전문 스트리머 +5`
-    : '최대 +15점 — VOD 13개 이상 +5 · 다시보기 유지율 90% 이상 +5 · 전문 스트리머 +5 (최근 3개월)');
-  const ups = [];
-  if (r.nextFans) ups.push(`애청자 +${n(r.nextFans.need)}명이면 +${fmt((r.nextFans.score - r.fanScore) * WEIGHTS.fans)}점`);
-  if (r.nextHours) ups.push(`방송 +${n(Math.ceil(r.nextHours.need))}시간이면 +${fmt((r.nextHours.score - r.hourScore) * WEIGHTS.hours)}점`);
-  if (ups.length) item('다음 단계', ups.join(' · '));
-  box.append(how);
-  box.append(el('p', 'best-check-note', 'SOOP 공식 기준표(12월 신청분부터)로 계산한 예상치예요. 평균 동접은 최근 3개월 평균이고, 경고 감점·실제 선발은 SOOP 심사로 정해져요.'));
+  const sb = state.specialty ? 5 : 0; // 전문 스트리머 뱃지(방송국 공개)
+  const vb = (Number.isFinite(state.vodCount) ? vodBonus(state.vodCount) : 0) + sb;
+  const vodPts = vb - sb;
+  // 평균 동접 점수를 아직 모르면 최저점(50)으로 둔다 — 누구나 받는 점수라 현재 점수가 부풀지 않는다.
+  const scores = { viewers: Number.isFinite(state.viewerScore) ? state.viewerScore : 50, fans: r.fanScore, hours: r.hourScore };
+  const total = (sc) => sc.viewers * WEIGHTS.viewers + sc.fans * WEIGHTS.fans + sc.hours * WEIGHTS.hours + vb;
+  const score = total(scores);
+  const gap = Math.max(0, PASS_SCORE - score);
+  const pct = Math.min(100, (score / PASS_SCORE) * 100);
+  const meter = el('div', 'best-check-meter');
+  const now = el('div', 'best-check-score'); now.append(el('b', '', fmt(score)), el('span', '', ' / 75점'));
+  const bar = el('div', 'best-check-bar'); const fill = el('i'); fill.style.width = `${pct}%`; bar.append(fill);
+  meter.append(now, bar);
+  const got = [sb ? `${state.specialty} 전문 +5` : '', vodPts ? `VOD +${vodPts}` : ''].filter(Boolean);
+  if (got.length) meter.append(el('p', 'best-check-got', `가산점 ${got.join(' · ')}`));
+  box.append(meter);
+  if (gap <= 0) { box.append(el('p', 'best-check-pass', '🎉 75점 달성!')); return box; }
+  // 한 항목만 올려서 75점이 되는 값(다른 항목은 그대로)
+  const current = { viewers: null, fans: r.fans, hours: r.hours };
+  const options = [];
+  for (const [kind, label, unit] of [['viewers', '평균 시청자', '명'], ['fans', '애청자', '명'], ['hours', '방송 시간', '시간']]) {
+    const row = [...SCORE_TABLE].reverse().find((t) => t[0] > scores[kind] && total({ ...scores, [kind]: t[0] }) >= PASS_SCORE);
+    if (!row) continue;
+    const target = row[COL[kind]];
+    const plus = current[kind] == null ? null : Math.max(0, Math.ceil(target - current[kind]));
+    options.push([label, `${n(target)}${unit}`, plus == null ? '' : `+${n(plus)}${unit}`]);
+  }
+  const need = el('div', 'best-check-need');
+  need.append(el('p', 'best-check-need-title', `${fmt(gap)}점 더 필요해요`));
+  if (options.length) {
+    const list = el('div', 'best-check-options');
+    options.forEach(([label, value, plus], i) => {
+      if (i) list.append(el('span', 'best-check-or', '또는'));
+      const chip = el('div', 'best-check-option');
+      chip.append(el('span', 'best-check-option-label', label), el('b', '', value));
+      if (plus) chip.append(el('small', '', plus));
+      list.append(chip);
+    });
+    need.append(list);
+  } else need.append(el('p', 'best-check-need-title', '한 항목만으로는 어려워요'));
+  // 가산점(최대 +15): VOD는 센 값이 있으면 남은 만큼, 유지율·전문 스트리머는 비공개라 받을 수 있는 최대치
+  const bonus = [];
+  if (vodPts < 5) bonus.push(['VOD 13개', Number.isFinite(state.vodCount) ? `+${n(13 - state.vodCount)}개` : '최근 3개월', 5 - vodPts]);
+  bonus.push(['다시보기 유지율 90%', '', 5]);
+  if (!sb) bonus.push(['전문 스트리머', '뱃지', 5]);
+  const bonusBox = el('div', 'best-check-bonus');
+  bonusBox.append(el('p', 'best-check-need-title', '가산점으로 채우기'));
+  const bonusList = el('div', 'best-check-options');
+  bonus.forEach(([label, sub, pts]) => {
+    const chip = el('div', `best-check-option is-bonus${pts >= gap ? ' is-enough' : ''}`);
+    chip.append(el('span', 'best-check-option-label', label), el('b', '', `+${pts}점`));
+    if (sub) chip.append(el('small', '', sub));
+    bonusList.append(chip);
+  });
+  bonusBox.append(bonusList);
+  need.append(bonusBox);
+  box.append(need);
+  const miss = [r.apply.fans === false ? `애청자 ${n(APPLY.fans)}명` : '', r.apply.hours === false ? `방송 ${n(APPLY.hours)}시간` : ''].filter(Boolean);
+  if (miss.length) box.append(el('p', 'best-check-apply', `신청 조건: ${miss.join(' · ')}`));
   return box;
 }

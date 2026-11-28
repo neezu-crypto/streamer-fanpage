@@ -7,7 +7,7 @@ import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.
 import { createTutorialVideoButton, closeTutorialVideo } from './fanpage-tutorial-video.mjs?v=20261127-video1';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
 import { renderIntroDeckSection } from './intro-deck-view.js?v=20261124-editor1';
-import { renderBestStreamerCard } from './best-streamer-check.mjs?v=20261128-best3';
+import { renderBestStreamerCard } from './best-streamer-check.mjs?v=20261129-best8';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
@@ -8083,7 +8083,7 @@ function renderLiveSection(page) {
     }
   }
   // 베스트 스트리머 도전 현황(공개 수치 기준 예상, 방송 상태 응답 재사용)
-  const bestCard = renderBestStreamerCard({ fanCount: state.fanCount, totalBroadHours: state.totalBroadHours, isBest: state.isBest === true, vodCount: state.vodCount, vodCountedAt: state.vodCountedAt });
+  const bestCard = renderBestStreamerCard({ fanCount: state.fanCount, totalBroadHours: state.totalBroadHours, isBest: state.isBest === true, vodCount: state.vodCount, vodCountedAt: state.vodCountedAt, viewerScore: state.viewerScore, viewerSamples: state.viewerSamples, specialty: state.specialty });
   if (bestCard) content.append(bestCard);
   section.append(heading, content);
   return section;
@@ -8124,7 +8124,9 @@ async function loadLiveStatus(streamerId) {
     if (Number.isFinite(result.fanCount) && result.fanCount >= 0) state.fanCount = result.fanCount;
     if (Number.isFinite(result.totalBroadHours) && result.totalBroadHours >= 0) state.totalBroadHours = result.totalBroadHours;
     if (typeof result.isBest === 'boolean') state.isBest = result.isBest;
+    if (typeof result.specialty === 'string') state.specialty = result.specialty;
     if (Number.isFinite(result.vodCount) && result.vodCount >= 0) { state.vodCount = result.vodCount; state.vodCountedAt = Number(result.vodCountedAt) || 0; }
+    if (Number.isFinite(result.viewerScore)) { state.viewerScore = result.viewerScore; state.viewerSamples = Number(result.viewerSamples) || 0; }
   } catch (_) {
     if (currentPage && currentPage.streamer.id === streamerId) state.error = 'unavailable';
   } finally {

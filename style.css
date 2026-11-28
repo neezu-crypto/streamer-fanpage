@@ -2600,19 +2600,29 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .intro-editor-layout.is-active{background:var(--accent,#c45b9a);color:#fff;border-color:transparent}
 
 /* 베스트 스트리머 도전 현황(best-streamer-check.mjs) */
-.best-check { margin-top: 14px; padding: 12px 14px; border: 1px solid rgba(127,127,127,.28); border-radius: 14px; background: rgba(127,127,127,.08); color: inherit; display: grid; gap: 8px; font-size: 14px; }
-.best-check-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.best-check-link { font-size: 12px; font-weight: 700; color: inherit; opacity: .7; }
-.best-check-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.best-check-list li { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 6px; }
-.best-check-list b { font-weight: 700; font-variant-numeric: tabular-nums; }
-.best-check-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 800; color: #fff; background: #b8b0a6; }
-.best-check-list .is-ok .best-check-mark { background: #2fa66a; }
-.best-check-list .is-no .best-check-mark { background: #e2554f; }
-.best-check-goal { margin: 0; font-weight: 700; }
-.best-check-next { margin: 0; font-size: 13px; opacity: .85; }
-.best-check-note { margin: 0; font-size: 12px; opacity: .65; }
-.best-check-sum { display: grid; gap: 2px; }
-.best-check-how { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
-.best-check-how li { display: grid; grid-template-columns: 4.5em 1fr; gap: 6px; }
-.best-check-how b { font-weight: 800; }
+.best-check { margin-top: 14px; padding: 14px 16px; border: 1px solid rgba(127,127,127,.25); border-radius: 16px; background: rgba(127,127,127,.07); color: inherit; display: grid; gap: 10px; }
+.best-check-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+.best-check-link { font-size: 12px; font-weight: 700; color: inherit; opacity: .65; }
+.best-check-note { margin: 0; font-size: 13px; opacity: .7; }
+.best-check-meter { display: grid; gap: 6px; }
+.best-check-score { font-variant-numeric: tabular-nums; }
+.best-check-score b { font-size: 30px; font-weight: 900; line-height: 1; }
+.best-check-score span { font-size: 14px; font-weight: 700; opacity: .6; }
+.best-check-bar { height: 10px; border-radius: 99px; background: rgba(127,127,127,.2); overflow: hidden; }
+.best-check-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffb347, #ff6f91); }
+.best-check-pass { margin: 0; font-weight: 800; }
+.best-check-need { display: grid; gap: 8px; }
+.best-check-need-title { margin: 0; font-size: 14px; font-weight: 800; }
+.best-check-options { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.best-check-option { flex: 1 1 96px; display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: rgba(127,127,127,.12); text-align: center; }
+.best-check-option-label { font-size: 12px; font-weight: 700; opacity: .7; }
+.best-check-option b { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.best-check-option small { font-size: 11px; font-weight: 700; color: #e2554f; }
+.best-check-or { font-size: 11px; font-weight: 800; opacity: .5; }
+.best-check-apply { margin: 0; font-size: 12px; font-weight: 700; color: #e2554f; }
+.best-check-bonus { display: grid; gap: 6px; padding-top: 8px; border-top: 1px dashed rgba(127,127,127,.3); }
+.best-check-option.is-bonus { flex-basis: 84px; padding: 8px 10px; background: rgba(255,179,71,.14); }
+.best-check-option.is-bonus b { font-size: 16px; color: #d9822b; }
+.best-check-option.is-bonus small { color: inherit; opacity: .6; }
+.best-check-option.is-enough { outline: 2px solid #2fa66a; }
+.best-check-got { margin: 0; font-size: 12px; font-weight: 800; color: #d9822b; }
