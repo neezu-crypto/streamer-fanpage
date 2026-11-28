@@ -60,13 +60,20 @@ const fmt = (v) => (Math.round(v * 10) / 10).toLocaleString('ko-KR');
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 // state: { fanCount, totalBroadHours, isBest } — 아직 모르면 null 반환(카드 숨김)
-export function renderBestStreamerCard(state) {
+export function renderBestStreamerCard(state, onRefresh = null) {
   if (!state || !Number.isFinite(state.fanCount) || !Number.isFinite(state.totalBroadHours)) return null;
   const box = el('div', 'best-check');
   const head = el('div', 'best-check-head');
   head.append(el('strong', '', state.isBest ? '🏅 베스트 스트리머' : '🏅 베스트 스트리머 도전 현황'));
   const link = el('a', 'best-check-link', '공식 기준 ↗'); link.href = OFFICIAL_URL; link.target = '_blank'; link.rel = 'noopener';
-  head.append(link); box.append(head);
+  const tools = el('div', 'best-check-tools');
+  if (onRefresh && !state.isBest) {
+    const refresh = el('button', 'best-check-refresh', state.bestLoading ? '계산 중…' : '↻ 다시 계산');
+    refresh.type = 'button'; refresh.disabled = !!state.bestLoading;
+    refresh.addEventListener('click', () => { refresh.disabled = true; refresh.textContent = '계산 중…'; onRefresh(); });
+    tools.append(refresh);
+  }
+  tools.append(link); head.append(tools); box.append(head);
   if (state.isBest) { box.append(el('p', 'best-check-note', '지금 SOOP 베스트 스트리머예요.')); return box; }
   const r = evaluate(state);
   const sb = state.specialty ? 5 : 0; // 전문 스트리머 뱃지(방송국 공개)
@@ -86,29 +93,42 @@ export function renderBestStreamerCard(state) {
   if (got.length) meter.append(el('p', 'best-check-got', `가산점 ${got.join(' · ')}`));
   box.append(meter);
   if (gap <= 0) { box.append(el('p', 'best-check-pass', '🎉 75점 달성!')); return box; }
-  // 한 항목만 올려서 75점이 되는 값(다른 항목은 그대로)
-  const current = { viewers: null, fans: r.fans, hours: r.hours };
-  const options = [];
-  for (const [kind, label, unit] of [['viewers', '평균 시청자', '명'], ['fans', '애청자', '명'], ['hours', '방송 시간', '시간']]) {
-    const row = [...SCORE_TABLE].reverse().find((t) => t[0] > scores[kind] && total({ ...scores, [kind]: t[0] }) >= PASS_SCORE);
-    if (!row) continue;
-    const target = row[COL[kind]];
-    const plus = current[kind] == null ? null : Math.max(0, Math.ceil(target - current[kind]));
-    options.push([label, `${n(target)}${unit}`, plus == null ? '' : `+${n(plus)}${unit}`]);
+  // 최적화는 모든 점수(평균 동접·VOD·전문 뱃지)를 계산한 뒤에만 보여 준다.
+  if (!Number.isFinite(state.viewerScore) || !Number.isFinite(state.vodCount)) {
+    box.append(el('p', 'best-check-need-title', '점수 계산 전이에요 · 스트리머가 팬페이지에 들어오면 계산돼요'));
+    return box;
   }
+  // 가장 적게 늘려서 75점이 되는 조합: 항목마다 (지금 그대로 | 표의 더 높은 단계)를 모두 시도하고
+  // 비용 = 늘려야 하는 배율의 로그 합(애청자 2배 = 시청자 2배 = 방송 시간 2배를 같은 노력으로 본다).
+  const rowOf = (kind, score) => SCORE_TABLE.find((t) => t[0] === score);
+  const currentValue = {
+    viewers: scores.viewers > 50 ? rowOf('viewers', scores.viewers)[COL.viewers] : 5, // 공개하지 않는 동접은 그 점수 구간의 하한
+    fans: Math.max(1, r.fans), hours: Math.max(1, r.hours),
+  };
+  const choices = (kind) => [[scores[kind], 0, null]].concat(SCORE_TABLE.filter((t) => t[0] > scores[kind])
+    .map((t) => [t[0], Math.log(t[COL[kind]] / currentValue[kind]), t[COL[kind]]]));
+  let best = null;
+  for (const [vS, vC, vT] of choices('viewers')) for (const [fS, fC, fT] of choices('fans')) for (const [hS, hC, hT] of choices('hours')) {
+    if (total({ viewers: vS, fans: fS, hours: hS }) < PASS_SCORE) continue;
+    const cost = vC + fC + hC;
+    if (!best || cost < best.cost - 1e-9) best = { cost, picks: [['viewers', vT], ['fans', fT], ['hours', hT]] };
+  }
+  const labels = { viewers: ['평균 시청자', '명'], fans: ['애청자', '명'], hours: ['방송 시간', '시간'] };
+  const current = { viewers: null, fans: r.fans, hours: r.hours };
   const need = el('div', 'best-check-need');
-  need.append(el('p', 'best-check-need-title', `${fmt(gap)}점 더 필요해요`));
-  if (options.length) {
+  need.append(el('p', 'best-check-need-title', `${fmt(gap)}점 더 필요해요 · 가장 쉬운 조합`));
+  if (best) {
     const list = el('div', 'best-check-options');
-    options.forEach(([label, value, plus], i) => {
-      if (i) list.append(el('span', 'best-check-or', '또는'));
+    best.picks.filter(([, target]) => target != null).forEach(([kind, target], i) => {
+      if (i) list.append(el('span', 'best-check-or', '+'));
+      const [label, unit] = labels[kind];
       const chip = el('div', 'best-check-option');
-      chip.append(el('span', 'best-check-option-label', label), el('b', '', value));
-      if (plus) chip.append(el('small', '', plus));
+      chip.append(el('span', 'best-check-option-label', label), el('b', '', `${n(target)}${unit}`));
+      if (current[kind] != null) chip.append(el('small', '', `+${n(Math.max(0, Math.ceil(target - current[kind])))}${unit}`));
       list.append(chip);
     });
     need.append(list);
-  } else need.append(el('p', 'best-check-need-title', '한 항목만으로는 어려워요'));
+  } else need.append(el('p', 'best-check-need-title', '가산점이 필요해요'));
   // 가산점(최대 +15): VOD는 센 값이 있으면 남은 만큼, 유지율·전문 스트리머는 비공개라 받을 수 있는 최대치
   const bonus = [];
   if (vodPts < 5) bonus.push(['VOD 13개', Number.isFinite(state.vodCount) ? `+${n(13 - state.vodCount)}개` : '최근 3개월', 5 - vodPts]);

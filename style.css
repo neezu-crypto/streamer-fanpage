@@ -2626,3 +2626,6 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .best-check-option.is-bonus small { color: inherit; opacity: .6; }
 .best-check-option.is-enough { outline: 2px solid #2fa66a; }
 .best-check-got { margin: 0; font-size: 12px; font-weight: 800; color: #d9822b; }
+.best-check-tools { display: flex; align-items: center; gap: 8px; }
+.best-check-refresh { border: 0; border-radius: 99px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 800; color: inherit; background: rgba(127,127,127,.16); cursor: pointer; }
+.best-check-refresh:disabled { opacity: .5; cursor: default; }
