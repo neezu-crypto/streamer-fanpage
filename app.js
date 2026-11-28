@@ -7,7 +7,7 @@ import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.
 import { createTutorialVideoButton, closeTutorialVideo } from './fanpage-tutorial-video.mjs?v=20261127-video1';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
 import { renderIntroDeckSection } from './intro-deck-view.js?v=20261124-editor1';
-import { renderBestStreamerCard } from './best-streamer-check.mjs?v=20261129-best12';
+import { renderBestStreamerCard } from './best-streamer-check.mjs?v=20261129-best13';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 

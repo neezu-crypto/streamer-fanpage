@@ -121,18 +121,24 @@ export function renderBestStreamerCard(state, onRefresh = null, onRetention = nu
     viewers: scores.viewers > 50 ? rowOf('viewers', scores.viewers)[COL.viewers] : 5, // 공개하지 않는 동접은 그 점수 구간의 하한
     fans: Math.max(1, r.fans), hours: Math.max(1, r.hours),
   };
-  const choices = (kind) => [[scores[kind], 0, null]].concat(SCORE_TABLE.filter((t) => t[0] > scores[kind])
-    .map((t) => [t[0], Math.log(t[COL[kind]] / currentValue[kind]), t[COL[kind]]]));
+  // 비용 = 올라가야 하는 표 단계 수(제곱합으로 고르게). 방송 시간은 3개월 안에 현실적으로 늘릴 수 있는 만큼(+450시간)만.
+  const HOURS_REACH = 450;
+  const choices = (kind) => {
+    const ups = SCORE_TABLE.filter((t) => t[0] > scores[kind]).reverse()
+      .filter((t) => kind !== 'hours' || t[COL.hours] - currentValue.hours <= HOURS_REACH);
+    return [[scores[kind], 0, null]].concat(ups.map((t, i) => [t[0], i + 1, t[COL[kind]]]));
+  };
   let best = null;
   for (const [vS, vC, vT] of choices('viewers')) for (const [fS, fC, fT] of choices('fans')) for (const [hS, hC, hT] of choices('hours')) {
     if (total({ viewers: vS, fans: fS, hours: hS }) < PASS_SCORE) continue;
-    const cost = vC + fC + hC;
+    // 제곱합: 한 항목만 크게 늘리는 것보다 세 항목을 고르게 조금씩 늘리는 조합이 더 싸게 계산된다.
+    const cost = vC * vC + fC * fC + hC * hC;
     if (!best || cost < best.cost - 1e-9) best = { cost, picks: [['viewers', vT], ['fans', fT], ['hours', hT]] };
   }
   const labels = { viewers: ['평균 시청자', '명'], fans: ['애청자', '명'], hours: ['방송 시간', '시간'] };
   const current = { viewers: null, fans: r.fans, hours: r.hours };
   const need = el('div', 'best-check-need');
-  need.append(el('p', 'best-check-need-title', `${fmt(gap)}점 더 필요해요 · 가장 쉬운 조합`));
+  need.append(el('p', 'best-check-need-title', `${fmt(gap)}점 더 필요해요 · 골고루 채우는 조합`));
   if (best) {
     const list = el('div', 'best-check-options');
     best.picks.filter(([, target]) => target != null).forEach(([kind, target], i) => {
