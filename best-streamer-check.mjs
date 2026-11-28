@@ -87,6 +87,9 @@ export function renderBestStreamerCard(state, onRefresh = null, onRetention = nu
     refresh.addEventListener('click', () => { refresh.disabled = true; refresh.textContent = '계산 중…'; onRefresh(); });
     tools.append(refresh);
   }
+  // 스트리머·관리자만: 점수 내역 안내 모달
+  const detailBtn = onRefresh && !state.isBest ? el('button', 'best-check-refresh', '내 계산 보기') : null;
+  if (detailBtn) { detailBtn.type = 'button'; tools.append(detailBtn); }
   tools.append(link); head.append(tools); box.append(head);
   if (state.isBest) { box.append(el('p', 'best-check-note', '지금 SOOP 베스트 스트리머예요.')); return box; }
   const r = evaluate(state);
@@ -108,6 +111,14 @@ export function renderBestStreamerCard(state, onRefresh = null, onRetention = nu
   const got = [sb ? `${state.specialty} 전문 +5` : '', vodPts ? `VOD +${vodPts}` : '', rb ? `다시보기 유지율 ${Math.round(retPct)}% +${rb}` : ''].filter(Boolean);
   if (got.length) meter.append(el('p', 'best-check-got', `가산점 ${got.join(' · ')}`));
   box.append(meter);
+  if (detailBtn) detailBtn.addEventListener('click', () => openBestDetail([
+    ['평균 동접', Number.isFinite(state.viewerScore) ? `최근 다시보기 ${state.viewerSamples || 3}개 기준` : '계산 전 (최저점으로 계산)', `${scores.viewers}점 × 40%`, fmt(scores.viewers * WEIGHTS.viewers)],
+    ['애청자', `${n(r.fans)}명`, `${r.fanScore}점 × 40%`, fmt(r.fanScore * WEIGHTS.fans)],
+    ['누적 방송 시간', `${n(r.hours)}시간`, `${r.hourScore}점 × 20%`, fmt(r.hourScore * WEIGHTS.hours)],
+    ['VOD (최근 3개월)', Number.isFinite(state.vodCount) ? `${n(state.vodCount)}개` : '계산 전', '가산점', `+${vodPts}`],
+    ['다시보기 유지율', retPct != null ? `${Math.round(retPct)}% (직접 입력)` : '입력 전', '가산점', `+${rb}`],
+    ['전문 스트리머', state.specialty ? `${state.specialty} 뱃지` : '뱃지 없음', '가산점', `+${sb}`],
+  ], fmt(score)));
   if (gap <= 0) { box.append(el('p', 'best-check-pass', '🎉 75점 달성!')); return box; }
   // 최적화는 모든 점수(평균 동접·VOD·전문 뱃지)를 계산한 뒤에만 보여 준다.
   if (!Number.isFinite(state.viewerScore) || !Number.isFinite(state.vodCount)) {
@@ -201,4 +212,23 @@ function retentionForm(state, retPct, onRetention) {
     catch (error) { msg.textContent = (error && error.message) || '저장하지 못했어요.'; save.disabled = false; }
   });
   return form;
+}
+
+function openBestDetail(rows, totalText) {
+  const overlay = el('div', 'best-detail-overlay');
+  const dialog = el('div', 'best-detail'); dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true');
+  dialog.append(el('h3', '', '내 베스트 점수 계산'));
+  const table = el('table');
+  const head = el('tr'); ['항목', '내 값', '반영', '점수'].forEach((t) => head.append(el('th', '', t))); table.append(head);
+  rows.forEach((cells) => { const tr = el('tr'); cells.forEach((t) => tr.append(el('td', '', t))); table.append(tr); });
+  const sum = el('tr', 'is-total'); ['합계', '', '', `${totalText}점`].forEach((t) => sum.append(el('td', '', t))); table.append(sum);
+  dialog.append(table);
+  dialog.append(el('p', 'best-check-unit', '평균 동접 숫자는 공개하지 않고 점수만 보여 줘요. 경고 감점은 반영되지 않아요.'));
+  const close = el('button', 'best-check-refresh', '닫기'); close.type = 'button';
+  const done = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') done(); };
+  close.addEventListener('click', done);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) done(); });
+  document.addEventListener('keydown', onKey);
+  dialog.append(close); overlay.append(dialog); document.body.append(overlay); close.focus();
 }

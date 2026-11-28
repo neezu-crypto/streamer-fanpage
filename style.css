@@ -2627,10 +2627,19 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .best-check-option.is-enough { outline: 2px solid #2fa66a; }
 .best-check-got { margin: 0; font-size: 12px; font-weight: 800; color: #d9822b; }
 .best-check-tools { display: flex; align-items: center; gap: 8px; }
-.best-check-refresh { border: 0; border-radius: 99px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 800; color: inherit; background: rgba(127,127,127,.16); cursor: pointer; }
+.best-check-refresh { white-space: nowrap; border: 0; border-radius: 99px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 800; color: inherit; background: rgba(127,127,127,.16); cursor: pointer; }
 .best-check-refresh:disabled { opacity: .5; cursor: default; }
 .best-check-retention { display: grid; gap: 6px; margin-top: 4px; }
 .best-check-retention-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .best-check-retention select, .best-check-retention input { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 10px; border: 1px solid rgba(127,127,127,.35); background: rgba(255,255,255,.7); color: inherit; }
 .best-check-retention input { width: 88px; }
 .best-check-unit { font-size: 12px; opacity: .7; }
+.best-detail-overlay { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 16px; background: rgba(20,16,24,.45); }
+.best-detail { width: min(460px, 100%); max-height: 90vh; overflow: auto; display: grid; gap: 10px; padding: 18px; border-radius: 18px; background: #fffaf7; color: #3f3340; box-shadow: 0 18px 50px rgba(0,0,0,.25); }
+.best-detail h3 { margin: 0; font-size: 17px; }
+.best-detail table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.best-detail th, .best-detail td { padding: 7px 4px; text-align: left; border-bottom: 1px solid rgba(127,127,127,.2); }
+.best-detail th { font-size: 12px; opacity: .6; }
+.best-detail td:last-child, .best-detail th:last-child { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.best-detail .is-total td { border-bottom: 0; font-size: 15px; font-weight: 900; }
+.best-detail > .best-check-refresh { justify-self: end; }
