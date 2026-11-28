@@ -7,7 +7,7 @@ import { setupFanpageBlanket, teardownFanpageBlanket } from './fanpage-layout-5.
 import { createTutorialVideoButton, closeTutorialVideo } from './fanpage-tutorial-video.mjs?v=20261127-video1';
 import { setupBugReport } from './bug-report.js?v=20261121-bug1';
 import { renderIntroDeckSection } from './intro-deck-view.js?v=20261124-editor1';
-import { renderBestStreamerCard } from './best-streamer-check.mjs?v=20261129-best10';
+import { renderBestStreamerCard } from './best-streamer-check.mjs?v=20261129-best12';
 import { drainRollingPaperStickerMoveQueue } from './rolling-paper-sticker-moves.mjs?v=20261030-sticker-drag-queue';
 import { weeklyTemplate, isWeeklyTemplateId, isPremiumWeeklyTemplate, WEEKLY_TEMPLATES, WEEKLY_WIDTH, WEEKLY_HEIGHT } from './weekly-schedule-templates.mjs?v=20261112-lb1';
 
@@ -181,6 +181,7 @@ const callCalendar = authenticatedCallable('streamerFanPageCalendar');
 const callWeeklySchedule = authenticatedCallable('streamerFanPageWeeklySchedule');
 const callDesignPass = authenticatedCallable('streamerFanPageDesignPass');
 const callLiveStatus = authenticatedCallable('streamerFanPageLiveStatus');
+const callBestRetention = authenticatedCallable('streamerFanPageBestRetention');
 const callGalleryUploadTarget = authenticatedCallable('streamerFanPageGallery');
 const callGalleryUploadPrepare = authenticatedCallable('requestImageUpload');
 const callGalleryImageRegister = authenticatedCallable('registerImage');
@@ -8083,9 +8084,14 @@ function renderLiveSection(page) {
     }
   }
   // 베스트 스트리머 도전 현황(공개 수치 기준 예상, 방송 상태 응답 재사용)
-  const bestCard = renderBestStreamerCard({ fanCount: state.fanCount, totalBroadHours: state.totalBroadHours, isBest: state.isBest === true, vodCount: state.vodCount, vodCountedAt: state.vodCountedAt, viewerScore: state.viewerScore, viewerSamples: state.viewerSamples, specialty: state.specialty }, currentPage && currentPage.canManage === true ? () => {
+  const bestCard = renderBestStreamerCard({ fanCount: state.fanCount, totalBroadHours: state.totalBroadHours, isBest: state.isBest === true, vodCount: state.vodCount, vodCountedAt: state.vodCountedAt, viewerScore: state.viewerScore, viewerSamples: state.viewerSamples, specialty: state.specialty, replayCount: state.replayCount, replaySeconds: state.replaySeconds, retention: state.retention }, currentPage && currentPage.canManage === true ? () => {
     //  관리자·스트리머 수동 갱신: VOD 수·평균 동접 점수를 바로 다시 센다.
     state.bestForce = true; state.forceNext = true; loadLiveStatus(page.streamer.id);
+  } : null, currentPage && currentPage.canManage === true ? async (type, value) => {
+    //  다시보기 유지율 근거 직접 입력(유지율 %·방송 횟수·방송 시간 중 하나)
+    const result = (await callBestRetention({ streamerId: page.streamer.id, type, value })).data;
+    state.retention = result && result.retention ? result.retention : null;
+    refreshLiveSection(page.streamer.id);
   } : null);
   if (bestCard) content.append(bestCard);
   section.append(heading, content);
@@ -8131,6 +8137,8 @@ async function loadLiveStatus(streamerId) {
     if (typeof result.specialty === 'string') state.specialty = result.specialty;
     if (Number.isFinite(result.vodCount) && result.vodCount >= 0) { state.vodCount = result.vodCount; state.vodCountedAt = Number(result.vodCountedAt) || 0; }
     if (Number.isFinite(result.viewerScore)) { state.viewerScore = result.viewerScore; state.viewerSamples = Number(result.viewerSamples) || 0; }
+    if (Number.isFinite(result.replayCount)) { state.replayCount = result.replayCount; state.replaySeconds = Number(result.replaySeconds) || 0; }
+    state.retention = result.retention && typeof result.retention === 'object' ? result.retention : null;
   } catch (_) {
     if (currentPage && currentPage.streamer.id === streamerId) state.error = 'unavailable';
   } finally {

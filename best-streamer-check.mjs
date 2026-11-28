@@ -60,7 +60,21 @@ const fmt = (v) => (Math.round(v * 10) / 10).toLocaleString('ko-KR');
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 // state: { fanCount, totalBroadHours, isBest } — 아직 모르면 null 반환(카드 숨김)
-export function renderBestStreamerCard(state, onRefresh = null) {
+// 직접 입력한 근거로 다시보기 유지율(%) 계산. 30일 지나면 무효.
+export const RETENTION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export function retentionPercent(state, now = Date.now()) {
+  const ret = state && state.retention;
+  if (!ret || !(now - Number(ret.at) < RETENTION_TTL_MS)) return null;
+  const v = Number(ret.value);
+  if (ret.type === 'percent') return Math.min(100, v);
+  if (!Number.isFinite(state.replayCount)) return null;
+  if (ret.type === 'count') return Math.min(100, (state.replayCount / v) * 100);
+  if (ret.type === 'hours') return Math.min(100, ((Number(state.replaySeconds) || 0) / 3600 / v) * 100);
+  return null;
+}
+export function retentionBonus(pct) { return pct == null ? 0 : pct >= 90 ? 5 : pct >= 80 ? 3 : pct >= 70 ? 1 : 0; }
+
+export function renderBestStreamerCard(state, onRefresh = null, onRetention = null) {
   if (!state || !Number.isFinite(state.fanCount) || !Number.isFinite(state.totalBroadHours)) return null;
   const box = el('div', 'best-check');
   const head = el('div', 'best-check-head');
@@ -77,8 +91,10 @@ export function renderBestStreamerCard(state, onRefresh = null) {
   if (state.isBest) { box.append(el('p', 'best-check-note', '지금 SOOP 베스트 스트리머예요.')); return box; }
   const r = evaluate(state);
   const sb = state.specialty ? 5 : 0; // 전문 스트리머 뱃지(방송국 공개)
-  const vb = (Number.isFinite(state.vodCount) ? vodBonus(state.vodCount) : 0) + sb;
-  const vodPts = vb - sb;
+  const retPct = retentionPercent(state);
+  const rb = retentionBonus(retPct);
+  const vodPts = Number.isFinite(state.vodCount) ? vodBonus(state.vodCount) : 0;
+  const vb = vodPts + sb + rb;
   // 평균 동접 점수를 아직 모르면 최저점(50)으로 둔다 — 누구나 받는 점수라 현재 점수가 부풀지 않는다.
   const scores = { viewers: Number.isFinite(state.viewerScore) ? state.viewerScore : 50, fans: r.fanScore, hours: r.hourScore };
   const total = (sc) => sc.viewers * WEIGHTS.viewers + sc.fans * WEIGHTS.fans + sc.hours * WEIGHTS.hours + vb;
@@ -89,7 +105,7 @@ export function renderBestStreamerCard(state, onRefresh = null) {
   const now = el('div', 'best-check-score'); now.append(el('b', '', fmt(score)), el('span', '', ' / 75점'));
   const bar = el('div', 'best-check-bar'); const fill = el('i'); fill.style.width = `${pct}%`; bar.append(fill);
   meter.append(now, bar);
-  const got = [sb ? `${state.specialty} 전문 +5` : '', vodPts ? `VOD +${vodPts}` : ''].filter(Boolean);
+  const got = [sb ? `${state.specialty} 전문 +5` : '', vodPts ? `VOD +${vodPts}` : '', rb ? `다시보기 유지율 ${Math.round(retPct)}% +${rb}` : ''].filter(Boolean);
   if (got.length) meter.append(el('p', 'best-check-got', `가산점 ${got.join(' · ')}`));
   box.append(meter);
   if (gap <= 0) { box.append(el('p', 'best-check-pass', '🎉 75점 달성!')); return box; }
@@ -132,7 +148,7 @@ export function renderBestStreamerCard(state, onRefresh = null) {
   // 가산점(최대 +15): VOD는 센 값이 있으면 남은 만큼, 유지율·전문 스트리머는 비공개라 받을 수 있는 최대치
   const bonus = [];
   if (vodPts < 5) bonus.push(['VOD 13개', Number.isFinite(state.vodCount) ? `+${n(13 - state.vodCount)}개` : '최근 3개월', 5 - vodPts]);
-  bonus.push(['다시보기 유지율 90%', '', 5]);
+  if (rb < 5) bonus.push(['다시보기 유지율 90%', retPct != null ? `지금 ${Math.round(retPct)}%` : '', 5 - rb]);
   if (!sb) bonus.push(['전문 스트리머', '뱃지', 5]);
   const bonusBox = el('div', 'best-check-bonus');
   bonusBox.append(el('p', 'best-check-need-title', '가산점으로 채우기'));
@@ -144,9 +160,39 @@ export function renderBestStreamerCard(state, onRefresh = null) {
     bonusList.append(chip);
   });
   bonusBox.append(bonusList);
+  if (onRetention) bonusBox.append(retentionForm(state, retPct, onRetention));
   need.append(bonusBox);
   box.append(need);
   const miss = [r.apply.fans === false ? `애청자 ${n(APPLY.fans)}명` : '', r.apply.hours === false ? `방송 ${n(APPLY.hours)}시간` : ''].filter(Boolean);
   if (miss.length) box.append(el('p', 'best-check-apply', `신청 조건: ${miss.join(' · ')}`));
   return box;
+}
+
+// 스트리머·관리자 입력: 유지율 % · 최근 3개월 방송 횟수 · 최근 3개월 방송 시간 중 하나
+const RETENTION_TYPES = [['percent', '유지율', '%'], ['count', '방송 횟수', '회'], ['hours', '방송 시간', '시간']];
+function retentionForm(state, retPct, onRetention) {
+  const form = el('form', 'best-check-retention');
+  const ret = state.retention;
+  const expired = ret && !(Date.now() - Number(ret.at) < RETENTION_TTL_MS);
+  form.append(el('span', 'best-check-option-label', expired ? '다시보기 유지율 · 30일이 지나 다시 입력해 주세요' : '다시보기 유지율 입력 (최근 3개월)'));
+  const row = el('div', 'best-check-retention-row');
+  const select = el('select');
+  RETENTION_TYPES.forEach(([value, label]) => { const o = el('option', '', label); o.value = value; select.append(o); });
+  const input = el('input'); input.type = 'number'; input.inputMode = 'decimal'; input.min = '0'; input.step = '0.1'; input.required = true;
+  const unit = el('span', 'best-check-unit');
+  const sync = () => { const t = RETENTION_TYPES.find((x) => x[0] === select.value); unit.textContent = t[2]; input.max = select.value === 'percent' ? '100' : select.value === 'count' ? '1000' : '3000'; };
+  if (ret && !expired) { select.value = ret.type; input.value = String(ret.value); }
+  sync(); select.addEventListener('change', sync);
+  const save = el('button', 'best-check-refresh', '저장'); save.type = 'submit';
+  row.append(select, input, unit, save);
+  form.append(row);
+  const msg = el('small', 'best-check-unit', '');
+  form.append(msg);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    save.disabled = true; msg.textContent = '저장 중…';
+    try { await onRetention(select.value, Number(input.value)); }
+    catch (error) { msg.textContent = (error && error.message) || '저장하지 못했어요.'; save.disabled = false; }
+  });
+  return form;
 }

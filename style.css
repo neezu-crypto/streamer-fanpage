@@ -2629,3 +2629,8 @@ html.intro-present-open,html.intro-present-open body{overflow:hidden}
 .best-check-tools { display: flex; align-items: center; gap: 8px; }
 .best-check-refresh { border: 0; border-radius: 99px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 800; color: inherit; background: rgba(127,127,127,.16); cursor: pointer; }
 .best-check-refresh:disabled { opacity: .5; cursor: default; }
+.best-check-retention { display: grid; gap: 6px; margin-top: 4px; }
+.best-check-retention-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.best-check-retention select, .best-check-retention input { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 10px; border: 1px solid rgba(127,127,127,.35); background: rgba(255,255,255,.7); color: inherit; }
+.best-check-retention input { width: 88px; }
+.best-check-unit { font-size: 12px; opacity: .7; }
